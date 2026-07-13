@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
+import StartScreen from '../views/StartScreen.vue'
 import Home from '../views/Home.vue'
 import Cultivation from '../views/Cultivation.vue'
 import Inventory from '../views/Inventory.vue'
@@ -14,38 +15,50 @@ import Gacha from '../views/Gacha.vue'
 const routes = [
   {
     path: '/',
+    name: 'StartScreen',
+    component: StartScreen
+  },
+  {
+    path: '/home',
     name: 'Home',
-    component: Home
+    component: Home,
+    meta: { requiresGame: true }
   },
   {
     path: '/cultivation',
     name: 'Cultivation',
-    component: Cultivation
+    component: Cultivation,
+    meta: { requiresGame: true }
   },
   {
     path: '/inventory',
     name: 'Inventory',
-    component: Inventory
+    component: Inventory,
+    meta: { requiresGame: true }
   },
   {
     path: '/exploration',
     name: 'Exploration',
-    component: Exploration
+    component: Exploration,
+    meta: { requiresGame: true }
   },
   {
     path: '/achievements',
     name: 'Achievements',
-    component: Achievements
+    component: Achievements,
+    meta: { requiresGame: true }
   },
   {
     path: '/settings',
     name: 'Settings',
-    component: Settings
+    component: Settings,
+    meta: { requiresGame: true }
   },
   {
     path: '/gm',
     name: 'gm',
     component: GM,
+    meta: { requiresGame: true },
     beforeEnter: (to, from, next) => {
       const playerStore = usePlayerStore()
       if (!playerStore.isGMMode) {
@@ -58,23 +71,37 @@ const routes = [
   {
     path: '/alchemy',
     name: 'alchemy',
-    component: Alchemy
+    component: Alchemy,
+    meta: { requiresGame: true }
   },
   {
     path: '/dungeon',
     name: 'Dungeon',
-    component: Dungeon
+    component: Dungeon,
+    meta: { requiresGame: true }
   },
   {
     path: '/gacha',
     name: 'Gacha',
-    component: Gacha
+    component: Gacha,
+    meta: { requiresGame: true }
   }
 ]
 
 const router = createRouter({
   history: createWebHashHistory(),
   routes
+})
+
+router.beforeEach((to, from, next) => {
+  if (to.meta.requiresGame) {
+    const playerStore = usePlayerStore()
+    if (playerStore.isNewPlayer && !playerStore.name) {
+      next('/')
+      return
+    }
+  }
+  next()
 })
 
 export default router

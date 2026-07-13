@@ -3,7 +3,8 @@
     <n-message-provider>
       <n-dialog-provider>
         <n-spin :show="isLoading" description="正在加载游戏数据...">
-          <div class="game-container">
+          <router-view v-if="isStartScreen" />
+          <div v-else class="game-container">
             <!-- 顶部状态栏 -->
             <header class="top-bar">
               <div class="player-info">
@@ -135,6 +136,8 @@
   const stonesRaf = ref(null)
   const cultivationRaf = ref(null)
 
+  const isStartScreen = computed(() => route.path === '/')
+
   playerStore.initializePlayer().then(() => {
     isLoading.value = false
     isNewPlayer.value = playerStore.isNewPlayer
@@ -177,7 +180,6 @@
       if (item.key === 'gm') return playerStore.isGMMode
       return true
     })
-    // 前半部分放第一排
     return items.slice(0, Math.ceil(items.length / 2))
   })
 
@@ -187,7 +189,6 @@
       if (item.key === 'gm') return playerStore.isGMMode
       return true
     })
-    // 后半部分放第二排
     return items.slice(Math.ceil(items.length / 2))
   })
 
@@ -226,6 +227,7 @@
   }
 
   const startAutoGain = () => {
+    if (isStartScreen.value) return
     if (spiritWorker.value) return
     spiritWorker.value = new Worker(new URL('./workers/spirit.js', import.meta.url))
     spiritWorker.value.onmessage = e => {
