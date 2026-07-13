@@ -19,7 +19,7 @@
             <div
               v-for="(name, type) in equipmentTypes"
               :key="type"
-              class="simple-card"
+              :class="['simple-card', { 'all-card': type === 'all' }]"
               @click="showEquipmentList(type)"
             >
               <div class="card-header">
@@ -235,7 +235,7 @@
   <div v-if="showEquipmentModal" class="simple-modal" @click.self="showEquipmentModal = false">
     <div class="simple-modal-content wide">
       <div class="modal-header">
-        <h3>{{ equipmentTypes[selectedEquipmentType] }}列表</h3>
+        <h3>{{ equipmentModalTitle }}</h3>
         <button class="btn-small" @click="showEquipmentModal = false">关闭</button>
       </div>
       <div class="modal-toolbar">
@@ -245,7 +245,7 @@
           </option>
         </select>
         <button class="btn-small btn-warning" :disabled="equipmentList.length === 0" @click="batchSellEquipments">
-          一键卖出
+          一键出售
         </button>
       </div>
       <div v-if="equipmentList.length > 0" class="pagination-info">
@@ -261,14 +261,28 @@
           @click="showEquipmentDetails(equipment)"
         >
           <div class="card-header">
-            <span>{{ equipment.name }}</span>
-            <button class="btn-small btn-warning" @click.stop="sellEquipment(equipment)">卖出</button>
+            <span class="equip-name">{{ equipment.name }}</span>
+            <button
+              v-if="!isEquipped(equipment)"
+              class="btn-small btn-equip"
+              @click.stop="equipItem(equipment)"
+              :disabled="(equipment.requiredRealm || 1) > playerStore.level"
+            >装备</button>
+            <button
+              v-else
+              class="btn-small btn-danger"
+              @click.stop="unequipItem(equipment.slot || equipment.type)"
+            >卸下</button>
           </div>
           <div class="card-body">
-            <span class="simple-tag" :style="{ color: equipment.qualityInfo.color }">
-              {{ equipment.qualityInfo.name }}
-            </span>
-            <p>境界要求：{{ getRealmName(equipment.requiredRealm).name }}</p>
+            <div class="equip-meta">
+              <span class="simple-tag" :style="{ color: qualityInfoOf(equipment).color }">
+                {{ qualityInfoOf(equipment).name }}
+              </span>
+              <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equipment) }}</span>
+            </div>
+            <p class="equip-affix-preview">词条：{{ formatAffixNames(equipment.affixes) }}</p>
+            <p>境界要求：{{ getRealmName(equipment.requiredRealm || 1).name }}</p>
           </div>
         </div>
       </div>
@@ -291,7 +305,7 @@
           </span>
         </div>
         <div class="detail-row">
-          <span>类型</span><span>{{ equipmentTypes[selectedEquipment.type] }}</span>
+          <span>类型</span><span>{{ equipmentTypes[selectedEquipment.slot || selectedEquipment.type] }}</span>
         </div>
         <div class="detail-row">
           <span>强化等级</span><span>+{{ selectedEquipment.enhanceLevel || 0 }}</span>
@@ -340,7 +354,7 @@
             </tbody>
           </table>
         </div>
-        <div class="modal-actions">
+        <div class="modal-actions four-grid">
           <button
             class="btn-small btn-primary"
             @click="showEnhanceConfirm = true"
@@ -348,26 +362,34 @@
           >
             强化
           </button>
-          <button class="btn-small btn-info" :disabled="playerStore.refinementStones === 0" @click="handleReforgeEquipment">
+          <button
+            class="btn-small btn-info"
+            :disabled="playerStore.refinementStones === 0"
+            @click="showReforgePreConfirm = true"
+          >
             洗练
           </button>
           <button
-            v-if="selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot]?.id"
+            v-if="selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot || selectedEquipment?.type]?.id"
             class="btn-small"
             @click="equipItem(selectedEquipment)"
-            :disabled="playerStore.level < selectedEquipment?.requiredRealm"
+            :disabled="playerStore.level < (selectedEquipment?.requiredRealm || 1)"
           >
             装备
           </button>
-          <button v-else class="btn-small" @click="unequipItem(selectedEquipment?.slot)" :disabled="playerStore.level < selectedEquipment?.requiredRealm">
+          <button
+            v-else
+            class="btn-small"
+            @click="unequipItem(selectedEquipment?.slot || selectedEquipment?.type)"
+            :disabled="playerStore.level < (selectedEquipment?.requiredRealm || 1)"
+          >
             卸下
           </button>
           <button
-            v-if="selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot]?.id"
             class="btn-small btn-danger"
-            @click="sellEquipment(selectedEquipment)"
+            @click="showSellDisassemble = true"
           >
-            出售
+            出售/分解
           </button>
         </div>
       </div>
@@ -414,6 +436,40 @@
       <div class="modal-actions">
         <button class="btn-small btn-primary" @click="confirmReforgeResult(true)">确认新属性</button>
         <button class="btn-small" @click="confirmReforgeResult(false)">保留原属性</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 洗练前置确认弹窗 -->
+  <div v-if="showReforgePreConfirm" class="simple-modal" @click.self="showReforgePreConfirm = false">
+    <div class="simple-modal-content">
+      <div class="modal-header"><h3>洗练确认</h3></div>
+      <p>洗练将消耗 {{ reforgeCost }} 洗练石，并可能改变装备的词条属性，是否继续？</p>
+      <p>当前洗练石数量：{{ playerStore.refinementStones }}</p>
+      <div class="modal-actions">
+        <button class="btn-small" @click="showReforgePreConfirm = false">取消</button>
+        <button
+          class="btn-small btn-info"
+          @click="confirmReforgeStart"
+          :disabled="playerStore.refinementStones < reforgeCost"
+        >确认洗练</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 出售 / 分解选择弹窗 -->
+  <div v-if="showSellDisassemble" class="simple-modal" @click.self="showSellDisassemble = false">
+    <div class="simple-modal-content">
+      <div class="modal-header"><h3>出售 / 分解</h3></div>
+      <p>请选择对「{{ selectedEquipment?.name }}」的处理方式：</p>
+      <div class="modal-actions sell-disassemble-actions">
+        <button class="btn-small btn-warning" @click="sellCurrentEquipment">
+          出售（获得 {{ sellPreview }} 灵石）
+        </button>
+        <button class="btn-small btn-info" @click="disassembleCurrentEquipment">
+          分解（获得强化石 / 洗练石）
+        </button>
+        <button class="btn-small" @click="showSellDisassemble = false">返回</button>
       </div>
     </div>
   </div>
@@ -662,8 +718,13 @@
     ring1: '戒指1',
     ring2: '戒指2',
     belt: '腰带',
-    artifact: '法宝'
+    artifact: '法宝',
+    all: '全部'
   }
+
+  // 所有装备槽位（用于识别装备类物品，兼容 gacha 与挂机两种生成形态）
+  const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+  const isEquipmentItem = item => !!item && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
   // 当前选中的装备类型
   const selectedType = ref('')
@@ -690,6 +751,12 @@
   const showEquipmentModal = ref(false)
   const selectedEquipmentType = ref('')
   const selectedQuality = ref('all')
+
+  // 装备列表弹窗标题（含“全部”）
+  const equipmentModalTitle = computed(() => {
+    if (!selectedEquipmentType.value || selectedEquipmentType.value === 'all') return '全部装备'
+    return equipmentTypes[selectedEquipmentType.value] + '列表'
+  })
   const currentEquipmentPage = ref(1)
   const equipmentPageSize = ref(8)
 
@@ -697,7 +764,7 @@
   const qualityOptions = computed(() => {
     const equipmentsByQuality = {}
     playerStore.items
-      .filter(item => !selectedEquipmentType.value || item.type === selectedEquipmentType.value)
+      .filter(item => isEquipmentItem(item) && (!selectedEquipmentType.value || selectedEquipmentType.value === 'all' || item.slot === selectedEquipmentType.value))
       .forEach(item => {
         equipmentsByQuality[item.quality] = (equipmentsByQuality[item.quality] || 0) + 1
       })
@@ -715,8 +782,8 @@
   // 过滤后的装备列表
   const filteredEquipmentList = computed(() => {
     let list = playerStore.items.filter(item => {
-      if (!selectedEquipmentType.value) return false
-      if (item.type !== selectedEquipmentType.value) return false
+      if (!isEquipmentItem(item)) return false
+      if (selectedEquipmentType.value && selectedEquipmentType.value !== 'all' && item.slot !== selectedEquipmentType.value) return false
       if (selectedQuality.value !== 'all' && item.quality !== selectedQuality.value) return false
       return true
     })
@@ -744,13 +811,29 @@
   }
 
   // 卖出单件装备
-  const sellEquipment = async equipment => {
-    const result = await playerStore.sellEquipment(equipment)
+  // 出售当前装备（获得灵石，按评分折价）
+  const sellCurrentEquipment = async () => {
+    if (!selectedEquipment.value) return
+    const result = await playerStore.sellEquipment(selectedEquipment.value)
+    showSellDisassemble.value = false
     if (result.success) {
       message.success(result.message)
       showEquipmentDetailModal.value = false
     } else {
-      message.error(result.message || '卖出失败')
+      message.error(result.message || '出售失败')
+    }
+  }
+
+  // 分解当前装备（获得强化石 / 洗练石）
+  const disassembleCurrentEquipment = async () => {
+    if (!selectedEquipment.value) return
+    const result = await playerStore.disassembleEquipment(selectedEquipment.value)
+    showSellDisassemble.value = false
+    if (result.success) {
+      message.success(result.message)
+      showEquipmentDetailModal.value = false
+    } else {
+      message.error(result.message || '分解失败')
     }
   }
 
@@ -763,6 +846,12 @@
   // 装备详情相关
   const showEquipmentDetailModal = ref(false)
   const selectedEquipment = ref(null)
+
+  // 出售预览灵石（按评分折价）
+  const sellPreview = computed(() => {
+    if (!selectedEquipment.value) return 0
+    return Math.max(1, Math.round((calculateEquipmentScore(selectedEquipment.value) || 0) * 0.1))
+  })
 
   // 强化确认弹窗
   const showEnhanceConfirm = ref(false)
@@ -784,9 +873,22 @@
     }
   }
 
+  // 洗练前置确认弹窗
+  const showReforgePreConfirm = ref(false)
+  // 洗练消耗（与 plugins/equipment reforgeConfig.costPerAttempt 保持一致）
+  const reforgeCost = 10
+  // 出售 / 分解选择弹窗
+  const showSellDisassemble = ref(false)
+
   // 洗练确认弹窗
   const showReforgeConfirm = ref(false)
   const reforgeResult = ref(null)
+
+  // 洗练前置确认后，执行洗练
+  const confirmReforgeStart = () => {
+    showReforgePreConfirm.value = false
+    handleReforgeEquipment()
+  }
 
   // 洗练装备
   const handleReforgeEquipment = () => {
@@ -823,9 +925,10 @@
     playerStore.saveData()
   }
 
-  // 使用装备
+  // 使用装备（兼容 gacha 的 type=槽位 与 挂机生成的 type='equipment'，统一取 slot）
   const equipItem = equipment => {
-    const result = playerStore.equipArtifact(equipment, equipment.type)
+    const slot = equipment.slot || equipment.type
+    const result = playerStore.equipArtifact(equipment, slot)
     if (result.success) {
       message.success(result.message)
       showEquipmentModal.value = false
@@ -833,6 +936,26 @@
     } else {
       message.error(result.message || '装备失败')
     }
+  }
+
+  // 判断某件装备是否已装备
+  const isEquipped = equipment => {
+    const slot = equipment.slot || equipment.type
+    return playerStore.equippedArtifacts[slot]?.id === equipment.id
+  }
+
+  // 兼容 qualityInfo 缺失的装备（如挂机生成），回退到 rarityConfig
+  const qualityInfoOf = item => {
+    if (item && item.qualityInfo && item.qualityInfo.name) return item.qualityInfo
+    const cfg = rarityConfig[item?.quality]
+    if (cfg) return { name: cfg.name, color: cfg.color }
+    return { name: item?.quality || '未知', color: '#999' }
+  }
+
+  // 将词条压缩为紧凑展示文本
+  const formatAffixNames = affixes => {
+    if (!affixes || affixes.length === 0) return '无'
+    return affixes.map(a => a.name).join('、')
   }
 
   const getSetInfo = setId => {
@@ -944,8 +1067,9 @@
 
   // 装备属性对比计算
   const equipmentComparison = computed(() => {
-    if (!selectedEquipment.value || !selectedEquipmentType.value) return null
-    const currentEquipment = playerStore.equippedArtifacts[selectedEquipmentType.value]
+    if (!selectedEquipment.value) return null
+    const slot = selectedEquipment.value.slot || selectedEquipment.value.type
+    const currentEquipment = playerStore.equippedArtifacts[slot]
     if (!currentEquipment) return null
     const comparison = {}
     const allStats = new Set([...Object.keys(selectedEquipment.value.stats), ...Object.keys(currentEquipment.stats)])
@@ -1254,6 +1378,81 @@
     gap: 8px;
     margin-top: 16px;
     flex-wrap: wrap;
+  }
+
+  /* 装备详情四宫格（强化 / 洗练 / 装备 / 出售分解） */
+  .modal-actions.four-grid {
+    display: grid;
+    grid-template-columns: 1fr 1fr;
+    gap: 10px;
+  }
+
+  .modal-actions.four-grid .btn-small {
+    width: 100%;
+    padding: 10px 0;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  /* 列表“全部”卡片高亮 */
+  .simple-card.all-card {
+    border-color: rgba(218, 165, 32, 0.7);
+    background: rgba(218, 165, 32, 0.08);
+  }
+
+  .simple-card.all-card .card-header {
+    color: #DAA520;
+  }
+
+  /* 列表卡片：装备名、评分、词条 */
+  .equip-name {
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    max-width: 70%;
+  }
+
+  .equip-meta {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+
+  .equip-score-badge {
+    display: inline-block;
+    padding: 2px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #FFD700;
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+
+  .equip-affix-preview {
+    margin: 0 0 6px;
+    font-size: 12px;
+    color: #9FD8A0;
+    line-height: 1.4;
+  }
+
+  /* 列表“装备”按钮 */
+  .btn-small.btn-equip {
+    background: rgba(34, 139, 34, 0.6);
+    color: #fff;
+  }
+
+  /* 出售/分解选择弹窗按钮纵向排布 */
+  .sell-disassemble-actions {
+    flex-direction: column;
+  }
+
+  .sell-disassemble-actions .btn-small {
+    width: 100%;
+    padding: 10px 0;
+    font-size: 14px;
   }
 
   .simple-divider {

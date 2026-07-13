@@ -5,6 +5,22 @@ import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, calculateEquipmentScore, calculateBuildStrength } from '../plugins/buildSystem'
 
+// 装备出售/分解相关常量
+// 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
+const SELL_DISCOUNT_RATE = 0.1
+// 分解产出映射（基于品质）：强化石数量 + 洗练石数量（凡品不产洗练石）
+const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+const QUALITY_STONE_MAP = {
+  mythic: 6,
+  legendary: 5,
+  epic: 4,
+  rare: 3,
+  uncommon: 2,
+  common: 1
+}
+// 是否装备类物品（兼容 gacha 生成 type=槽位 与 挂机生成 type='equipment' 两种形态）
+const isEquipmentItem = item => !!item && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
+
 export const usePlayerStore = defineStore('player', {
   state: () => ({
     // 保存防抖计时器（不持久化）
@@ -734,71 +750,59 @@ export const usePlayerStore = defineStore('player', {
       }
       return { success: false, message: '无法使用该物品' }
     },
-    // 卖出装备
+    // 出售装备（获得灵石，按装备评分折价）
     async sellEquipment(equipment) {
       const index = this.items.findIndex(i => i.id === equipment.id)
       if (index === -1) {
         return { success: false, message: '装备不存在' }
       }
-      return new Promise(resolve => {
-        const worker = new Worker(new URL('../workers/equipment.js', import.meta.url))
-        worker.onmessage = e => {
-          const { stoneAmount, itemId } = e.data
-          this.reinforceStones += stoneAmount
-          const index = this.items.findIndex(i => i.id === itemId)
-          if (index > -1) {
-            this.items.splice(index, 1)
-          }
-          this.queueSave()
-          worker.terminate()
-          resolve({ success: true, message: `成功卖出装备，获得${stoneAmount}个强化石` })
-        }
-        // 只传递必要的数据
-        worker.postMessage({
-          type: 'single',
-          equipment: {
-            id: equipment.id,
-            quality: equipment.quality
-          }
-        })
-      })
+      const score = calculateEquipmentScore(equipment) || 0
+      const gained = Math.max(1, Math.round(score * SELL_DISCOUNT_RATE))
+      this.spiritStones += gained
+      this.items.splice(index, 1)
+      this.queueSave()
+      return { success: true, message: `成功出售装备，获得 ${gained} 灵石（评分 ${score}）` }
     },
-    // 批量卖出装备
+    // 分解装备（获得强化石 / 洗练石）
+    async disassembleEquipment(equipment) {
+      const index = this.items.findIndex(i => i.id === equipment.id)
+      if (index === -1) {
+        return { success: false, message: '装备不存在' }
+      }
+      const q = equipment.quality || 'common'
+      const reinforce = QUALITY_STONE_MAP[q] || 1
+      const refine = q === 'common' ? 0 : Math.max(1, (QUALITY_STONE_MAP[q] || 1) - 1)
+      this.reinforceStones += reinforce
+      this.refinementStones += refine
+      this.items.splice(index, 1)
+      this.queueSave()
+      const parts = [`强化石×${reinforce}`]
+      if (refine > 0) parts.push(`洗练石×${refine}`)
+      return { success: true, message: `分解成功，获得 ${parts.join('、')}` }
+    },
+    // 批量出售装备（按当前筛选，统一折算为灵石）
     async batchSellEquipments(quality = null, equipmentType = null) {
-      return new Promise(resolve => {
-        const worker = new Worker(new URL('../workers/equipment.js', import.meta.url))
-        worker.onmessage = e => {
-          const { totalStones, itemsToRemove, count } = e.data
-          this.reinforceStones += totalStones
-          this.items = this.items.filter(item => !itemsToRemove.includes(item.id))
-          this.queueSave()
-          worker.terminate()
-          resolve({
-            success: true,
-            message: `成功卖出${count}件装备，获得${totalStones}个强化石`
-          })
-        }
-        // 将数据转换为纯对象数组
-        const itemsToSell = this.items
-          .filter(item => {
-            if (!item || !item.type || item.type === 'pill' || item.type === 'pet') return false
-            if (equipmentType && item.type !== equipmentType) return false
-            if (quality && item.quality !== quality) return false
-            return true
-          })
-          .map(item => ({
-            id: item.id,
-            type: item.type,
-            quality: item.quality
-          }))
-        // 发送简化后的数据
-        worker.postMessage({
-          type: 'batch',
-          items: JSON.parse(JSON.stringify(itemsToSell)),
-          quality,
-          equipmentType
-        })
+      const toSell = this.items.filter(item => {
+        if (!isEquipmentItem(item)) return false
+        if (equipmentType && equipmentType !== 'all' && item.slot !== equipmentType) return false
+        if (quality && item.quality !== quality) return false
+        return true
       })
+      if (toSell.length === 0) {
+        return { success: false, message: '没有可出售的装备' }
+      }
+      let total = 0
+      toSell.forEach(eq => {
+        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * SELL_DISCOUNT_RATE))
+      })
+      this.spiritStones += total
+      const ids = new Set(toSell.map(e => e.id))
+      this.items = this.items.filter(i => !ids.has(i.id))
+      this.queueSave()
+      return {
+        success: true,
+        message: `成功出售 ${toSell.length} 件装备，获得 ${total} 灵石`
+      }
     },
     // 使用丹药
     usePill(pill) {
