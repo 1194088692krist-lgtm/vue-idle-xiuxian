@@ -357,10 +357,11 @@
             :class="eq.quality"
             @click="editEquipment(eq)"
           >
-            <div class="eq-icon">{{ eq.type === 'weapon' ? '⚔️' : eq.type === 'body' ? '👕' : '💎' }}</div>
+            <div class="eq-icon">{{ eq.type === 'weapon' ? '⚔️' : eq.type === 'body' ? '👕' : eq.type === 'head' ? '🪖' : eq.type === 'feet' ? '👢' : eq.type === 'legs' ? '👖' : eq.type === 'shoulder' ? '🦾' : eq.type === 'necklace' ? '📿' : eq.type === 'belt' ? '💼' : eq.type === 'wrist' ? '🧤' : eq.type === 'ring1' || eq.type === 'ring2' ? '💍' : eq.type === 'artifact' ? '🔮' : '💎' }}</div>
             <div class="eq-info">
               <div class="eq-name">{{ eq.name }}</div>
               <div class="eq-type">{{ getEquipmentTypeName(eq.type) }}</div>
+              <div class="eq-score">评分: {{ calculateEquipmentScore(eq) }}</div>
             </div>
             <button class="btn-delete" @click.stop="deleteEquipment(index)">×</button>
           </div>
@@ -384,48 +385,272 @@
                   <option value="legs">裤子</option>
                   <option value="feet">鞋子</option>
                   <option value="shoulder">肩甲</option>
-                  <option value="accessory">饰品</option>
+                  <option value="necklace">项链</option>
+                  <option value="belt">腰带</option>
+                  <option value="wrist">护腕</option>
+                  <option value="hands">手套</option>
+                  <option value="ring1">戒指1</option>
+                  <option value="ring2">戒指2</option>
+                  <option value="artifact">法宝</option>
                 </select>
               </div>
               <div class="form-item">
                 <label>品质</label>
                 <select v-model="editingEquipment.quality">
                   <option value="common">凡品</option>
-                  <option value="uncommon">精品</option>
-                  <option value="rare">稀有</option>
-                  <option value="epic">史诗</option>
-                  <option value="legendary">传说</option>
-                  <option value="mythic">神话</option>
+                  <option value="uncommon">良品</option>
+                  <option value="rare">上品</option>
+                  <option value="epic">极品</option>
+                  <option value="legendary">仙品</option>
+                  <option value="mythic">神品</option>
                 </select>
               </div>
               <div class="form-item">
                 <label>等级要求</label>
                 <input type="number" v-model.number="editingEquipment.levelReq" />
               </div>
-              <div class="form-item full">
-                <label>攻击加成</label>
-                <input type="number" v-model.number="editingEquipment.attackBonus" />
+              <div class="form-item">
+                <label>套装</label>
+                <select v-model="editingEquipment.setId">
+                  <option value="">无套装</option>
+                  <option v-for="set in setBonuses" :key="set.id" :value="set.id">{{ set.name }}</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>强化等级</label>
+                <input type="number" v-model.number="editingEquipment.enhanceLevel" />
               </div>
               <div class="form-item full">
-                <label>生命加成</label>
-                <input type="number" v-model.number="editingEquipment.healthBonus" />
+                <label>基础属性 (JSON格式)</label>
+                <textarea v-model="equipmentStatsJson" rows="4"></textarea>
               </div>
               <div class="form-item full">
-                <label>防御加成</label>
-                <input type="number" v-model.number="editingEquipment.defenseBonus" />
-              </div>
-              <div class="form-item full">
-                <label>速度加成</label>
-                <input type="number" v-model.number="editingEquipment.speedBonus" />
+                <label>词条列表</label>
+                <div class="affix-list">
+                  <div v-for="(affix, idx) in editingEquipment.affixes" :key="idx" class="affix-item">
+                    <select v-model="affix.id">
+                      <option v-for="poolAffix in getAvailableAffixes()" :key="poolAffix.id" :value="poolAffix.id">{{ poolAffix.name }}</option>
+                    </select>
+                    <input type="number" :step="affix.valueType === 'percent' ? '0.001' : '1'" v-model.number="affix.value" />
+                    <button class="btn-delete" @click="editingEquipment.affixes.splice(idx, 1)">×</button>
+                  </div>
+                  <button class="btn-add" @click="addAffixToEquipment">+ 添加词条</button>
+                </div>
               </div>
               <div class="form-item full">
                 <label>图片路径</label>
                 <input type="text" v-model="editingEquipment.image" placeholder="assets/equipment/xxx.png" />
               </div>
+              <div class="form-item full">
+                <label>装备评分</label>
+                <span class="equipment-score">{{ calculateEquipmentScore(editingEquipment) }}</span>
+              </div>
             </div>
             <div class="modal-actions">
               <button class="btn-primary" @click="saveEquipment">保存</button>
               <button class="btn-secondary" @click="editingEquipment = null">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 词条编辑器 -->
+      <div v-if="activeTab === 'affixes'" class="panel">
+        <div class="editor-header">
+          <button class="btn-add" @click="addAffix">+ 新词条</button>
+          <select v-model="affixFilter" class="filter-select">
+            <option value="all">全部等级</option>
+            <option value="1">T1基础</option>
+            <option value="2">T2战斗</option>
+            <option value="3">T3稀有</option>
+          </select>
+        </div>
+        <div class="affix-list-panel">
+          <div 
+            v-for="(affix, index) in filteredAffixes" 
+            :key="affix.id"
+            class="affix-card"
+            :class="'affix-tier-' + affix.tier"
+            @click="editAffix(affix)"
+          >
+            <div class="affix-icon">{{ affix.tier === 1 ? '🌿' : affix.tier === 2 ? '⚡' : '💎' }}</div>
+            <div class="affix-info">
+              <div class="affix-name">{{ affix.name }}</div>
+              <div class="affix-stat">{{ getStatName(affix.stat) }} {{ affix.valueType === 'percent' ? '%' : '' }}</div>
+            </div>
+            <div class="affix-tier-badge">T{{ affix.tier }}</div>
+            <button class="btn-delete" @click.stop="deleteAffix(index)">×</button>
+          </div>
+        </div>
+
+        <!-- 词条编辑弹窗 -->
+        <div v-if="editingAffix" class="edit-modal">
+          <div class="modal-content">
+            <h3>编辑词条</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>ID</label>
+                <input type="text" v-model="editingAffix.id" />
+              </div>
+              <div class="form-item">
+                <label>名称</label>
+                <input type="text" v-model="editingAffix.name" />
+              </div>
+              <div class="form-item">
+                <label>属性</label>
+                <select v-model="editingAffix.stat">
+                  <option v-for="stat in allStats" :key="stat.key" :value="stat.key">{{ stat.name }}</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>数值类型</label>
+                <select v-model="editingAffix.valueType">
+                  <option value="flat">固定值</option>
+                  <option value="percent">百分比</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>等级</label>
+                <select v-model.number="editingAffix.tier">
+                  <option :value="1">T1 基础</option>
+                  <option :value="2">T2 战斗</option>
+                  <option :value="3">T3 稀有</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>数值范围</label>
+                <input type="text" v-model="affixRange" placeholder="[min, max]" />
+              </div>
+              <div class="form-item full">
+                <label>适用部位</label>
+                <select multiple v-model="editingAffix.slots" class="multi-select">
+                  <option v-for="slot in equipmentSlots" :key="slot.key" :value="slot.key">{{ slot.name }}</option>
+                </select>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-primary" @click="saveAffix">保存</button>
+              <button class="btn-secondary" @click="editingAffix = null">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
+      <!-- 套装编辑器 -->
+      <div v-if="activeTab === 'sets'" class="panel">
+        <div class="editor-header">
+          <button class="btn-add" @click="addSet">+ 新套装</button>
+        </div>
+        <div class="set-list">
+          <div 
+            v-for="(set, index) in setBonuses" 
+            :key="set.id"
+            class="set-card"
+            :style="{ borderColor: set.color }"
+            @click="editSet(set)"
+          >
+            <div class="set-icon">🔮</div>
+            <div class="set-info">
+              <div class="set-name" :style="{ color: set.color }">{{ set.name }}</div>
+              <div class="set-pieces">{{ set.pieces.length }}件套</div>
+            </div>
+            <div class="set-bonuses">
+              <span v-if="set.bonus2">2件+</span>
+              <span v-if="set.bonus3">3件+</span>
+              <span v-if="set.bonus4">4件+</span>
+              <span v-if="set.bonus5">5件+</span>
+            </div>
+            <button class="btn-delete" @click.stop="deleteSet(index)">×</button>
+          </div>
+        </div>
+
+        <!-- 套装编辑弹窗 -->
+        <div v-if="editingSet" class="edit-modal">
+          <div class="modal-content">
+            <h3>编辑套装</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>ID</label>
+                <input type="text" v-model="editingSet.id" />
+              </div>
+              <div class="form-item">
+                <label>名称</label>
+                <input type="text" v-model="editingSet.name" />
+              </div>
+              <div class="form-item">
+                <label>颜色</label>
+                <input type="color" v-model="editingSet.color" />
+              </div>
+              <div class="form-item">
+                <label>描述</label>
+                <textarea v-model="editingSet.description" rows="3"></textarea>
+              </div>
+              <div class="form-item full">
+                <label>套装部件</label>
+                <select multiple v-model="editingSet.pieces" class="multi-select">
+                  <option v-for="slot in equipmentSlots" :key="slot.key" :value="slot.key">{{ slot.name }}</option>
+                </select>
+              </div>
+              <div class="form-item full">
+                <label>2件套效果</label>
+                <input type="text" v-model="editingSet.bonus2.label" placeholder="例如: 攻击+10%" />
+                <div class="bonus-detail">
+                  <select v-model="editingSet.bonus2.stat">
+                    <option v-for="stat in allStats" :key="stat.key" :value="stat.key">{{ stat.name }}</option>
+                  </select>
+                  <input type="number" step="0.01" v-model.number="editingSet.bonus2.value" placeholder="数值" />
+                  <select v-model="editingSet.bonus2.valueType">
+                    <option value="percent">%</option>
+                    <option value="flat">固定</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="editingSet.bonus3" class="form-item full">
+                <label>3件套效果</label>
+                <input type="text" v-model="editingSet.bonus3.label" placeholder="例如: 暴击+10%" />
+                <div class="bonus-detail">
+                  <select v-model="editingSet.bonus3.stat">
+                    <option v-for="stat in allStats" :key="stat.key" :value="stat.key">{{ stat.name }}</option>
+                  </select>
+                  <input type="number" step="0.01" v-model.number="editingSet.bonus3.value" placeholder="数值" />
+                  <select v-model="editingSet.bonus3.valueType">
+                    <option value="percent">%</option>
+                    <option value="flat">固定</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="editingSet.bonus4" class="form-item full">
+                <label>4件套效果</label>
+                <input type="text" v-model="editingSet.bonus4.label" placeholder="例如: 增伤+15%" />
+                <div class="bonus-detail">
+                  <select v-model="editingSet.bonus4.stat">
+                    <option v-for="stat in allStats" :key="stat.key" :value="stat.key">{{ stat.name }}</option>
+                  </select>
+                  <input type="number" step="0.01" v-model.number="editingSet.bonus4.value" placeholder="数值" />
+                  <select v-model="editingSet.bonus4.valueType">
+                    <option value="percent">%</option>
+                    <option value="flat">固定</option>
+                  </select>
+                </div>
+              </div>
+              <div v-if="editingSet.bonus5" class="form-item full">
+                <label>5件套效果</label>
+                <input type="text" v-model="editingSet.bonus5.label" placeholder="例如: 最终增伤+20%" />
+                <div class="bonus-detail" v-if="editingSet.bonus5">
+                  <select v-model="editingSet.bonus5.stat">
+                    <option v-for="stat in allStats" :key="stat.key" :value="stat.key">{{ stat.name }}</option>
+                  </select>
+                  <input type="number" step="0.01" v-model.number="editingSet.bonus5.value" placeholder="数值" />
+                  <select v-model="editingSet.bonus5.valueType">
+                    <option value="percent">%</option>
+                    <option value="flat">固定</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-primary" @click="saveSet">保存</button>
+              <button class="btn-secondary" @click="editingSet = null">取消</button>
             </div>
           </div>
         </div>
@@ -643,6 +868,7 @@ import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
 import { equipmentQualities, equipmentTypeNames, petRarities, equipmentNameParts, petNameParts, petDescriptions, equipmentStatPool } from '../plugins/gacha'
+import { rarityConfig, affixPool, setBonuses, calculateEquipmentScore, getAffixesForSlot } from '../plugins/buildSystem'
 
 const playerStore = usePlayerStore()
 const activeTab = ref('values')
@@ -650,6 +876,8 @@ const tabs = [
   { key: 'values', label: '数值调整' },
   { key: 'theme', label: '主题配置' },
   { key: 'equipment', label: '装备编辑' },
+  { key: 'affixes', label: '词条编辑' },
+  { key: 'sets', label: '套装编辑' },
   { key: 'pets', label: '灵宠编辑' },
   { key: 'monsters', label: '怪物编辑' },
   { key: 'assets', label: '素材管理' }
@@ -677,6 +905,150 @@ const gameValues = ref({ ...defaultValues })
 // 主题配置
 const themeData = ref({ ...defaultTheme })
 const themeSection = ref('start')
+
+// 词条编辑器数据
+const affixFilter = ref('all')
+const editingAffix = ref(null)
+const affixRange = ref('')
+
+const equipmentSlots = [
+  { key: 'weapon', name: '武器' },
+  { key: 'head', name: '头部' },
+  { key: 'body', name: '衣服' },
+  { key: 'legs', name: '裤子' },
+  { key: 'feet', name: '鞋子' },
+  { key: 'shoulder', name: '肩甲' },
+  { key: 'necklace', name: '项链' },
+  { key: 'belt', name: '腰带' },
+  { key: 'wrist', name: '护腕' },
+  { key: 'hands', name: '手套' },
+  { key: 'ring1', name: '戒指1' },
+  { key: 'ring2', name: '戒指2' },
+  { key: 'artifact', name: '法宝' }
+]
+
+const allStats = [
+  { key: 'attack', name: '攻击' },
+  { key: 'health', name: '生命' },
+  { key: 'defense', name: '防御' },
+  { key: 'speed', name: '速度' },
+  { key: 'critRate', name: '暴击率' },
+  { key: 'critDamageBoost', name: '暴击伤害' },
+  { key: 'comboRate', name: '连击率' },
+  { key: 'counterRate', name: '反击率' },
+  { key: 'stunRate', name: '眩晕率' },
+  { key: 'dodgeRate', name: '闪避率' },
+  { key: 'vampireRate', name: '吸血率' },
+  { key: 'healBoost', name: '治疗效果' },
+  { key: 'finalDamageBoost', name: '最终增伤' },
+  { key: 'finalDamageReduce', name: '最终减伤' },
+  { key: 'combatBoost', name: '战斗属性' },
+  { key: 'resistanceBoost', name: '战斗抗性' },
+  { key: 'spiritRate', name: '灵力获取' },
+  { key: 'cultivationRate', name: '修炼效率' },
+  { key: 'critResist', name: '抗暴' },
+  { key: 'comboResist', name: '抗连' },
+  { key: 'dodgeResist', name: '命击' },
+  { key: 'stunResist', name: '抗晕' },
+  { key: 'vampireResist', name: '抗吸血' },
+  { key: 'counterResist', name: '抗反击' }
+]
+
+const filteredAffixes = computed(() => {
+  if (affixFilter.value === 'all') return affixPool
+  return affixPool.filter(a => a.tier === parseInt(affixFilter.value))
+})
+
+const getStatName = (stat) => {
+  const found = allStats.find(s => s.key === stat)
+  return found ? found.name : stat
+}
+
+const addAffix = () => {
+  editingAffix.value = {
+    id: `affix_${Date.now()}`,
+    name: '新词条',
+    stat: 'attack',
+    valueType: 'flat',
+    baseRange: [5, 15],
+    tier: 1,
+    slots: ['weapon']
+  }
+  affixRange.value = '[5, 15]'
+}
+
+const editAffix = (affix) => {
+  editingAffix.value = { ...affix, slots: [...affix.slots] }
+  affixRange.value = JSON.stringify(affix.baseRange)
+}
+
+const saveAffix = () => {
+  try {
+    editingAffix.value.baseRange = JSON.parse(affixRange.value)
+  } catch (e) {
+    alert('数值范围格式错误')
+    return
+  }
+  const index = affixPool.findIndex(a => a.id === editingAffix.value.id)
+  if (index >= 0) {
+    affixPool[index] = { ...editingAffix.value }
+  } else {
+    affixPool.push({ ...editingAffix.value })
+  }
+  editingAffix.value = null
+  alert('词条已保存！')
+}
+
+const deleteAffix = (index) => {
+  if (confirm('确定删除此词条吗？')) {
+    affixPool.splice(index, 1)
+  }
+}
+
+// 套装编辑器数据
+const editingSet = ref(null)
+
+const addSet = () => {
+  editingSet.value = {
+    id: `set_${Date.now()}`,
+    name: '新套装',
+    description: '',
+    pieces: ['weapon', 'head'],
+    color: '#FFD700',
+    bonus2: { stat: 'attack', value: 0.1, valueType: 'percent', label: '' },
+    bonus3: null,
+    bonus4: null,
+    bonus5: null
+  }
+}
+
+const editSet = (set) => {
+  editingSet.value = { 
+    ...set, 
+    pieces: [...set.pieces],
+    bonus2: set.bonus2 ? { ...set.bonus2 } : null,
+    bonus3: set.bonus3 ? { ...set.bonus3 } : null,
+    bonus4: set.bonus4 ? { ...set.bonus4 } : null,
+    bonus5: set.bonus5 ? { ...set.bonus5 } : null
+  }
+}
+
+const saveSet = () => {
+  const index = setBonuses.findIndex(s => s.id === editingSet.value.id)
+  if (index >= 0) {
+    setBonuses[index] = { ...editingSet.value }
+  } else {
+    setBonuses.push({ ...editingSet.value })
+  }
+  editingSet.value = null
+  alert('套装已保存！')
+}
+
+const deleteSet = (index) => {
+  if (confirm('确定删除此套装吗？')) {
+    setBonuses.splice(index, 1)
+  }
+}
 
 const loadThemeData = () => {
   themeData.value = getCurrentTheme()
@@ -809,10 +1181,18 @@ const getEquipmentTypeName = (type) => {
     legs: '裤子',
     feet: '鞋子',
     shoulder: '肩甲',
-    accessory: '饰品'
+    necklace: '项链',
+    belt: '腰带',
+    wrist: '护腕',
+    hands: '手套',
+    ring1: '戒指1',
+    ring2: '戒指2',
+    artifact: '法宝'
   }
   return names[type] || type
 }
+
+const equipmentStatsJson = ref('')
 
 const addEquipment = () => {
   editingEquipment.value = {
@@ -821,19 +1201,47 @@ const addEquipment = () => {
     type: 'weapon',
     quality: 'common',
     levelReq: 1,
-    attackBonus: 0,
-    healthBonus: 0,
-    defenseBonus: 0,
-    speedBonus: 0,
+    stats: { attack: 0, health: 0, defense: 0, speed: 0 },
+    affixes: [],
+    setId: '',
+    enhanceLevel: 0,
     image: ''
   }
+  equipmentStatsJson.value = JSON.stringify(editingEquipment.value.stats, null, 2)
 }
 
 const editEquipment = (eq) => {
-  editingEquipment.value = { ...eq }
+  editingEquipment.value = { ...eq, affixes: eq.affixes ? [...eq.affixes] : [], stats: eq.stats ? { ...eq.stats } : {} }
+  equipmentStatsJson.value = JSON.stringify(editingEquipment.value.stats, null, 2)
+}
+
+const getAvailableAffixes = () => {
+  if (!editingEquipment.value) return []
+  return affixPool.filter(a => a.slots.includes(editingEquipment.value.type))
+}
+
+const addAffixToEquipment = () => {
+  if (!editingEquipment.value) return
+  const available = getAvailableAffixes()
+  if (available.length === 0) return
+  const affix = available[0]
+  editingEquipment.value.affixes.push({
+    id: affix.id,
+    name: affix.name,
+    stat: affix.stat,
+    value: affix.valueType === 'percent' ? 0.05 : 10,
+    valueType: affix.valueType,
+    tier: affix.tier
+  })
 }
 
 const saveEquipment = () => {
+  try {
+    editingEquipment.value.stats = JSON.parse(equipmentStatsJson.value)
+  } catch (e) {
+    alert('属性JSON格式错误')
+    return
+  }
   const index = equipmentList.value.findIndex(eq => eq.id === editingEquipment.value.id)
   if (index >= 0) {
     equipmentList.value[index] = { ...editingEquipment.value }
@@ -1687,6 +2095,181 @@ onMounted(() => {
 .asset-selector select option {
   background: #1A1A2E;
   color: #F5DEB3;
+}
+
+.eq-score {
+  font-size: 12px;
+  color: #FFD700;
+}
+
+.equipment-score {
+  font-size: 18px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+}
+
+.affix-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.affix-item {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.affix-item select {
+  flex: 1;
+}
+
+.affix-item input {
+  width: 100px;
+}
+
+.affix-list-panel {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(180px, 1fr));
+  gap: 12px;
+}
+
+.affix-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 1px solid transparent;
+}
+
+.affix-card:hover {
+  background: rgba(218, 165, 32, 0.1);
+  border-color: rgba(218, 165, 32, 0.3);
+}
+
+.affix-icon {
+  font-size: 20px;
+}
+
+.affix-info {
+  flex: 1;
+}
+
+.affix-name {
+  font-size: 14px;
+  color: #F5DEB3;
+  font-weight: bold;
+}
+
+.affix-stat {
+  font-size: 12px;
+  color: #8B8B8B;
+}
+
+.affix-tier-badge {
+  font-size: 11px;
+  padding: 2px 6px;
+  border-radius: 4px;
+}
+
+.affix-tier-1 {
+  border-color: #32CD32;
+}
+
+.affix-tier-1 .affix-tier-badge {
+  background: rgba(50, 205, 50, 0.2);
+  color: #32CD32;
+}
+
+.affix-tier-2 {
+  border-color: #1E90FF;
+}
+
+.affix-tier-2 .affix-tier-badge {
+  background: rgba(30, 144, 255, 0.2);
+  color: #1E90FF;
+}
+
+.affix-tier-3 {
+  border-color: #FFD700;
+}
+
+.affix-tier-3 .affix-tier-badge {
+  background: rgba(255, 215, 0, 0.2);
+  color: #FFD700;
+}
+
+.set-list {
+  display: grid;
+  grid-template-columns: repeat(auto-fill, minmax(200px, 1fr));
+  gap: 12px;
+}
+
+.set-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.2s;
+  border: 2px solid transparent;
+}
+
+.set-card:hover {
+  background: rgba(218, 165, 32, 0.1);
+}
+
+.set-icon {
+  font-size: 24px;
+}
+
+.set-info {
+  flex: 1;
+}
+
+.set-name {
+  font-size: 14px;
+  font-weight: bold;
+}
+
+.set-pieces {
+  font-size: 12px;
+  color: #8B8B8B;
+}
+
+.set-bonuses {
+  display: flex;
+  gap: 4px;
+}
+
+.set-bonuses span {
+  font-size: 10px;
+  padding: 2px 4px;
+  background: rgba(255, 215, 0, 0.1);
+  color: #FFD700;
+  border-radius: 4px;
+}
+
+.multi-select {
+  height: 120px;
+}
+
+.bonus-detail {
+  display: flex;
+  gap: 8px;
+  margin-top: 8px;
+}
+
+.bonus-detail select,
+.bonus-detail input {
+  flex: 1;
 }
 
 @media (max-width: 600px) {
