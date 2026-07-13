@@ -33,47 +33,123 @@ let idleTimer = null
 let isRunning = false // 重入锁
 
 // ============ 生动日志文案库（修仙风） ============
+// 通用场景（无专属描写时回退）
 const SCENES = [
-  '林间雾气氤氲，你屏息潜行，灵识扫过每一寸草木。',
-  '山风呼啸，乱石嶙峋，你踏歌而行，浑然不惧。',
-  '洞府幽深，火灵翻涌，炽浪扑面而来。',
-  '深渊幽暗，龙吟隐隐，寒意刺骨。',
-  '荒原寂寥，白骨皑皑，怨气冲霄。',
-  '冰雪封山，琼楼玉宇，朔风如刀割面。',
-  '残垣断壁间，仙光若隐若现，似有古人长叹。',
-  '混沌虚无，法则崩坏，时空在此处扭曲错位。'
+  '林间雾气氤氲如纱，你屏息敛息，灵识如涟漪般扫过每一寸草木，捕捉着最细微的灵机波动。',
+  '山风呼啸掠过乱石，你踏歌而行、足下生风，对周遭潜藏的煞气浑然不惧。',
+  '洞府幽深，火灵翻涌如潮，炽浪扑面而来，将你的衣袂灼得微微卷曲。',
+  '深渊幽暗无光，龙吟隐隐自地底传来，刺骨寒意顺着经脉悄然蔓延周身。',
+  '荒原寂寥，白骨皑皑铺成血色长路，冲霄怨气令空气都凝滞了几分。',
+  '冰雪封山，琼楼玉宇在朔风中若隐若现，厉风如刀，割得面皮生疼。',
+  '残垣断壁间仙光流转，似有古人长叹穿越千年，余音绕梁、久久不散。',
+  '混沌虚无之地，法则崩坏、时空错位，你每一步都踏在天地裂隙的边缘。'
 ]
+// 八图专属探索描写（更详尽、各有意境）
+const ZONE_SCENES = {
+  forest_edge: [
+    '林缘古木参天，藤蔓垂落如帘，你拨开半人高的荒草，听见远处灵兽啃噬浆果的细响。',
+    '晨露未晞，林间浮起一层淡金灵雾，你踩着湿润的苔径，灵识悄然探入树海深处。'
+  ],
+  misty_valley: [
+    '雾谷终年云雾缭绕，能见度不过丈许，你以灵识代目，循着一缕若有若无的灵泉之音前行。',
+    '谷中雾气忽聚忽散，隐约现出一座半塌的石桥，桥下灵泉汩汩，映着朦胧月色。'
+  ],
+  phoenix_cave: [
+    '火凤洞内岩浆奔流如河，热浪扭曲了视线，你运转护体真气，踏着冷却的玄武岩步步深入。',
+    '洞壁嵌满赤红火晶，每一次心跳都仿佛与地火共鸣，焦糊的硫磺味扑面而来。'
+  ],
+  dragon_abyss: [
+    '龙渊深不见底，黑水之上寒气凝结成霜，你御风悬于渊口，隐约瞥见水底有庞然黑影游弋。',
+    '渊底龙吟低沉如雷，震得崖壁簌簌落石，你屏息凝神，灵识小心翼翼探向那片幽暗。'
+  ],
+  ghost_wasteland: [
+    '鬼荒之地白骨蔽野，残魂如萤火飘荡，凄厉怨啸缠上神魂，你以清心诀压下心头寒意。',
+    '断戟朽甲散落满地，一缕缕黑气自尸骸中渗出，汇成偌大的怨气漩涡缓缓旋转。'
+  ],
+  ice_palace: [
+    '冰宫玉砌银装，千年不化的玄冰倒悬如剑，你每一步落足都激起清脆如磬的回响。',
+    '宫殿深处宝光莹莹，冰封的仙池下似有残阵流转，朔风卷着冰屑拂过你眉间。'
+  ],
+  immortal_ruins: [
+    '仙墟断壁残垣爬满古老的道纹，虽已残破，仍透出令人心悸的法则余威。',
+    '废墟中央矗立半截碑文，字迹被岁月蚀去大半，你驻足凝望，似有所悟又怅然若失。'
+  ],
+  chaos_realm: [
+    '混沌界中五行颠倒、光暗交错，脚下的大地时而化为流沙、时而凝作坚铁。',
+    '此处时空如碎镜，你看见数个自己的残影在不同方向行走，法则的碎屑在指缝间流过。'
+  ]
+}
+// 敌人现身描写（按层级）
+const ENEMY_APPEAR = {
+  boss: [
+    (n) => `👑 天穹骤暗，${n} 自虚空裂隙中降临，威压如万钧大山轰然压下，天地为之失色！`,
+    (n) => `👑 一声长啸震碎云霄，${n} 裹挟滔天煞气现身，周遭法则都在其怒意下微微颤栗！`
+  ],
+  elite: [
+    (n) => `⚡ 一股凶煞之气破空袭来——${n}（精英）自暗影中横空而出，双目猩红、气势逼人！`,
+    (n) => `⚡ 林木倒卷，${n}（精英）踏碎山石逼近，鳞甲上还沾着未干的温热血迹！`
+  ],
+  normal: [
+    (n) => `一头${n}自草莽暗处扑出，獠牙森森、腥风扑面，杀意凛然！`,
+    (n) => `${n}自岩后悄然探出头颅，目光如钩，已死死锁定了你的咽喉！`
+  ]
+}
+// 战斗动作（带招式名，多段描写）
 const COMBAT_ACTIONS = [
-  { type: 'victory', text: '⚡ 你抓住破绽，一击命中要害，霎时暴击伤害炸裂！' },
-  { type: 'victory', text: '🔥 剑光连绵，连环三击如疾风骤雨，敌人节节败退！' },
-  { type: 'victory', text: '🌀 你身形鬼魅般一晃，轻易避开这记杀招，反手一剑。' },
-  { type: 'victory', text: '🛡️ 护体真气一震，将敌人攻势尽数反震回去！' },
-  { type: 'victory', text: '🌟 你以绝对修为压制全场，敌人气机为之紊乱！' },
-  { type: 'victory', text: '💥 你引动灵力，一掌拍出，山河为之震颤！' }
+  { type: 'combat', text: '⚡ 你捕捉敌方气机破绽，剑随念动，「惊鸿破月」一击正中要害，暴击伤害如惊雷炸裂！' },
+  { type: 'combat', text: '🔥 剑光连绵成网，连环三击如疾风骤雨倾泻而下，逼得敌人节节败退、气机大乱！' },
+  { type: 'combat', text: '🌀 你身形鬼魅般一晃，轻易避开这记噬魂杀招，反手「流光剑」已无声抵在其咽喉！' },
+  { type: 'combat', text: '🛡️ 护体真气轰然一震，将敌人狂暴攻势尽数反震回去，震得它气血翻涌、踉跄数步！' },
+  { type: 'combat', text: '🌟 你以碾压级的修为压制全场，威压如山倾泻，敌人动作立时凝滞、破绽百出！' },
+  { type: 'combat', text: '💥 你引动周身灵力，一掌「撼山印」拍出，掌风所过山河震颤、碎石崩飞！' },
+  { type: 'combat', text: '🗡️ 你踏罡步斗，身形化作流光绕敌三匝，每一闪现都带走一道血光，敌人防不胜防！' },
+  { type: 'combat', text: '❄️ 寒霜灵力透体而出，将敌人双足封冻于地，你趁机长剑贯胸，冰碴与热血一同迸溅！' }
 ]
 const VICTORY_LINES = [
-  (e) => `🗡️ ${e} 轰然倒地，腥血溅落，你悠然收剑入鞘。`,
-  (e) => `✨ 你身形一闪，${e} 已授首，清风拂过染血的战袍。`,
-  (e) => `🌿 你以四两拨千斤之势，将${e}轻松放倒，神色淡然。`
+  (e) => `🗡️ ${e} 轰然倒地，腥血溅落青石，你悠然收剑入鞘，衣袂不染纤尘。`,
+  (e) => `✨ 你身形一闪，${e} 已授首殒命，清风拂过染血的战袍，杀意渐散于天地间。`,
+  (e) => `🌿 你以四两拨千斤之势将${e}轻松放倒，神色淡然，仿佛只是拂去肩头落雪。`,
+  (e) => `🔥 ${e} 在连绵剑影中化作血雾溃散，你负手而立，周身灵光因畅快一战而愈发炽盛。`
 ]
 const DEFEAT_LINES = [
-  (e, l) => `😱 你被 ${e} 一爪拍飞，气血翻涌，修为折损 ${l}！`,
-  (e, l) => `💢 不敌 ${e} 之威，你狼狈遁走，修为受损 ${l}。`,
-  (e, l) => `🩸 ${e} 一击洞穿护体真气，你险象环生，折损修为 ${l}。`
+  (e, l) => `😱 你被 ${e} 一爪狠狠拍飞，气血翻涌几欲呕血，此役折损修为 ${l} 点。`,
+  (e, l) => `💢 不敌 ${e} 之威，你狼狈遁走，灵力枯竭、修为受损 ${l} 点，须得养精蓄锐再战。`,
+  (e, l) => `🩸 ${e} 一击洞穿护体真气，你险象环生、踉跄败退，折损修为 ${l} 点。`
 ]
 const FORTUNE_LINES = [
-  (n) => `🌀 机缘巧合，你于石缝间发现${n}，此乃天赐！`,
-  (n) => `🌿 一株${n}破土而生，你福至心灵将其采下。`,
-  (n) => `✨ 奇遇降临，你寻得${n}，周身灵气为之一振！`
+  (n) => `🌀 机缘巧合，你于石缝灵脉间寻得${n}，此乃天赐造化，福缘匪浅！`,
+  (n) => `🌿 一株${n}破土而生、灵光流转，你福至心灵将其小心采下，周身灵气为之一振！`,
+  (n) => `✨ 奇遇骤降，你于残阵中寻得${n}，宝光温润，似有古老封印仍未散去。`
 ]
 
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a
 
-function addLog(type, text) {
-  logs.value.push({ type, text, time: new Date().toLocaleTimeString() })
+function addLog(type, text, detail = null) {
+  logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
   // 控制内存体积：最多保留 400 条
   if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+}
+
+// 将装备/灵宠的基础数据格式化为日志明细子行
+function formatItemDetail(item, type, rarity) {
+  if (!item) return ''
+  const st = item.stats || {}
+  if (type === 'equipment') {
+    let s = `攻+${st.attack ?? 0}　生+${st.health ?? 0}　防+${st.defense ?? 0}　速+${st.speed ?? 0}`
+    const affixes = item.affixes || []
+    if (affixes.length) s += '　｜ ' + affixes.map(a => a.name).join('·')
+    if (item.setId) {
+      const setData = setBonuses.find(x => x.id === item.setId)
+      if (setData) s += `　｜ 套装·${setData.name}`
+    }
+    return s
+  }
+  if (type === 'pet') {
+    const rName = (rarityInfo[rarity] && rarityInfo[rarity].name) || ''
+    return `${rName}灵宠　攻+${st.attack ?? 0}　防+${st.defense ?? 0}　生+${st.health ?? 0}`
+  }
+  return ''
 }
 
 // ============ 奖励品质信息 ============
@@ -334,7 +410,7 @@ function grantReward(effectiveZone, isIdleMode = false) {
         s.items.push(equip); s.itemsFound++
         runStats.value.equipment++
         const info = rarityInfo[rarity] || rarityInfo.common
-        rewards.push({ type: 'equipment', name: info.name + '装备', rarity, info })
+        rewards.push({ type: 'equipment', name: equip.name, rarity, info, item: equip })
       } else if (rw.type === 'pet') {
         let rarity = rw.rarity[Math.floor(Math.random() * rw.rarity.length)]
         if (Math.random() < upgradeChance) {
@@ -345,7 +421,7 @@ function grantReward(effectiveZone, isIdleMode = false) {
         s.items.push(pet); s.itemsFound++
         runStats.value.equipment++
         const info = rarityInfo[rarity] || rarityInfo.mortal
-        rewards.push({ type: 'pet', name: info.name, rarity, info })
+        rewards.push({ type: 'pet', name: pet.name, rarity, info, item: pet })
       }
     }
   }
@@ -410,31 +486,32 @@ function showTreasureFlash(reward) {
 
 // ============ 生动日志：单场遭遇 ============
 function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
-  addLog('info', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
-  addLog('info', pick(SCENES))
-  const appearType = enemy.tier === 'boss' ? 'reward-epic' : enemy.tier === 'elite' ? 'reward-highlight' : 'info'
-  if (enemy.tier === 'boss') addLog('reward-epic', `👑 ${enemy.name} 自虚空中降临，威压如山，天地为之变色！`)
-  else if (enemy.tier === 'elite') addLog('reward-highlight', `⚡ 一股凶煞之气逼近——${enemy.name}（精英）横空而出，气势逼人！`)
-  else addLog(appearType, `一头${enemy.name}自暗处扑出，獠牙森森，杀意凛然！`)
-
+  addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
+  // 探索场景：优先使用对应地图专属描写，让八图各有意境
+  const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
+  addLog('scene', pick(scenePool))
+  // 敌人现身（按层级差异化描写）
+  const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
+  addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
+  // 战斗过程：先交手后分胜负，普通怪 2 段、精英/Boss 3 段，描述更详尽
+  const actions = 2 + (enemy.tier !== 'normal' ? 1 : 0)
+  for (let i = 0; i < actions; i++) {
+    const a = pick(COMBAT_ACTIONS); addLog('combat', a.text)
+  }
   if (victory) {
     addLog('victory', pick(VICTORY_LINES)(enemy.name))
-    // 1~2 条战斗动作描写
-    const actions = 1 + (enemy.tier !== 'normal' ? 1 : 0)
-    for (let i = 0; i < actions; i++) {
-      const a = pick(COMBAT_ACTIONS); addLog(a.type, a.text)
-    }
     rewards.forEach(r => {
       if (r.type === 'equipment' || r.type === 'pet') {
         const info = r.info
-        if (info.tier === 'legendary') addLog('reward-legendary', `🔥 金光万丈！获得【${r.name}】，异象冲霄，天地同贺！`)
-        else if (info.tier === 'epic') addLog('reward-epic', `🌟 紫气东来！获得【${r.name}】，瑞光环绕！`)
-        else if (info.tier === 'highlight') addLog('reward-highlight', `💎 稀有收获：【${r.name}】`)
-        else addLog('victory', `获得 ${r.name}`)
+        const detail = formatItemDetail(r.item, r.type, r.rarity)
+        if (info.tier === 'legendary') addLog('reward-legendary', `🔥 金光万丈！获得【${r.name}】，异象冲霄，天地同贺！`, detail)
+        else if (info.tier === 'epic') addLog('reward-epic', `🌟 紫气东来！获得【${r.name}】，瑞光环绕！`, detail)
+        else if (info.tier === 'highlight') addLog('reward-highlight', `💎 稀有收获：【${r.name}】`, detail)
+        else addLog('reward-normal', `获得 ${r.name}`, detail)
       } else if (r.type === 'fortune') {
-        addLog('reward-epic', pick(FORTUNE_LINES)(r.material?.name || r.name))
+        addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
       } else {
-        addLog('victory', `获得 ${r.amount} ${r.name}`)
+        addLog('reward-normal', `获得 ${r.amount} ${r.name}`)
       }
       showTreasureFlash(r)
     })

@@ -244,10 +244,8 @@
           class="log-line"
           :class="log.type"
         >
-          <span v-if="log.type === 'reward-highlight'" class="log-highlight">{{ log.text }}</span>
-          <span v-else-if="log.type === 'reward-epic'" class="log-epic">{{ log.text }}</span>
-          <span v-else-if="log.type === 'reward-legendary'" class="log-legendary">{{ log.text }}</span>
-          <span v-else>{{ log.text }}</span>
+          <div class="log-text">{{ log.text }}</div>
+          <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
         </div>
       </div>
       <!-- 挂机统计 -->
@@ -959,59 +957,162 @@ onUnmounted(() => {
 }
 .log-line {
   font-size: 12px;
-  padding: 3px 6px;
-  border-radius: 4px;
+  padding: 4px 8px;
+  border-radius: 6px;
   line-height: 1.5;
   word-break: break-word;
+  border-left: 2px solid transparent;
+  animation: logIn 0.35s ease;
 }
-.log-line.victory {
-  color: #66BB6A;
+.log-text { display: block; }
+@keyframes logIn {
+  from { opacity: 0; transform: translateX(-8px); }
+  to { opacity: 1; transform: translateX(0); }
 }
-.log-line.defeat {
-  color: #EF5350;
+
+/* 探索场景：氛围、幽暗 */
+.log-line.scene {
+  color: #8aa0bf;
+  font-style: italic;
+  font-size: 11.5px;
+  border-left-color: rgba(138, 160, 191, 0.4);
+  background: rgba(138, 160, 191, 0.05);
 }
-.log-line.info {
-  color: #58a6ff;
+/* 敌人现身 */
+.log-line.enemy-normal {
+  color: #c8b89a;
+  border-left-color: rgba(200, 184, 154, 0.5);
 }
-.log-line.warning {
-  color: #f0883e;
-}
-.log-highlight {
-  color: #4488ff;
+.log-line.enemy-elite {
+  color: #c89bff;
   font-weight: bold;
-  background: rgba(68, 136, 255, 0.1);
-  border-radius: 4px;
-  padding: 2px 6px;
-  display: block;
+  border-left-color: #9932CC;
+  background: rgba(153, 50, 204, 0.12);
+  text-shadow: 0 0 8px rgba(153, 50, 204, 0.5);
 }
-.log-epic {
-  color: #aa44ff;
-  font-weight: bold;
-  background: rgba(170, 68, 255, 0.15);
-  border-radius: 4px;
-  padding: 2px 6px;
-  display: block;
-  animation: epicGlow 1s ease;
-}
-.log-legendary {
+.log-line.enemy-boss {
   color: #FFD700;
   font-weight: bold;
-  background: rgba(255, 215, 0, 0.2);
-  border-radius: 4px;
-  padding: 4px 6px;
-  display: block;
+  border-left-color: #FF4444;
+  background: rgba(255, 68, 68, 0.12);
+  text-shadow: 0 0 10px rgba(255, 68, 68, 0.7);
+  animation: bossAppear 0.6s ease, logIn 0.35s ease;
+}
+@keyframes bossAppear {
+  0% { transform: scale(0.92); letter-spacing: 2px; }
+  60% { transform: scale(1.04); letter-spacing: 0; }
+  100% { transform: scale(1); }
+}
+/* 战斗动作：流光扫过 */
+.log-line.combat {
+  color: #ffd9a0;
+  border-left-color: rgba(255, 176, 64, 0.6);
+  background: linear-gradient(90deg, rgba(255, 176, 64, 0.08), rgba(255, 176, 64, 0));
+  position: relative;
+  overflow: hidden;
+}
+.log-line.combat::after {
+  content: '';
+  position: absolute;
+  top: 0; bottom: 0; left: -40%;
+  width: 40%;
+  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
+  animation: combatSweep 2.2s ease-in-out infinite;
+}
+@keyframes combatSweep {
+  0% { left: -40%; }
+  100% { left: 110%; }
+}
+/* 胜利 */
+.log-line.victory {
+  color: #7CE38B;
+  border-left-color: #66BB6A;
+  background: rgba(102, 187, 106, 0.08);
+}
+.log-line.defeat {
+  color: #FF6B6B;
+  border-left-color: #EF5350;
+  background: rgba(239, 83, 80, 0.1);
+  animation: defeatShake 0.4s ease, logIn 0.35s ease;
+}
+@keyframes defeatShake {
+  0%, 100% { transform: translateX(0); }
+  25% { transform: translateX(-4px); }
+  75% { transform: translateX(4px); }
+}
+/* 奖励 */
+.log-line.reward-normal {
+  color: #d8d8d8;
+  border-left-color: rgba(255, 255, 255, 0.2);
+}
+.log-line.reward-highlight {
+  color: #7db4ff;
+  font-weight: bold;
+  border-left-color: #4488ff;
+  background: rgba(68, 136, 255, 0.12);
+}
+.log-line.reward-epic {
+  color: #c89bff;
+  font-weight: bold;
+  border-left-color: #aa44ff;
+  background: rgba(170, 68, 255, 0.15);
+  animation: logIn 0.35s ease, epicGlowLoop 1.4s ease-in-out infinite;
+}
+@keyframes epicGlowLoop {
+  0%, 100% { box-shadow: 0 0 4px rgba(170, 68, 255, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(170, 68, 255, 0.7); }
+}
+.log-line.reward-legendary {
+  color: #FFD700;
+  font-weight: bold;
+  border-left-color: #FFD700;
+  background: rgba(255, 215, 0, 0.18);
   border: 1px solid rgba(255, 215, 0, 0.5);
-  animation: legendaryGlow 1.5s ease;
+  animation: logIn 0.35s ease, legendaryGlowLoop 1.8s ease-in-out infinite;
 }
-@keyframes epicGlow {
-  0% { box-shadow: 0 0 0 rgba(170, 68, 255, 0); }
-  50% { box-shadow: 0 0 12px rgba(170, 68, 255, 0.6); }
-  100% { box-shadow: 0 0 0 rgba(170, 68, 255, 0); }
+@keyframes legendaryGlowLoop {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 215, 0, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.9); }
 }
-@keyframes legendaryGlow {
-  0% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); transform: scale(1); }
-  30% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.8); transform: scale(1.02); }
-  100% { box-shadow: 0 0 0 rgba(255, 215, 0, 0); transform: scale(1); }
+/* 奇遇：流光溢彩 */
+.log-line.fortune {
+  color: #ffd1f0;
+  font-weight: bold;
+  border-left-color: #ff66cc;
+  background: linear-gradient(90deg, rgba(255, 102, 204, 0.12), rgba(255, 215, 0, 0.08));
+  background-size: 220% 100%;
+  animation: fortuneHue 3s linear infinite;
+}
+@keyframes fortuneHue {
+  0% { background-position: 0% 50%; filter: hue-rotate(0deg); }
+  100% { background-position: 220% 50%; filter: hue-rotate(40deg); }
+}
+/* 标题 / 警告 */
+.log-line.header {
+  color: #FFD700;
+  font-weight: bold;
+  font-size: 12.5px;
+  letter-spacing: 0.5px;
+  border-left-color: #DAA520;
+  background: rgba(218, 165, 32, 0.1);
+}
+.log-line.warning {
+  color: #f0a85e;
+  border-left-color: #f0883e;
+  background: rgba(240, 136, 62, 0.1);
+}
+/* 奖励明细（装备/灵宠基础数据） */
+.log-detail {
+  margin-top: 3px;
+  padding: 4px 8px;
+  font-size: 11px;
+  line-height: 1.5;
+  color: #b9c4d6;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 0 0 6px 6px;
+  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  font-family: 'Consolas', 'Menlo', monospace;
+  letter-spacing: 0.3px;
 }
 
 /* 挂机统计 */
