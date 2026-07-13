@@ -965,7 +965,7 @@ onUnmounted(() => {
   animation: logIn 0.35s ease;
   font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
 }
-.log-text { display: block; }
+.log-text { display: block; position: relative; z-index: 1; }
 @keyframes logIn {
   from { opacity: 0; transform: translateX(-8px); }
   to { opacity: 1; transform: translateX(0); }
@@ -1011,6 +1011,8 @@ onUnmounted(() => {
   background: linear-gradient(90deg, rgba(255, 176, 64, 0.08), rgba(255, 176, 64, 0));
   position: relative;
   overflow: hidden;
+  -webkit-font-smoothing: antialiased;
+  -moz-osx-font-smoothing: grayscale;
 }
 .log-line.combat::after {
   content: '';
@@ -1019,6 +1021,13 @@ onUnmounted(() => {
   width: 40%;
   background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
   animation: combatSweep 2.2s ease-in-out infinite;
+  z-index: 0;
+  pointer-events: none;
+  will-change: left;
+}
+.log-line.combat .log-text {
+  position: relative;
+  z-index: 1;
 }
 @keyframes combatSweep {
   0% { left: -40%; }
