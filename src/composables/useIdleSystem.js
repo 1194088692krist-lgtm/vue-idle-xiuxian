@@ -454,12 +454,12 @@ async function runIdleEncounter() {
   const effectiveZone = buildEffectiveZone(zone, diff)
   try {
     s.regenerateSpirit()
-    if (s.spirit < diff.spiritCost) {
-      addLog('warning', '灵力不足，挂机探索暂停，恢复灵力后可继续。')
+    if (s.spiritStones < diff.spiritCost) {
+      addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
       stopIdle()
       return
     }
-    s.spirit -= diff.spiritCost
+    s.spiritStones -= diff.spiritCost
     idleEncounterCount.value++
     const count = idleEncounterCount.value
     const result = await runExploreCombat(effectiveZone, count, true)
@@ -493,8 +493,8 @@ async function runIdleEncounter() {
 function runOfflineEncounter(zone, diff, count) {
   const s = store()
   s.regenerateSpirit()
-  if (s.spirit < diff.spiritCost) return false
-  s.spirit -= diff.spiritCost
+  if (s.spiritStones < diff.spiritCost) return false
+  s.spiritStones -= diff.spiritCost
   const pAtk = s.baseAttributes.attack + (s.getPetBonus?.attack || 0) + (s.artifactBonuses?.attack || 0)
   const pHp = s.baseAttributes.health + (s.getPetBonus?.health || 0) + (s.artifactBonuses?.health || 0)
   const winChance = Math.min(0.95, Math.max(0.3,
@@ -624,7 +624,7 @@ const canStartIdle = computed(() => {
   const zone = selectedZone.value
   if (!zone) return false
   const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
-  return s.spirit >= diff.spiritCost
+  return s.spiritStones >= diff.spiritCost
 })
 
 export function useIdleSystem() {

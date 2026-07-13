@@ -83,7 +83,7 @@
           <span>推荐攻击 {{ currentDifficulty.recommendedStats.attack }}</span>
           <span>推荐生命 {{ currentDifficulty.recommendedStats.health }}</span>
           <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
-          <span>{{ currentDifficulty.spiritCost }} 灵力/场</span>
+          <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
       </div>
 
@@ -105,8 +105,8 @@
           <span class="stat-value gold-text">x{{ currentDifficulty?.rewardMultiplier }}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">灵力消耗</span>
-          <span class="stat-value">{{ currentDifficulty?.spiritCost }} 灵力/场</span>
+          <span class="stat-label">灵石消耗</span>
+          <span class="stat-value">{{ currentDifficulty?.spiritCost }} 灵石/场</span>
         </div>
       </div>
 
@@ -203,7 +203,7 @@
           >
             <div class="dur-time">{{ dur.minutes }}分钟</div>
             <div class="dur-info">{{ dur.encounters }}次探索</div>
-            <div class="dur-cost">{{ dur.encounters * 100 }}灵力</div>
+            <div class="dur-cost">{{ dur.encounters * 100 }}灵石</div>
           </div>
         </div>
         <button
@@ -212,7 +212,7 @@
           :disabled="!canStartIdle"
           @click="startIdle(selectedDuration)"
         >
-          开始挂机（{{ selectedDuration }}分钟 · 约 {{ idleEncounterEstimate }} 场 · {{ idleSpiritEstimate }} 灵力）
+          开始挂机（{{ selectedDuration }}分钟 · 约 {{ idleEncounterEstimate }} 场 · {{ idleStoneEstimate }} 灵石）
         </button>
         <!-- 挂机进行中 -->
         <div v-if="isIdling" class="idle-running">
@@ -369,7 +369,7 @@ const idleDurations = [
 const selectedDuration = ref(5)
 // 约 15 秒一场遭遇
 const idleEncounterEstimate = computed(() => Math.max(1, Math.round((selectedDuration.value * 60) / 15)))
-const idleSpiritEstimate = computed(() =>
+const idleStoneEstimate = computed(() =>
   currentDifficulty.value ? currentDifficulty.value.spiritCost * idleEncounterEstimate.value : 0
 )
 
