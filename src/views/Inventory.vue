@@ -16,6 +16,9 @@
         <!-- 装备 -->
         <div v-if="activeTab === 'equipment'" class="tab-pane">
           <div class="equip-toolbar">
+            <button class="btn-small btn-warning all-equip-btn" @click="showEquipmentList('all')">
+              📦 全部装备
+            </button>
             <button class="btn-small btn-primary auto-equip-btn" @click="handleAutoEquipBest" :disabled="!hasEquipableItems">
               ⚡ 一键装备最强
             </button>
@@ -24,7 +27,7 @@
             <div
               v-for="(name, type) in equipmentTypes"
               :key="type"
-              :class="['simple-card', { 'all-card': type === 'all' }]"
+              class="simple-card"
               @click="showEquipmentList(type)"
             >
               <div class="card-header">
@@ -723,8 +726,7 @@
     ring1: '戒指1',
     ring2: '戒指2',
     belt: '腰带',
-    artifact: '法宝',
-    all: '全部'
+    artifact: '法宝'
   }
 
   // 所有装备槽位（用于识别装备类物品，兼容 gacha 与挂机两种生成形态）
@@ -1170,7 +1172,9 @@
   /* 装备操作栏 */
   .equip-toolbar {
     display: flex;
-    justify-content: flex-end;
+    justify-content: space-between;
+    align-items: center;
+    gap: 8px;
     margin-bottom: 10px;
   }
 
@@ -1449,14 +1453,24 @@
     font-weight: bold;
   }
 
-  /* 列表“全部”卡片高亮 */
-  .simple-card.all-card {
-    border-color: rgba(218, 165, 32, 0.7);
-    background: rgba(218, 165, 32, 0.08);
+  /* 工具栏“全部装备”按钮 */
+  .all-equip-btn {
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    background: rgba(139, 69, 19, 0.6) !important;
+    color: #F5DEB3 !important;
+    border: 1px solid rgba(218, 165, 32, 0.5) !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-weight: bold;
+    letter-spacing: 0.5px;
   }
 
-  .simple-card.all-card .card-header {
-    color: #DAA520;
+  .all-equip-btn:hover {
+    background: rgba(139, 69, 19, 0.85) !important;
+    box-shadow: 0 0 12px rgba(218, 165, 32, 0.35);
+    transform: translateY(-1px);
   }
 
   /* 列表卡片：装备名、评分、词条 */
