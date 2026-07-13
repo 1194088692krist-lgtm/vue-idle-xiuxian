@@ -160,10 +160,10 @@
       <div v-if="!combatState.inCombat" class="action-bar">
         <button
           class="btn btn-primary"
-          :disabled="playerStore.spirit < 50 || isIdling"
+          :disabled="isIdling"
           @click="startExplore"
         >
-          开始探索 (50灵力)
+          开始探索
         </button>
       </div>
 
@@ -180,16 +180,16 @@
           >
             <div class="dur-time">{{ dur.minutes }}分钟</div>
             <div class="dur-info">{{ dur.encounters }}次探索</div>
-            <div class="dur-cost">{{ dur.encounters * 50 }}灵力</div>
+            <div class="dur-cost">{{ dur.encounters * 100 }}灵力</div>
           </div>
         </div>
         <button
           v-if="!isIdling"
           class="btn btn-success"
-          :disabled="playerStore.spirit < 50 || !selectedZone"
+          :disabled="playerStore.spirit < 100 || !selectedZone"
           @click="startIdle"
         >
-          开始挂机 ({{ selectedDuration }}分钟)
+          开始挂机 ({{ selectedDuration }}分钟，共{{ idleDurations.find(d=>d.minutes===selectedDuration)?.encounters || 0 }}次，{{ idleDurations.find(d=>d.minutes===selectedDuration)?.encounters || 0 * 100 }}灵力)
         </button>
         <!-- 挂机进行中 -->
         <div v-if="isIdling" class="idle-running">
@@ -650,8 +650,8 @@ const showTreasureFlash = (reward) => {
 
 // ========== 手动探索 ==========
 const startExplore = async () => {
-  if (!selectedZone.value || playerStore.spirit < 50 || combatState.value.inCombat || isIdling.value) return
-  playerStore.spirit -= 50
+  if (!selectedZone.value || combatState.value.inCombat || isIdling.value) return
+  playerStore.regenerateSpirit() // 先恢复灵力
   playerStore.explorationCount++
   playerStore.queueSave()
 
@@ -676,11 +676,11 @@ const startExplore = async () => {
 
 // ========== 挂机探索（持久化版） ==========
 const idleDurations = [
-  { minutes: 5, encounters: 60 },
-  { minutes: 10, encounters: 120 },
-  { minutes: 15, encounters: 180 },
-  { minutes: 20, encounters: 240 },
-  { minutes: 30, encounters: 360 }
+  { minutes: 5, encounters: 1 },
+  { minutes: 10, encounters: 2 },
+  { minutes: 15, encounters: 3 },
+  { minutes: 20, encounters: 4 },
+  { minutes: 30, encounters: 6 }
 ]
 const selectedDuration = ref(5)
 const isIdling = ref(false)
@@ -748,8 +748,9 @@ const processOfflineIdle = () => {
 }
 
 const runOfflineEncounter = (zone, count) => {
-  if (playerStore.spirit < 50) return false
-  playerStore.spirit -= 50
+  playerStore.regenerateSpirit() // 先恢复灵力
+  if (playerStore.spirit < 100) return false
+  playerStore.spirit -= 100
   idleEncounterCount.value++
   const recommended = zone.recommendedStats
   const playerAttack = playerStore.baseAttributes.attack
@@ -797,7 +798,7 @@ const startIdleTimers = () => {
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = setInterval(async () => {
     await runIdleEncounter()
-  }, 5000)
+  }, 300000)
   idleTimer = setInterval(() => {
     const remaining = playerStore.getIdleRemainingTime()
     const elapsed = playerStore.idleExploration.duration - remaining
@@ -813,12 +814,13 @@ const startIdleTimers = () => {
 }
 
 const startIdle = () => {
-  if (!selectedZone.value || playerStore.spirit < 50) return
+  if (!selectedZone.value || playerStore.spirit < 100) return
+  playerStore.regenerateSpirit() // 先恢复灵力
   playerStore.startIdleExploration(selectedZone.value.id, selectedDuration.value)
   isIdling.value = true
   idleEncounterCount.value = 0
   currentIdleLogs.value = []
-  currentIdleLogs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}】，预计 ${selectedDuration.value} 分钟` })
+  currentIdleLogs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}】，预计 ${selectedDuration.value} 分钟，每5分钟消耗100灵力` })
   startIdleTimers()
   const min = selectedDuration.value
   idleTimeRemaining.value = `${min}:00`
@@ -826,12 +828,13 @@ const startIdle = () => {
 
 const runIdleEncounter = async () => {
   if (!isIdling.value || !selectedZone.value) return
-  if (playerStore.spirit < 50) {
+  playerStore.regenerateSpirit() // 先恢复灵力
+  if (playerStore.spirit < 100) {
     currentIdleLogs.value.push({ type: 'warning', text: '灵力不足，挂机探索停止' })
     finishIdle()
     return
   }
-  playerStore.spirit -= 50
+  playerStore.spirit -= 100
   idleEncounterCount.value++
   const count = idleEncounterCount.value
   const result = await runExploreCombat(selectedZone.value, count, true)
@@ -912,6 +915,7 @@ const stopIdle = () => {
 }
 
 onMounted(() => {
+  playerStore.regenerateSpirit() // 页面加载时恢复离线灵力
   syncIdleStateFromStore()
 })
 

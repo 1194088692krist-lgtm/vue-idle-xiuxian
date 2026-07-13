@@ -101,6 +101,7 @@ const startNewGame = async () => {
 const loadGame = async (slot) => {
   try {
     await playerStore.loadFromSlot(slot)
+    playerStore.regenerateSpirit() // 加载存档后恢复离线灵力
     router.push('/cultivation')
   } catch (error) {
     console.error('加载存档失败:', error)

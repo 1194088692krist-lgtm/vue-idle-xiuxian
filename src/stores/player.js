@@ -36,8 +36,10 @@ export const usePlayerStore = defineStore('player', {
     realm: '练气期一层', // 当前境界名称
     cultivation: 0, // 当前修为值
     maxCultivation: 100, // 当前境界最大修为值
-    spirit: 0, // 灵力值
+    spirit: 1000, // 灵力值
+    maxSpirit: 1000, // 灵力上限
     spiritRate: 1, // 灵力获取倍率
+    lastSpiritUpdate: Date.now(), // 上次灵力更新时间
     luck: 1, // 幸运值
     cultivationRate: 1, // 修炼速率
     herbRate: 1, // 灵草获取倍率
@@ -499,7 +501,22 @@ export const usePlayerStore = defineStore('player', {
     // 获取灵力
     gainSpirit(amount) {
       this.spirit += amount * this.spiritRate
+      this.spirit = Math.min(this.spirit, this.maxSpirit)
       this.queueSave()
+    },
+    // 恢复灵力（2小时回满上限）
+    regenerateSpirit() {
+      const now = Date.now()
+      const elapsedMs = now - (this.lastSpiritUpdate || now)
+      // 2小时 = 7200000ms 回满 maxSpirit
+      const regenRate = this.maxSpirit / 7200000 // 每毫秒恢复量
+      const recovered = elapsedMs * regenRate * this.spiritRate
+      if (recovered > 0) {
+        this.spirit = Math.min(this.maxSpirit, this.spirit + recovered)
+        this.lastSpiritUpdate = now
+        this.queueSave()
+      }
+      return recovered
     },
     // 修炼增加修为
     cultivate(amount) {

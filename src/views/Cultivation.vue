@@ -300,6 +300,7 @@ const initCultivationWorker = () => {
     if (data.type === 'error') { showMessage('error', data.message); return }
     if (data.type === 'success') {
       const { spiritCost, cultivationGain: gain, doubleGainTimes } = data.result
+      playerStore.regenerateSpirit() // 先恢复灵力
       playerStore.spirit -= spiritCost
       playerStore.cultivate(gain)
       if (doubleGainTimes > 0) showMessage('success', `获得${doubleGainTimes}次双倍修为！`)
@@ -316,6 +317,7 @@ const initCultivationWorker = () => {
 
 const cultivateUntilBreakthrough = () => {
   if (!canBreakthrough()) {
+    playerStore.regenerateSpirit() // 先恢复灵力
     cultivationWorker.value?.postMessage({
       type: 'cultivateUntilBreakthrough',
       playerData: {
@@ -332,6 +334,7 @@ const cultivateUntilBreakthrough = () => {
 }
 
 const cultivate = () => {
+  playerStore.regenerateSpirit() // 先恢复灵力
   const currentCost = getCurrentCultivationCost()
   if (playerStore.spirit >= currentCost) {
     const oldLevel = playerStore.level
@@ -357,6 +360,7 @@ const toggleAutoCultivation = () => {
   } else {
     isAutoCultivating.value = true
     cultivationTimer.value = setInterval(() => {
+      playerStore.regenerateSpirit() // 先恢复灵力
       const currentCost = getCurrentCultivationCost()
       if (playerStore.spirit >= currentCost) {
         playerStore.spirit -= currentCost
