@@ -1,22 +1,24 @@
 <template>
   <div class="start-screen">
-    <div class="start-bg" :style="bgStyle"></div>
+    <div class="start-bg"></div>
+    <div class="bg-overlay"></div>
     <div class="start-content">
       <div class="game-title" @click="handleTitleClick">
-        <img v-if="theme.startScreen.logo.image" :src="getAssetUrl(theme.startScreen.logo.image)" class="logo-image" alt="logo">
-        <div class="title-main">{{ theme.startScreen.logo.title }}</div>
-        <div class="title-sub">{{ theme.startScreen.logo.subtitle }}</div>
-        <div class="title-version">{{ theme.startScreen.logo.version }}</div>
+        <div class="title-ornament top">✦ ✦ ✦</div>
+        <div class="title-main">修仙问道</div>
+        <div class="title-sub">Idle Cultivation</div>
+        <div class="title-version">v1.1.0</div>
+        <div class="title-ornament bottom">✦ ✦ ✦</div>
       </div>
 
       <div class="start-buttons" v-if="!showLoadMenu">
         <button class="btn-primary" @click="startNewGame">
-          <span class="btn-icon">{{ theme.startScreen.buttons.newGame.icon }}</span>
-          <span class="btn-text">{{ theme.startScreen.buttons.newGame.text }}</span>
+          <span class="btn-icon">⚔</span>
+          <span class="btn-text">新的开始</span>
         </button>
         <button class="btn-secondary" @click="showLoadMenu = true">
-          <span class="btn-icon">{{ theme.startScreen.buttons.loadGame.icon }}</span>
-          <span class="btn-text">{{ theme.startScreen.buttons.loadGame.text }}</span>
+          <span class="btn-icon">📜</span>
+          <span class="btn-text">读取存档</span>
         </button>
       </div>
 
@@ -59,37 +61,22 @@
       </div>
 
       <div class="start-footer">
-        <span>{{ theme.startScreen.footerText }}</span>
+        <span>道可道 · 非常道</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted, computed } from 'vue'
+import { ref, onMounted } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
-import { getCurrentTheme, getAssetUrl, loadTheme } from '../plugins/theme'
+import { loadTheme } from '../plugins/theme'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
 const showLoadMenu = ref(false)
 const saveSlots = ref([])
-const theme = ref(getCurrentTheme())
-
-const bgStyle = computed(() => {
-  const bg = theme.value.startScreen.background
-  if (bg.image) {
-    return {
-      backgroundImage: `url(${getAssetUrl(bg.image)})`,
-      backgroundSize: 'cover',
-      backgroundPosition: 'center'
-    }
-  }
-  return {
-    background: `linear-gradient(135deg, ${bg.gradient[0]} 0%, ${bg.gradient[1]} 50%, ${bg.gradient[2] || bg.gradient[1]} 100%)`
-  }
-})
 
 const loadSlots = async () => {
   try {
@@ -169,7 +156,6 @@ const handleTitleClick = () => {
 
 onMounted(() => {
   loadTheme()
-  theme.value = getCurrentTheme()
   loadSlots()
 })
 </script>
@@ -194,26 +180,39 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background: linear-gradient(135deg, #0D0D12 0%, #1A1A2E 50%, #2D1B4E 100%);
+  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20ink%20wash%20painting%20style%2C%20a%20sword-wielding%20Taoist%20cultivator%20standing%20on%20a%20mountain%20peak%20overlooking%20a%20sea%20of%20clouds%20at%20sunrise%2C%20golden%20light%20rays%2C%20majestic%20mountains%2C%20winding%20river%2C%20traditional%20Chinese%20landscape%2C%20epic%2C%20serene&image_size=portrait_9_16');
+  background-size: cover;
+  background-position: center top;
 }
 
-.start-bg::before {
+.bg-overlay {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: linear-gradient(
+    180deg,
+    rgba(0, 0, 0, 0.4) 0%,
+    rgba(0, 0, 0, 0.25) 20%,
+    rgba(0, 0, 0, 0.35) 50%,
+    rgba(0, 0, 0, 0.6) 80%,
+    rgba(0, 0, 0, 0.8) 100%
+  );
+}
+
+.bg-overlay::before {
   content: '';
   position: absolute;
   top: 0;
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: 
-    radial-gradient(circle at 20% 20%, rgba(218, 165, 32, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 80% 80%, rgba(153, 50, 204, 0.08) 0%, transparent 50%),
-    radial-gradient(circle at 50% 50%, rgba(30, 144, 255, 0.05) 0%, transparent 70%);
-  animation: bgPulse 8s ease-in-out infinite;
-}
-
-@keyframes bgPulse {
-  0%, 100% { opacity: 0.6; }
-  50% { opacity: 1; }
+  background: radial-gradient(
+    ellipse at center top,
+    rgba(255, 215, 0, 0.15) 0%,
+    transparent 50%
+  );
 }
 
 .start-content {
@@ -221,51 +220,61 @@ onMounted(() => {
   z-index: 1;
   text-align: center;
   padding: 20px;
-  max-width: 400px;
+  max-width: 420px;
   width: 100%;
 }
 
 .game-title {
-  margin-bottom: 60px;
+  margin-bottom: 70px;
+  cursor: default;
 }
 
-.logo-image {
-  max-width: 200px;
-  max-height: 200px;
-  margin: 0 auto 20px;
-  display: block;
-  filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
+.title-ornament {
+  font-size: 14px;
+  color: #B8860B;
+  letter-spacing: 8px;
+  text-shadow: 0 0 10px rgba(184, 134, 11, 0.5);
+  margin-bottom: 12px;
+}
+
+.title-ornament.bottom {
+  margin-bottom: 0;
+  margin-top: 12px;
 }
 
 .title-main {
-  font-family: 'Ma Shan Zheng', cursive;
-  font-size: 48px;
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', serif;
+  font-size: 56px;
   color: #FFD700;
   text-shadow: 
-    0 0 10px rgba(255, 215, 0, 0.5),
-    0 0 20px rgba(255, 215, 0, 0.3),
-    0 0 30px rgba(255, 215, 0, 0.2);
-  margin-bottom: 8px;
-  letter-spacing: 8px;
+    0 0 12px rgba(255, 215, 0, 0.6),
+    0 0 24px rgba(255, 215, 0, 0.4),
+    0 0 36px rgba(255, 215, 0, 0.2),
+    2px 2px 4px rgba(0, 0, 0, 0.8);
+  margin-bottom: 10px;
+  letter-spacing: 10px;
+  font-weight: normal;
 }
 
 .title-sub {
-  font-size: 16px;
-  color: #8B8B8B;
+  font-size: 14px;
+  color: #DAA520;
   font-weight: 300;
-  letter-spacing: 4px;
-  margin-bottom: 8px;
+  letter-spacing: 6px;
+  margin-bottom: 6px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 .title-version {
-  font-size: 12px;
-  color: #555;
+  font-size: 11px;
+  color: #8B7355;
+  letter-spacing: 2px;
 }
 
 .start-buttons {
   display: flex;
   flex-direction: column;
-  gap: 16px;
+  gap: 18px;
   align-items: center;
 }
 
@@ -274,31 +283,48 @@ onMounted(() => {
   display: flex;
   align-items: center;
   justify-content: center;
-  gap: 10px;
-  padding: 16px 48px;
-  border-radius: 40px;
+  gap: 12px;
+  padding: 18px 56px;
+  border-radius: 2px;
   font-size: 18px;
   font-weight: bold;
   cursor: pointer;
   transition: all 0.3s ease;
   border: none;
   width: 100%;
-  max-width: 280px;
+  max-width: 300px;
+  position: relative;
+  overflow: hidden;
 }
 
 .btn-primary {
-  background: linear-gradient(135deg, #DAA520, #FFD700);
-  color: #0D0D12;
+  background: linear-gradient(135deg, #8B6914 0%, #DAA520 50%, #FFD700 100%);
+  color: #0a0a0a;
+  border: 2px solid #FFD700;
   box-shadow: 
-    0 4px 15px rgba(218, 165, 32, 0.4),
-    0 0 30px rgba(218, 165, 32, 0.2);
+    0 4px 20px rgba(218, 165, 32, 0.5),
+    0 0 40px rgba(218, 165, 32, 0.3),
+    inset 0 1px 0 rgba(255, 255, 255, 0.3);
+  text-shadow: 0 1px 0 rgba(255, 255, 255, 0.3);
+}
+
+.btn-primary::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border: 1px solid rgba(139, 105, 20, 0.5);
+  pointer-events: none;
 }
 
 .btn-primary:hover {
   transform: translateY(-2px);
   box-shadow: 
-    0 6px 20px rgba(218, 165, 32, 0.5),
-    0 0 40px rgba(218, 165, 32, 0.3);
+    0 6px 28px rgba(255, 215, 0, 0.6),
+    0 0 60px rgba(255, 215, 0, 0.4),
+    inset 0 1px 0 rgba(255, 255, 255, 0.4);
 }
 
 .btn-primary:active {
@@ -306,31 +332,67 @@ onMounted(() => {
 }
 
 .btn-secondary {
-  background: rgba(255, 255, 255, 0.1);
-  color: #F5DEB3;
-  border: 1px solid rgba(218, 165, 32, 0.3);
+  background: rgba(10, 10, 10, 0.85);
+  color: #DAA520;
+  border: 2px solid #8B6914;
+  box-shadow: 
+    0 2px 10px rgba(0, 0, 0, 0.5),
+    inset 0 1px 0 rgba(218, 165, 32, 0.1);
+}
+
+.btn-secondary::before {
+  content: '';
+  position: absolute;
+  top: 2px;
+  left: 2px;
+  right: 2px;
+  bottom: 2px;
+  border: 1px solid rgba(139, 105, 20, 0.3);
+  pointer-events: none;
 }
 
 .btn-secondary:hover {
-  background: rgba(255, 255, 255, 0.15);
-  border-color: rgba(218, 165, 32, 0.5);
+  background: rgba(20, 15, 5, 0.9);
+  border-color: #DAA520;
+  color: #FFD700;
+  box-shadow: 
+    0 4px 15px rgba(218, 165, 32, 0.3),
+    inset 0 1px 0 rgba(218, 165, 32, 0.2);
 }
 
 .btn-icon {
-  font-size: 20px;
+  font-size: 18px;
 }
 
 .btn-text {
-  font-family: 'Ma Shan Zheng', cursive;
-  letter-spacing: 2px;
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', serif;
+  letter-spacing: 4px;
+  font-weight: normal;
 }
 
 .load-menu {
-  background: rgba(20, 25, 30, 0.95);
-  border-radius: 20px;
-  padding: 20px;
-  backdrop-filter: blur(10px);
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  background: linear-gradient(180deg, rgba(15, 12, 8, 0.97) 0%, rgba(5, 4, 2, 0.98) 100%);
+  border-radius: 4px;
+  padding: 24px 20px;
+  backdrop-filter: blur(8px);
+  border: 1px solid #8B6914;
+  position: relative;
+  box-shadow: 
+    0 8px 32px rgba(0, 0, 0, 0.8),
+    0 0 60px rgba(218, 165, 32, 0.1),
+    inset 0 1px 0 rgba(218, 165, 32, 0.1);
+}
+
+.load-menu::before {
+  content: '';
+  position: absolute;
+  top: 4px;
+  left: 4px;
+  right: 4px;
+  bottom: 4px;
+  border: 1px solid rgba(139, 105, 20, 0.3);
+  pointer-events: none;
+  border-radius: 2px;
 }
 
 .menu-header {
@@ -339,29 +401,32 @@ onMounted(() => {
   justify-content: space-between;
   margin-bottom: 20px;
   padding-bottom: 15px;
-  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+  border-bottom: 1px solid rgba(139, 105, 20, 0.4);
 }
 
 .btn-back {
   background: transparent;
   border: none;
-  color: #8B8B8B;
+  color: #8B7355;
   font-size: 14px;
   cursor: pointer;
   padding: 8px 12px;
-  border-radius: 8px;
+  border-radius: 4px;
   transition: all 0.2s ease;
+  font-family: 'Ma Shan Zheng', serif;
 }
 
 .btn-back:hover {
-  background: rgba(255, 255, 255, 0.1);
-  color: #F5DEB3;
+  background: rgba(218, 165, 32, 0.1);
+  color: #DAA520;
 }
 
 .menu-title {
-  font-family: 'Ma Shan Zheng', cursive;
-  font-size: 20px;
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', serif;
+  font-size: 22px;
   color: #FFD700;
+  letter-spacing: 4px;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.4);
 }
 
 .menu-spacer {
@@ -377,41 +442,47 @@ onMounted(() => {
 .slot-item {
   display: flex;
   align-items: center;
-  gap: 12px;
-  padding: 15px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 12px;
+  gap: 14px;
+  padding: 14px 16px;
+  background: linear-gradient(180deg, rgba(20, 16, 10, 0.9) 0%, rgba(10, 8, 5, 0.95) 100%);
+  border-radius: 2px;
   cursor: pointer;
-  transition: all 0.2s ease;
-  border: 1px solid transparent;
+  transition: all 0.25s ease;
+  border: 1px solid rgba(139, 105, 20, 0.3);
 }
 
 .slot-item:hover:not(.empty):not(.damaged) {
-  background: rgba(218, 165, 32, 0.1);
-  border-color: rgba(218, 165, 32, 0.3);
+  background: linear-gradient(180deg, rgba(30, 24, 12, 0.95) 0%, rgba(15, 12, 6, 0.98) 100%);
+  border-color: #DAA520;
+  box-shadow: 
+    0 2px 12px rgba(218, 165, 32, 0.2),
+    inset 0 1px 0 rgba(218, 165, 32, 0.1);
 }
 
 .slot-item.empty {
   cursor: default;
-  opacity: 0.5;
+  opacity: 0.4;
 }
 
 .slot-item.damaged {
   cursor: default;
-  opacity: 0.6;
+  opacity: 0.5;
+  border-color: rgba(178, 34, 34, 0.4);
 }
 
 .slot-number {
-  width: 36px;
-  height: 36px;
+  width: 40px;
+  height: 40px;
   border-radius: 50%;
-  background: rgba(218, 165, 32, 0.2);
+  background: linear-gradient(135deg, #1a1510 0%, #0a0805 100%);
   color: #DAA520;
   display: flex;
   align-items: center;
   justify-content: center;
-  font-size: 14px;
+  font-size: 15px;
   font-weight: bold;
+  border: 1px solid #8B6914;
+  font-family: 'Ma Shan Zheng', serif;
 }
 
 .slot-info {
@@ -422,8 +493,10 @@ onMounted(() => {
 .slot-name {
   font-size: 15px;
   color: #F5DEB3;
-  font-weight: bold;
-  margin-bottom: 2px;
+  font-weight: normal;
+  margin-bottom: 3px;
+  font-family: 'Ma Shan Zheng', serif;
+  letter-spacing: 2px;
 }
 
 .slot-realm {
@@ -434,7 +507,7 @@ onMounted(() => {
 
 .slot-time {
   font-size: 11px;
-  color: #666;
+  color: #665544;
 }
 
 .slot-action {
@@ -442,37 +515,42 @@ onMounted(() => {
 }
 
 .btn-small {
-  padding: 6px 12px;
-  border-radius: 6px;
+  padding: 6px 14px;
+  border-radius: 2px;
   font-size: 12px;
-  border: none;
+  border: 1px solid rgba(178, 34, 34, 0.4);
   cursor: pointer;
   transition: all 0.2s ease;
+  font-family: 'Ma Shan Zheng', serif;
+  letter-spacing: 2px;
 }
 
 .btn-danger {
-  background: rgba(255, 99, 71, 0.2);
-  color: #FF6347;
+  background: rgba(30, 10, 5, 0.8);
+  color: #CD5C5C;
 }
 
 .btn-danger:hover {
-  background: rgba(255, 99, 71, 0.3);
+  background: rgba(50, 15, 10, 0.9);
+  border-color: rgba(205, 92, 92, 0.6);
 }
 
 .start-footer {
-  margin-top: 60px;
+  margin-top: 70px;
   font-size: 12px;
-  color: #555;
-  letter-spacing: 2px;
+  color: #6B5B3F;
+  letter-spacing: 4px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+  font-family: 'Ma Shan Zheng', serif;
 }
 
 @media (min-width: 769px) {
   .start-screen {
     max-width: 520px;
     margin: 0 auto;
-    border-left: 1px solid rgba(139, 69, 19, 0.2);
-    border-right: 1px solid rgba(139, 69, 19, 0.2);
-    box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    border-left: 1px solid rgba(139, 105, 20, 0.3);
+    border-right: 1px solid rgba(139, 105, 20, 0.3);
+    box-shadow: 0 0 60px rgba(0, 0, 0, 0.8);
   }
 }
 </style>

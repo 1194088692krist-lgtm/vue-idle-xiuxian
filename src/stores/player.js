@@ -3,6 +3,7 @@ import { GameDB } from './db'
 import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
+import { getAffixesForSlot, getActiveSetBonuses, calculateEquipmentScore, calculateBuildStrength } from '../plugins/buildSystem'
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
@@ -182,6 +183,23 @@ export const usePlayerStore = defineStore('player', {
       speed: 0,
       cultivationRate: 0,
       spiritRate: 0
+    },
+    // 挂机探索状态
+    idleExploration: {
+      isActive: false,
+      zoneId: null,
+      startTime: 0,
+      duration: 0, // 总时长(ms)
+      encounterCount: 0,
+      lastEncounterTime: 0,
+      logs: [],
+      stats: {
+        victories: 0,
+        defeats: 0,
+        rewards: 0,
+        spiritStones: 0,
+        itemsFound: 0
+      }
     }
   }),
   getters: {
@@ -258,6 +276,12 @@ export const usePlayerStore = defineStore('player', {
         combatBoost: combatBonus,
         resistanceBoost: combatBonus
       }
+    },
+    buildStrength() {
+      return calculateBuildStrength(this.equippedArtifacts)
+    },
+    activeSetBonuses() {
+      return getActiveSetBonuses(this.equippedArtifacts)
     }
   },
   actions: {
@@ -794,13 +818,11 @@ export const usePlayerStore = defineStore('player', {
       }
       // 穿上新装备
       this.equippedArtifacts[slot] = artifact
-      // 应用装备加成
+      // 应用装备基础属性
       if (artifact.stats) {
         Object.entries(artifact.stats).forEach(([key, value]) => {
-          // 先更新artifactBonuses
           if (this.artifactBonuses[key] !== undefined) {
             this.artifactBonuses[key] += value
-            // 根据属性类型应用到对应的属性组
             if (key in this.baseAttributes) {
               this.baseAttributes[key] += value
             } else if (key in this.combatAttributes) {
@@ -813,6 +835,51 @@ export const usePlayerStore = defineStore('player', {
           }
         })
       }
+      // 应用装备词条属性
+      if (artifact.affixes && artifact.affixes.length > 0) {
+        artifact.affixes.forEach(affix => {
+          const key = affix.stat
+          let value = affix.value
+          if (affix.valueType === 'percent') {
+            if (key in this.baseAttributes) {
+              const bonus = this.baseAttributes[key] * affix.value
+              this.baseAttributes[key] += bonus
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] += bonus
+              }
+            } else if (key in this.combatAttributes) {
+              this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + affix.value)
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] += affix.value
+              }
+            } else if (key in this.combatResistance) {
+              this.combatResistance[key] = Math.min(1, this.combatResistance[key] + affix.value)
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] += affix.value
+              }
+            } else if (key in this.specialAttributes) {
+              this.specialAttributes[key] += affix.value
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] += affix.value
+              }
+            }
+          } else {
+            if (this.artifactBonuses[key] !== undefined) {
+              this.artifactBonuses[key] += value
+              if (key in this.baseAttributes) {
+                this.baseAttributes[key] += value
+              } else if (key in this.combatAttributes) {
+                this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + value)
+              } else if (key in this.combatResistance) {
+                this.combatResistance[key] = Math.min(1, this.combatResistance[key] + value)
+              } else if (key in this.specialAttributes) {
+                this.specialAttributes[key] += value
+              }
+            }
+          }
+        })
+      }
+      this.recalcSetBonuses()
       this.queueSave()
       return { success: true, message: '装备成功' }
     },
@@ -820,12 +887,11 @@ export const usePlayerStore = defineStore('player', {
     unequipArtifact(slot) {
       const artifact = this.equippedArtifacts[slot]
       if (artifact) {
-        // 移除装备加成
+        // 移除装备基础属性
         if (artifact.stats) {
           Object.entries(artifact.stats).forEach(([key, value]) => {
             if (this.artifactBonuses[key] !== undefined) {
               this.artifactBonuses[key] -= value
-              // 从对应的属性组中移除加成
               if (key in this.baseAttributes) {
                 this.baseAttributes[key] -= value
               } else if (key in this.combatAttributes) {
@@ -838,17 +904,187 @@ export const usePlayerStore = defineStore('player', {
             }
           })
         }
+        // 移除装备词条属性
+        if (artifact.affixes && artifact.affixes.length > 0) {
+          artifact.affixes.forEach(affix => {
+            const key = affix.stat
+            let value = affix.value
+            if (affix.valueType === 'percent') {
+              if (key in this.baseAttributes) {
+                const totalBase = this.baseAttributes[key] / (1 + affix.value)
+                const bonus = totalBase * affix.value
+                this.baseAttributes[key] -= bonus
+                if (this.artifactBonuses[key] !== undefined) {
+                  this.artifactBonuses[key] -= bonus
+                }
+              } else if (key in this.combatAttributes) {
+                this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - affix.value)
+                if (this.artifactBonuses[key] !== undefined) {
+                  this.artifactBonuses[key] -= affix.value
+                }
+              } else if (key in this.combatResistance) {
+                this.combatResistance[key] = Math.max(0, this.combatResistance[key] - affix.value)
+                if (this.artifactBonuses[key] !== undefined) {
+                  this.artifactBonuses[key] -= affix.value
+                }
+              } else if (key in this.specialAttributes) {
+                this.specialAttributes[key] -= affix.value
+                if (this.artifactBonuses[key] !== undefined) {
+                  this.artifactBonuses[key] -= affix.value
+                }
+              }
+            } else {
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] -= value
+                if (key in this.baseAttributes) {
+                  this.baseAttributes[key] -= value
+                } else if (key in this.combatAttributes) {
+                  this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - value)
+                } else if (key in this.combatResistance) {
+                  this.combatResistance[key] = Math.max(0, this.combatResistance[key] - value)
+                } else if (key in this.specialAttributes) {
+                  this.specialAttributes[key] -= value
+                }
+              }
+            }
+          })
+        }
         // 将装备返回到背包
         this.items.push(artifact)
         this.equippedArtifacts[slot] = null
+        this.recalcSetBonuses()
         this.queueSave()
         return true
       }
       return false
     },
+    // 重新计算套装加成
+    recalcSetBonuses() {
+      const activeSets = getActiveSetBonuses(this.equippedArtifacts)
+      const setBonusKey = '__setBonusApplied'
+      if (this[setBonusKey]) {
+        this[setBonusKey].forEach(bonus => {
+          const key = bonus.stat
+          if (bonus.valueType === 'percent') {
+            if (key in this.baseAttributes) {
+              const current = this.baseAttributes[key]
+              const original = current / (1 + bonus.value)
+              this.baseAttributes[key] = original
+              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - (current - original)
+            } else if (key in this.combatAttributes) {
+              this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - bonus.value)
+              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
+            } else if (key in this.combatResistance) {
+              this.combatResistance[key] = Math.max(0, this.combatResistance[key] - bonus.value)
+              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
+            } else if (key in this.specialAttributes) {
+              this.specialAttributes[key] -= bonus.value
+              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
+            }
+          } else {
+            if (this.artifactBonuses[key] !== undefined) {
+              this.artifactBonuses[key] -= bonus.value
+              if (key in this.baseAttributes) {
+                this.baseAttributes[key] -= bonus.value
+              } else if (key in this.combatAttributes) {
+                this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - bonus.value)
+              } else if (key in this.combatResistance) {
+                this.combatResistance[key] = Math.max(0, this.combatResistance[key] - bonus.value)
+              } else if (key in this.specialAttributes) {
+                this.specialAttributes[key] -= bonus.value
+              }
+            }
+          }
+        })
+      }
+      const allBonuses = []
+      activeSets.forEach(setInfo => {
+        setInfo.bonuses.forEach(bonus => {
+          allBonuses.push(bonus)
+        })
+      })
+      allBonuses.forEach(bonus => {
+        const key = bonus.stat
+        if (bonus.valueType === 'percent') {
+          if (key in this.baseAttributes) {
+            const bonusAmount = this.baseAttributes[key] * bonus.value
+            this.baseAttributes[key] += bonusAmount
+            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonusAmount
+          } else if (key in this.combatAttributes) {
+            this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + bonus.value)
+            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+          } else if (key in this.combatResistance) {
+            this.combatResistance[key] = Math.min(1, this.combatResistance[key] + bonus.value)
+            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+          } else if (key in this.specialAttributes) {
+            this.specialAttributes[key] += bonus.value
+            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+          }
+        } else {
+          if (this.artifactBonuses[key] !== undefined) {
+            this.artifactBonuses[key] += bonus.value
+            if (key in this.baseAttributes) {
+              this.baseAttributes[key] += bonus.value
+            } else if (key in this.combatAttributes) {
+              this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + bonus.value)
+            } else if (key in this.combatResistance) {
+              this.combatResistance[key] = Math.min(1, this.combatResistance[key] + bonus.value)
+            } else if (key in this.specialAttributes) {
+              this.specialAttributes[key] += bonus.value
+            }
+          }
+        }
+      })
+      this[setBonusKey] = allBonuses
+    },
     // 获取装备总加成
     getArtifactBonus(type) {
       return this.artifactBonuses[type] || 1
+    },
+    // 开始挂机探索
+    startIdleExploration(zoneId, durationMinutes) {
+      this.idleExploration = {
+        isActive: true,
+        zoneId,
+        startTime: Date.now(),
+        duration: durationMinutes * 60 * 1000,
+        encounterCount: 0,
+        lastEncounterTime: Date.now(),
+        logs: [],
+        stats: {
+          victories: 0,
+          defeats: 0,
+          rewards: 0,
+          spiritStones: 0,
+          itemsFound: 0
+        }
+      }
+      this.queueSave()
+    },
+    // 更新挂机探索状态
+    updateIdleExploration(data) {
+      if (!this.idleExploration.isActive) return
+      this.idleExploration = {
+        ...this.idleExploration,
+        ...data
+      }
+      this.queueSave()
+    },
+    // 停止挂机探索
+    stopIdleExploration() {
+      this.idleExploration.isActive = false
+      this.queueSave()
+    },
+    // 获取挂机剩余时间
+    getIdleRemainingTime() {
+      if (!this.idleExploration.isActive) return 0
+      const elapsed = Date.now() - this.idleExploration.startTime
+      return Math.max(0, this.idleExploration.duration - elapsed)
+    },
+    // 检查挂机是否完成
+    isIdleExplorationComplete() {
+      if (!this.idleExploration.isActive) return true
+      return Date.now() - this.idleExploration.startTime >= this.idleExploration.duration
     },
     // 获得丹方残页
     gainPillFragment(recipeId) {

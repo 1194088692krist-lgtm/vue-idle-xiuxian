@@ -283,6 +283,7 @@ import { usePlayerStore } from '../stores/player'
 import { zones } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRealmName } from '../plugins/realm'
+import { getAffixesForSlot, setBonuses } from '../plugins/buildSystem'
 
 const playerStore = usePlayerStore()
 
@@ -539,27 +540,44 @@ const generateEquipment = (rarity, zone) => {
     common: 1, uncommon: 1.3, rare: 1.8, epic: 2.5, legendary: 4, mythic: 7
   }
   const mult = rarityMultipliers[rarity] || 1
+  const affixes = getAffixesForSlot(slot, rarity)
+  let setId = null
+  if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
+    const availableSets = setBonuses.filter(s => s.pieces.includes(slot))
+    if (availableSets.length > 0) {
+      setId = availableSets[Math.floor(Math.random() * availableSets.length)].id
+    }
+  }
   return {
     id: Date.now() + Math.random(),
     type: 'equipment',
     slot,
-    name: getEquipName(slot, rarity),
+    name: getEquipName(slot, rarity, setId),
     quality: rarity,
+    rarity,
     stats: {
       attack: Math.floor(zone.recommendedStats.attack * 0.15 * mult),
       health: Math.floor(zone.recommendedStats.health * 0.1 * mult),
       defense: Math.floor(zone.recommendedStats.attack * 0.08 * mult),
       speed: Math.floor(5 * mult)
     },
+    affixes,
+    setId,
     enhanceLevel: 0,
     value: Math.floor(50 * zone.difficulty * mult)
   }
 }
 
-const getEquipName = (slot, rarity) => {
+const getEquipName = (slot, rarity, setId = null) => {
   const slotNames = { weapon: '剑', head: '冠', body: '袍', legs: '裤', feet: '靴', shoulder: '甲', hands: '套', wrist: '腕', necklace: '链', ring1: '戒', ring2: '戒', belt: '带' }
-  const rarityPrefix = { common: '', uncommon: '精良', rare: '稀有', epic: '史诗', legendary: '传说', mythic: '仙器' }
-  return (rarityPrefix[rarity] || '') + slotNames[slot]
+  const rarityPrefix = { common: '凡品', uncommon: '良品', rare: '上品', epic: '极品', legendary: '仙品', mythic: '神品' }
+  if (setId) {
+    const setData = setBonuses.find(s => s.id === setId)
+    if (setData) {
+      return `${setData.name}·${slotNames[slot]}`
+    }
+  }
+  return (rarityPrefix[rarity] || '凡品') + slotNames[slot]
 }
 
 // 生成灵宠
@@ -640,7 +658,7 @@ const startExplore = async () => {
   combatState.value = { inCombat: false, combatManager: null }
 }
 
-// ========== 挂机探索 ==========
+// ========== 挂机探索（持久化版） ==========
 const idleDurations = [
   { minutes: 5, encounters: 60 },
   { minutes: 10, encounters: 120 },
@@ -657,47 +675,135 @@ const currentIdleLogs = ref([])
 const lastIdleLog = ref(null)
 const idleLogRef = ref(null)
 
-let idleTimer = null
 let idleInterval = null
-let idleStartTime = 0
-let idleTotalMs = 0
+let idleTimer = null
 
 const displayIdleLogs = computed(() => {
   if (isIdling.value) return currentIdleLogs.value
   return lastIdleLog.value?.logs || []
 })
 
-const startIdle = () => {
-  if (!selectedZone.value || playerStore.spirit < 50) return
-  isIdling.value = true
-  idleEncounterCount.value = 0
-  currentIdleLogs.value = []
-  idleStartTime = Date.now()
-  idleTotalMs = selectedDuration.value * 60 * 1000
+const syncIdleStateFromStore = () => {
+  const idleState = playerStore.idleExploration
+  if (idleState && idleState.isActive) {
+    isIdling.value = true
+    idleEncounterCount.value = idleState.encounterCount
+    currentIdleLogs.value = idleState.logs ? [...idleState.logs] : []
+    if (!selectedZone.value && idleState.zoneId) {
+      selectedZone.value = zones.find(z => z.id === idleState.zoneId) || null
+    }
+    startIdleTimers()
+    processOfflineIdle()
+  }
+}
 
-  currentIdleLogs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}】，预计 ${selectedDuration.value} 分钟` })
+const processOfflineIdle = () => {
+  const idleState = playerStore.idleExploration
+  if (!idleState || !idleState.isActive) return
+  const now = Date.now()
+  const elapsed = now - idleState.startTime
+  const totalDuration = idleState.duration
+  if (elapsed >= totalDuration) {
+    const expectedEncounters = Math.floor(totalDuration / 5000)
+    const missed = Math.max(0, expectedEncounters - idleState.encounterCount)
+    if (missed > 0) {
+      currentIdleLogs.value.push({ type: 'info', text: `离线期间进行了 ${missed} 次探索...` })
+      const zone = zones.find(z => z.id === idleState.zoneId)
+      if (zone) {
+        for (let i = 0; i < Math.min(missed, 200); i++) {
+          runOfflineEncounter(zone, idleState.encounterCount + i + 1)
+        }
+      }
+    }
+    finishIdle()
+    return
+  }
+  const expectedEncounters = Math.floor(elapsed / 5000)
+  const missed = Math.max(0, expectedEncounters - idleState.encounterCount)
+  if (missed > 0) {
+    currentIdleLogs.value.push({ type: 'info', text: `离线期间进行了 ${missed} 次探索...` })
+    const zone = zones.find(z => z.id === idleState.zoneId)
+    if (zone) {
+      for (let i = 0; i < Math.min(missed, 100); i++) {
+        runOfflineEncounter(zone, idleState.encounterCount + i + 1)
+      }
+    }
+  }
+}
 
-  // 每5秒执行一次探索
+const runOfflineEncounter = (zone, count) => {
+  if (playerStore.spirit < 50) return false
+  playerStore.spirit -= 50
+  idleEncounterCount.value++
+  const recommended = zone.recommendedStats
+  const playerAttack = playerStore.baseAttributes.attack
+  const playerHealth = playerStore.baseAttributes.health
+  const winChance = Math.min(0.95, Math.max(0.3,
+    0.5 + (playerAttack - recommended.attack) * 0.02 + (playerHealth - recommended.health) * 0.002
+  ))
+  const isVictory = Math.random() < winChance
+  if (isVictory) {
+    const rewards = grantReward(zone, true, null)
+    playerStore.dungeonTotalKills++
+    playerStore.explorationCount++
+    if (rewards.length > 0) {
+      const rewardStrs = rewards.map(r => r.amount ? `${r.amount}${r.name}` : r.name).join('、')
+      currentIdleLogs.value.push({ type: 'victory', text: `[${count}] 胜利，获得：${rewardStrs}` })
+      for (const r of rewards) {
+        if (r.type === 'equipment' || r.type === 'pet') {
+          const tier = r.info?.tier || 'normal'
+          if (tier === 'legendary') {
+            currentIdleLogs.value.push({ type: 'reward-legendary', text: `🌟【神品降临】获得${r.name}！金光万丈！` })
+          } else if (tier === 'epic') {
+            currentIdleLogs.value.push({ type: 'reward-epic', text: `✨【极品宝物】获得${r.name}！紫气东来！` })
+          }
+        }
+      }
+    } else {
+      currentIdleLogs.value.push({ type: 'victory', text: `[${count}] 胜利，无掉落` })
+    }
+  } else {
+    const loss = Math.floor(playerStore.cultivation * 0.02)
+    playerStore.cultivation = Math.max(0, playerStore.cultivation - loss)
+    playerStore.dungeonDeathCount++
+    currentIdleLogs.value.push({ type: 'defeat', text: `[${count}] 战败` })
+  }
+  playerStore.updateIdleExploration({
+    encounterCount: idleEncounterCount.value,
+    lastEncounterTime: Date.now(),
+    logs: currentIdleLogs.value.slice(-500)
+  })
+  return isVictory
+}
+
+const startIdleTimers = () => {
+  if (idleInterval) clearInterval(idleInterval)
+  if (idleTimer) clearInterval(idleTimer)
   idleInterval = setInterval(async () => {
     await runIdleEncounter()
   }, 5000)
-
-  // 每秒更新倒计时
   idleTimer = setInterval(() => {
-    const elapsed = Date.now() - idleStartTime
-    const remaining = Math.max(0, idleTotalMs - elapsed)
-    idleProgress.value = (elapsed / idleTotalMs) * 100
-
+    const remaining = playerStore.getIdleRemainingTime()
+    const elapsed = playerStore.idleExploration.duration - remaining
+    const total = playerStore.idleExploration.duration
+    idleProgress.value = total > 0 ? (elapsed / total) * 100 : 0
     const min = Math.floor(remaining / 60000)
     const sec = Math.floor((remaining % 60000) / 1000)
     idleTimeRemaining.value = `${min}:${String(sec).padStart(2, '0')}`
-
     if (remaining <= 0) {
       finishIdle()
     }
   }, 1000)
+}
 
-  // 初始倒计时
+const startIdle = () => {
+  if (!selectedZone.value || playerStore.spirit < 50) return
+  playerStore.startIdleExploration(selectedZone.value.id, selectedDuration.value)
+  isIdling.value = true
+  idleEncounterCount.value = 0
+  currentIdleLogs.value = []
+  currentIdleLogs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}】，预计 ${selectedDuration.value} 分钟` })
+  startIdleTimers()
   const min = selectedDuration.value
   idleTimeRemaining.value = `${min}:00`
 }
@@ -709,21 +815,15 @@ const runIdleEncounter = async () => {
     finishIdle()
     return
   }
-
   playerStore.spirit -= 50
   idleEncounterCount.value++
   const count = idleEncounterCount.value
-
   const result = await runExploreCombat(selectedZone.value, count, true)
-
   if (result.victory) {
     const rewards = grantReward(selectedZone.value, true, null)
     playerStore.dungeonTotalKills++
     playerStore.explorationCount++
-
-    // 构建日志
-    const enemyName = result.enemy.name
-    let logText = `[${count}] 击败${enemyName}`
+    let logText = `[${count}] 击败${result.enemy.name}`
     if (rewards.length > 0) {
       const rewardStrs = rewards.map(r => {
         if (r.type === 'equipment' || r.type === 'pet') {
@@ -732,8 +832,6 @@ const runIdleEncounter = async () => {
         return `${r.amount}${r.name}`
       })
       logText += `，获得：${rewardStrs.join('、')}`
-
-      // 根据品质设置日志类型
       for (const r of rewards) {
         if (r.type === 'equipment' || r.type === 'pet') {
           const tier = r.info?.tier || 'normal'
@@ -758,10 +856,11 @@ const runIdleEncounter = async () => {
     playerStore.dungeonDeathCount++
     currentIdleLogs.value.push({ type: 'defeat', text: `[${count}] 被${result.enemy.name}击败，损失${loss}修为` })
   }
-
-  playerStore.queueSave()
-
-  // 自动滚动到底部
+  playerStore.updateIdleExploration({
+    encounterCount: idleEncounterCount.value,
+    lastEncounterTime: Date.now(),
+    logs: currentIdleLogs.value.slice(-500)
+  })
   nextTick(() => {
     if (idleLogRef.value) {
       idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
@@ -773,10 +872,8 @@ const finishIdle = () => {
   if (!isIdling.value) return
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
-
-  // 保存上次挂机日志
   const summary = {
-    zoneName: selectedZone.value.name,
+    zoneName: selectedZone.value?.name || '未知',
     duration: selectedDuration.value,
     encounters: idleEncounterCount.value,
     victories: currentIdleLogs.value.filter(l => l.type === 'victory').length,
@@ -787,7 +884,7 @@ const finishIdle = () => {
     logs: [...currentIdleLogs.value]
   }
   lastIdleLog.value = summary
-
+  playerStore.stopIdleExploration()
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
@@ -797,6 +894,10 @@ const finishIdle = () => {
 const stopIdle = () => {
   finishIdle()
 }
+
+onMounted(() => {
+  syncIdleStateFromStore()
+})
 
 onUnmounted(() => {
   if (idleInterval) clearInterval(idleInterval)
