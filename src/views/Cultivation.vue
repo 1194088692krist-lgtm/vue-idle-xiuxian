@@ -1,107 +1,235 @@
 <template>
-  <div class="cultivation-page fade-in-up">
-    <div class="cultivation-card glass-card">
-      <div class="card-header">
-        <div class="header-icon">
-            <BookOutlined />
+  <div class="character-page fade-in-up">
+    <!-- 人物信息卡 -->
+    <div class="char-card glass-card">
+      <div class="char-header">
+        <div class="char-avatar">
+          <span>仙</span>
+        </div>
+        <div class="char-info">
+          <div class="char-name-row">
+            <h2 class="char-name">{{ playerStore.name }}</h2>
+            <span v-if="playerStore.rebirthCount > 0" class="rebirth-badge">
+              第{{ playerStore.rebirthCount }}世
+            </span>
           </div>
-        <div class="header-info">
-          <h2 class="card-title gold-gradient-text">修炼</h2>
-          <p class="card-subtitle">打坐修炼，积累修为，突破境界</p>
+          <div class="char-realm" :style="{ color: getRealmColor(playerStore.level) }">
+            {{ getRealmName(playerStore.level)?.name || playerStore.realm }}
+          </div>
+          <div class="char-level">Lv.{{ playerStore.level }}</div>
         </div>
       </div>
-      <div class="card-body">
-        <div class="cultivation-progress">
-          <div class="progress-header">
-            <span class="progress-label">当前修为</span>
-            <span class="progress-value">
-              <AnimatedNumber :value="playerStore.cultivation" :highlight="true" /> / 
-              <AnimatedNumber :value="playerStore.maxCultivation" />
-            </span>
-          </div>
-          <div class="progress-bar-container">
-            <div 
-              class="progress-bar" 
-              :style="{ width: `${(playerStore.cultivation / playerStore.maxCultivation) * 100}%` }"
-            >
-              <div class="progress-glow"></div>
-            </div>
-          </div>
-          <div class="progress-percentage">{{ ((playerStore.cultivation / playerStore.maxCultivation) * 100).toFixed(1) }}%</div>
+
+      <!-- 修为进度 -->
+      <div class="cultivation-progress">
+        <div class="progress-header">
+          <span class="progress-label">修为</span>
+          <span class="progress-value">
+            {{ Math.floor(playerStore.cultivation) }} / {{ playerStore.maxCultivation }}
+          </span>
         </div>
-        <div class="tips-box">
-            <InfoCircleOutlined />
-            <span>通过打坐修炼来提升修为，积累足够的修为后可以尝试突破境界。</span>
-          </div>
-        <div class="action-buttons">
-          <button
-            class="btn btn-primary"
-            :class="{ disabled: playerStore.spirit < cultivationCost }"
-            @click="cultivate"
+        <div class="progress-bar-container">
+          <div
+            class="progress-bar"
+            :style="{ width: `${(playerStore.cultivation / playerStore.maxCultivation) * 100}%` }"
           >
-            <span class="btn-icon"><ArrowUpOutlined /></span>
-            <span>打坐修炼</span>
-            <span class="btn-cost">消耗 {{ cultivationCost }} 灵力</span>
-          </button>
-          <button
-            class="btn"
-            :class="isAutoCultivating ? 'btn-warning' : 'btn-success'"
-            @click="toggleAutoCultivation"
-          >
-            <span class="btn-icon">
-              <PauseCircleOutlined v-if="isAutoCultivating" />
-              <PlayCircleOutlined v-else />
-            </span>
-            <span>{{ isAutoCultivating ? '停止自动修炼' : '开始自动修炼' }}</span>
-          </button>
-          <button
-            class="btn btn-info"
-            :class="{ disabled: playerStore.spirit < calculateBreakthroughCost() }"
-            @click="cultivateUntilBreakthrough"
-          >
-            <span class="btn-icon"><AimOutlined /></span>
-            <span>一键突破</span>
-          </button>
-        </div>
-        <div class="stats-section">
-          <h3 class="section-title">修炼详情</h3>
-          <div class="stats-grid">
-            <div class="stat-item">
-              <div class="stat-icon">
-                <ArrowUpOutlined />
-              </div>
-              <div class="stat-content">
-                <div class="stat-label">灵力获取速率</div>
-                <div class="stat-value"><AnimatedNumber :value="baseGainRate * playerStore.spiritRate" /> / 秒</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-icon">
-                <AimOutlined />
-              </div>
-              <div class="stat-content">
-                <div class="stat-label">修炼效率</div>
-                <div class="stat-value"><AnimatedNumber :value="cultivationGain" /> 修为 / 次</div>
-              </div>
-            </div>
-            <div class="stat-item">
-              <div class="stat-icon">
-                <StarOutlined />
-              </div>
-              <div class="stat-content">
-                <div class="stat-label">突破所需修为</div>
-                <div class="stat-value"><AnimatedNumber :value="playerStore.maxCultivation" /></div>
-              </div>
-            </div>
+            <div class="progress-glow"></div>
           </div>
         </div>
-        <div class="log-section">
-          <h3 class="section-title">修炼日志</h3>
-          <log-panel ref="logRef" />
+        <div class="progress-percentage">
+          {{ ((playerStore.cultivation / playerStore.maxCultivation) * 100).toFixed(1) }}%
         </div>
       </div>
     </div>
-    <BreakthroughEffect 
+
+    <!-- 属性面板 -->
+    <div class="stats-card glass-card">
+      <h3 class="section-title">人物属性</h3>
+      <div class="stats-grid">
+        <div class="stat-item">
+          <span class="stat-label">攻击</span>
+          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.attack) }}</span>
+          <span v-if="playerStore.rebirthBonus.attack" class="stat-bonus">+{{ playerStore.rebirthBonus.attack }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">生命</span>
+          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.health) }}</span>
+          <span v-if="playerStore.rebirthBonus.health" class="stat-bonus">+{{ playerStore.rebirthBonus.health }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">防御</span>
+          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.defense) }}</span>
+          <span v-if="playerStore.rebirthBonus.defense" class="stat-bonus">+{{ playerStore.rebirthBonus.defense }}</span>
+        </div>
+        <div class="stat-item">
+          <span class="stat-label">速度</span>
+          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.speed) }}</span>
+          <span v-if="playerStore.rebirthBonus.speed" class="stat-bonus">+{{ playerStore.rebirthBonus.speed }}</span>
+        </div>
+      </div>
+
+      <!-- 战斗属性 -->
+      <div class="combat-stats">
+        <h4 class="sub-title">战斗属性</h4>
+        <div class="combat-grid">
+          <div class="combat-item">
+            <span class="combat-label">暴击率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.critRate * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="combat-item">
+            <span class="combat-label">连击率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.comboRate * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="combat-item">
+            <span class="combat-label">闪避率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.dodgeRate * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="combat-item">
+            <span class="combat-label">吸血率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.vampireRate * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="combat-item">
+            <span class="combat-label">反击率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.counterRate * 100).toFixed(1) }}%</span>
+          </div>
+          <div class="combat-item">
+            <span class="combat-label">眩晕率</span>
+            <span class="combat-value">{{ (playerStore.combatAttributes.stunRate * 100).toFixed(1) }}%</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 资源信息 -->
+      <div class="resource-stats">
+        <h4 class="sub-title">资源信息</h4>
+        <div class="resource-grid">
+          <div class="resource-item">
+            <span class="resource-label">灵力</span>
+            <span class="resource-value">{{ Math.floor(playerStore.spirit) }}</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-label">灵石</span>
+            <span class="resource-value">{{ playerStore.spiritStones }}</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-label">强化石</span>
+            <span class="resource-value">{{ playerStore.reinforceStones }}</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-label">洗练石</span>
+            <span class="resource-value">{{ playerStore.refinementStones }}</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-label">灵力倍率</span>
+            <span class="resource-value">x{{ playerStore.spiritRate.toFixed(1) }}</span>
+          </div>
+          <div class="resource-item">
+            <span class="resource-label">幸运值</span>
+            <span class="resource-value">{{ playerStore.luck }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 修炼系统 -->
+    <div class="cultivation-card glass-card">
+      <h3 class="section-title">修炼突破</h3>
+      <div class="action-buttons">
+        <button
+          class="btn btn-primary"
+          :class="{ disabled: playerStore.spirit < cultivationCost }"
+          @click="cultivate"
+        >
+          <span>打坐修炼</span>
+          <span class="btn-cost">消耗 {{ cultivationCost }} 灵力</span>
+        </button>
+        <button
+          class="btn"
+          :class="isAutoCultivating ? 'btn-warning' : 'btn-success'"
+          @click="toggleAutoCultivation"
+        >
+          <span>{{ isAutoCultivating ? '停止自动' : '自动修炼' }}</span>
+        </button>
+        <button
+          class="btn btn-info"
+          :class="{ disabled: playerStore.spirit < calculateBreakthroughCost() }"
+          @click="cultivateUntilBreakthrough"
+        >
+          <span>一键突破</span>
+          <span class="btn-cost">消耗 {{ calculateBreakthroughCost() }} 灵力</span>
+        </button>
+      </div>
+
+      <div class="cultivation-detail">
+        <div class="detail-item">
+          <span class="detail-label">修炼效率</span>
+          <span class="detail-value">{{ cultivationGain }} 修为/次</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">灵力获取</span>
+          <span class="detail-value">{{ (baseGainRate * playerStore.spiritRate).toFixed(1) }} /秒</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">突破次数</span>
+          <span class="detail-value">{{ playerStore.breakthroughCount }}</span>
+        </div>
+        <div class="detail-item">
+          <span class="detail-label">修炼时长</span>
+          <span class="detail-value">{{ playerStore.totalCultivationTime }}</span>
+        </div>
+      </div>
+
+      <div class="log-section">
+        <h4 class="sub-title">修炼日志</h4>
+        <log-panel ref="logRef" />
+      </div>
+    </div>
+
+    <!-- 转生系统 -->
+    <div class="rebirth-card glass-card">
+      <h3 class="section-title">转生渡劫</h3>
+      <p class="rebirth-desc">
+        达到50级后可转生，重置等级但获得永久属性加成。每次转生加成更加强大。
+      </p>
+      <div v-if="playerStore.rebirthCount > 0" class="rebirth-bonus-display">
+        <div class="bonus-item">
+          <span class="bonus-label">攻击加成</span>
+          <span class="bonus-value">+{{ playerStore.rebirthBonus.attack }}</span>
+        </div>
+        <div class="bonus-item">
+          <span class="bonus-label">生命加成</span>
+          <span class="bonus-value">+{{ playerStore.rebirthBonus.health }}</span>
+        </div>
+        <div class="bonus-item">
+          <span class="bonus-label">防御加成</span>
+          <span class="bonus-value">+{{ playerStore.rebirthBonus.defense }}</span>
+        </div>
+        <div class="bonus-item">
+          <span class="bonus-label">速度加成</span>
+          <span class="bonus-value">+{{ playerStore.rebirthBonus.speed }}</span>
+        </div>
+        <div class="bonus-item">
+          <span class="bonus-label">修炼效率</span>
+          <span class="bonus-value">+{{ (playerStore.rebirthBonus.cultivationRate * 100).toFixed(0) }}%</span>
+        </div>
+        <div class="bonus-item">
+          <span class="bonus-label">灵力效率</span>
+          <span class="bonus-value">+{{ (playerStore.rebirthBonus.spiritRate * 100).toFixed(0) }}%</span>
+        </div>
+      </div>
+      <button
+        class="btn btn-rebirth"
+        :class="{ disabled: playerStore.level < 50 }"
+        @click="tryRebirth"
+      >
+        <span>{{ playerStore.level >= 50 ? '转生渡劫' : `需达到50级 (当前${playerStore.level}级)` }}</span>
+      </button>
+      <div v-if="playerStore.rebirthCount > 0" class="rebirth-count">
+        当前为第 <span class="rebirth-num">{{ playerStore.rebirthCount }}</span> 世
+      </div>
+    </div>
+
+    <BreakthroughEffect
       :visible="showBreakthroughEffect"
       :realm-name="breakthroughRealm"
       :realm-color="breakthroughColor"
@@ -111,406 +239,439 @@
 </template>
 
 <script setup>
-  import { usePlayerStore } from '../stores/player'
-  import { ref, computed, onMounted, onUnmounted } from 'vue'
-  import {
-    BookOutlined,
-    InfoCircleOutlined,
-    ArrowUpOutlined,
-    PlayCircleOutlined,
-    PauseCircleOutlined,
-    AimOutlined,
-    StarOutlined
-  } from '@ant-design/icons-vue'
-  import { getRealmName, getRealmColor } from '../plugins/realm'
-  import LogPanel from '../components/LogPanel.vue'
-  import AnimatedNumber from '../components/AnimatedNumber.vue'
-  import BreakthroughEffect from '../components/BreakthroughEffect.vue'
+import { usePlayerStore } from '../stores/player'
+import { ref, computed, onMounted, onUnmounted } from 'vue'
+import { useMessage, useDialog } from 'naive-ui'
+import { getRealmName, getRealmColor } from '../plugins/realm'
+import LogPanel from '../components/LogPanel.vue'
+import BreakthroughEffect from '../components/BreakthroughEffect.vue'
 
-  const playerStore = usePlayerStore()
-  const logRef = ref(null)
-  const showBreakthroughEffect = ref(false)
-  const breakthroughRealm = ref('')
-  const breakthroughColor = ref('#DAA520')
+const playerStore = usePlayerStore()
+const message = useMessage()
+const dialog = useDialog()
+const logRef = ref(null)
+const showBreakthroughEffect = ref(false)
+const breakthroughRealm = ref('')
+const breakthroughColor = ref('#DAA520')
 
-  const baseGainRate = 1
-  const baseCultivationCost = 10
-  const baseCultivationGain = 1
-  const autoGainInterval = 1000
-  const extraCultivationChance = 0.3
+const baseGainRate = 1
+const baseCultivationCost = 10
+const baseCultivationGain = 1
+const autoGainInterval = 1000
+const extraCultivationChance = 0.3
 
-  const getCurrentCultivationCost = () => {
-    return Math.floor(baseCultivationCost * Math.pow(1.5, playerStore.level - 1))
+const getCurrentCultivationCost = () => Math.floor(baseCultivationCost * Math.pow(1.5, playerStore.level - 1))
+const getCurrentCultivationGain = () => Math.floor(baseCultivationGain * Math.pow(1.2, playerStore.level - 1))
+
+const cultivationCost = computed(() => getCurrentCultivationCost())
+const cultivationGain = computed(() => getCurrentCultivationGain())
+
+const calculateBreakthroughCost = () => {
+  const remaining = Math.max(0, playerStore.maxCultivation - playerStore.cultivation)
+  const gain = cultivationGain.value || 1
+  if (gain <= 0) return 0
+  return Math.max(0, Math.ceil(remaining / gain) * getCurrentCultivationCost())
+}
+
+const isAutoCultivating = ref(false)
+const cultivationTimer = ref(null)
+const cultivationWorker = ref(null)
+
+const showMessage = (type, content) => logRef.value?.addLog(type, content)
+
+const calculateCultivationGain = () => {
+  let gain = cultivationGain.value
+  if (Math.random() < extraCultivationChance * playerStore.luck) {
+    gain *= 2
+    showMessage('success', '福缘不错，获得双倍修为！')
   }
+  return gain
+}
 
-  const getCurrentCultivationGain = () => {
-    return Math.floor(baseCultivationGain * Math.pow(1.2, playerStore.level - 1))
-  }
+const canBreakthrough = () => playerStore.cultivation >= playerStore.maxCultivation
 
-  const cultivationCost = computed(() => getCurrentCultivationCost())
-  const cultivationGain = computed(() => getCurrentCultivationGain())
-
-  const calculateBreakthroughCost = () => {
-    const remainingCultivation = Math.max(0, playerStore.maxCultivation - playerStore.cultivation)
-    const gain = cultivationGain.value || 1
-    if (gain <= 0) return 0
-    const cultivationTimes = Math.ceil(remainingCultivation / gain)
-    return Math.max(0, cultivationTimes * getCurrentCultivationCost())
-  }
-
-  const isAutoCultivating = ref(false)
-  const cultivationTimer = ref(null)
-
-  const showMessage = (type, content) => {
-    return logRef.value?.addLog(type, content)
-  }
-
-  const calculateCultivationGain = () => {
-    let gain = cultivationGain.value
-    if (Math.random() < extraCultivationChance * playerStore.luck) {
-      gain *= 2
-      showMessage('success', '福缘不错，获得双倍修为！')
-    }
-    return gain
-  }
-
-  const canBreakthrough = () => {
-    return playerStore.cultivation >= playerStore.maxCultivation
-  }
-
-  const cultivationWorker = ref(null)
-
-  const initCultivationWorker = () => {
-    cultivationWorker.value = new Worker(new URL('../workers/cultivation.js', import.meta.url), { type: 'module' })
-    cultivationWorker.value.onmessage = ({ data }) => {
-      if (data.type === 'error') {
-        showMessage('error', data.message)
-        return
-      }
-      if (data.type === 'success') {
-        const { spiritCost, cultivationGain: gain, doubleGainTimes } = data.result
-        playerStore.spirit -= spiritCost
-        playerStore.cultivate(gain)
-        if (doubleGainTimes > 0) {
-          showMessage('success', `福缘不错，获得${doubleGainTimes}次双倍修为！`)
-        }
-        if (canBreakthrough() && playerStore.tryBreakthrough()) {
-          showMessage('success', `突破成功！恭喜进入${playerStore.realm}！`)
-        } else if (canBreakthrough()) {
-          showMessage('info', '已达到突破条件，但突破失败，请继续努力！')
-        } else {
-          showMessage('success', '修炼成功！')
-        }
-      }
-    }
-  }
-
-  const cultivateUntilBreakthrough = () => {
-    try {
-      if (!canBreakthrough()) {
-        cultivationWorker.value?.postMessage({
-          type: 'cultivateUntilBreakthrough',
-          playerData: {
-            level: playerStore.level,
-            spirit: playerStore.spirit,
-            cultivation: playerStore.cultivation,
-            maxCultivation: playerStore.maxCultivation,
-            luck: playerStore.luck
-          }
-        })
+const initCultivationWorker = () => {
+  cultivationWorker.value = new Worker(new URL('../workers/cultivation.js', import.meta.url), { type: 'module' })
+  cultivationWorker.value.onmessage = ({ data }) => {
+    if (data.type === 'error') { showMessage('error', data.message); return }
+    if (data.type === 'success') {
+      const { spiritCost, cultivationGain: gain, doubleGainTimes } = data.result
+      playerStore.spirit -= spiritCost
+      playerStore.cultivate(gain)
+      if (doubleGainTimes > 0) showMessage('success', `获得${doubleGainTimes}次双倍修为！`)
+      if (canBreakthrough() && playerStore.tryBreakthrough()) {
+        showMessage('success', `突破成功！进入${playerStore.realm}！`)
+      } else if (canBreakthrough()) {
+        showMessage('info', '已达到突破条件')
       } else {
-        if (playerStore.tryBreakthrough()) {
-          showMessage('success', `突破成功！恭喜进入${playerStore.realm}！`)
-        } else {
-          showMessage('info', '已达到突破条件，但突破失败，请继续努力！')
-        }
+        showMessage('success', '修炼成功！')
       }
-    } catch (error) {
-      console.error('一键修炼出错：', error)
-      showMessage('error', '修炼失败！')
     }
   }
+}
 
-  const cultivate = () => {
-    try {
+const cultivateUntilBreakthrough = () => {
+  if (!canBreakthrough()) {
+    cultivationWorker.value?.postMessage({
+      type: 'cultivateUntilBreakthrough',
+      playerData: {
+        level: playerStore.level, spirit: playerStore.spirit,
+        cultivation: playerStore.cultivation, maxCultivation: playerStore.maxCultivation,
+        luck: playerStore.luck
+      }
+    })
+  } else {
+    if (playerStore.tryBreakthrough()) {
+      showMessage('success', `突破成功！进入${playerStore.realm}！`)
+    }
+  }
+}
+
+const cultivate = () => {
+  const currentCost = getCurrentCultivationCost()
+  if (playerStore.spirit >= currentCost) {
+    const oldLevel = playerStore.level
+    playerStore.spirit -= currentCost
+    playerStore.cultivate(calculateCultivationGain())
+    if (playerStore.level !== oldLevel) {
+      showMessage('success', `突破成功！进入${playerStore.realm}！`)
+      breakthroughRealm.value = getRealmName(playerStore.level)?.name || playerStore.realm
+      breakthroughColor.value = getRealmColor(playerStore.level)
+      showBreakthroughEffect.value = true
+    } else {
+      showMessage('success', '修炼成功！')
+    }
+  } else {
+    showMessage('error', '灵力不足！')
+  }
+}
+
+const toggleAutoCultivation = () => {
+  if (isAutoCultivating.value) {
+    isAutoCultivating.value = false
+    if (cultivationTimer.value) { clearInterval(cultivationTimer.value); cultivationTimer.value = null }
+  } else {
+    isAutoCultivating.value = true
+    cultivationTimer.value = setInterval(() => {
       const currentCost = getCurrentCultivationCost()
       if (playerStore.spirit >= currentCost) {
-        const oldLevel = playerStore.level
         playerStore.spirit -= currentCost
-        playerStore.cultivate(calculateCultivationGain())
-        if (playerStore.level !== oldLevel) {
-          showMessage('success', `突破成功！恭喜进入${playerStore.realm}！`)
-          breakthroughRealm.value = getRealmName(playerStore.level)?.name || playerStore.realm
-          breakthroughColor.value = getRealmColor(playerStore.level)
-          showBreakthroughEffect.value = true
-        } else {
-          showMessage('success', '修炼成功！')
-        }
-      } else {
-        showMessage('error', '灵力不足！')
+        playerStore.cultivate(cultivationGain.value)
       }
-    } catch (error) {
-      console.error('修炼出错：', error)
-      showMessage('error', '修炼失败！')
-    }
+    }, autoGainInterval)
   }
+}
 
-  const toggleAutoCultivation = () => {
-    try {
-      if (isAutoCultivating.value) {
+const tryRebirth = () => {
+  if (playerStore.level < 50) return
+  dialog.warning({
+    title: '转生渡劫',
+    content: `转生将重置等级为1，但保留灵石、装备和物品。第${playerStore.rebirthCount + 1}次转生将获得：
+      \n攻击+${5 * (playerStore.rebirthCount + 1)}、生命+${50 * (playerStore.rebirthCount + 1)}
+      \n防御+${3 * (playerStore.rebirthCount + 1)}、速度+${2 * (playerStore.rebirthCount + 1)}
+      \n修炼效率+${10 * (playerStore.rebirthCount + 1)}%、灵力效率+${10 * (playerStore.rebirthCount + 1)}%
+      \n\n确定要转生吗？`,
+    positiveText: '确认转生',
+    negativeText: '取消',
+    onPositiveClick: () => {
+      const result = playerStore.rebirth()
+      if (result.success) {
+        message.success(result.message)
+        showMessage('success', result.message)
         isAutoCultivating.value = false
-        if (cultivationTimer.value) {
-          clearInterval(cultivationTimer.value)
-          cultivationTimer.value = null
-        }
+        if (cultivationTimer.value) { clearInterval(cultivationTimer.value); cultivationTimer.value = null }
       } else {
-        if (cultivationTimer.value) return
-        isAutoCultivating.value = true
-        cultivationTimer.value = setInterval(() => {
-          const currentCost = getCurrentCultivationCost()
-          if (playerStore.spirit >= currentCost) {
-            playerStore.spirit -= currentCost
-            playerStore.cultivate(cultivationGain.value)
-          }
-        }, autoGainInterval)
-      }
-    } catch (error) {
-      console.error('切换自动修炼出错：', error)
-      logRef.value?.addLog('error', '切换失败！')
-      isAutoCultivating.value = false
-      if (cultivationTimer.value) {
-        clearInterval(cultivationTimer.value)
-        cultivationTimer.value = null
+        message.error(result.message)
       }
     }
-  }
-
-  onMounted(() => {
-    initCultivationWorker()
   })
+}
 
-  onUnmounted(() => {
-    try {
-      if (cultivationTimer.value) {
-        clearInterval(cultivationTimer.value)
-        cultivationTimer.value = null
-      }
-      isAutoCultivating.value = false
-      if (cultivationWorker.value) {
-        cultivationWorker.value.terminate()
-        cultivationWorker.value = null
-      }
-    } catch (error) {
-      console.error('清理修炼资源出错：', error)
-    }
-  })
+onMounted(() => { initCultivationWorker() })
+onUnmounted(() => {
+  if (cultivationTimer.value) { clearInterval(cultivationTimer.value); cultivationTimer.value = null }
+  if (cultivationWorker.value) { cultivationWorker.value.terminate(); cultivationWorker.value = null }
+  isAutoCultivating.value = false
+})
 </script>
 
 <style scoped>
-  .cultivation-page {
-    max-width: 100%;
-  }
+.character-page {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+}
 
-  .cultivation-card {
-    padding: 16px;
-  }
+/* 人物信息卡 */
+.char-card {
+  padding: 16px;
+  border-radius: 12px;
+}
+.char-header {
+  display: flex;
+  align-items: center;
+  gap: 16px;
+  margin-bottom: 12px;
+}
+.char-avatar {
+  width: 64px; height: 64px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B4513, #DAA520);
+  display: flex; align-items: center; justify-content: center;
+  font-size: 28px;
+  color: #fff;
+  font-weight: bold;
+}
+.char-info {
+  flex: 1;
+}
+.char-name-row {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.char-name {
+  margin: 0;
+  font-size: 20px;
+  color: #DAA520;
+}
+.rebirth-badge {
+  padding: 2px 8px;
+  background: linear-gradient(135deg, #FF6347, #FFD700);
+  border-radius: 4px;
+  font-size: 11px;
+  color: #fff;
+  font-weight: bold;
+}
+.char-realm {
+  font-size: 14px;
+  margin: 4px 0;
+}
+.char-level {
+  font-size: 13px;
+  color: #888;
+}
 
-  .card-header {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    margin-bottom: 16px;
-    padding-bottom: 12px;
-    border-bottom: 1px solid rgba(139, 69, 19, 0.3);
-  }
+/* 修为进度 */
+.cultivation-progress {
+  margin-top: 8px;
+}
+.progress-header {
+  display: flex;
+  justify-content: space-between;
+  margin-bottom: 4px;
+  font-size: 13px;
+}
+.progress-label { color: #888; }
+.progress-value { color: #fff; font-weight: bold; }
+.progress-bar-container {
+  height: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 5px;
+  overflow: hidden;
+}
+.progress-bar {
+  height: 100%;
+  background: linear-gradient(90deg, #8B4513, #DAA520);
+  border-radius: 5px;
+  transition: width 0.5s;
+  position: relative;
+}
+.progress-glow {
+  position: absolute;
+  top: 0; left: 0; right: 0; bottom: 0;
+  background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
+  animation: shimmer 2s infinite;
+}
+@keyframes shimmer {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(100%); }
+}
+.progress-percentage {
+  text-align: right;
+  font-size: 11px;
+  color: #888;
+  margin-top: 2px;
+}
 
-  .header-icon {
-    width: 44px;
-    height: 44px;
-    border-radius: 12px;
-    background: linear-gradient(135deg, rgba(139, 69, 19, 0.3), rgba(218, 165, 32, 0.2));
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 22px;
-    color: #DAA520;
-  }
+/* 属性面板 */
+.stats-card {
+  padding: 16px;
+  border-radius: 12px;
+}
+.section-title {
+  margin: 0 0 12px;
+  font-size: 16px;
+  color: #DAA520;
+  font-weight: bold;
+}
+.sub-title {
+  margin: 12px 0 8px;
+  font-size: 14px;
+  color: #aaa;
+  font-weight: bold;
+}
+.stats-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+.stat-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  font-size: 14px;
+}
+.stat-label { color: #888; flex: 1; }
+.stat-value { color: #fff; font-weight: bold; }
+.stat-bonus { color: #66BB6A; font-size: 12px; }
 
-  .card-title {
-    font-family: 'Ma Shan Zheng', cursive;
-    font-size: 24px;
-    margin: 0;
-  }
+.combat-stats {
+  margin-top: 12px;
+}
+.combat-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.combat-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+.combat-label { font-size: 11px; color: #888; }
+.combat-value { font-size: 14px; color: #fff; font-weight: bold; }
 
-  .card-subtitle {
-    font-size: 13px;
-    color: #8B8B8B;
-    margin: 4px 0 0;
-  }
+.resource-stats { margin-top: 12px; }
+.resource-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+}
+.resource-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.15);
+  border-radius: 6px;
+}
+.resource-label { font-size: 11px; color: #888; }
+.resource-value { font-size: 14px; color: #DAA520; font-weight: bold; }
 
-  .tips-box {
-    display: flex;
-    align-items: flex-start;
-    gap: 10px;
-    padding: 10px 14px;
-    background: rgba(139, 69, 19, 0.1);
-    border-radius: 8px;
-    border-left: 3px solid #DAA520;
-    margin-bottom: 16px;
-    font-size: 13px;
-    color: #CDCDCD;
-  }
+/* 修炼系统 */
+.cultivation-card {
+  padding: 16px;
+  border-radius: 12px;
+}
+.action-buttons {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+  margin-bottom: 12px;
+}
+.btn {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 16px;
+  border-radius: 10px;
+  font-size: 14px;
+  cursor: pointer;
+  border: none;
+  transition: all 0.3s;
+  min-height: 48px;
+}
+.btn:disabled, .btn.disabled { opacity: 0.4; cursor: not-allowed; }
+.btn-primary { background: linear-gradient(135deg, #8B4513, #DAA520); color: #fff; }
+.btn-success { background: linear-gradient(135deg, #2E7D32, #66BB6A); color: #fff; }
+.btn-warning { background: linear-gradient(135deg, #E65100, #FF8F00); color: #fff; }
+.btn-info { background: linear-gradient(135deg, #1565C0, #42A5F5); color: #fff; }
+.btn-cost { font-size: 11px; opacity: 0.8; }
 
-  .action-buttons {
-    display: flex;
-    flex-direction: column;
-    gap: 10px;
-    margin-bottom: 16px;
-  }
+.cultivation-detail {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.detail-item {
+  display: flex;
+  justify-content: space-between;
+  padding: 6px 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 6px;
+  font-size: 13px;
+}
+.detail-label { color: #888; }
+.detail-value { color: #fff; font-weight: bold; }
 
-  .btn {
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    gap: 8px;
-    padding: 14px 20px;
-    border: none;
-    border-radius: 10px;
-    font-size: 15px;
-    font-weight: 600;
-    cursor: pointer;
-    transition: all 0.3s ease;
-    font-family: 'Noto Serif SC', serif;
-    min-height: 48px;
-  }
+.log-section { margin-top: 8px; }
 
-  .btn:disabled,
-  .btn.disabled {
-    opacity: 0.5;
-    cursor: not-allowed;
-    transform: none !important;
-  }
+/* 转生系统 */
+.rebirth-card {
+  padding: 16px;
+  border-radius: 12px;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.1), rgba(255, 215, 0, 0.05));
+}
+.rebirth-desc {
+  font-size: 13px;
+  color: #888;
+  margin: 0 0 12px;
+  line-height: 1.5;
+}
+.rebirth-bonus-display {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 12px;
+}
+.bonus-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  background: rgba(255, 215, 0, 0.08);
+  border-radius: 6px;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+}
+.bonus-label { font-size: 10px; color: #888; }
+.bonus-value { font-size: 14px; color: #FFD700; font-weight: bold; }
 
-  .btn-primary {
-    background: linear-gradient(135deg, #8B4513, #A0522D);
-    color: #F5DEB3;
-    box-shadow: 0 4px 15px rgba(139, 69, 19, 0.4);
-  }
+.btn-rebirth {
+  width: 100%;
+  background: linear-gradient(135deg, #FF6347, #FFD700);
+  color: #fff;
+  font-weight: bold;
+  font-size: 16px;
+  padding: 14px;
+  border-radius: 10px;
+  border: none;
+  cursor: pointer;
+  transition: all 0.3s;
+}
+.btn-rebirth:hover:not(.disabled) {
+  box-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+}
+.btn-rebirth.disabled { opacity: 0.4; cursor: not-allowed; }
 
-  .btn-primary:hover:not(:disabled):not(.disabled) {
-    background: linear-gradient(135deg, #A0522D, #8B4513);
-    box-shadow: 0 6px 20px rgba(139, 69, 19, 0.6);
-    transform: translateY(-2px);
-  }
-
-  .btn-success {
-    background: linear-gradient(135deg, #228B22, #2E8B57);
-    color: white;
-    box-shadow: 0 4px 15px rgba(34, 139, 34, 0.3);
-  }
-
-  .btn-success:hover:not(:disabled):not(.disabled) {
-    background: linear-gradient(135deg, #2E8B57, #228B22);
-    box-shadow: 0 6px 20px rgba(34, 139, 34, 0.5);
-    transform: translateY(-2px);
-  }
-
-  .btn-warning {
-    background: linear-gradient(135deg, #DAA520, #FFD700);
-    color: #0D0D12;
-    box-shadow: 0 4px 15px rgba(218, 165, 32, 0.3);
-  }
-
-  .btn-warning:hover:not(:disabled):not(.disabled) {
-    background: linear-gradient(135deg, #FFD700, #DAA520);
-    box-shadow: 0 6px 20px rgba(218, 165, 32, 0.5);
-    transform: translateY(-2px);
-  }
-
-  .btn-info {
-    background: linear-gradient(135deg, #1E90FF, #4169E1);
-    color: white;
-    box-shadow: 0 4px 15px rgba(30, 144, 255, 0.3);
-  }
-
-  .btn-info:hover:not(:disabled):not(.disabled) {
-    background: linear-gradient(135deg, #4169E1, #1E90FF);
-    box-shadow: 0 6px 20px rgba(30, 144, 255, 0.5);
-    transform: translateY(-2px);
-  }
-
-  .btn-icon {
-    font-size: 18px;
-  }
-
-  .btn-cost {
-    font-size: 12px;
-    opacity: 0.8;
-    margin-left: auto;
-  }
-
-  .stats-section {
-    margin-bottom: 16px;
-  }
-
-  .section-title {
-    font-family: 'Ma Shan Zheng', cursive;
-    font-size: 20px;
-    color: #F5DEB3;
-    margin: 0 0 16px;
-    padding-bottom: 8px;
-    border-bottom: 1px solid rgba(139, 69, 19, 0.3);
-  }
-
-  .stats-grid {
-    display: grid;
-    grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
-    gap: 16px;
-  }
-
-  .stat-item {
-    display: flex;
-    align-items: center;
-    gap: 12px;
-    padding: 14px;
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    border: 1px solid rgba(139, 69, 19, 0.2);
-  }
-
-  .stat-icon {
-    width: 40px;
-    height: 40px;
-    border-radius: 50%;
-    background: rgba(218, 165, 32, 0.1);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-size: 18px;
-    color: #DAA520;
-  }
-
-  .stat-label {
-    font-size: 12px;
-    color: #8B8B8B;
-  }
-
-  .stat-value {
-    font-size: 16px;
-    font-weight: bold;
-    color: #F5DEB3;
-  }
-
-  .log-section {
-    background: rgba(0, 0, 0, 0.2);
-    border-radius: 8px;
-    border: 1px solid rgba(139, 69, 19, 0.2);
-    overflow: hidden;
-  }
-
-  .log-section .section-title {
-    padding: 12px 16px;
-    margin: 0;
-    border-bottom: 1px solid rgba(139, 69, 19, 0.3);
-  }
+.rebirth-count {
+  text-align: center;
+  margin-top: 8px;
+  font-size: 14px;
+  color: #888;
+}
+.rebirth-num {
+  color: #FFD700;
+  font-weight: bold;
+  font-size: 18px;
+}
 </style>

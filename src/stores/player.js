@@ -172,7 +172,17 @@ export const usePlayerStore = defineStore('player', {
     unlockedLocations: ['新手村'], // 已解锁地点
     unlockedSkills: [], // 已解锁功法
     completedAchievements: [], // 已完成成就
-    beginnerRewardClaimed: false // 是否已领取新手福利
+    beginnerRewardClaimed: false, // 是否已领取新手福利
+    // 转生系统
+    rebirthCount: 0, // 转生次数
+    rebirthBonus: { // 转生加成
+      attack: 0,
+      health: 0,
+      defense: 0,
+      speed: 0,
+      cultivationRate: 0,
+      spiritRate: 0
+    }
   }),
   getters: {
     // 获取灵宠的属性加成
@@ -503,6 +513,40 @@ export const usePlayerStore = defineStore('player', {
         return true
       }
       return false
+    },
+    // 转生：重置等级但获得永久加成
+    rebirth() {
+      if (this.level < 50) return { success: false, message: '需达到50级才能转生' }
+
+      const count = this.rebirthCount + 1
+      // 永久加成
+      const bonus = {
+        attack: Math.floor(5 * count),
+        health: Math.floor(50 * count),
+        defense: Math.floor(3 * count),
+        speed: Math.floor(2 * count),
+        cultivationRate: 0.1 * count,
+        spiritRate: 0.1 * count
+      }
+
+      this.rebirthCount = count
+      this.rebirthBonus = bonus
+      // 重置等级和修为
+      this.level = 1
+      this.realm = getRealmName(1).name
+      this.cultivation = 0
+      this.maxCultivation = getRealmName(1).maxCultivation
+      // 应用永久加成到基础属性
+      this.baseAttributes.attack = 10 + bonus.attack
+      this.baseAttributes.health = 100 + bonus.health
+      this.baseAttributes.defense = 5 + bonus.defense
+      this.baseAttributes.speed = 10 + bonus.speed
+      // 提升倍率
+      this.spiritRate = 1 + bonus.spiritRate
+      this.cultivationRate = 1 + bonus.cultivationRate
+      // 保留灵石和物品
+      this.queueSave()
+      return { success: true, message: `转生成功！当前为第${count}世，获得永久属性加成` }
     },
     // 获得物品
     gainItem(item) {

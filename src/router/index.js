@@ -10,7 +10,6 @@ import Settings from '../views/Settings.vue'
 import GM from '../views/GM.vue'
 import GMTools from '../views/GMTools.vue'
 import Alchemy from '../views/Alchemy.vue'
-import Dungeon from '../views/Dungeon.vue'
 import Gacha from '../views/Gacha.vue'
 
 const routes = [
@@ -87,12 +86,6 @@ const routes = [
     path: '/alchemy',
     name: 'alchemy',
     component: Alchemy,
-    meta: { requiresGame: true }
-  },
-  {
-    path: '/dungeon',
-    name: 'Dungeon',
-    component: Dungeon,
     meta: { requiresGame: true }
   },
   {

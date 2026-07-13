@@ -119,7 +119,7 @@
     DollarOutlined,
     StarOutlined
   } from '@ant-design/icons-vue'
-  import { Moon, Sunny, Flash } from '@vicons/ionicons5'
+  import { Moon, Sunny } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
 
   const router = useRouter()
@@ -211,12 +211,11 @@
   const getMenuItems = () => {
     menuItems.value = [
       ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
-      { label: '修炼', key: 'cultivation', icon: BookOutlined },
+      { label: '人物', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
-      { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
+      { label: '炼丹', key: 'alchemy', icon: MedicineKitOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
       { label: '抽奖', key: 'gacha', icon: GiftOutlined },
-      { label: '秘境', key: 'dungeon', icon: Flash },
       { label: '成就', key: 'achievements', icon: TrophyOutlined },
       { label: '设置', key: 'settings', icon: SettingOutlined },
       ...(playerStore.isGMMode ? [{ label: 'GM', key: 'gm', icon: SmileOutlined }] : [])
