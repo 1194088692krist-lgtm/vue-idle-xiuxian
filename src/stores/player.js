@@ -171,7 +171,8 @@ export const usePlayerStore = defineStore('player', {
     unlockedRealms: ['练气一层'], // 已解锁境界
     unlockedLocations: ['新手村'], // 已解锁地点
     unlockedSkills: [], // 已解锁功法
-    completedAchievements: [] // 已完成成就
+    completedAchievements: [], // 已完成成就
+    beginnerRewardClaimed: false // 是否已领取新手福利
   }),
   getters: {
     // 获取灵宠的属性加成

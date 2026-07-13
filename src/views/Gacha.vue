@@ -11,6 +11,20 @@
         </div>
       </div>
       <div class="card-body">
+        <!-- 新手福利 -->
+        <div v-if="!playerStore.beginnerRewardClaimed" class="beginner-reward-box">
+          <div class="beginner-reward-info">
+            <div class="beginner-reward-icon">🎁</div>
+            <div class="beginner-reward-text">
+              <div class="beginner-reward-title">新手福利</div>
+              <div class="beginner-reward-desc">新修士专属，领取 20,000 灵石开启修仙之旅！</div>
+            </div>
+          </div>
+          <button class="btn btn-beginner" @click="claimBeginnerReward">
+            领取福利
+          </button>
+        </div>
+
         <div class="tips-box">
           <InfoCircleOutlined />
           <span>不同奖池产出不同，高品质物品概率更低但属性更强。</span>
@@ -137,6 +151,15 @@
     reinforce_stone: '强化石',
     refinement_stone: '洗练石',
     pet_essence: '灵宠精华'
+  }
+
+  // 新手福利领取
+  const claimBeginnerReward = () => {
+    if (playerStore.beginnerRewardClaimed) return
+    playerStore.spiritStones += 20000
+    playerStore.beginnerRewardClaimed = true
+    showMessage('success', '恭喜领取新手福利！获得 20,000 灵石！')
+    playerStore.queueSave()
   }
 
   const formatNumber = num => {
@@ -318,6 +341,75 @@
     margin-bottom: 16px;
     color: #aaa;
     font-size: 13px;
+  }
+
+  /* 新手福利 */
+  .beginner-reward-box {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 16px;
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.15), rgba(255, 215, 0, 0.08));
+    border: 1px solid rgba(218, 165, 32, 0.4);
+    border-radius: 12px;
+    margin-bottom: 16px;
+    animation: beginnerGlow 2s ease-in-out infinite;
+  }
+
+  @keyframes beginnerGlow {
+    0%, 100% { box-shadow: 0 0 8px rgba(218, 165, 32, 0.2); }
+    50% { box-shadow: 0 0 20px rgba(218, 165, 32, 0.4); }
+  }
+
+  .beginner-reward-info {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    flex: 1;
+  }
+
+  .beginner-reward-icon {
+    font-size: 36px;
+    animation: bounce 1.5s ease-in-out infinite;
+  }
+
+  @keyframes bounce {
+    0%, 100% { transform: translateY(0); }
+    50% { transform: translateY(-6px); }
+  }
+
+  .beginner-reward-title {
+    font-size: 16px;
+    font-weight: bold;
+    color: #FFD700;
+    margin-bottom: 2px;
+  }
+
+  .beginner-reward-desc {
+    font-size: 12px;
+    color: #DAA520;
+  }
+
+  .btn-beginner {
+    background: linear-gradient(135deg, #DAA520, #FFD700);
+    color: #0D0D12;
+    font-weight: bold;
+    font-size: 14px;
+    padding: 10px 24px;
+    border-radius: 20px;
+    border: none;
+    cursor: pointer;
+    transition: all 0.3s;
+    flex-shrink: 0;
+  }
+
+  .btn-beginner:hover {
+    transform: scale(1.05);
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
+  }
+
+  .btn-beginner:active {
+    transform: scale(0.98);
   }
 
   /* 奖池选择 */
