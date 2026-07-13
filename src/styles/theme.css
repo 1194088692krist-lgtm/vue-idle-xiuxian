@@ -1,0 +1,345 @@
+@import url('https://fonts.googleapis.com/css2?family=Ma+Shan+Zheng&family=Noto+Serif+SC:wght@400;500;600;700&display=swap');
+
+:root {
+  --color-primary: #8B4513;
+  --color-primary-light: #A0522D;
+  --color-primary-dark: #6B3410;
+  --color-secondary: #2F4F4F;
+  --color-secondary-light: #4A6B6B;
+  --color-accent-gold: #DAA520;
+  --color-accent-red: #DC143C;
+  --color-accent-blue: #1E90FF;
+  --color-accent-green: #228B22;
+  --color-accent-purple: #9932CC;
+  --color-bg-dark: #0D0D12;
+  --color-bg-card: rgba(20, 25, 30, 0.85);
+  --color-bg-card-light: rgba(30, 38, 45, 0.9);
+  --color-text-primary: #F5DEB3;
+  --color-text-secondary: #CDCDCD;
+  --color-text-muted: #8B8B8B;
+  --color-border: rgba(139, 69, 19, 0.3);
+  --color-glow-gold: rgba(218, 165, 32, 0.5);
+  --color-glow-red: rgba(220, 20, 60, 0.5);
+  --color-glow-blue: rgba(30, 144, 255, 0.5);
+  --font-family-heading: 'Ma Shan Zheng', cursive;
+  --font-family-body: 'Noto Serif SC', serif;
+  --shadow-glow-gold: 0 0 20px rgba(218, 165, 32, 0.3);
+  --shadow-glow-red: 0 0 20px rgba(220, 20, 60, 0.3);
+  --shadow-glow-blue: 0 0 20px rgba(30, 144, 255, 0.3);
+}
+
+html {
+  font-family: var(--font-family-body);
+  background: linear-gradient(135deg, #0D0D12 0%, #1A1A2E 50%, #0D0D12 100%);
+  min-height: 100vh;
+}
+
+body {
+  color: var(--color-text-primary);
+  margin: 0;
+  padding: 0;
+  background: transparent;
+}
+
+::-webkit-scrollbar {
+  width: 8px;
+  height: 8px;
+}
+
+::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+}
+
+::-webkit-scrollbar-thumb {
+  background: rgba(139, 69, 19, 0.5);
+  border-radius: 4px;
+}
+
+::-webkit-scrollbar-thumb:hover {
+  background: rgba(139, 69, 19, 0.7);
+}
+
+@layer utilities {
+  .glass-card {
+    background: var(--color-bg-card);
+    backdrop-filter: blur(12px);
+    -webkit-backdrop-filter: blur(12px);
+    border: 1px solid var(--color-border);
+    border-radius: 12px;
+    box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  .glass-card-hover:hover {
+    border-color: rgba(218, 165, 32, 0.5);
+    box-shadow: var(--shadow-glow-gold);
+    transform: translateY(-2px);
+    transition: all 0.3s ease;
+  }
+
+  .gold-gradient-text {
+    background: linear-gradient(135deg, #DAA520, #FFD700, #DAA520);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
+  }
+
+  .gold-border {
+    border: 2px solid transparent;
+    background-image: linear-gradient(var(--color-bg-card), var(--color-bg-card)), linear-gradient(135deg, #DAA520, #FFD700, #DAA520);
+    background-origin: border-box;
+    background-clip: padding-box, border-box;
+  }
+
+  .glow-effect {
+    animation: glow 2s ease-in-out infinite alternate;
+  }
+
+  .float-animation {
+    animation: float 3s ease-in-out infinite;
+  }
+
+  .pulse-animation {
+    animation: pulse 2s ease-in-out infinite;
+  }
+}
+
+@keyframes glow {
+  from {
+    box-shadow: 0 0 5px var(--color-glow-gold);
+  }
+  to {
+    box-shadow: 0 0 20px var(--color-glow-gold), 0 0 30px rgba(218, 165, 32, 0.3);
+  }
+}
+
+@keyframes float {
+  0%, 100% {
+    transform: translateY(0);
+  }
+  50% {
+    transform: translateY(-10px);
+  }
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 1;
+    transform: scale(1);
+  }
+  50% {
+    opacity: 0.8;
+    transform: scale(1.02);
+  }
+}
+
+@keyframes shake {
+  0%, 100% { transform: translateX(0); }
+  10%, 30%, 50%, 70%, 90% { transform: translateX(-5px); }
+  20%, 40%, 60%, 80% { transform: translateX(5px); }
+}
+
+@keyframes fadeInUp {
+  from {
+    opacity: 0;
+    transform: translateY(20px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
+
+@keyframes numberRoll {
+  0% {
+    transform: translateY(100%);
+    opacity: 0;
+  }
+  100% {
+    transform: translateY(0);
+    opacity: 1;
+  }
+}
+
+.shake {
+  animation: shake 0.5s ease-in-out;
+}
+
+.fade-in-up {
+  animation: fadeInUp 0.5s ease-out forwards;
+}
+
+.number-roll {
+  animation: numberRoll 0.3s ease-out;
+}
+
+/* 页面通用样式 - 适配底部导航布局 */
+.cultivation-page,
+.home-page,
+.exploration-page,
+.alchemy-page,
+.inventory-page,
+.gacha-page,
+.dungeon-page,
+.achievements-page,
+.settings-page,
+.gm-page {
+  padding: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  min-height: 100%;
+}
+
+@media (max-width: 768px) {
+  .glass-card {
+    padding: 14px;
+    border-radius: 10px;
+  }
+
+  .card-header {
+    flex-direction: row;
+    gap: 12px;
+    text-align: left;
+    padding-bottom: 12px;
+    margin-bottom: 12px;
+  }
+
+  .header-icon {
+    width: 40px;
+    height: 40px;
+    font-size: 20px;
+  }
+
+  .card-title {
+    font-size: 20px;
+  }
+
+  .action-buttons {
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .btn {
+    padding: 12px 16px;
+    font-size: 14px;
+  }
+
+  .stats-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .locations-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .recipes-grid {
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .materials-list {
+    gap: 8px;
+  }
+
+  .effect-grid {
+    grid-template-columns: 1fr;
+    gap: 8px;
+  }
+
+  .progress-bar-container {
+    height: 10px;
+  }
+
+  .progress-header {
+    flex-direction: row;
+    gap: 8px;
+  }
+
+  .progress-value {
+    font-size: 14px;
+  }
+
+  .log-section {
+    max-height: 160px;
+    overflow-y: auto;
+  }
+}
+
+@media (max-width: 480px) {
+  .glass-card {
+    padding: 12px;
+  }
+
+  .card-title {
+    font-size: 18px;
+  }
+
+  .card-subtitle {
+    font-size: 12px;
+  }
+
+  .btn {
+    padding: 10px 14px;
+    font-size: 13px;
+  }
+
+  .btn-icon {
+    font-size: 14px;
+  }
+
+  .stat-item {
+    padding: 10px;
+  }
+
+  .stat-icon {
+    width: 32px;
+    height: 32px;
+    font-size: 14px;
+  }
+
+  .stat-value {
+    font-size: 14px;
+  }
+
+  .tips-box {
+    padding: 10px 12px;
+    font-size: 12px;
+    margin-bottom: 12px;
+  }
+
+  .section-title {
+    font-size: 16px;
+    margin-bottom: 12px;
+  }
+
+  .location-name {
+    font-size: 16px;
+  }
+
+  .location-desc {
+    font-size: 12px;
+  }
+
+  .recipe-name {
+    font-size: 16px;
+  }
+
+  .recipe-desc {
+    font-size: 12px;
+  }
+
+  .material-name {
+    font-size: 12px;
+  }
+
+  .material-status {
+    font-size: 12px;
+    padding: 2px 8px;
+  }
+
+  .effect-value {
+    font-size: 12px;
+  }
+}

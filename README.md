@@ -1,4 +1,4 @@
-# 我的放置仙途
+# 凡人修仙
 
 <p align="center">
     <img src="https://i0.hdslb.com/bfs/article/c5bd547efa79470ccaab206c22b694c48941412.png" width="400">
@@ -71,14 +71,14 @@ npm run build
 
 ## 版权声明
 
-Copyright © 2025 我的放置仙途
+Copyright © 2025 凡人修仙
 
 本项目采用 MIT 许可证。详情请参阅 LICENSE 文件。
 
 ```
 MIT License
 
-版权所有 (c) 2025 我的放置仙途
+版权所有 (c) 2025 凡人修仙
 
 特此免费授予任何获得本软件和相关文档文件（"软件"）副本的人不受限制地处理本软件的权利，
 包括但不限于使用、复制、修改、合并、发布、分发、再许可和/或出售本软件副本的权利，

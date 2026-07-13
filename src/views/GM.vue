@@ -1,7 +1,7 @@
 <template>
-  <n-layout>
+  <n-layout class="gm-page">
     <n-layout-content class="gm-content">
-      <n-card title="基础属性修改">
+      <n-card title="基础属性修改" class="gm-card">
         <n-form>
           <n-form-item label="道号">
             <n-input v-model:value="baseAttributes.name" />
@@ -116,4 +116,17 @@
   }
 </script>
 
-<style scoped></style>
+<style scoped>
+  .gm-page {
+    padding: 0;
+    min-height: 100%;
+  }
+
+  .gm-content {
+    padding: 0;
+  }
+
+  .gm-card {
+    background: var(--color-bg-card);
+  }
+</style>

@@ -159,7 +159,7 @@ export const triggerRandomEvent = (playerStore, message) => {
       message('info', `[${event.name}]${event.description}`)
       event.effect(playerStore, message)
       playerStore.eventTriggered++ // 增加事件触发次数统计
-      playerStore.saveData()
+      playerStore.queueSave()
       return true
     }
   }

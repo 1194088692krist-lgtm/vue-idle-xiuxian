@@ -1,78 +1,109 @@
 <template>
-  <n-card title="丹药炼制">
-    <n-space vertical>
-      <template v-if="unlockedRecipes.length > 0">
-        <n-divider>丹方选择</n-divider>
-        <!-- 丹方选择 -->
-        <n-grid :cols="2" :x-gap="12">
-          <n-grid-item v-for="recipe in unlockedRecipes" :key="recipe.id">
-            <n-card :title="recipe.name" size="small">
-              <n-space vertical>
-                <n-text depth="3">{{ recipe.description }}</n-text>
-                <n-space>
-                  <n-tag type="info">{{ pillGrades[recipe.grade].name }}</n-tag>
-                  <n-tag type="warning">{{ pillTypes[recipe.type].name }}</n-tag>
-                </n-space>
-                <n-button
-                  @click="selectRecipe(recipe)"
-                  block
-                  :type="selectedRecipe?.id === recipe.id ? 'primary' : 'default'"
-                >
-                  {{ selectedRecipe?.id === recipe.id ? '已选择' : '选择' }}
-                </n-button>
-              </n-space>
-            </n-card>
-          </n-grid-item>
-        </n-grid>
-      </template>
-      <n-space vertical v-else>
-        <n-empty description="暂未掌握任何丹方" />
-      </n-space>
-      <!-- 材料需求 -->
-      <template v-if="selectedRecipe">
-        <n-divider>材料需求</n-divider>
-        <n-list>
-          <n-list-item v-for="material in selectedRecipe.materials" :key="material.herb">
-            <n-space justify="space-between">
-              <n-space>
-                <span>{{ getHerbName(material.herb) }}</span>
-                <n-tag size="small">需要数量: {{ material.count }}</n-tag>
-              </n-space>
-              <n-tag
-                :type="getMaterialStatus(material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
+  <div class="alchemy-page fade-in-up">
+    <div class="main-card glass-card">
+      <div class="card-header">
+        <div class="header-icon">
+          <MedicineBoxOutlined />
+        </div>
+        <div class="header-info">
+          <h2 class="card-title gold-gradient-text">丹药炼制</h2>
+          <p class="card-subtitle">炼制丹药，提升修为</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <div class="tips-box">
+          <InfoCircleOutlined />
+          <span>选择丹方，收集材料，炼制各种神奇丹药。</span>
+        </div>
+        <template v-if="unlockedRecipes.length > 0">
+          <div class="section">
+            <h3 class="section-title">丹方选择</h3>
+            <div class="recipes-grid">
+              <div
+                class="recipe-card glass-card"
+                v-for="recipe in unlockedRecipes"
+                :key="recipe.id"
+                :class="{ selected: selectedRecipe?.id === recipe.id }"
+                @click="selectRecipe(recipe)"
               >
-                拥有: {{ getMaterialStatus(material) }}
-              </n-tag>
-            </n-space>
-          </n-list-item>
-        </n-list>
-      </template>
-      <!-- 效果预览 -->
-      <template v-if="selectedRecipe">
-        <n-divider>效果预览</n-divider>
-        <n-descriptions bordered :column="2">
-          <n-descriptions-item label="丹药介绍">
-            {{ selectedRecipe.description }}
-          </n-descriptions-item>
-          <n-descriptions-item label="效果数值">+{{ (currentEffect.value * 100).toFixed(1) }}%</n-descriptions-item>
-          <n-descriptions-item label="持续时间">{{ Math.floor(currentEffect.duration / 60) }}分钟</n-descriptions-item>
-          <n-descriptions-item label="成功率">{{ (currentEffect.successRate * 100).toFixed(1) }}%</n-descriptions-item>
-        </n-descriptions>
-      </template>
-      <!-- 炼制按钮 -->
-      <n-button
-        class="craft-button"
-        type="primary"
-        block
-        v-if="selectedRecipe"
-        :disabled="!selectedRecipe || !checkMaterials(selectedRecipe)"
-        @click="craftPill"
-      >
-        {{ !checkMaterials(selectedRecipe) ? '材料不足' : '开始炼制' }}
-      </n-button>
-    </n-space>
-    <log-panel v-if="selectedRecipe" ref="logRef" title="炼丹日志" />
-  </n-card>
+                <div class="recipe-header">
+                  <h4 class="recipe-name">{{ recipe.name }}</h4>
+                  <div class="recipe-tags">
+                    <n-tag type="info" size="small">{{ pillGrades[recipe.grade].name }}</n-tag>
+                    <n-tag type="warning" size="small">{{ pillTypes[recipe.type].name }}</n-tag>
+                  </div>
+                </div>
+                <p class="recipe-desc">{{ recipe.description }}</p>
+                <div class="recipe-status">
+                  {{ selectedRecipe?.id === recipe.id ? '已选择' : '点击选择' }}
+                </div>
+              </div>
+            </div>
+          </div>
+        </template>
+        <div v-else class="empty-state">
+          <n-empty description="暂未掌握任何丹方" />
+          <p class="empty-hint">探索秘境可获得丹方残页</p>
+        </div>
+        <template v-if="selectedRecipe">
+          <div class="section">
+            <h3 class="section-title">材料需求</h3>
+            <div class="materials-list">
+              <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.herb">
+                <div class="material-info">
+                  <span class="material-name">{{ getHerbName(material.herb) }}</span>
+                  <span class="material-need">需要: {{ material.count }}</span>
+                </div>
+                <div
+                  class="material-status"
+                  :class="getMaterialStatus(material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
+                >
+                  {{ getMaterialStatus(material) }}
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="section">
+            <h3 class="section-title">效果预览</h3>
+            <div class="effect-grid">
+              <div class="effect-item">
+                <div class="effect-label">丹药介绍</div>
+                <div class="effect-value">{{ selectedRecipe.description }}</div>
+              </div>
+              <div class="effect-item">
+                <div class="effect-label">效果数值</div>
+                <div class="effect-value highlight">+{{ (currentEffect.value * 100).toFixed(1) }}%</div>
+              </div>
+              <div class="effect-item">
+                <div class="effect-label">持续时间</div>
+                <div class="effect-value">{{ Math.floor(currentEffect.duration / 60) }}分钟</div>
+              </div>
+              <div class="effect-item">
+                <div class="effect-label">成功率</div>
+                <div class="effect-value">{{ (currentEffect.successRate * 100).toFixed(1) }}%</div>
+              </div>
+            </div>
+          </div>
+          <div class="craft-section">
+            <button
+              class="btn btn-primary craft-button"
+              :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe) }"
+              @click="craftPill"
+            >
+              <span class="btn-icon"><FireOutlined /></span>
+              <span>{{ !checkMaterials(selectedRecipe) ? '材料不足' : '开始炼制' }}</span>
+            </button>
+          </div>
+        </template>
+      </div>
+    </div>
+    <div class="log-section" v-if="selectedRecipe">
+      <div class="log-header">
+        <h3 class="section-title gold-gradient-text">炼丹日志</h3>
+      </div>
+      <log-panel ref="logRef" />
+    </div>
+  </div>
 </template>
 
 <script setup>
@@ -81,24 +112,25 @@
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { herbs } from '../plugins/herbs'
   import LogPanel from '../components/LogPanel.vue'
+  import {
+    MedicineBoxOutlined,
+    InfoCircleOutlined,
+    FireOutlined
+  } from '@ant-design/icons-vue'
 
   const playerStore = usePlayerStore()
   const logRef = ref(null)
 
-  // 当前选择的丹方
   const selectedRecipe = ref(null)
 
-  // 已解锁的丹方列表
   const unlockedRecipes = computed(() => {
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
   })
 
-  // 选择丹方
   const selectRecipe = recipe => {
     selectedRecipe.value = recipe
   }
 
-  // 检查材料是否充足
   const checkMaterials = recipe => {
     if (!recipe) return false
     return recipe.materials.every(material => {
@@ -107,31 +139,26 @@
     })
   }
 
-  // 获取材料状态文本
   const getMaterialStatus = material => {
     const count = playerStore.herbs.filter(h => h.id === material.herb).length
     return `${count}/${material.count}`
   }
 
-  // 获取灵草名称
   const getHerbName = herbId => {
     const herb = herbs.find(h => h.id === herbId)
     return herb ? herb.name : herbId
   }
 
-  // 计算当前效果
   const currentEffect = computed(() => {
     if (!selectedRecipe.value) return null
     return calculatePillEffect(selectedRecipe.value, playerStore.level)
   })
 
-  // 炼制丹药
   const craftPill = () => {
     if (!selectedRecipe.value) return
     const result = playerStore.craftPill(selectedRecipe.value.id)
     if (result.success) {
       logRef.value?.addLog('success', '炼制成功！')
-      // 播放成功动画效果
       const btn = document.querySelector('.craft-button')
       if (btn) {
         btn.classList.add('success-animation')
@@ -141,7 +168,6 @@
       }
     } else {
       logRef.value?.addLog('error', `炼制失败：${result.message}`)
-      // 播放失败动画效果
       const btn = document.querySelector('.craft-button')
       if (btn) {
         btn.classList.add('fail-animation')
@@ -154,16 +180,254 @@
 </script>
 
 <style scoped>
-  .n-space {
-    width: 100%;
+  .alchemy-page {
+    padding: 0;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    min-height: 100%;
   }
 
-  .n-button {
+  .card-header {
+    display: flex;
+    align-items: center;
+    gap: 16px;
+    padding-bottom: 16px;
+    border-bottom: 1px solid rgba(139, 69, 19, 0.2);
+    margin-bottom: 16px;
+  }
+
+  .header-icon {
+    width: 48px;
+    height: 48px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.3), rgba(218, 165, 32, 0.2));
+    border-radius: 12px;
+    font-size: 24px;
+    color: var(--color-accent-gold);
+  }
+
+  .card-title {
+    margin: 0;
+    font-size: 24px;
+    font-family: var(--font-family-heading);
+  }
+
+  .card-subtitle {
+    margin: 4px 0 0;
+    color: #888;
+    font-size: 14px;
+  }
+
+  .tips-box {
+    display: flex;
+    align-items: flex-start;
+    gap: 8px;
+    padding: 10px 14px;
+    background: rgba(139, 69, 19, 0.1);
+    border-radius: 8px;
     margin-bottom: 12px;
+    color: #aaa;
+    font-size: 13px;
   }
 
-  .n-collapse {
+  .section {
+    margin-bottom: 16px;
+  }
+
+  .section-title {
+    margin: 0 0 12px;
+    font-size: 18px;
+    color: #fff;
+    font-family: var(--font-family-heading);
+  }
+
+  .recipes-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 12px;
+  }
+
+  .recipe-card {
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .recipe-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(139, 69, 19, 0.2);
+  }
+
+  .recipe-card.selected {
+    border-color: var(--color-accent-gold);
+    background: rgba(218, 165, 32, 0.1);
+  }
+
+  .recipe-header {
+    display: flex;
+    flex-direction: column;
+    justify-content: space-between;
+    align-items: flex-start;
+    gap: 8px;
+    margin-bottom: 8px;
+  }
+
+  .recipe-name {
+    margin: 0;
+    font-size: 18px;
+    color: var(--color-accent-gold);
+    font-family: var(--font-family-heading);
+  }
+
+  .recipe-tags {
+    display: flex;
+    gap: 4px;
+  }
+
+  .recipe-desc {
+    margin: 0 0 12px;
+    font-size: 14px;
+    color: #aaa;
+    line-height: 1.5;
+  }
+
+  .recipe-status {
+    font-size: 12px;
+    color: #888;
+    text-align: right;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px;
+  }
+
+  .empty-hint {
     margin-top: 12px;
+    color: #888;
+    font-size: 14px;
+  }
+
+  .materials-list {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .material-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+  }
+
+  .material-info {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+  }
+
+  .material-name {
+    font-size: 14px;
+    color: #fff;
+  }
+
+  .material-need {
+    font-size: 12px;
+    color: #888;
+  }
+
+  .material-status {
+    padding: 4px 12px;
+    border-radius: 4px;
+    font-size: 14px;
+    font-weight: bold;
+  }
+
+  .material-status.success {
+    background: rgba(76, 175, 80, 0.3);
+    color: #4CAF50;
+  }
+
+  .material-status.warning {
+    background: rgba(255, 193, 7, 0.3);
+    color: #FFC107;
+  }
+
+  .effect-grid {
+    display: grid;
+    grid-template-columns: 1fr;
+    gap: 10px;
+  }
+
+  .effect-item {
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 8px;
+  }
+
+  .effect-label {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
+  }
+
+  .effect-value {
+    font-size: 14px;
+    color: #fff;
+  }
+
+  .effect-value.highlight {
+    color: var(--color-accent-gold);
+    font-weight: bold;
+  }
+
+  .craft-section {
+    margin-top: 16px;
+    padding-top: 16px;
+    border-top: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .btn {
+    width: 100%;
+    display: inline-flex;
+    align-items: center;
+    justify-content: center;
+    gap: 8px;
+    padding: 14px 24px;
+    border-radius: 10px;
+    font-size: 16px;
+    font-family: var(--font-family-body);
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: none;
+    min-height: 48px;
+  }
+
+  .btn-primary {
+    background: linear-gradient(135deg, #8B4513, #DAA520);
+    color: #fff;
+    box-shadow: 0 4px 15px rgba(139, 69, 19, 0.4);
+  }
+
+  .btn-primary:hover:not(.disabled) {
+    transform: translateY(-2px);
+    box-shadow: 0 6px 20px rgba(218, 165, 32, 0.5);
+  }
+
+  .btn.disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .btn-icon {
+    font-size: 18px;
   }
 
   .craft-button {
@@ -210,5 +474,13 @@
 
   .fail-animation {
     animation: fail-shake 0.5s ease-in-out;
+  }
+
+  .log-section {
+    margin-top: auto;
+  }
+
+  .log-header {
+    margin-bottom: 12px;
   }
 </style>

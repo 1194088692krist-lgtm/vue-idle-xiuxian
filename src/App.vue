@@ -1,159 +1,80 @@
 <template>
-  <n-config-provider :theme="playerStore.isDarkMode ? darkTheme : null">
+  <n-config-provider :theme="darkTheme">
     <n-message-provider>
       <n-dialog-provider>
         <n-spin :show="isLoading" description="正在加载游戏数据...">
-          <n-layout>
-            <n-layout-header bordered>
-              <div class="header-content">
-                <n-page-header>
-                  <template #title>我的放置仙途</template>
-                  <template #extra>
-                    <n-button quaternary circle @click="playerStore.toggle">
-                      <template #icon>
-                        <n-icon>
-                          <Sunny v-if="playerStore.isDarkMode" />
-                          <Moon v-else />
-                        </n-icon>
-                      </template>
-                    </n-button>
-                  </template>
-                </n-page-header>
-                <n-scrollbar x-scrollable trigger="none">
-                  <n-menu
-                    mode="horizontal"
-                    :options="menuOptions"
-                    :value="getCurrentMenuKey()"
-                    @update:value="handleMenuClick"
-                  />
-                </n-scrollbar>
+          <div class="game-container">
+            <!-- 顶部状态栏 -->
+            <header class="top-bar">
+              <div class="player-info">
+                <div class="player-avatar">
+                  <span>仙</span>
+                </div>
+                <div class="player-meta">
+                  <div class="player-name">{{ playerStore.name }}</div>
+                  <div class="player-realm" :style="{ color: getRealmColor(playerStore.level) }">
+                    {{ getRealmName(playerStore.level).name }}
+                  </div>
+                </div>
               </div>
-            </n-layout-header>
-            <n-layout-content>
-              <div class="content-wrapper">
-                <n-card>
-                  <n-space vertical>
-                    <n-descriptions bordered>
-                      <n-descriptions-item label="道号">
-                        {{ playerStore.name }}
-                      </n-descriptions-item>
-                      <n-descriptions-item label="境界">
-                        {{ getRealmName(playerStore.level).name }}
-                      </n-descriptions-item>
-                      <n-descriptions-item label="修为">
-                        {{ playerStore.cultivation }} / {{ playerStore.maxCultivation }}
-                      </n-descriptions-item>
-                      <n-descriptions-item label="灵力">
-                        {{ playerStore.spirit.toFixed(2) }}
-                      </n-descriptions-item>
-                      <n-descriptions-item label="灵石">
-                        {{ playerStore.spiritStones }}
-                      </n-descriptions-item>
-                      <n-descriptions-item label="强化石">
-                        {{ playerStore.reinforceStones }}
-                      </n-descriptions-item>
-                    </n-descriptions>
-                    <n-collapse>
-                      <n-collapse-item title="详细信息" name="1">
-                        <n-divider>基础属性</n-divider>
-                        <n-descriptions bordered :column="2">
-                          <n-descriptions-item label="生命值">
-                            {{ (playerStore.baseAttributes.health || 0).toFixed(0) }}
-                          </n-descriptions-item>
-                          <n-descriptions-item label="攻击力">
-                            {{ (playerStore.baseAttributes.attack || 0).toFixed(0) }}
-                          </n-descriptions-item>
-                          <n-descriptions-item label="防御力">
-                            {{ (playerStore.baseAttributes.defense || 0).toFixed(0) }}
-                          </n-descriptions-item>
-                          <n-descriptions-item label="速度">
-                            {{ (playerStore.baseAttributes.speed || 0).toFixed(0) }}
-                          </n-descriptions-item>
-                        </n-descriptions>
-                        <n-divider>战斗属性</n-divider>
-                        <n-descriptions bordered :column="3">
-                          <n-descriptions-item label="暴击率">
-                            {{ (playerStore.combatAttributes.critRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="连击率">
-                            {{ (playerStore.combatAttributes.comboRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="反击率">
-                            {{ (playerStore.combatAttributes.counterRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="眩晕率">
-                            {{ (playerStore.combatAttributes.stunRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="闪避率">
-                            {{ (playerStore.combatAttributes.dodgeRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="吸血率">
-                            {{ (playerStore.combatAttributes.vampireRate * 100).toFixed(1) }}%
-                          </n-descriptions-item>
-                        </n-descriptions>
-                        <n-divider>战斗抗性</n-divider>
-                        <n-descriptions bordered :column="3">
-                          <n-descriptions-item label="抗暴击">
-                            {{ (playerStore.combatResistance.critResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="抗连击">
-                            {{ (playerStore.combatResistance.comboResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="抗反击">
-                            {{ (playerStore.combatResistance.counterResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="抗眩晕">
-                            {{ (playerStore.combatResistance.stunResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="抗闪避">
-                            {{ (playerStore.combatResistance.dodgeResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="抗吸血">
-                            {{ (playerStore.combatResistance.vampireResist * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                        </n-descriptions>
-                        <n-divider>特殊属性</n-divider>
-                        <n-descriptions bordered :column="4">
-                          <n-descriptions-item label="强化治疗">
-                            {{ (playerStore.specialAttributes.healBoost * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="强化爆伤">
-                            {{ (playerStore.specialAttributes.critDamageBoost * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="弱化爆伤">
-                            {{ (playerStore.specialAttributes.critDamageReduce * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="最终增伤">
-                            {{ (playerStore.specialAttributes.finalDamageBoost * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="最终减伤">
-                            {{ (playerStore.specialAttributes.finalDamageReduce * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="战斗属性提升">
-                            {{ (playerStore.specialAttributes.combatBoost * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                          <n-descriptions-item label="战斗抗性提升">
-                            {{ (playerStore.specialAttributes.resistanceBoost * 100 || 0).toFixed(1) }}%
-                          </n-descriptions-item>
-                        </n-descriptions>
-                      </n-collapse-item>
-                    </n-collapse>
-                    <n-progress
-                      type="line"
-                      :percentage="Number(((playerStore.cultivation / playerStore.maxCultivation) * 100).toFixed(2))"
-                      indicator-text-color="rgba(255, 255, 255, 0.82)"
-                      rail-color="rgba(32, 128, 240, 0.2)"
-                      color="#2080f0"
-                      :show-indicator="true"
-                      indicator-placement="inside"
-                      processing
-                    />
-                  </n-space>
-                </n-card>
-                <router-view />
+              <div class="resource-bar">
+                <div class="resource-item">
+                  <n-icon class="resource-icon"><ArrowUpOutlined /></n-icon>
+                  <span class="resource-value">{{ animatedSpirit }}</span>
+                  <span class="resource-label">灵力</span>
+                </div>
+                <div class="resource-item gold">
+                  <n-icon class="resource-icon"><DollarOutlined /></n-icon>
+                  <span class="resource-value">{{ animatedStones }}</span>
+                  <span class="resource-label">灵石</span>
+                </div>
               </div>
-            </n-layout-content>
-          </n-layout>
+              <div class="top-actions">
+                <n-button quaternary circle @click="playerStore.toggle">
+                  <n-icon><Sunny v-if="playerStore.isDarkMode" /><Moon v-else /></n-icon>
+                </n-button>
+              </div>
+            </header>
+
+            <!-- 修为进度条 -->
+            <div class="cultivation-bar">
+              <div class="cultivation-info">
+                <span class="cultivation-label">修为</span>
+                <span class="cultivation-text">{{ animatedCultivation }} / {{ playerStore.maxCultivation }}</span>
+              </div>
+              <div class="cultivation-progress">
+                <div class="progress-bar">
+                  <div class="progress-fill" :style="{ width: cultivationPercentage + '%' }">
+                    <div class="progress-shimmer"></div>
+                  </div>
+                </div>
+              </div>
+              <div class="cultivation-percent">{{ cultivationPercentage.toFixed(1) }}%</div>
+            </div>
+
+            <!-- 主内容区 -->
+            <main class="content-area">
+              <router-view />
+            </main>
+
+            <!-- 底部导航栏 -->
+            <nav class="bottom-nav">
+              <div class="bottom-nav-inner">
+                <div
+                  v-for="item in visibleMenuItems"
+                  :key="item.key"
+                  class="nav-item"
+                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  @click="handleMenuClick(item.key)"
+                >
+                  <n-icon class="nav-icon">
+                    <component :is="item.icon" />
+                  </n-icon>
+                  <span class="nav-label">{{ item.label }}</span>
+                </div>
+              </div>
+            </nav>
+          </div>
         </n-spin>
       </n-dialog-provider>
     </n-message-provider>
@@ -163,7 +84,7 @@
 <script setup>
   import { useRouter, useRoute } from 'vue-router'
   import { usePlayerStore } from './stores/player'
-  import { h, ref } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
   import { NIcon, darkTheme } from 'naive-ui'
   import {
     BookOutlined,
@@ -175,8 +96,9 @@
     GiftOutlined,
     HomeOutlined,
     SmileOutlined,
-    AppstoreOutlined,
-    BugOutlined
+    ArrowUpOutlined,
+    DollarOutlined,
+    StarOutlined
   } from '@ant-design/icons-vue'
   import { Moon, Sunny, Flash } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
@@ -185,94 +107,94 @@
   const route = useRoute()
   const playerStore = usePlayerStore()
   const spiritWorker = ref(null)
-  const menuOptions = ref([])
+  const menuItems = ref([])
   const isNewPlayer = ref(false)
-  const isLoading = ref(true) // 添加加载状态
+  const isLoading = ref(true)
+  const animatedSpirit = ref(0)
+  const animatedStones = ref(0)
+  const animatedCultivation = ref(0)
+  const spiritRaf = ref(null)
+  const stonesRaf = ref(null)
+  const cultivationRaf = ref(null)
 
-  // 初始化数据加载
   playerStore.initializePlayer().then(() => {
     isLoading.value = false
-    getMenuOptions()
+    isNewPlayer.value = playerStore.isNewPlayer
+    animatedSpirit.value = playerStore.spirit.toFixed(2)
+    animatedStones.value = playerStore.spiritStones
+    animatedCultivation.value = playerStore.cultivation
+    getMenuItems()
   })
 
-  // 监听玩家状态
   watch(
     () => playerStore.isNewPlayer,
     bool => {
       isNewPlayer.value = bool
+      getMenuItems()
       if (!bool && route.path === '/') {
         router.push('/cultivation')
       }
     }
   )
 
-  // 灵力获取相关配置
-  const baseGainRate = 1 // 基础灵力获取率
+  watch(() => playerStore.spirit, val => {
+    animateValue(animatedSpirit, val.toFixed(2), 500, spiritRaf)
+  })
 
-  const getMenuOptions = () => {
-    menuOptions.value = [
-      ,
-      ...(isNewPlayer.value
-        ? [
-            {
-              label: '欢迎',
-              key: '',
-              icon: renderIcon(HomeOutlined)
-            }
-          ]
-        : []),
-      {
-        label: '修炼',
-        key: 'cultivation',
-        icon: renderIcon(BookOutlined)
-      },
-      {
-        label: '背包',
-        key: 'inventory',
-        icon: renderIcon(ExperimentOutlined)
-      },
-      {
-        label: '抽奖',
-        key: 'gacha',
-        icon: renderIcon(GiftOutlined)
-      },
-      {
-        label: '炼丹',
-        key: 'alchemy',
-        icon: renderIcon(MedicineBoxOutlined)
-      },
-      {
-        label: '探索',
-        key: 'exploration',
-        icon: renderIcon(CompassOutlined)
-      },
-      {
-        label: '秘境',
-        key: 'dungeon',
-        icon: renderIcon(Flash)
-      },
-      {
-        label: '成就',
-        key: 'achievements',
-        icon: renderIcon(TrophyOutlined)
-      },
-      {
-        label: '设置',
-        key: 'settings',
-        icon: renderIcon(SettingOutlined)
-      },
-      ...(playerStore.isGMMode
-        ? [
-            {
-              label: 'GM调试',
-              key: 'gm',
-              icon: renderIcon(SmileOutlined)
-            }
-          ]
-        : [])
+  watch(() => playerStore.spiritStones, val => {
+    animateValue(animatedStones, val, 500, stonesRaf)
+  })
+
+  watch(() => playerStore.cultivation, val => {
+    animateValue(animatedCultivation, val, 300, cultivationRaf)
+  })
+
+  watch(() => playerStore.isGMMode, () => {
+    getMenuItems()
+  })
+
+  const visibleMenuItems = computed(() => {
+    return menuItems.value.filter(item => {
+      if (item.key === '') return isNewPlayer.value
+      if (item.key === 'gm') return playerStore.isGMMode
+      return true
+    })
+  })
+
+  const realmColors = [
+    '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32',
+    '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF', '#1E90FF',
+    '#9932CC', '#9932CC', '#9932CC', '#9932CC', '#9932CC', '#9932CC', '#9932CC', '#9932CC', '#9932CC',
+    '#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700', '#FFD700',
+    '#FF6347', '#FF6347', '#FF6347', '#FF6347', '#FF6347', '#FF6347', '#FF6347', '#FF6347', '#FF6347',
+    '#00CED1', '#00CED1', '#00CED1', '#00CED1', '#00CED1', '#00CED1', '#00CED1', '#00CED1', '#00CED1',
+    '#FF1493', '#FF1493', '#FF1493', '#FF1493', '#FF1493', '#FF1493', '#FF1493', '#FF1493', '#FF1493',
+    '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00', '#7FFF00',
+    '#FF4500', '#FF4500', '#FF4500', '#FF4500', '#FF4500', '#FF4500', '#FF4500', '#FF4500', '#FF4500',
+    '#C71585', '#C71585', '#C71585', '#C71585', '#C71585', '#C71585', '#C71585', '#C71585', '#C71585',
+    '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA', '#20B2AA',
+    '#DAA520', '#DAA520', '#DAA520', '#DAA520', '#DAA520', '#DAA520', '#DAA520', '#DAA520', '#DAA520',
+    '#FFD700'
+  ]
+  const getRealmColor = level => {
+    return realmColors[Math.min(level - 1, realmColors.length - 1)] || '#F5DEB3'
+  }
+
+  const getMenuItems = () => {
+    menuItems.value = [
+      ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
+      { label: '修炼', key: 'cultivation', icon: BookOutlined },
+      { label: '探索', key: 'exploration', icon: CompassOutlined },
+      { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
+      { label: '背包', key: 'inventory', icon: ExperimentOutlined },
+      { label: '抽奖', key: 'gacha', icon: GiftOutlined },
+      { label: '秘境', key: 'dungeon', icon: Flash },
+      { label: '成就', key: 'achievements', icon: TrophyOutlined },
+      { label: '设置', key: 'settings', icon: SettingOutlined },
+      ...(playerStore.isGMMode ? [{ label: 'GM', key: 'gm', icon: SmileOutlined }] : [])
     ]
   }
-  // 自动获取灵力
+
   const startAutoGain = () => {
     if (spiritWorker.value) return
     spiritWorker.value = new Worker(new URL('./workers/spirit.js', import.meta.url))
@@ -285,110 +207,411 @@
     spiritWorker.value.postMessage({ type: 'start' })
   }
 
+  const flushSave = () => {
+    if (playerStore.pendingSave || playerStore.saveTimer) {
+      playerStore.saveData()
+    }
+  }
+
   onMounted(() => {
-    startAutoGain() // 启动自动获取灵力
+    startAutoGain()
+    window.addEventListener('beforeunload', flushSave)
   })
 
-  // 图标
-  const renderIcon = icon => {
-    return () => h(NIcon, null, { default: () => h(icon) })
-  }
+  onUnmounted(() => {
+    flushSave()
+    if (spiritWorker.value) {
+      spiritWorker.value.terminate()
+      spiritWorker.value = null
+    }
+    if (spiritRaf.value) cancelAnimationFrame(spiritRaf.value)
+    if (stonesRaf.value) cancelAnimationFrame(stonesRaf.value)
+    if (cultivationRaf.value) cancelAnimationFrame(cultivationRaf.value)
+    window.removeEventListener('beforeunload', flushSave)
+  })
 
-  // 获取当前路由对应的菜单key
   const getCurrentMenuKey = () => {
-    const path = route.path.slice(1) // 移除开头的斜杠
-    return path // 如果是根路径，默认返回cultivation
+    return route.path.slice(1)
   }
 
-  // 菜单点击事件
   const handleMenuClick = key => {
     router.push(`/${key}`)
+  }
+
+  const baseGainRate = 1
+
+  const cultivationPercentage = computed(() => {
+    return (playerStore.cultivation / playerStore.maxCultivation) * 100
+  })
+
+  const animateValue = (ref, target, duration, rafRef) => {
+    if (rafRef.value) {
+      cancelAnimationFrame(rafRef.value)
+    }
+    const start = Number(ref.value)
+    const diff = target - start
+    const startTime = performance.now()
+    const animate = currentTime => {
+      const elapsed = currentTime - startTime
+      const progress = Math.min(elapsed / duration, 1)
+      ref.value = Math.round((start + diff * progress) * 100) / 100
+      if (progress < 1) {
+        rafRef.value = requestAnimationFrame(animate)
+      } else {
+        rafRef.value = null
+      }
+    }
+    rafRef.value = requestAnimationFrame(animate)
   }
 </script>
 
 <style>
-  * {
-    margin: 0;
-    padding: 0;
-    box-sizing: border-box;
-  }
-  :root {
-    --n-color: rgb(16, 16, 20);
-    --n-text-color: rgba(255, 255, 255, 0.82);
-  }
-
-  html.dark {
-    background-color: var(--n-color);
-  }
-
-  body {
-    font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, 'Open Sans',
-      'Helvetica Neue', sans-serif;
-  }
-
-  .n-config-provider,
-  .n-layout {
-    height: 100%;
-    min-height: 100vh;
-  }
-
-  .header-content {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 0 16px;
-  }
-
-  .content-wrapper {
-    max-width: 1200px;
-    margin: 0 auto;
-    padding: 16px;
-  }
-
-  .n-card {
-    margin-bottom: 16px;
-  }
-
-  .footer-content {
+  .game-container {
     display: flex;
-    justify-content: center;
+    flex-direction: column;
+    height: 100vh;
+    height: 100dvh;
+    overflow: hidden;
+    background: linear-gradient(135deg, #0D0D12 0%, #1A1A2E 50%, #0D0D12 100%);
+  }
+
+  /* 顶部状态栏 */
+  .top-bar {
+    flex-shrink: 0;
+    height: auto;
+    min-height: 56px;
+    background: rgba(20, 25, 30, 0.95);
+    backdrop-filter: blur(20px);
+    border-bottom: 1px solid rgba(139, 69, 19, 0.3);
+    display: flex;
     align-items: center;
+    padding: 8px 12px;
+    gap: 12px;
+  }
+
+  .player-info {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    min-width: 0;
+  }
+
+  .player-avatar {
+    width: 38px;
+    height: 38px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #DAA520, #FFD700);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-family: 'Ma Shan Zheng', cursive;
+    font-size: 20px;
+    color: #0D0D12;
+    box-shadow: 0 0 12px rgba(218, 165, 32, 0.4);
+    flex-shrink: 0;
+  }
+
+  .player-meta {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    min-width: 0;
+  }
+
+  .player-name {
+    font-family: 'Ma Shan Zheng', cursive;
+    font-size: 16px;
+    color: #F5DEB3;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100px;
+  }
+
+  .player-realm {
+    font-size: 11px;
+    padding: 2px 8px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(218, 165, 32, 0.3);
+    white-space: nowrap;
+  }
+
+  .resource-bar {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-left: auto;
+  }
+
+  .resource-item {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+    padding: 4px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 16px;
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    font-size: 12px;
+  }
+
+  .resource-item.gold {
+    border-color: rgba(218, 165, 32, 0.4);
+    background: rgba(218, 165, 32, 0.05);
+  }
+
+  .resource-icon {
+    font-size: 14px;
+    color: #DAA520;
+  }
+
+  .resource-value {
+    font-weight: bold;
+    color: #F5DEB3;
+    min-width: auto;
+  }
+
+  .resource-label {
+    font-size: 11px;
+    color: #8B8B8B;
+  }
+
+  .top-actions {
+    display: flex;
+    flex-shrink: 0;
+  }
+
+  /* 修为进度条 */
+  .cultivation-bar {
+    flex-shrink: 0;
+    padding: 8px 12px;
+    background: rgba(10, 12, 15, 0.85);
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    border-bottom: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .cultivation-info {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+    flex-shrink: 0;
+  }
+
+  .cultivation-label {
+    font-size: 12px;
+    color: #8B8B8B;
+    white-space: nowrap;
+  }
+
+  .cultivation-text {
+    font-size: 12px;
+    color: #DAA520;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .cultivation-progress {
+    flex: 1;
+    min-width: 0;
+  }
+
+  .progress-bar {
+    height: 8px;
+    background: rgba(0, 0, 0, 0.4);
+    border-radius: 4px;
+    overflow: hidden;
+    border: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .progress-fill {
+    position: relative;
+    height: 100%;
+    background: linear-gradient(90deg, #8B4513, #DAA520, #FFD700);
+    border-radius: 4px;
+    transition: width 0.5s ease;
+    box-shadow: 0 0 10px rgba(218, 165, 32, 0.5);
+    overflow: hidden;
+  }
+
+  .progress-shimmer {
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.3), transparent);
+    animation: shimmer 2s infinite;
+  }
+
+  @keyframes shimmer {
+    0% { transform: translateX(-100%); }
+    100% { transform: translateX(100%); }
+  }
+
+  .cultivation-percent {
+    font-size: 11px;
+    color: #DAA520;
+    font-weight: bold;
+    flex-shrink: 0;
+    min-width: 36px;
+    text-align: right;
+  }
+
+  /* 主内容区 */
+  .content-area {
+    flex: 1;
+    overflow-y: auto;
+    overflow-x: hidden;
     padding: 12px;
+    -webkit-overflow-scrolling: touch;
   }
 
-  .n-page-header__title {
-    padding: 16px 0;
-    margin: 0 16px;
+  /* 底部导航 */
+  .bottom-nav {
+    flex-shrink: 0;
+    background: rgba(20, 25, 30, 0.98);
+    backdrop-filter: blur(20px);
+    border-top: 1px solid rgba(139, 69, 19, 0.3);
+    padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
-  ::-webkit-scrollbar {
-    width: 12px;
-    height: 12px;
+  .bottom-nav-inner {
+    display: flex;
+    justify-content: space-around;
+    align-items: center;
+    height: 56px;
+    padding: 0 4px;
   }
 
-  ::-webkit-scrollbar-track {
-    background-color: rgba(0, 0, 0, 0.03);
+  .nav-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    justify-content: center;
+    gap: 3px;
+    flex: 1;
+    height: 100%;
+    cursor: pointer;
+    transition: all 0.2s ease;
+    color: #8B8B8B;
+    border-radius: 8px;
+    max-width: 72px;
   }
 
-  ::-webkit-scrollbar-thumb {
-    background-color: rgba(0, 0, 0, 0.2);
-    border-radius: 6px;
-    border: 3px solid transparent;
-    background-clip: padding-box;
+  .nav-item:active {
+    transform: scale(0.95);
+    background: rgba(139, 69, 19, 0.1);
   }
 
-  ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(0, 0, 0, 0.3);
+  .nav-item.active {
+    color: #DAA520;
   }
 
-  html.dark ::-webkit-scrollbar-track {
-    background-color: rgba(255, 255, 255, 0.03);
+  .nav-item.active .nav-icon {
+    filter: drop-shadow(0 0 6px rgba(218, 165, 32, 0.6));
   }
 
-  html.dark ::-webkit-scrollbar-thumb {
-    background-color: rgba(255, 255, 255, 0.2);
+  .nav-icon {
+    font-size: 20px;
+    transition: all 0.2s ease;
   }
 
-  html.dark ::-webkit-scrollbar-thumb:hover {
-    background-color: rgba(255, 255, 255, 0.3);
+  .nav-label {
+    font-size: 10px;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    max-width: 100%;
+  }
+
+  .fade-enter-active,
+  .fade-leave-active {
+    transition: opacity 0.3s ease, transform 0.3s ease;
+  }
+
+  .fade-enter-from {
+    opacity: 0;
+    transform: translateY(10px);
+  }
+
+  .fade-leave-to {
+    opacity: 0;
+    transform: translateY(-10px);
+  }
+
+  .n-config-provider {
+    height: 100%;
+  }
+
+  /* 桌面端优化 */
+  @media (min-width: 769px) {
+    .game-container {
+      max-width: 520px;
+      margin: 0 auto;
+      border-left: 1px solid rgba(139, 69, 19, 0.2);
+      border-right: 1px solid rgba(139, 69, 19, 0.2);
+      box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
+    }
+
+    .player-name {
+      max-width: 160px;
+    }
+
+    .bottom-nav-inner {
+      justify-content: center;
+      gap: 8px;
+    }
+
+    .nav-item {
+      max-width: 80px;
+    }
+  }
+
+  /* 横屏适配 */
+  @media (max-height: 480px) and (orientation: landscape) {
+    .top-bar {
+      min-height: 44px;
+      padding: 4px 12px;
+    }
+
+    .player-avatar {
+      width: 30px;
+      height: 30px;
+      font-size: 16px;
+    }
+
+    .player-name {
+      font-size: 14px;
+    }
+
+    .player-realm {
+      font-size: 10px;
+    }
+
+    .resource-item {
+      padding: 2px 8px;
+    }
+
+    .cultivation-bar {
+      padding: 4px 12px;
+    }
+
+    .bottom-nav-inner {
+      height: 44px;
+    }
+
+    .nav-icon {
+      font-size: 16px;
+    }
+
+    .nav-label {
+      font-size: 9px;
+    }
+
+    .content-area {
+      padding: 8px;
+    }
   }
 </style>

@@ -765,7 +765,7 @@ export const checkAchievements = player => {
           }
         }
         // 保存玩家数据
-        player.saveData()
+        player.queueSave()
       }
     })
   })

@@ -1,6 +1,6 @@
 <template>
-  <div class="dungeon-container">
-    <n-card title="秘境探索">
+  <div class="dungeon-page">
+    <n-card title="秘境探索" class="dungeon-card">
       <template #header-extra>
         <n-space>
           <n-select
@@ -289,7 +289,7 @@
 </template>
 
 <script setup>
-  import { ref } from 'vue'
+  import { ref, computed, onUnmounted } from 'vue'
   import { usePlayerStore } from '../stores/player'
   import { getRealmName } from '../plugins/realm'
   import { CombatManager, CombatEntity, generateEnemy, CombatType } from '../plugins/combat'
@@ -297,6 +297,29 @@
   import dungeonBuffs from '../plugins/dungeonBuffs'
   import { useMessage } from 'naive-ui'
   import LogPanel from '../components/LogPanel.vue'
+
+  // 战斗循环清理
+  let combatTimer = null
+  let combatResolve = null
+  const sleep = ms => new Promise(resolve => {
+    combatResolve = resolve
+    combatTimer = setTimeout(() => {
+      combatTimer = null
+      combatResolve = null
+      resolve()
+    }, ms)
+  })
+  const stopCombatLoop = () => {
+    dungeonState.value.inCombat = false
+    if (combatTimer) {
+      clearTimeout(combatTimer)
+      combatTimer = null
+    }
+    if (combatResolve) {
+      combatResolve()
+      combatResolve = null
+    }
+  }
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -504,20 +527,20 @@
       const result = dungeonState.value.combatManager.executeTurn()
       const getCombatLog = dungeonState.value.combatManager.getCombatLog()
       // 添加动画效果
-      if (result.attacker === dungeonState.value.combatManager.player) {
+      if (result && result.attacker === dungeonState.value.combatManager.player) {
         playerAttacking.value = true
         enemyHurt.value = true
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await sleep(500)
         playerAttacking.value = false
         enemyHurt.value = false
-      } else {
+      } else if (result) {
         enemyAttacking.value = true
         playerHurt.value = true
-        await new Promise(resolve => setTimeout(resolve, 500))
+        await sleep(500)
         enemyAttacking.value = false
         playerHurt.value = false
       }
-      if (!result) break
+      if (!result || !dungeonState.value.inCombat) break
       // 更新战斗日志
       getCombatLog.forEach(item => {
         logRef.value?.addLog('info', item)
@@ -531,9 +554,15 @@
         break
       }
       // 添加延迟使战斗动画更流畅
-      await new Promise(resolve => setTimeout(resolve, 500))
+      await sleep(500)
     }
   }
+
+  onUnmounted(() => {
+    stopCombatLoop()
+    dungeonState.value.combatManager = null
+    combatLog.value = []
+  })
 
   // 处理胜利
   const handleVictory = () => {
@@ -618,20 +647,26 @@
 </script>
 
 <style scoped>
-  .dungeon-container {
-    margin: 0 auto;
+  .dungeon-page {
+    padding: 0;
+    min-height: 100%;
+  }
+
+  .dungeon-card {
+    background: var(--color-bg-card);
   }
 
   .option-cards {
     display: flex;
-    gap: 16px;
-    padding: 16px;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px 0;
     margin: 0 auto;
   }
 
   .option-card {
     position: relative;
-    padding: 20px;
+    padding: 16px;
     border: 2px solid;
     border-radius: 12px;
     background: var(--n-color);
@@ -639,8 +674,8 @@
     transition: all 0.3s ease;
     display: flex;
     flex-direction: column;
-    min-height: 100px;
-    width: 33%;
+    min-height: 80px;
+    width: 100%;
   }
 
   .option-card:hover {
@@ -649,10 +684,10 @@
   }
 
   .option-name {
-    font-size: 1.3em;
+    font-size: 1.2em;
     font-weight: bold;
-    margin-bottom: 12px;
-    padding-right: 80px;
+    margin-bottom: 8px;
+    padding-right: 60px;
   }
 
   .option-description {
@@ -678,9 +713,9 @@
     display: flex;
     justify-content: space-between;
     align-items: center;
-    padding: 20px;
-    margin-bottom: 20px;
-    min-height: 200px;
+    padding: 16px 12px;
+    margin-bottom: 16px;
+    min-height: 160px;
     background: rgba(0, 0, 0, 0.05);
     border-radius: 8px;
   }
@@ -693,20 +728,23 @@
   }
 
   .character-avatar {
-    font-size: 48px;
-    margin: 10px 0;
+    width: 52px;
+    height: 52px;
+    font-size: 20px;
+    margin: 8px 0;
   }
 
   .character-name {
     font-weight: bold;
     margin-bottom: 8px;
+    font-size: 12px;
   }
 
   .health-bar {
-    width: 100px;
-    height: 10px;
+    width: 80px;
+    height: 8px;
     background: #ff000033;
-    border-radius: 5px;
+    border-radius: 4px;
     overflow: hidden;
   }
 
@@ -725,14 +763,14 @@
   }
 
   .character-avatar {
-    width: 60px;
-    height: 60px;
+    width: 52px;
+    height: 52px;
     display: flex;
     align-items: center;
     justify-content: center;
-    font-size: 24px;
+    font-size: 20px;
     font-weight: bold;
-    margin: 10px 0;
+    margin: 8px 0;
     color: #fff;
   }
 

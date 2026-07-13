@@ -6,6 +6,10 @@ import { getRealmName, getRealmLength } from '../plugins/realm'
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
+    // 保存防抖计时器（不持久化）
+    saveTimer: null,
+    pendingSave: false,
+    lastSaveTime: 0,
     // 是否新玩家
     isNewPlayer: true,
     // GM模式开关
@@ -270,6 +274,10 @@ export const usePlayerStore = defineStore('player', {
       } catch (error) {
         console.error('加载存档失败:', error)
       }
+      // 重置非持久化的保存相关状态，避免加载旧计时器 ID 等无效值
+      this.saveTimer = null
+      this.pendingSave = false
+      this.lastSaveTime = 0
       // 初始化主题设置
       this.isDarkMode = localStorage.getItem('darkMode') === 'true'
       // 同步暗黑模式状态到HTML标签
@@ -281,20 +289,42 @@ export const usePlayerStore = defineStore('player', {
       localStorage.setItem('darkMode', this.isDarkMode)
       // 更新html标签的class
       this.updateHtmlDarkMode(this.isDarkMode)
-      this.saveData()
+      this.queueSave()
     },
     // 保存数据到IndexedDB
     async saveData() {
+      // 清除待保存计时器，避免重复保存
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer)
+        this.saveTimer = null
+      }
+      this.pendingSave = false
       const encryptedData = encryptData(this.$state)
       if (encryptedData) {
         try {
           await GameDB.setData('playerData', encryptedData)
+          this.lastSaveTime = Date.now()
         } catch (error) {
           console.error('数据保存失败:', error)
         }
       } else {
         console.error('数据加密失败')
       }
+    },
+    // 防抖保存：高频操作使用此接口，避免每次调用都加密写入 IndexedDB
+    // 连续活动时会合并保存，但最多 10 秒强制保存一次，防止进度丢失
+    queueSave() {
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer)
+      }
+      this.pendingSave = true
+      const now = Date.now()
+      const maxInterval = 10000
+      const debounceDelay = 5000
+      const delay = Math.max(debounceDelay, this.lastSaveTime + maxInterval - now)
+      this.saveTimer = setTimeout(() => {
+        this.saveData()
+      }, delay)
     },
     // 导出存档数据
     async exportData() {
@@ -326,10 +356,93 @@ export const usePlayerStore = defineStore('player', {
         throw error
       }
     },
+    // === 多存档槽位功能 ===
+    // 获取存档槽位列表
+    async getSaveSlots() {
+      const slots = []
+      for (let i = 1; i <= 5; i++) {
+        const slotKey = `saveSlot_${i}`
+        const encryptedData = await GameDB.getData(slotKey)
+        if (encryptedData) {
+          try {
+            const decryptedData = decryptData(encryptedData)
+            slots.push({
+              slot: i,
+              name: decryptedData?.name || `修士${i}`,
+              level: decryptedData?.level || 1,
+              realm: decryptedData?.realm || '未知',
+              saveTime: decryptedData?._saveTime || null
+            })
+          } catch {
+            slots.push({ slot: i, name: '存档损坏', level: 0, realm: '未知', saveTime: null })
+          }
+        } else {
+          slots.push({ slot: i, name: null, level: 0, realm: '', saveTime: null })
+        }
+      }
+      return slots
+    },
+    // 保存到指定槽位
+    async saveToSlot(slot) {
+      try {
+        // 先保存当前数据到主存档
+        await this.saveData()
+        const currentData = await GameDB.getData('playerData')
+        if (!currentData) {
+          throw new Error('当前没有可保存的存档数据')
+        }
+        const decryptedData = decryptData(currentData)
+        if (!decryptedData) {
+          throw new Error('数据解密失败')
+        }
+        decryptedData._saveTime = Date.now()
+        const encryptedSlotData = encryptData(decryptedData)
+        await GameDB.setData(`saveSlot_${slot}`, encryptedSlotData)
+        return true
+      } catch (error) {
+        console.error('保存到槽位失败:', error)
+        throw error
+      }
+    },
+    // 从指定槽位加载
+    async loadFromSlot(slot) {
+      try {
+        const encryptedSlotData = await GameDB.getData(`saveSlot_${slot}`)
+        if (!encryptedSlotData) {
+          throw new Error('该槽位没有存档')
+        }
+        const decryptedData = decryptData(encryptedSlotData)
+        if (!decryptedData || !validateData(decryptedData)) {
+          throw new Error('存档数据损坏或无效')
+        }
+        // 删除非游戏数据
+        delete decryptedData._saveTime
+        // 写入主存档
+        const encryptedData = encryptData(decryptedData)
+        await GameDB.setData('playerData', encryptedData)
+        // 重新初始化
+        this.$reset()
+        await this.initializePlayer()
+        return true
+      } catch (error) {
+        console.error('从槽位加载失败:', error)
+        throw error
+      }
+    },
+    // 删除指定槽位
+    async deleteSlot(slot) {
+      try {
+        await GameDB.setData(`saveSlot_${slot}`, null)
+        return true
+      } catch (error) {
+        console.error('删除槽位失败:', error)
+        throw error
+      }
+    },
     // 获取灵力
     gainSpirit(amount) {
       this.spirit += amount * this.spiritRate
-      this.saveData()
+      this.queueSave()
     },
     // 修炼增加修为
     cultivate(amount) {
@@ -341,7 +454,7 @@ export const usePlayerStore = defineStore('player', {
       if (this.cultivation >= this.maxCultivation) {
         this.tryBreakthrough()
       }
-      this.saveData()
+      this.queueSave()
     },
     // 尝试突破
     tryBreakthrough() {
@@ -363,7 +476,7 @@ export const usePlayerStore = defineStore('player', {
         // 突破奖励
         this.spirit += 100 * this.level // 获得灵力奖励
         this.spiritRate *= 1.2 // 提升灵力获取倍率
-        this.saveData()
+        this.queueSave()
         return true
       }
       return false
@@ -372,7 +485,7 @@ export const usePlayerStore = defineStore('player', {
     gainItem(item) {
       this.items.push(item)
       this.itemsFound++ // 增加获得物品统计
-      this.saveData()
+      this.queueSave()
     },
     // 使用物品（丹药或灵宠）
     useItem(item) {
@@ -398,7 +511,7 @@ export const usePlayerStore = defineStore('player', {
           if (index > -1) {
             this.items.splice(index, 1)
           }
-          this.saveData()
+          this.queueSave()
           worker.terminate()
           resolve({ success: true, message: `成功卖出装备，获得${stoneAmount}个强化石` })
         }
@@ -420,7 +533,7 @@ export const usePlayerStore = defineStore('player', {
           const { totalStones, itemsToRemove, count } = e.data
           this.reinforceStones += totalStones
           this.items = this.items.filter(item => !itemsToRemove.includes(item.id))
-          this.saveData()
+          this.queueSave()
           worker.terminate()
           resolve({
             success: true,
@@ -466,7 +579,7 @@ export const usePlayerStore = defineStore('player', {
       }
       // 清理过期效果
       this.activeEffects = this.activeEffects.filter(effect => effect.endTime > now)
-      this.saveData()
+      this.queueSave()
       return { success: true, message: '使用丹药成功' }
     },
     // 炼制丹药
@@ -502,7 +615,7 @@ export const usePlayerStore = defineStore('player', {
           effect: effect
         })
         this.pillsCrafted++
-        this.saveData()
+        this.queueSave()
       }
       return result
     },
@@ -528,7 +641,7 @@ export const usePlayerStore = defineStore('player', {
       // 重置所有属性加成
       this.resetPetBonuses()
       this.activePet = null
-      this.saveData()
+      this.queueSave()
       return { success: true, message: '召回成功' }
     },
     // 出战灵宠
@@ -541,7 +654,7 @@ export const usePlayerStore = defineStore('player', {
       this.activePet = pet
       // 应用灵宠属性加成
       this.applyPetBonuses()
-      this.saveData()
+      this.queueSave()
       return { success: true, message: '出战成功' }
     },
     // 重置灵宠属性加成
@@ -633,7 +746,7 @@ export const usePlayerStore = defineStore('player', {
           }
         })
       }
-      this.saveData()
+      this.queueSave()
       return { success: true, message: '装备成功' }
     },
     // 卸下装备
@@ -661,7 +774,7 @@ export const usePlayerStore = defineStore('player', {
         // 将装备返回到背包
         this.items.push(artifact)
         this.equippedArtifacts[slot] = null
-        this.saveData()
+        this.queueSave()
         return true
       }
       return false
@@ -685,7 +798,7 @@ export const usePlayerStore = defineStore('player', {
           this.unlockedPillRecipes++
         }
       }
-      this.saveData()
+      this.queueSave()
     },
     // 炼制丹药
     craftPill(recipeId) {
@@ -716,7 +829,7 @@ export const usePlayerStore = defineStore('player', {
         }
         this.items.push(pill)
         this.pillsCrafted++
-        this.saveData()
+        this.queueSave()
       }
       return result
     },
@@ -738,7 +851,7 @@ export const usePlayerStore = defineStore('player', {
         }
         // 清理过期效果
         this.activeEffects = this.activeEffects.filter(effect => effect.endTime > now)
-        this.saveData()
+        this.queueSave()
         return true
       }
       return false
@@ -754,7 +867,7 @@ export const usePlayerStore = defineStore('player', {
         this.items = []
       }
       this.items.push(equipment)
-      this.saveData()
+      this.queueSave()
     },
     // 升级灵宠
     upgradePet(pet, essenceCount) {
@@ -810,7 +923,7 @@ export const usePlayerStore = defineStore('player', {
           this.applyPetBonuses()
         }
       }
-      this.saveData()
+      this.queueSave()
       return { success: true, message: '升级成功' }
     },
     // 升星灵宠
@@ -829,7 +942,7 @@ export const usePlayerStore = defineStore('player', {
         this.items.splice(foodPetIndex, 1)
         // 提升目标灵宠星级
         this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
-        this.saveData()
+        this.queueSave()
         return { success: true, message: '升星成功' }
       }
       return { success: false, message: '升星失败' }
