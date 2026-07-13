@@ -213,7 +213,7 @@
       ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
       { label: '人物', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
-      { label: '炼丹', key: 'alchemy', icon: MedicineKitOutlined },
+      { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
       { label: '抽奖', key: 'gacha', icon: GiftOutlined },
       { label: '成就', key: 'achievements', icon: TrophyOutlined },
