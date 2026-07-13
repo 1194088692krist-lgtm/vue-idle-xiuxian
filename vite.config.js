@@ -6,6 +6,8 @@ import { defineConfig } from 'vite'
 import pkg from './package.json'
 import vitePluginBundleObfuscator from 'vite-plugin-bundle-obfuscator'
 
+import { cloudflare } from "@cloudflare/vite-plugin";
+
 export default defineConfig({
   define: {
     __APP_VERSION__: JSON.stringify(pkg.version)
@@ -44,42 +46,37 @@ export default defineConfig({
       }
     }
   },
-  plugins: [
-    vue(),
-    AutoImport({
-      imports: [
-        'vue',
-        {
-          'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar']
-        }
-      ]
-    }),
-    Components({
-      resolvers: [NaiveUiResolver()]
-    }),
-    vitePluginBundleObfuscator({
+  plugins: [vue(), AutoImport({
+    imports: [
+      'vue',
+      {
+        'naive-ui': ['useDialog', 'useMessage', 'useNotification', 'useLoadingBar']
+      }
+    ]
+  }), Components({
+    resolvers: [NaiveUiResolver()]
+  }), vitePluginBundleObfuscator({
+    log: false,
+    enable: true,
+    options: {
       log: false,
-      enable: true,
-      options: {
-        log: false,
-        compact: true,
-        stringArray: true,
-        renameGlobals: false,
-        selfDefending: false,
-        debugProtection: false,
-        rotateStringArray: true,
-        deadCodeInjection: false,
-        stringArrayEncoding: ['none'],
-        disableConsoleOutput: true,
-        stringArrayThreshold: 0.75,
-        controlFlowFlattening: false,
-        unicodeEscapeSequence: true,
-        identifierNamesGenerator: 'hexadecimal'
-      },
-      // excludes: ['router.js'],
-      autoExcludeNodeModules: true
-    })
-  ],
+      compact: true,
+      stringArray: true,
+      renameGlobals: false,
+      selfDefending: false,
+      debugProtection: false,
+      rotateStringArray: true,
+      deadCodeInjection: false,
+      stringArrayEncoding: ['none'],
+      disableConsoleOutput: true,
+      stringArrayThreshold: 0.75,
+      controlFlowFlattening: false,
+      unicodeEscapeSequence: true,
+      identifierNamesGenerator: 'hexadecimal'
+    },
+    // excludes: ['router.js'],
+    autoExcludeNodeModules: true
+  }), cloudflare()],
   worker: {
     format: 'es'
   }
