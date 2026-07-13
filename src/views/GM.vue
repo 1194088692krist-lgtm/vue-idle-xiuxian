@@ -1,7 +1,12 @@
 <template>
   <n-layout class="gm-page">
     <n-layout-content class="gm-content">
-      <n-card title="基础属性修改" class="gm-card">
+      <n-card title="GM控制台" class="gm-card">
+        <template #header-extra>
+          <n-button type="warning" @click="$router.push('/gm-tools')">
+            资源管理工具
+          </n-button>
+        </template>
         <n-form>
           <n-form-item label="道号">
             <n-input v-model:value="baseAttributes.name" />

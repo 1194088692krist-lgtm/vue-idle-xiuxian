@@ -8,6 +8,7 @@ import Exploration from '../views/Exploration.vue'
 import Achievements from '../views/Achievements.vue'
 import Settings from '../views/Settings.vue'
 import GM from '../views/GM.vue'
+import GMTools from '../views/GMTools.vue'
 import Alchemy from '../views/Alchemy.vue'
 import Dungeon from '../views/Dungeon.vue'
 import Gacha from '../views/Gacha.vue'
@@ -58,6 +59,20 @@ const routes = [
     path: '/gm',
     name: 'gm',
     component: GM,
+    meta: { requiresGame: true },
+    beforeEnter: (to, from, next) => {
+      const playerStore = usePlayerStore()
+      if (!playerStore.isGMMode) {
+        next('/cultivation')
+      } else {
+        next()
+      }
+    }
+  },
+  {
+    path: '/gm-tools',
+    name: 'GMTools',
+    component: GMTools,
     meta: { requiresGame: true },
     beforeEnter: (to, from, next) => {
       const playerStore = usePlayerStore()
