@@ -282,6 +282,28 @@ export const usePlayerStore = defineStore('player', {
       this.isDarkMode = localStorage.getItem('darkMode') === 'true'
       // 同步暗黑模式状态到HTML标签
       this.updateHtmlDarkMode(this.isDarkMode)
+      // 初始化GM模式设置
+      const gmMode = localStorage.getItem('isGMMode')
+      if (gmMode !== null) {
+        this.isGMMode = gmMode === 'true'
+      }
+    },
+    // 创建新玩家数据
+    initNewPlayer() {
+      this.name = '无名修士'
+      this.level = 1
+      this.realm = '练气期一层'
+      this.cultivation = 0
+      this.maxCultivation = 100
+      this.spirit = 0
+      this.spiritRate = 1
+      this.luck = 1
+      this.cultivationRate = 1
+      this.herbRate = 1
+      this.alchemyRate = 1
+      this.spiritStones = 0
+      this.petEssence = 0
+      this.isNewPlayer = false
     },
     // 切换暗黑模式
     toggle() {

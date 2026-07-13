@@ -140,6 +140,7 @@ const handleTitleClick = () => {
   if (clickTimer) clearTimeout(clickTimer)
   if (clickCount >= 5) {
     playerStore.isGMMode = !playerStore.isGMMode
+    localStorage.setItem('isGMMode', playerStore.isGMMode)
     alert(playerStore.isGMMode ? 'GM模式已开启' : 'GM模式已关闭')
     clickCount = 0
   } else {

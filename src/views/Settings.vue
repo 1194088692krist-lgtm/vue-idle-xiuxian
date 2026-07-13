@@ -137,42 +137,7 @@
       </div>
     </div>
 
-    <!-- 关于 -->
-    <div class="main-card glass-card">
-      <div class="card-header">
-        <div class="header-icon">
-          <GithubOutlined />
-        </div>
-        <div class="header-info">
-          <h2 class="card-title gold-gradient-text">关于</h2>
-        </div>
-      </div>
-      <div class="card-body">
-        <div class="about-links">
-          <a
-            class="btn btn-outline"
-            href="https://github.com/setube/vue-idle-xiuxian"
-            target="_blank"
-          >
-            开源地址
-          </a>
-          <button class="btn btn-outline" @click="qq = true">官方群聊</button>
-        </div>
-      </div>
-    </div>
-
-    <!-- 群聊弹窗 -->
-    <div v-if="qq" class="modal-overlay" @click.self="qq = false">
-      <div class="modal-content glass-card">
-        <div class="modal-header">
-          <h3>玩家交流群</h3>
-          <button class="btn btn-small btn-danger" @click="qq = false">关闭</button>
-        </div>
-        <div class="modal-body">
-          <input class="setting-input" value="920930589" readonly />
-        </div>
-      </div>
-    </div>
+    
   </div>
 </template>
 
