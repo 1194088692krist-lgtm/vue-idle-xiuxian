@@ -32,13 +32,20 @@
             >
               <div class="card-header">
                 <span>{{ name }}</span>
-                <button
-                  v-if="playerStore.equippedArtifacts[type]"
-                  class="btn-small btn-danger"
-                  @click.stop="unequipItem(type)"
-                >
-                  卸下
-                </button>
+                <div v-if="playerStore.equippedArtifacts[type]" class="card-actions">
+                  <button
+                    class="btn-small btn-info"
+                    @click.stop="showEquipmentDetails(playerStore.equippedArtifacts[type])"
+                  >
+                    详情
+                  </button>
+                  <button
+                    class="btn-small btn-danger"
+                    @click.stop="unequipItem(type)"
+                  >
+                    卸下
+                  </button>
+                </div>
               </div>
               <div class="card-body">
                 <p v-if="playerStore.equippedArtifacts[type]">
@@ -1233,6 +1240,12 @@
     margin-bottom: 8px;
     font-weight: bold;
     color: #F5DEB3;
+  }
+
+  .card-actions {
+    display: flex;
+    gap: 4px;
+    flex-shrink: 0;
   }
 
   .simple-card .card-body {
