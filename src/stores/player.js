@@ -11,6 +11,8 @@ export const usePlayerStore = defineStore('player', {
     saveTimer: null,
     pendingSave: false,
     lastSaveTime: 0,
+    // 当前存档所在槽位（null 表示尚未指定，自动存档时默认写入槽位 1）
+    currentSlot: null,
     // 是否新玩家
     isNewPlayer: true,
     // GM模式开关
@@ -495,11 +497,19 @@ export const usePlayerStore = defineStore('player', {
         decryptedData._saveTime = Date.now()
         const encryptedSlotData = encryptData(decryptedData)
         await GameDB.setData(`saveSlot_${slot}`, encryptedSlotData)
+        this.currentSlot = slot
         return true
       } catch (error) {
         console.error('保存到槽位失败:', error)
         throw error
       }
+    },
+    // 保存到"当前所在槽位"：底部存档按钮与抽奖后自动存档均走此接口
+    // 若尚未指定槽位，则默认写入槽位 1
+    async saveToCurrentSlot() {
+      const target = this.currentSlot ?? 1
+      await this.saveToSlot(target)
+      return target
     },
     // 从指定槽位加载
     async loadFromSlot(slot) {
@@ -520,6 +530,7 @@ export const usePlayerStore = defineStore('player', {
         // 重新初始化
         this.$reset()
         await this.initializePlayer()
+        this.currentSlot = slot
         return true
       } catch (error) {
         console.error('从槽位加载失败:', error)

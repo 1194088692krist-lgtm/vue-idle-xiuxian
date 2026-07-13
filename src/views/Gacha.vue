@@ -236,6 +236,8 @@
     gachaResults.value = [result]
     showMessage('success', `抽奖获得：${getRewardName(result)}`)
     playerStore.queueSave()
+    // 抽奖结束后自动存入当前所在存档槽（未指定则默认槽位 1）
+    playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
 
   // 十连
@@ -265,6 +267,8 @@
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
     showMessage('success', `十连抽奖完成：${parts.join('，')}`)
     playerStore.queueSave()
+    // 抽奖结束后自动存入当前所在存档槽（未指定则默认槽位 1）
+    playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
 
   const clearLogPanel = () => {

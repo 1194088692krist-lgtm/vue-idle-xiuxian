@@ -91,6 +91,8 @@
                   </n-icon>
                   <span class="nav-label">{{ item.label }}</span>
                 </div>
+                <!-- 底部存档按钮：保存至当前所在存档槽 -->
+                <SaveButton />
               </div>
             </nav>
           </div>
@@ -122,6 +124,7 @@
   import { Moon, Sunny } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
+import SaveButton from './components/SaveButton.vue'
 
   const router = useRouter()
   const route = useRoute()
