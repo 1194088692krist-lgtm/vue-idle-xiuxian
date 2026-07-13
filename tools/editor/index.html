@@ -1,0 +1,1003 @@
+<!DOCTYPE html>
+<html lang="zh-CN">
+<head>
+  <meta charset="UTF-8">
+  <meta name="viewport" content="width=device-width, initial-scale=1.0">
+  <title>修仙游戏编辑器 - 独立开发工具</title>
+  <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/prism/1.29.0/themes/prism-tomorrow.min.css">
+  <style>
+    * { margin: 0; padding: 0; box-sizing: border-box; }
+    :root {
+      --bg: #0d1117;
+      --bg-secondary: #161b22;
+      --bg-tertiary: #21262d;
+      --border: #30363d;
+      --text: #c9d1d9;
+      --text-secondary: #8b949e;
+      --accent: #58a6ff;
+      --accent-hover: #79c0ff;
+      --success: #238636;
+      --success-hover: #2ea043;
+      --warning: #f0883e;
+      --danger: #da3633;
+      --gold: #e3b341;
+    }
+    body {
+      font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', 'Noto Sans SC', sans-serif;
+      background: var(--bg);
+      color: var(--text);
+      height: 100vh;
+      overflow: hidden;
+    }
+    .app {
+      display: flex;
+      height: 100vh;
+    }
+    /* 侧边栏 */
+    .sidebar {
+      width: 260px;
+      background: var(--bg-secondary);
+      border-right: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+    }
+    .logo {
+      padding: 20px;
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      gap: 12px;
+    }
+    .logo-icon {
+      width: 36px; height: 36px;
+      background: linear-gradient(135deg, #8B4513, #DAA520);
+      border-radius: 8px;
+      display: flex; align-items: center; justify-content: center;
+      font-size: 18px;
+    }
+    .logo-text h1 {
+      font-size: 16px; font-weight: 600;
+      color: var(--gold);
+    }
+    .logo-text p {
+      font-size: 11px; color: var(--text-secondary);
+    }
+    .nav-section {
+      padding: 12px 16px;
+      font-size: 11px;
+      font-weight: 600;
+      color: var(--text-secondary);
+      text-transform: uppercase;
+      letter-spacing: 0.5px;
+    }
+    .file-list {
+      flex: 1;
+      overflow-y: auto;
+      padding: 0 8px 12px;
+    }
+    .file-item {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 12px;
+      border-radius: 6px;
+      cursor: pointer;
+      font-size: 13px;
+      color: var(--text);
+      transition: all 0.2s;
+      margin-bottom: 2px;
+    }
+    .file-item:hover { background: var(--bg-tertiary); }
+    .file-item.active { background: var(--accent); color: #fff; }
+    .file-item .dot {
+      width: 8px; height: 8px; border-radius: 50%;
+      background: var(--success); opacity: 0;
+    }
+    .file-item.modified .dot { opacity: 1; }
+    .file-item .name { flex: 1; }
+    .sidebar-footer {
+      padding: 12px;
+      border-top: 1px solid var(--border);
+    }
+    .git-status {
+      font-size: 11px;
+      color: var(--text-secondary);
+      padding: 8px;
+      background: var(--bg);
+      border-radius: 6px;
+      margin-bottom: 8px;
+      white-space: pre-wrap;
+      max-height: 100px;
+      overflow-y: auto;
+    }
+    /* 主内容区 */
+    .main {
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      overflow: hidden;
+    }
+    .toolbar {
+      height: 52px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+      display: flex;
+      align-items: center;
+      padding: 0 16px;
+      gap: 8px;
+    }
+    .toolbar-title {
+      flex: 1;
+      font-size: 14px;
+      font-weight: 500;
+    }
+    .toolbar-title .modified-tag {
+      display: inline-block;
+      padding: 2px 8px;
+      background: var(--warning);
+      color: #fff;
+      border-radius: 4px;
+      font-size: 11px;
+      margin-left: 8px;
+    }
+    .btn {
+      display: inline-flex;
+      align-items: center;
+      gap: 6px;
+      padding: 6px 14px;
+      border-radius: 6px;
+      font-size: 13px;
+      font-weight: 500;
+      cursor: pointer;
+      border: 1px solid var(--border);
+      background: var(--bg-tertiary);
+      color: var(--text);
+      transition: all 0.2s;
+    }
+    .btn:hover { background: var(--border); }
+    .btn-primary {
+      background: var(--success);
+      border-color: var(--success);
+      color: #fff;
+    }
+    .btn-primary:hover { background: var(--success-hover); }
+    .btn-accent {
+      background: var(--accent);
+      border-color: var(--accent);
+      color: #fff;
+    }
+    .btn-accent:hover { background: var(--accent-hover); }
+    .btn-danger {
+      background: var(--danger);
+      border-color: var(--danger);
+      color: #fff;
+    }
+    .editor-container {
+      flex: 1;
+      display: flex;
+      overflow: hidden;
+    }
+    .code-editor {
+      flex: 1;
+      position: relative;
+    }
+    .code-editor textarea {
+      width: 100%; height: 100%;
+      background: var(--bg);
+      color: var(--text);
+      border: none;
+      padding: 16px;
+      font-family: 'SF Mono', Monaco, 'Cascadia Code', monospace;
+      font-size: 13px;
+      line-height: 1.6;
+      resize: none;
+      outline: none;
+      tab-size: 2;
+    }
+    /* 预览面板 */
+    .preview-panel {
+      width: 360px;
+      background: var(--bg-secondary);
+      border-left: 1px solid var(--border);
+      display: flex;
+      flex-direction: column;
+      overflow-y: auto;
+    }
+    .panel-header {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+      font-size: 14px;
+      font-weight: 600;
+    }
+    .panel-section {
+      padding: 16px;
+      border-bottom: 1px solid var(--border);
+    }
+    .panel-section h3 {
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 12px;
+      text-transform: uppercase;
+    }
+    .form-group {
+      margin-bottom: 12px;
+    }
+    .form-group label {
+      display: block;
+      font-size: 12px;
+      color: var(--text-secondary);
+      margin-bottom: 4px;
+    }
+    .form-group input,
+    .form-group select,
+    .form-group textarea {
+      width: 100%;
+      padding: 8px 10px;
+      background: var(--bg);
+      border: 1px solid var(--border);
+      border-radius: 6px;
+      color: var(--text);
+      font-size: 13px;
+      outline: none;
+    }
+    .form-group input:focus,
+    .form-group select:focus,
+    .form-group textarea:focus {
+      border-color: var(--accent);
+    }
+    .form-group textarea {
+      min-height: 60px;
+      resize: vertical;
+    }
+    .array-item {
+      display: flex;
+      gap: 8px;
+      margin-bottom: 8px;
+      align-items: center;
+    }
+    .array-item input { flex: 1; }
+    .array-item .btn-small {
+      padding: 4px 8px;
+      font-size: 11px;
+    }
+    /* 素材上传 */
+    .upload-area {
+      border: 2px dashed var(--border);
+      border-radius: 8px;
+      padding: 24px;
+      text-align: center;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+    .upload-area:hover {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.05);
+    }
+    .upload-area.dragover {
+      border-color: var(--accent);
+      background: rgba(88, 166, 255, 0.1);
+    }
+    .asset-grid {
+      display: grid;
+      grid-template-columns: repeat(3, 1fr);
+      gap: 8px;
+      margin-top: 12px;
+    }
+    .asset-thumb {
+      aspect-ratio: 1;
+      background: var(--bg);
+      border-radius: 6px;
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      font-size: 11px;
+      color: var(--text-secondary);
+      overflow: hidden;
+      position: relative;
+    }
+    .asset-thumb img {
+      width: 100%; height: 100%;
+      object-fit: cover;
+    }
+    .asset-thumb .name {
+      position: absolute;
+      bottom: 0; left: 0; right: 0;
+      padding: 4px;
+      background: rgba(0,0,0,0.7);
+      font-size: 10px;
+      text-align: center;
+      white-space: nowrap;
+      overflow: hidden;
+      text-overflow: ellipsis;
+    }
+    /* Toast */
+    .toast-container {
+      position: fixed;
+      top: 20px; right: 20px;
+      z-index: 1000;
+      display: flex;
+      flex-direction: column;
+      gap: 8px;
+    }
+    .toast {
+      padding: 12px 16px;
+      border-radius: 8px;
+      font-size: 13px;
+      animation: slideIn 0.3s ease;
+      max-width: 320px;
+    }
+    .toast.success { background: var(--success); color: #fff; }
+    .toast.error { background: var(--danger); color: #fff; }
+    .toast.info { background: var(--accent); color: #fff; }
+    @keyframes slideIn {
+      from { transform: translateX(100%); opacity: 0; }
+      to { transform: translateX(0); opacity: 1; }
+    }
+    /* 数据表格 */
+    .data-table {
+      width: 100%;
+      border-collapse: collapse;
+      font-size: 12px;
+    }
+    .data-table th,
+    .data-table td {
+      padding: 8px;
+      text-align: left;
+      border-bottom: 1px solid var(--border);
+    }
+    .data-table th {
+      color: var(--text-secondary);
+      font-weight: 500;
+    }
+    .data-table tr:hover { background: var(--bg-tertiary); }
+    /* Tab */
+    .tabs {
+      display: flex;
+      gap: 2px;
+      padding: 0 16px;
+      background: var(--bg-secondary);
+      border-bottom: 1px solid var(--border);
+    }
+    .tab {
+      padding: 10px 16px;
+      font-size: 13px;
+      cursor: pointer;
+      border-bottom: 2px solid transparent;
+      margin-bottom: -1px;
+      color: var(--text-secondary);
+    }
+    .tab.active {
+      color: var(--accent);
+      border-bottom-color: var(--accent);
+    }
+    /* 批量操作 */
+    .batch-bar {
+      display: flex;
+      align-items: center;
+      gap: 8px;
+      padding: 8px 16px;
+      background: var(--bg-tertiary);
+      border-bottom: 1px solid var(--border);
+      font-size: 13px;
+    }
+    .batch-bar label {
+      display: flex;
+      align-items: center;
+      gap: 6px;
+      cursor: pointer;
+    }
+    .hidden { display: none !important; }
+  </style>
+</head>
+<body>
+  <div class="app">
+    <!-- 侧边栏 -->
+    <aside class="sidebar">
+      <div class="logo">
+        <div class="logo-icon">修</div>
+        <div class="logo-text">
+          <h1>修仙游戏编辑器</h1>
+          <p>独立开发工具 v1.0</p>
+        </div>
+      </div>
+      <div class="nav-section">游戏数据文件</div>
+      <div class="file-list" id="fileList"></div>
+      <div class="sidebar-footer">
+        <div class="git-status" id="gitStatus">点击刷新查看Git状态...</div>
+        <button class="btn" style="width:100%;margin-bottom:8px;" onclick="refreshGitStatus()">
+          刷新Git状态
+        </button>
+        <button class="btn btn-primary" style="width:100%;" onclick="commitAndPush()">
+          提交并推送
+        </button>
+      </div>
+    </aside>
+
+    <!-- 主内容 -->
+    <main class="main">
+      <div class="toolbar">
+        <div class="toolbar-title" id="toolbarTitle">
+          选择一个文件开始编辑
+        </div>
+        <button class="btn" onclick="saveCurrentFile()">保存当前文件</button>
+        <button class="btn btn-primary" onclick="saveAllFiles()">保存所有修改</button>
+        <button class="btn btn-accent" onclick="exportData()">导出备份</button>
+        <button class="btn" onclick="document.getElementById('importInput').click()">导入数据</button>
+        <input type="file" id="importInput" style="display:none" accept=".json" onchange="importData(this)">
+      </div>
+
+      <div class="tabs">
+        <div class="tab active" onclick="switchTab('code')">代码编辑</div>
+        <div class="tab" onclick="switchTab('visual')">可视化编辑</div>
+        <div class="tab" onclick="switchTab('assets')">素材管理</div>
+      </div>
+
+      <!-- 代码编辑 -->
+      <div class="editor-container" id="tab-code">
+        <div class="code-editor">
+          <textarea id="codeEditor" placeholder="选择一个文件开始编辑..." oninput="onCodeChange()"></textarea>
+        </div>
+        <div class="preview-panel">
+          <div class="panel-header">数据结构预览</div>
+          <div class="panel-section" id="dataPreview">
+            <p style="color:var(--text-secondary);font-size:13px;">选择文件后将显示数据结构...</p>
+          </div>
+        </div>
+      </div>
+
+      <!-- 可视化编辑 -->
+      <div class="editor-container hidden" id="tab-visual">
+        <div style="flex:1;padding:20px;overflow-y:auto;" id="visualEditor">
+          <p style="color:var(--text-secondary);">选择包含数组数据的文件（如zones.js, equipment.js）以使用可视化编辑...</p>
+        </div>
+      </div>
+
+      <!-- 素材管理 -->
+      <div class="editor-container hidden" id="tab-assets">
+        <div style="flex:1;padding:20px;overflow-y:auto;">
+          <div class="upload-area" id="uploadArea"
+               ondrop="dropHandler(event)" ondragover="dragOverHandler(event)" ondragleave="dragLeaveHandler(event)">
+            <div style="font-size:24px;margin-bottom:8px;">📁</div>
+            <div>拖拽文件到此处上传</div>
+            <div style="color:var(--text-secondary);font-size:12px;margin-top:4px;">或点击选择文件</div>
+            <input type="file" id="assetInput" style="display:none" multiple onchange="uploadAssets(this)">
+          </div>
+          <div style="margin-top:16px;display:flex;gap:8px;">
+            <button class="btn" onclick="loadAssets('images')">图片素材</button>
+            <button class="btn" onclick="loadAssets('audio')">音频素材</button>
+          </div>
+          <div class="asset-grid" id="assetGrid"></div>
+        </div>
+      </div>
+    </main>
+  </div>
+
+  <div class="toast-container" id="toastContainer"></div>
+
+  <script>
+    const API = 'http://localhost:3456/api';
+    let files = {};
+    let currentFile = null;
+    let modifiedFiles = new Set();
+
+    // 初始化
+    async function init() {
+      await loadFileList();
+      await loadAssets('images');
+      refreshGitStatus();
+    }
+
+    // 加载文件列表
+    async function loadFileList() {
+      try {
+        const res = await fetch(`${API}/files`);
+        const data = await res.json();
+        if (data.success) {
+          const list = document.getElementById('fileList');
+          list.innerHTML = data.files.map(f => `
+            <div class="file-item ${f === currentFile ? 'active' : ''} ${modifiedFiles.has(f) ? 'modified' : ''}"
+                 onclick="openFile('${f}')">
+              <span class="dot"></span>
+              <span class="name">${f}</span>
+            </div>
+          `).join('');
+        }
+      } catch (e) {
+        showToast('error', '无法连接到编辑器服务，请确保后端已启动');
+      }
+    }
+
+    // 打开文件
+    async function openFile(name) {
+      try {
+        const res = await fetch(`${API}/file/${name}`);
+        const data = await res.json();
+        if (data.success) {
+          currentFile = name;
+          files[name] = data.content;
+          document.getElementById('codeEditor').value = data.content;
+          updateToolbar();
+          loadFileList();
+          updateDataPreview(data.content);
+          // 如果切换到可视化Tab，刷新可视化编辑器
+          if (!document.getElementById('tab-visual').classList.contains('hidden')) {
+            refreshVisualEditor();
+          }
+        }
+      } catch (e) {
+        showToast('error', '读取文件失败');
+      }
+    }
+
+    // 代码变化
+    function onCodeChange() {
+      if (!currentFile) return;
+      files[currentFile] = document.getElementById('codeEditor').value;
+      modifiedFiles.add(currentFile);
+      updateToolbar();
+      loadFileList();
+    }
+
+    // 更新工具栏
+    function updateToolbar() {
+      const title = document.getElementById('toolbarTitle');
+      if (currentFile) {
+        title.innerHTML = `${currentFile} ${modifiedFiles.has(currentFile) ? '<span class="modified-tag">已修改</span>' : ''}`;
+      } else {
+        title.textContent = '选择一个文件开始编辑';
+      }
+    }
+
+    // 保存当前文件
+    async function saveCurrentFile() {
+      if (!currentFile) return;
+      await saveFile(currentFile, files[currentFile]);
+    }
+
+    // 保存单个文件
+    async function saveFile(name, content) {
+      try {
+        const res = await fetch(`${API}/file/${name}`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ content })
+        });
+        const data = await res.json();
+        if (data.success) {
+          modifiedFiles.delete(name);
+          loadFileList();
+          updateToolbar();
+          showToast('success', `已保存 ${name}`);
+        } else {
+          showToast('error', data.error);
+        }
+      } catch (e) {
+        showToast('error', '保存失败');
+      }
+    }
+
+    // 保存所有修改
+    async function saveAllFiles() {
+      if (modifiedFiles.size === 0) {
+        showToast('info', '没有需要保存的修改');
+        return;
+      }
+      const batch = {};
+      for (const name of modifiedFiles) {
+        batch[name] = files[name];
+      }
+      try {
+        const res = await fetch(`${API}/files/batch`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ files: batch })
+        });
+        const data = await res.json();
+        if (data.success) {
+          modifiedFiles.clear();
+          loadFileList();
+          updateToolbar();
+          showToast('success', `已批量保存 ${data.files.length} 个文件`);
+          refreshGitStatus();
+        } else {
+          showToast('error', data.error);
+        }
+      } catch (e) {
+        showToast('error', '批量保存失败');
+      }
+    }
+
+    // 更新数据预览
+    function updateDataPreview(content) {
+      const preview = document.getElementById('dataPreview');
+      try {
+        // 尝试提取导出的数组或对象
+        const arrayMatch = content.match(/export\s+(?:const|let|var)\s+\w+\s*=\s*(\[.*?\]);?/s);
+        const objectMatch = content.match(/export\s+(?:const|let|var)\s+\w+\s*=\s*(\{.*?\});?/s);
+
+        if (arrayMatch) {
+          const data = eval(arrayMatch[1]);
+          preview.innerHTML = renderArrayTable(data);
+        } else if (objectMatch) {
+          const data = eval(objectMatch[1]);
+          preview.innerHTML = renderObjectTree(data);
+        } else {
+          preview.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">无法解析数据结构</p>';
+        }
+      } catch (e) {
+        preview.innerHTML = '<p style="color:var(--text-secondary);font-size:13px;">预览解析失败，不影响编辑</p>';
+      }
+    }
+
+    // 渲染数组表格
+    function renderArrayTable(data) {
+      if (!Array.isArray(data) || data.length === 0) return '<p>空数组</p>';
+      const item = data[0];
+      if (typeof item !== 'object') return `<p>共 ${data.length} 项</p>`;
+
+      const keys = Object.keys(item).slice(0, 6);
+      return `
+        <p style="margin-bottom:8px;">共 ${data.length} 条数据</p>
+        <table class="data-table">
+          <thead><tr>${keys.map(k => `<th>${k}</th>`).join('')}</tr></thead>
+          <tbody>
+            ${data.slice(0, 10).map(row => `
+              <tr>${keys.map(k => `<td>${formatValue(row[k])}</td>`).join('')}</tr>
+            `).join('')}
+          </tbody>
+        </table>
+        ${data.length > 10 ? `<p style="margin-top:8px;color:var(--text-secondary);">...还有 ${data.length - 10} 条</p>` : ''}
+      `;
+    }
+
+    function formatValue(v) {
+      if (v === null || v === undefined) return '-';
+      if (typeof v === 'object') return JSON.stringify(v).slice(0, 30) + '...';
+      return String(v).slice(0, 50);
+    }
+
+    function renderObjectTree(data) {
+      return `<pre style="font-size:12px;overflow:auto;">${JSON.stringify(data, null, 2).slice(0, 2000)}</pre>`;
+    }
+
+    // Tab切换
+    function switchTab(tab) {
+      document.querySelectorAll('.tab').forEach(t => t.classList.remove('active'));
+      event.target.classList.add('active');
+      document.querySelectorAll('.editor-container').forEach(el => el.classList.add('hidden'));
+      document.getElementById(`tab-${tab}`).classList.remove('hidden');
+      if (tab === 'visual') refreshVisualEditor();
+      if (tab === 'assets') loadAssets('images');
+    }
+
+    // 刷新可视化编辑器
+    function refreshVisualEditor() {
+      const container = document.getElementById('visualEditor');
+      if (!currentFile || !files[currentFile]) {
+        container.innerHTML = '<p style="color:var(--text-secondary);">请先选择一个包含数组数据的文件</p>';
+        return;
+      }
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        if (!arrayMatch) {
+          container.innerHTML = '<p style="color:var(--text-secondary);">当前文件不包含可编辑的数组数据</p>';
+          return;
+        }
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        container.innerHTML = renderVisualEditor(varName, data);
+      } catch (e) {
+        container.innerHTML = '<p style="color:var(--text-secondary);">解析失败</p>';
+      }
+    }
+
+    // 渲染可视化编辑器
+    function renderVisualEditor(varName, data) {
+      if (!Array.isArray(data)) return '<p>不支持的数据类型</p>';
+      return `
+        <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:16px;">
+          <h2 style="font-size:18px;">${varName} (${data.length} 项)</h2>
+          <button class="btn btn-primary" onclick="addVisualItem()">+ 添加新项</button>
+        </div>
+        <div style="display:flex;flex-direction:column;gap:12px;">
+          ${data.map((item, idx) => renderVisualItem(varName, item, idx)).join('')}
+        </div>
+      `;
+    }
+
+    function renderVisualItem(varName, item, idx) {
+      const fields = Object.entries(item).map(([key, val]) => {
+        if (typeof val === 'object' && !Array.isArray(val)) {
+          return `
+            <div class="form-group">
+              <label>${key}</label>
+              <textarea onchange="updateVisualField(${idx}, '${key}', this.value)">${JSON.stringify(val, null, 2)}</textarea>
+            </div>
+          `;
+        } else if (Array.isArray(val)) {
+          return `
+            <div class="form-group">
+              <label>${key}</label>
+              <div id="array-${idx}-${key}">
+                ${val.map((v, i) => `
+                  <div class="array-item">
+                    <input value="${typeof v === 'object' ? JSON.stringify(v) : v}" onchange="updateVisualArray(${idx}, '${key}', ${i}, this.value)">
+                    <button class="btn btn-small btn-danger" onclick="removeVisualArrayItem(${idx}, '${key}', ${i})">×</button>
+                  </div>
+                `).join('')}
+              </div>
+              <button class="btn btn-small" onclick="addVisualArrayItem(${idx}, '${key}')">+ 添加</button>
+            </div>
+          `;
+        } else {
+          return `
+            <div class="form-group">
+              <label>${key}</label>
+              <input value="${val}" onchange="updateVisualField(${idx}, '${key}', this.value)">
+            </div>
+          `;
+        }
+      }).join('');
+
+      return `
+        <div style="background:var(--bg-secondary);border:1px solid var(--border);border-radius:8px;padding:16px;" data-idx="${idx}">
+          <div style="display:flex;justify-content:space-between;align-items:center;margin-bottom:12px;">
+            <strong>#${idx + 1} ${item.name || item.id || ''}</strong>
+            <button class="btn btn-small btn-danger" onclick="removeVisualItem(${idx})">删除</button>
+          </div>
+          ${fields}
+        </div>
+      `;
+    }
+
+    // 更新可视化字段
+    function updateVisualField(idx, key, value) {
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        // 尝试解析JSON
+        try { value = JSON.parse(value); } catch(e) {}
+        data[idx][key] = value;
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+        showToast('success', '已更新');
+      } catch (e) {
+        showToast('error', '更新失败');
+      }
+    }
+
+    function updateVisualArray(idx, key, arrIdx, value) {
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        try { value = JSON.parse(value); } catch(e) {}
+        data[idx][key][arrIdx] = value;
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+      } catch (e) {}
+    }
+
+    function removeVisualArrayItem(idx, key, arrIdx) {
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        data[idx][key].splice(arrIdx, 1);
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+        refreshVisualEditor();
+      } catch (e) {}
+    }
+
+    function addVisualArrayItem(idx, key) {
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        data[idx][key].push('');
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+        refreshVisualEditor();
+      } catch (e) {}
+    }
+
+    function addVisualItem() {
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        const template = data.length > 0 ? JSON.parse(JSON.stringify(data[data.length - 1])) : {};
+        // 清空值但保留结构
+        Object.keys(template).forEach(k => {
+          if (typeof template[k] === 'string') template[k] = '';
+          else if (typeof template[k] === 'number') template[k] = 0;
+          else if (Array.isArray(template[k])) template[k] = [];
+          else if (typeof template[k] === 'object') template[k] = {};
+        });
+        data.push(template);
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+        refreshVisualEditor();
+        showToast('success', '已添加新项');
+      } catch (e) {
+        showToast('error', '添加失败');
+      }
+    }
+
+    function removeVisualItem(idx) {
+      if (!confirm('确定删除此项？')) return;
+      try {
+        const arrayMatch = files[currentFile].match(/export\s+(?:const|let|var)\s+(\w+)\s*=\s*(\[.*?\]);?/s);
+        const varName = arrayMatch[1];
+        const data = eval(arrayMatch[2]);
+        data.splice(idx, 1);
+        files[currentFile] = files[currentFile].replace(arrayMatch[0], `export const ${varName} = ${JSON.stringify(data, null, 2)};`);
+        document.getElementById('codeEditor').value = files[currentFile];
+        onCodeChange();
+        refreshVisualEditor();
+      } catch (e) {}
+    }
+
+    // 素材管理
+    async function loadAssets(type) {
+      try {
+        const res = await fetch(`${API}/assets/${type}`);
+        const data = await res.json();
+        const grid = document.getElementById('assetGrid');
+        if (data.success && data.assets.length > 0) {
+          grid.innerHTML = data.assets.map(a => `
+            <div class="asset-thumb">
+              ${type === 'images' ? `<img src="${a.path}" loading="lazy">` : '🎵'}
+              <div class="name">${a.name}</div>
+            </div>
+          `).join('');
+        } else {
+          grid.innerHTML = '<p style="grid-column:1/-1;color:var(--text-secondary);">暂无素材</p>';
+        }
+      } catch (e) {
+        showToast('error', '加载素材失败');
+      }
+    }
+
+    function dragOverHandler(e) {
+      e.preventDefault();
+      e.currentTarget.classList.add('dragover');
+    }
+    function dragLeaveHandler(e) {
+      e.currentTarget.classList.remove('dragover');
+    }
+    function dropHandler(e) {
+      e.preventDefault();
+      e.currentTarget.classList.remove('dragover');
+      uploadAssets({ files: e.dataTransfer.files });
+    }
+    document.getElementById('uploadArea').addEventListener('click', () => {
+      document.getElementById('assetInput').click();
+    });
+
+    async function uploadAssets(input) {
+      const files = input.files;
+      if (!files || files.length === 0) return;
+      for (const file of files) {
+        const formData = new FormData();
+        formData.append('file', file);
+        formData.append('type', file.type.startsWith('image/') ? 'images' : 'audio');
+        try {
+          const res = await fetch(`${API}/upload`, { method: 'POST', body: formData });
+          const data = await res.json();
+          if (data.success) showToast('success', `已上传 ${file.name}`);
+        } catch (e) {
+          showToast('error', `上传 ${file.name} 失败`);
+        }
+      }
+      loadAssets('images');
+    }
+
+    // Git操作
+    async function refreshGitStatus() {
+      try {
+        const res = await fetch(`${API}/git/status`);
+        const data = await res.json();
+        const el = document.getElementById('gitStatus');
+        if (data.success) {
+          el.textContent = data.hasChanges
+            ? `分支: ${data.branch}\n有未提交的更改:\n${data.status}`
+            : `分支: ${data.branch}\n工作区干净，无未提交更改`;
+        } else {
+          el.textContent = 'Git状态获取失败';
+        }
+      } catch (e) {
+        document.getElementById('gitStatus').textContent = '无法连接到服务';
+      }
+    }
+
+    async function commitAndPush() {
+      const msg = prompt('请输入提交信息:', 'update game data via editor');
+      if (!msg) return;
+      showToast('info', '正在提交...');
+      try {
+        const res = await fetch(`${API}/git/commit`, {
+          method: 'POST',
+          headers: { 'Content-Type': 'application/json' },
+          body: JSON.stringify({ message: msg })
+        });
+        const data = await res.json();
+        if (data.success) {
+          showToast('success', data.message);
+          refreshGitStatus();
+        } else {
+          showToast('error', data.error);
+        }
+      } catch (e) {
+        showToast('error', '提交失败');
+      }
+    }
+
+    // 导出/导入
+    async function exportData() {
+      try {
+        const res = await fetch(`${API}/export`);
+        const data = await res.json();
+        if (data.success) {
+          const blob = new Blob([JSON.stringify(data.data, null, 2)], { type: 'application/json' });
+          const url = URL.createObjectURL(blob);
+          const a = document.createElement('a');
+          a.href = url;
+          a.download = `game-backup-${new Date().toISOString().slice(0, 10)}.json`;
+          a.click();
+          showToast('success', '备份已下载');
+        }
+      } catch (e) {
+        showToast('error', '导出失败');
+      }
+    }
+
+    async function importData(input) {
+      const file = input.files[0];
+      if (!file) return;
+      const reader = new FileReader();
+      reader.onload = async (e) => {
+        try {
+          const data = JSON.parse(e.target.result);
+          if (!confirm(`将覆盖 ${Object.keys(data).length} 个文件，确定吗？`)) return;
+          const res = await fetch(`${API}/import`, {
+            method: 'POST',
+            headers: { 'Content-Type': 'application/json' },
+            body: JSON.stringify({ data })
+          });
+          const result = await res.json();
+          if (result.success) {
+            showToast('success', '数据导入成功');
+            loadFileList();
+          } else {
+            showToast('error', result.error);
+          }
+        } catch (err) {
+          showToast('error', '文件解析失败');
+        }
+      };
+      reader.readAsText(file);
+    }
+
+    // Toast
+    function showToast(type, message) {
+      const container = document.getElementById('toastContainer');
+      const toast = document.createElement('div');
+      toast.className = `toast ${type}`;
+      toast.textContent = message;
+      container.appendChild(toast);
+      setTimeout(() => toast.remove(), 3000);
+    }
+
+    // 启动
+    init();
+  </script>
+</body>
+</html>
