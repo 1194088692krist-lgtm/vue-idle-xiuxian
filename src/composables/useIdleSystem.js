@@ -153,7 +153,7 @@ function addLog(type, text, detail = null) {
 // 将装备/灵宠的基础数据格式化为日志明细子行
 function formatItemDetail(item, type, rarity) {
   if (!item) return ''
-  const st = item.stats || {}
+  const st = item.stats || item.combatAttributes || {}
   // 使用普通空格和 ASCII 分隔符替代全角空格（U+3000），避免部分设备渲染为乱码方块
   if (type === 'equipment') {
     let s = `攻+${st.attack ?? 0} 生+${st.health ?? 0} 防+${st.defense ?? 0} 速+${st.speed ?? 0}`
@@ -232,10 +232,10 @@ function generateEquipment(rarity, effectiveZone) {
     rarity,
     qualityInfo: { name: (rarityConfig[rarity] || {}).name || rarity, color: (rarityConfig[rarity] || {}).color || '#999' },
     stats: {
-      attack: Math.floor(effectiveZone.recommendedStats.attack * 0.15 * mult),
-      health: Math.floor(effectiveZone.recommendedStats.health * 0.1 * mult),
-      defense: Math.floor(effectiveZone.recommendedStats.attack * 0.08 * mult),
-      speed: Math.floor(5 * mult)
+      attack: Math.floor(effectiveZone.recommendedStats.attack * 0.22 * mult),
+      health: Math.floor(effectiveZone.recommendedStats.health * 0.16 * mult),
+      defense: Math.floor(effectiveZone.recommendedStats.attack * 0.13 * mult),
+      speed: Math.floor(8 * mult)
     },
     affixes,
     setId,
@@ -246,17 +246,43 @@ function generateEquipment(rarity, effectiveZone) {
 
 function generatePet(rarity, effectiveZone) {
   const petNames = ['灵狐', '仙鹤', '青鸾', '玉兔', '玄龟', '朱雀', '白虎', '麒麟']
+  // 与抽卡灵宠一致：输出 combatAttributes，使出战/升级/显示逻辑统一生效
+  const rarityMult = { mortal: 1, spiritual: 1.5, mystic: 2, celestial: 3, divine: 5 }[rarity] || 1
+  const zAtk = effectiveZone.recommendedStats.attack
+  const zHp = effectiveZone.recommendedStats.health
+  const combatAttributes = {
+    attack: Math.floor(zAtk * 0.16 * rarityMult),
+    defense: Math.floor(zAtk * 0.09 * rarityMult),
+    health: Math.floor(zHp * 0.09 * rarityMult),
+    speed: Math.floor(6 * rarityMult),
+    critRate: Math.min(0.5, 0.05 * rarityMult),
+    comboRate: Math.min(0.5, 0.05 * rarityMult),
+    counterRate: Math.min(0.5, 0.04 * rarityMult),
+    stunRate: Math.min(0.5, 0.04 * rarityMult),
+    dodgeRate: Math.min(0.5, 0.05 * rarityMult),
+    vampireRate: Math.min(0.5, 0.04 * rarityMult),
+    critResist: Math.min(0.5, 0.04 * rarityMult),
+    comboResist: Math.min(0.5, 0.04 * rarityMult),
+    counterResist: Math.min(0.5, 0.04 * rarityMult),
+    stunResist: Math.min(0.5, 0.04 * rarityMult),
+    dodgeResist: Math.min(0.5, 0.04 * rarityMult),
+    vampireResist: Math.min(0.5, 0.04 * rarityMult),
+    healBoost: 0,
+    critDamageBoost: 0,
+    critDamageReduce: 0,
+    finalDamageBoost: 0,
+    finalDamageReduce: 0,
+    combatBoost: 0,
+    resistanceBoost: 0
+  }
   return {
     id: Date.now() + Math.random(),
     type: 'pet',
     name: petNames[Math.floor(Math.random() * petNames.length)],
     rarity,
     level: 1,
-    stats: {
-      attack: Math.floor(effectiveZone.recommendedStats.attack * 0.1),
-      defense: Math.floor(effectiveZone.recommendedStats.attack * 0.05),
-      health: Math.floor(effectiveZone.recommendedStats.health * 0.05)
-    }
+    star: 0,
+    combatAttributes
   }
 }
 
