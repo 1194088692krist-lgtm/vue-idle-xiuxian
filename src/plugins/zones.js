@@ -4,11 +4,11 @@
 // cost  : 每场遭遇的灵力消耗
 // drop  : 掉落率/品质加成
 const DIFFICULTY_TEMPLATES = [
-  { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.5, cost: 20,  drop: 1.0 },
-  { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.8, cost: 35,  drop: 1.1 },
-  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.0, cost: 50,  drop: 1.2 },
-  { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.5, cost: 80,  drop: 1.4 },
-  { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.2, cost: 120, drop: 1.7 }
+  { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.6, cost: 8,  drop: 1.0 },
+  { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.9, cost: 15, drop: 1.15 },
+  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 25, drop: 1.3 },
+  { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.8, cost: 40, drop: 1.5 },
+  { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.8, cost: 65, drop: 1.8 }
 ]
 
 // 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
@@ -75,10 +75,10 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.5, amount: [5, 20], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.5, amount: [15, 60] },
       { type: 'herb', chance: 0.3, amount: [1, 3], name: '灵草' },
-      { type: 'cultivation', chance: 0.3, amount: [10, 30], name: '修为' },
-      { type: 'equipment', chance: 0.08, rarity: ['common'], name: '凡品装备' }
+      { type: 'cultivation', chance: 0.3, amount: [25, 75] },
+      { type: 'equipment', chance: 0.14, rarity: ['common'], name: '凡品装备' }
     ],
     recommendedStats: { attack: 8, health: 80 }
   },
@@ -123,10 +123,10 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.4, amount: [20, 60], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.4, amount: [60, 180] },
       { type: 'herb', chance: 0.3, amount: [3, 8], name: '灵草' },
-      { type: 'cultivation', chance: 0.25, amount: [50, 150], name: '修为' },
-      { type: 'equipment', chance: 0.12, rarity: ['common', 'uncommon'], name: '凡品装备' }
+      { type: 'cultivation', chance: 0.25, amount: [125, 375] },
+      { type: 'equipment', chance: 0.20, rarity: ['common', 'uncommon'], name: '凡品装备' }
     ],
     recommendedStats: { attack: 25, health: 200 }
   },
@@ -171,11 +171,11 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.35, amount: [50, 150], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.35, amount: [150, 450] },
       { type: 'herb', chance: 0.25, amount: [5, 15], name: '灵草' },
-      { type: 'cultivation', chance: 0.25, amount: [150, 400], name: '修为' },
-      { type: 'equipment', chance: 0.15, rarity: ['uncommon', 'rare'], name: '精品装备' },
-      { type: 'pet', chance: 0.08, rarity: ['mortal', 'spiritual'], name: '凡品灵宠' }
+      { type: 'cultivation', chance: 0.25, amount: [375, 1000] },
+      { type: 'equipment', chance: 0.24, rarity: ['uncommon', 'rare'], name: '精品装备' },
+      { type: 'pet', chance: 0.14, rarity: ['mortal', 'spiritual'], name: '凡品灵宠' }
     ],
     recommendedStats: { attack: 50, health: 400 }
   },
@@ -220,11 +220,11 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.3, amount: [100, 300], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.3, amount: [300, 900] },
       { type: 'herb', chance: 0.2, amount: [8, 20], name: '灵草' },
-      { type: 'cultivation', chance: 0.25, amount: [300, 800], name: '修为' },
-      { type: 'equipment', chance: 0.2, rarity: ['rare', 'epic'], name: '上品装备' },
-      { type: 'pet', chance: 0.12, rarity: ['spiritual', 'mystic'], name: '灵品灵宠' }
+      { type: 'cultivation', chance: 0.25, amount: [750, 2000] },
+      { type: 'equipment', chance: 0.28, rarity: ['rare', 'epic'], name: '上品装备' },
+      { type: 'pet', chance: 0.20, rarity: ['spiritual', 'mystic'], name: '灵品灵宠' }
     ],
     recommendedStats: { attack: 100, health: 800 }
   },
@@ -269,11 +269,11 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.2, amount: [200, 500], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.2, amount: [600, 1500] },
       { type: 'herb', chance: 0.15, amount: [10, 25], name: '灵草' },
-      { type: 'cultivation', chance: 0.2, amount: [500, 1200], name: '修为' },
-      { type: 'equipment', chance: 0.25, rarity: ['legendary', 'mythic'], name: '极品装备' },
-      { type: 'pet', chance: 0.2, rarity: ['mystic', 'celestial'], name: '玄品灵宠' }
+      { type: 'cultivation', chance: 0.2, amount: [1250, 3000] },
+      { type: 'equipment', chance: 0.36, rarity: ['legendary', 'mythic'], name: '极品装备' },
+      { type: 'pet', chance: 0.28, rarity: ['mystic', 'celestial'], name: '玄品灵宠' }
     ],
     recommendedStats: { attack: 150, health: 1500 }
   },
@@ -318,11 +318,11 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.15, amount: [400, 1000], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.15, amount: [1200, 3000] },
       { type: 'herb', chance: 0.1, amount: [15, 35], name: '灵草' },
-      { type: 'cultivation', chance: 0.2, amount: [800, 2000], name: '修为' },
-      { type: 'equipment', chance: 0.3, rarity: ['mythic'], name: '仙品装备' },
-      { type: 'pet', chance: 0.25, rarity: ['celestial'], name: '仙品灵宠' }
+      { type: 'cultivation', chance: 0.2, amount: [2000, 5000] },
+      { type: 'equipment', chance: 0.42, rarity: ['mythic'], name: '仙品装备' },
+      { type: 'pet', chance: 0.36, rarity: ['celestial'], name: '仙品灵宠' }
     ],
     recommendedStats: { attack: 300, health: 3000 }
   },
@@ -367,10 +367,10 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.1, amount: [800, 2000], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.1, amount: [2400, 6000] },
       { type: 'herb', chance: 0.08, amount: [20, 50], name: '灵草' },
-      { type: 'cultivation', chance: 0.2, amount: [1500, 4000], name: '修为' },
-      { type: 'equipment', chance: 0.35, rarity: ['mythic'], name: '仙品装备' },
+      { type: 'cultivation', chance: 0.2, amount: [3750, 10000] },
+      { type: 'equipment', chance: 0.50, rarity: ['mythic'], name: '仙品装备' },
       { type: 'pet', chance: 0.27, rarity: ['divine'], name: '神品灵宠' }
     ],
     recommendedStats: { attack: 600, health: 6000 }
@@ -416,11 +416,11 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.05, amount: [2000, 5000], name: '灵石' },
+      { type: 'spirit_stone', chance: 0.05, amount: [6000, 15000] },
       { type: 'herb', chance: 0.05, amount: [30, 80], name: '灵草' },
-      { type: 'cultivation', chance: 0.2, amount: [3000, 8000], name: '修为' },
-      { type: 'equipment', chance: 0.4, rarity: ['mythic'], name: '仙品装备' },
-      { type: 'pet', chance: 0.3, rarity: ['divine'], name: '神品灵宠' }
+      { type: 'cultivation', chance: 0.2, amount: [7500, 20000] },
+      { type: 'equipment', chance: 0.56, rarity: ['mythic'], name: '仙品装备' },
+      { type: 'pet', chance: 0.42, rarity: ['divine'], name: '神品灵宠' }
     ],
     recommendedStats: { attack: 1000, health: 10000 }
   }

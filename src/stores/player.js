@@ -569,7 +569,7 @@ export const usePlayerStore = defineStore('player', {
       this.spirit = Math.min(this.spirit, this.maxSpirit)
       this.queueSave()
     },
-    // 恢复灵力（2小时回满上限）
+    // 恢复灵力（2小时回满上限），同时被动获取修为
     regenerateSpirit() {
       const now = Date.now()
       const elapsedMs = now - (this.lastSpiritUpdate || now)
@@ -579,6 +579,13 @@ export const usePlayerStore = defineStore('player', {
       if (recovered > 0) {
         this.spirit = Math.min(this.maxSpirit, this.spirit + recovered)
         this.lastSpiritUpdate = now
+        // 被动修为增长：每10秒根据等级和Build强度自动获得修为
+        // 约每真实1小时可获得相当于手动修炼3-5次的修为量
+        const passiveCultRate = Math.max(1, Math.floor(this.level * 0.8 + this.buildStrength * 0.00001))
+        const passiveGain = Math.floor(elapsedMs / 10000) * passiveCultRate
+        if (passiveGain > 0) {
+          this.cultivate(passiveGain)
+        }
         this.queueSave()
       }
       return recovered

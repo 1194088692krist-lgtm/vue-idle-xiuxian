@@ -1173,6 +1173,11 @@ onUnmounted(() => {
 .log-line.reward-normal {
   color: #d8d8d8;
   border-left-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.03);
+}
+/* 普通品质装备掉落：让【名称】更醒目 */
+.log-line.reward-normal :deep(.log-text) b {
+  color: #b8c4d6;
 }
 .log-line.reward-highlight {
   color: #7db4ff;
@@ -1233,13 +1238,13 @@ onUnmounted(() => {
 /* 奖励明细（装备/灵宠基础数据） */
 .log-detail {
   margin-top: 3px;
-  padding: 4px 8px;
-  font-size: 11px;
-  line-height: 1.5;
+  padding: 5px 10px;
+  font-size: 11.5px;
+  line-height: 1.6;
   color: #b9c4d6;
-  background: rgba(0, 0, 0, 0.35);
+  background: rgba(0, 0, 0, 0.4);
   border-radius: 0 0 6px 6px;
-  border-top: 1px dashed rgba(255, 255, 255, 0.12);
+  border-top: 1px dashed rgba(255, 255, 255, 0.15);
   font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Consolas, Menlo, monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   letter-spacing: 0.3px;
 }

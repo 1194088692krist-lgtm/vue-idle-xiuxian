@@ -527,7 +527,8 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
         if (info.tier === 'legendary') addLog('reward-legendary', `🔥 金光万丈！获得【${r.name}】，异象冲霄，天地同贺！`, detail)
         else if (info.tier === 'epic') addLog('reward-epic', `🌟 紫气东来！获得【${r.name}】，瑞光环绕！`, detail)
         else if (info.tier === 'highlight') addLog('reward-highlight', `💎 稀有收获：【${r.name}】`, detail)
-        else addLog('reward-normal', `获得 ${r.name}`, detail)
+        // 普通品质也显示完整名称 + 数据（不再只显示"凡品/良品"）
+        else addLog('reward-normal', `⚔️ 获得【${r.name}】（${info.name}）`, detail)
       } else if (r.type === 'fortune') {
         addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
       } else {
@@ -568,6 +569,15 @@ async function runIdleEncounter() {
     if (result.victory) {
       rewards = grantReward(effectiveZone, true)
       s.dungeonTotalKills++; s.explorationCount++
+      // 保底灵石返还：每场胜利至少回收消耗的 30%~80%（难度越高比例越低但基数大）
+      const recoverRatio = Math.max(0.3, 0.8 - effectiveZone.difficulty * 0.06)
+      const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
+      s.spiritStones += recovered
+      runStats.value.spiritStones += recovered
+      // 挂机修为加成：每场胜利额外给修为（与地图等级相关）
+      const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5))
+      s.cultivate(cultBonus)
+      runStats.value.cultivation += cultBonus
       // 奇遇：每 20 次，50% 触发
       if (count % 20 === 0 && Math.random() < 0.5) {
         const fortunePool = [getRandomHerb({ difficulty: 9 }), getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 }), getRandomSpecial()].filter(Boolean)

@@ -259,13 +259,14 @@ const breakthroughRealm = ref('')
 const breakthroughColor = ref('#DAA520')
 
 const baseGainRate = 1
-const baseCultivationCost = 10
-const baseCultivationGain = 1
-const autoGainInterval = 1000
-const extraCultivationChance = 0.3
+const baseCultivationCost = 8
+const baseCultivationGain = 3
+const autoGainInterval = 500
+const extraCultivationChance = 0.35
 
-const getCurrentCultivationCost = () => Math.floor(baseCultivationCost * Math.pow(1.5, playerStore.level - 1))
-const getCurrentCultivationGain = () => Math.floor(baseCultivationGain * Math.pow(1.2, playerStore.level - 1))
+// 优化后的修炼曲线：消耗增长放缓（1.5→1.25），修为获取加快（1.2→1.28）
+const getCurrentCultivationCost = () => Math.floor(baseCultivationCost * Math.pow(1.25, playerStore.level - 1))
+const getCurrentCultivationGain = () => Math.floor(baseCultivationGain * Math.pow(1.28, playerStore.level - 1))
 
 const cultivationCost = computed(() => getCurrentCultivationCost())
 const cultivationGain = computed(() => getCurrentCultivationGain())

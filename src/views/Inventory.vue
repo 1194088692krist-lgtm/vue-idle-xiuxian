@@ -1390,35 +1390,41 @@
     left: 0;
     width: 100%;
     height: 100%;
-    background: rgba(0, 0, 0, 0.75);
+    background: rgba(0, 0, 0, 0.8);
     display: flex;
     align-items: center;
     justify-content: center;
     z-index: 1000;
-    padding: 16px;
+    padding: 20px;
+    /* 移动端留足安全区 */
+    box-sizing: border-box;
   }
 
   .simple-modal-content {
     background: #1A1A2E;
     border: 1px solid rgba(139, 69, 19, 0.4);
-    border-radius: 12px;
+    border-radius: 14px;
     width: 100%;
-    max-width: 500px;
-    max-height: 85vh;
+    max-width: 480px;
+    max-height: calc(100vh - 60px);
     overflow-y: auto;
-    padding: 16px;
+    padding: 18px 20px 24px;
+    /* 确保弹窗内容不超出可视区域 */
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   }
 
   .simple-modal-content.wide {
-    max-width: 800px;
+    max-width: 90vw;
+    max-height: calc(100vh - 50px);
   }
 
   .modal-header {
     display: flex;
     justify-content: space-between;
     align-items: center;
-    margin-bottom: 12px;
-    padding-bottom: 10px;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
     border-bottom: 1px solid rgba(139, 69, 19, 0.3);
   }
 
@@ -1426,6 +1432,15 @@
     margin: 0;
     font-size: 18px;
     color: #F5DEB3;
+  }
+
+  /* 关闭按钮增大点击区域 */
+  .modal-header .btn-small {
+    min-width: 56px;
+    min-height: 36px;
+    padding: 8px 16px;
+    font-size: 14px;
+    flex-shrink: 0;
   }
 
   .modal-body {
@@ -1449,6 +1464,7 @@
     display: flex;
     gap: 8px;
     margin-top: 16px;
+    margin-bottom: 4px;
     flex-wrap: wrap;
   }
 
