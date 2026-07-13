@@ -89,6 +89,17 @@
                 <template v-if="result.category === 'equipment'">
                   <span>{{ equipmentTypeNames[result.item.type] || '装备' }}</span>
                   <span>{{ result.item.qualityInfo?.name || '' }}</span>
+                  <div v-if="result.item.setId" class="result-set" :style="{ color: getSetColor(result.item.setId) }">
+                    {{ getSetName(result.item.setId) }}
+                  </div>
+                  <div v-if="result.item.affixes && result.item.affixes.length" class="result-affixes">
+                    <span
+                      v-for="a in result.item.affixes"
+                      :key="a.id"
+                      class="result-affix"
+                      :class="'affix-tier-' + a.tier"
+                    >{{ a.name }}</span>
+                  </div>
                 </template>
                 <template v-else-if="result.category === 'pet'">
                   <span>{{ petRarities[result.item.rarity]?.name || '' }}</span>
@@ -129,6 +140,7 @@
     petRarities,
     equipmentQualities
   } from '../plugins/gacha'
+  import { setBonuses } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
 
   const playerStore = usePlayerStore()
@@ -282,6 +294,15 @@
     if (result.category === 'equipment') return '装备'
     if (result.category === 'pet') return '灵宠'
     return resourceNames[result.item.type] || '资源'
+  }
+
+  const getSetName = (setId) => {
+    const s = setBonuses.find(x => x.id === setId)
+    return s ? s.name : ''
+  }
+  const getSetColor = (setId) => {
+    const s = setBonuses.find(x => x.id === setId)
+    return s ? s.color : '#DAA520'
   }
 </script>
 
@@ -603,6 +624,46 @@
     font-size: 12px;
     color: #aaa;
     flex-wrap: wrap;
+  }
+
+  .result-set {
+    width: 100%;
+    font-size: 12px;
+    font-weight: bold;
+    margin-top: 2px;
+  }
+
+  .result-affixes {
+    width: 100%;
+    display: flex;
+    justify-content: center;
+    flex-wrap: wrap;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .result-affix {
+    font-size: 11px;
+    padding: 1px 6px;
+    border-radius: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    color: #c8c8d0;
+  }
+
+  .result-affix.affix-tier-1 {
+    color: #9fe09f;
+    border-color: rgba(159, 224, 159, 0.4);
+  }
+
+  .result-affix.affix-tier-2 {
+    color: #6fb3ff;
+    border-color: rgba(111, 179, 255, 0.4);
+  }
+
+  .result-affix.affix-tier-3 {
+    color: #ffcf5e;
+    border-color: rgba(255, 207, 94, 0.5);
   }
 
   .log-section {

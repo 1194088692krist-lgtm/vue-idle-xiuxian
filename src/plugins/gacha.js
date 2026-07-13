@@ -1,6 +1,6 @@
 // 抽奖系统配置
 
-import { getAffixesForSlot, setBonuses, rarityConfig } from '../plugins/buildSystem'
+import { getAffixesForSlot, setBonuses, rarityConfig, affixPool } from '../plugins/buildSystem'
 
 // 装备品质配置
 export const equipmentQualities = {
@@ -138,7 +138,21 @@ export const generateEquipment = (playerLevel = 1) => {
   const name = `${nameBase}·${rarityConfig[rarity].name}`
 
   // 词条（接入 buildSystem，使抽奖装备也能吃 build 加成）
-  const affixes = getAffixesForSlot(type, rarity)
+  let affixes = getAffixesForSlot(type, rarity)
+  // 保底：非凡品装备至少带 1 条词条（凡品本就无词条，符合设定）
+  if (affixes.length === 0 && rarity !== 'common') {
+    const available = affixPool.filter(a => a.slots.includes(type))
+    if (available.length > 0) {
+      const affix = available[Math.floor(Math.random() * available.length)]
+      const [minVal, maxVal] = affix.baseRange
+      const value = minVal + Math.random() * (maxVal - minVal)
+      const roundedValue = affix.valueType === 'percent' ? Math.round(value * 1000) / 1000 : Math.round(value)
+      affixes = [{
+        id: affix.id, name: affix.name, stat: affix.stat,
+        value: roundedValue, valueType: affix.valueType, tier: affix.tier
+      }]
+    }
+  }
 
   // 套装（epic+ 30% 概率，且与当前部位匹配）
   let setId = null
