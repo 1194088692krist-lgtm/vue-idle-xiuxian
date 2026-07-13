@@ -1,5 +1,7 @@
 // 抽奖系统配置
 
+import { getAffixesForSlot, setBonuses, rarityConfig } from '../plugins/buildSystem'
+
 // 装备品质配置
 export const equipmentQualities = {
   mythic: { name: '仙品', color: '#FF0000', weight: 1 },
@@ -130,13 +132,26 @@ const pickByWeight = (qualityMap) => {
 export const generateEquipment = (playerLevel = 1) => {
   const type = equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)]
   const qualityInfo = pickByWeight(equipmentQualities)
+  const rarity = qualityInfo.key // 与 buildSystem.rarityConfig 的 key 完全一致
   const nameParts = equipmentNameParts[type] || ['未知']
   const nameBase = nameParts[Math.floor(Math.random() * nameParts.length)]
-  const name = `${nameBase}·${qualityInfo.name}`
+  const name = `${nameBase}·${rarityConfig[rarity].name}`
+
+  // 词条（接入 buildSystem，使抽奖装备也能吃 build 加成）
+  const affixes = getAffixesForSlot(type, rarity)
+
+  // 套装（epic+ 30% 概率，且与当前部位匹配）
+  let setId = null
+  if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
+    const candidateSets = setBonuses.filter(s => s.pieces.includes(type))
+    if (candidateSets.length > 0) {
+      setId = candidateSets[Math.floor(Math.random() * candidateSets.length)].id
+    }
+  }
 
   // 根据品质决定属性条数
   const statCountMap = { common: 2, uncommon: 2, rare: 3, epic: 3, legendary: 4, mythic: 5 }
-  const statCount = statCountMap[qualityInfo.key] || 2
+  const statCount = statCountMap[rarity] || 2
 
   // 随机选取属性
   const allStats = Object.keys(equipmentStatPool)
@@ -148,7 +163,7 @@ export const generateEquipment = (playerLevel = 1) => {
 
   // 品质倍率
   const qualityMultiplier = { common: 1, uncommon: 1.2, rare: 1.5, epic: 2, legendary: 3, mythic: 5 }
-  const multiplier = qualityMultiplier[qualityInfo.key] || 1
+  const multiplier = qualityMultiplier[rarity] || 1
 
   // 生成属性值
   const stats = {}
@@ -170,9 +185,13 @@ export const generateEquipment = (playerLevel = 1) => {
     id: `eq_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     name,
     type,
-    quality: qualityInfo.key,
-    qualityInfo: { name: qualityInfo.name, color: qualityInfo.color },
+    slot: type,
+    rarity,
+    quality: rarity,
+    qualityInfo: { name: rarityConfig[rarity].name, color: rarityConfig[rarity].color },
     stats,
+    affixes,
+    setId,
     enhanceLevel: 0,
     requiredRealm: Math.max(1, playerLevel - Math.floor(Math.random() * 5))
   }

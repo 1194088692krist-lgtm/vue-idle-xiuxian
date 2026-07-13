@@ -230,6 +230,134 @@ export const pillRecipes = [
       value: 0.6,
       duration: 1800
     }
+  },
+  // ===== 新增：丹药多元化（打破"全是限时 buff"） =====
+  // func 仅用于炼丹界面分类展示；materials 采用 {kind,id,count} 统一素材模型
+  {
+    id: 'wash_marrow_pill',
+    name: '洗髓丹',
+    description: '洗髓易筋，永久提升攻击（存档沉淀）',
+    grade: 'grade1',
+    type: 'attribute',
+    func: 'permanent',
+    materials: [
+      { kind: 'herb', id: 'wash_marrow_herb', count: 2 },
+      { kind: 'ore', id: 'iron_essence', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade1'),
+    baseEffect: { type: 'permanentStat', stat: 'attack', value: 5, duration: 0 }
+  },
+  {
+    id: 'forge_bone_pill',
+    name: '锻骨丹',
+    description: '锻骨淬体，永久提升防御（存档沉淀）',
+    grade: 'grade2',
+    type: 'attribute',
+    func: 'permanent',
+    materials: [
+      { kind: 'herb', id: 'forge_bone_wood', count: 2 },
+      { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade2'),
+    baseEffect: { type: 'permanentStat', stat: 'defense', value: 6, duration: 0 }
+  },
+  {
+    id: 'heal_pill',
+    name: '疗伤丹',
+    description: '生肌续命，战斗中可嗑以回复生命',
+    grade: 'grade1',
+    type: 'spirit',
+    func: 'battle',
+    materials: [
+      { kind: 'herb', id: 'flesh_growth_herb', count: 2 },
+      { kind: 'liquid', id: 'jade_marrow_liquid', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade1'),
+    baseEffect: { type: 'healBattle', value: 0.3, duration: 0 }
+  },
+  {
+    id: 'cleanse_pill',
+    name: '解厄丹',
+    description: '化解厄难，战斗中可嗑以清除负面状态',
+    grade: 'grade2',
+    type: 'special',
+    func: 'battle',
+    materials: [
+      { kind: 'herb', id: 'disaster_ward_flower', count: 2 },
+      { kind: 'liquid', id: 'ward_evil_dew', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade2'),
+    baseEffect: { type: 'cleanse', value: 1, duration: 0 }
+  },
+  {
+    id: 'enlightenment_pill',
+    name: '悟道丹',
+    description: '蕴含道韵，一定时间内修炼/探索修为加成',
+    grade: 'grade2',
+    type: 'cultivation',
+    func: 'explore',
+    materials: [
+      { kind: 'herb', id: 'enlightenment_leaf', count: 2 },
+      { kind: 'ore', id: 'dao_essence_stone', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade2'),
+    baseEffect: { type: 'expGain', value: 0.2, duration: 1800 }
+  },
+  {
+    id: 'treasure_pill',
+    name: '寻宝丹',
+    description: '感应宝物，一定时间内探索掉落加成',
+    grade: 'grade3',
+    type: 'special',
+    func: 'explore',
+    materials: [
+      { kind: 'herb', id: 'treasure_scent_herb', count: 2 },
+      { kind: 'ore', id: 'prospect_sand', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade3'),
+    baseEffect: { type: 'dropRate', value: 0.2, duration: 1800 }
+  },
+  {
+    id: 'quench_spirit_pill',
+    name: '淬灵丹',
+    description: '淬炼灵气，提升下次装备强化成功率',
+    grade: 'grade3',
+    type: 'attribute',
+    func: 'enhance',
+    materials: [
+      { kind: 'ore', id: 'spirit_quench_sand', count: 2 },
+      { kind: 'liquid', id: 'spirit_spring_water', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade3'),
+    baseEffect: { type: 'enhanceRate', value: 0.15, duration: 0 }
+  },
+  {
+    id: 'calm_spirit_pill',
+    name: '定灵丹',
+    description: '凝定神魂，洗练装备时保底不降属性',
+    grade: 'grade3',
+    type: 'special',
+    func: 'reforge',
+    materials: [
+      { kind: 'special', id: 'calm_spirit_pearl', count: 1 },
+      { kind: 'herb', id: 'calm_mind_herb', count: 2 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade3'),
+    baseEffect: { type: 'reforgeSafe', value: 1, duration: 0 }
+  },
+  {
+    id: 'tribulation_pill',
+    name: '渡厄丹',
+    description: '雷劫中绽放，提升境界突破成功率',
+    grade: 'grade4',
+    type: 'special',
+    func: 'breakthrough',
+    materials: [
+      { kind: 'herb', id: 'tribulation_lotus', count: 2 },
+      { kind: 'ore', id: 'tribulation_thunder_stone', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade4'),
+    baseEffect: { type: 'breakthroughRate', value: 0.1, duration: 0 }
   }
 ]
 
@@ -241,18 +369,22 @@ export const calculatePillEffect = (recipe, playerLevel) => {
   const levelMultiplier = 1 + (playerLevel - 1) * 0.1
   return {
     type: recipe.baseEffect.type,
+    stat: recipe.baseEffect.stat,
     value: recipe.baseEffect.value * type.effectMultiplier * levelMultiplier,
-    duration: recipe.baseEffect.duration,
+    duration: recipe.baseEffect.duration || 0,
     successRate: grade.successRate
   }
 }
 
 // 尝试合成丹药
 export const tryCreatePill = (recipe, herbs, player, fragments = 0, luck = 1) => {
-  // 检查材料是否足够
+  // 检查材料是否足够（支持 {kind,id} 与旧式 {herb} 写法；以 player.materials 为准）
+  const owned = player.materials || []
   for (const material of recipe.materials) {
-    const herbCount = herbs.filter(h => h.id === material.herb).length
-    if (herbCount < material.count) {
+    const kind = material.kind || 'herb'
+    const mid = material.id || material.herb
+    const have = owned.filter(m => m.kind === kind && m.id === mid).length
+    if (have < material.count) {
       return { success: false, message: '材料不足' }
     }
   }

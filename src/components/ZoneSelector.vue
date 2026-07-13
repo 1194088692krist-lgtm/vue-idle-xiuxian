@@ -154,6 +154,19 @@
             </div>
           </div>
         </div>
+        <!-- 战斗丹药快捷栏 -->
+        <div v-if="playerStore.battlePills.length" class="battle-pills">
+          <span class="battle-pills-label">战斗丹药:</span>
+          <button
+            v-for="p in playerStore.battlePills"
+            :key="p.uid"
+            class="battle-pill-btn"
+            :class="p.type"
+            @click="useBattlePill(p)"
+          >
+            {{ p.type === 'healBattle' ? '疗伤丹' : '解厄丹' }}
+          </button>
+        </div>
       </div>
 
       <!-- 探索按钮 -->
@@ -284,6 +297,7 @@ import { zones, difficultyTiers } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRealmName } from '../plugins/realm'
 import { getAffixesForSlot, setBonuses } from '../plugins/buildSystem'
+import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 
 const playerStore = usePlayerStore()
 
@@ -442,7 +456,9 @@ const generateZoneEnemy = (zone, encounterCount) => {
     monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
   }
 
-  return new CombatEntity(monsterName, zone.minLevel, baseStats, entityType)
+  const enemy = new CombatEntity(monsterName, zone.minLevel, baseStats, entityType)
+  enemy.tier = isBoss ? 'boss' : isElite ? 'elite' : 'normal'
+  return enemy
 }
 
 // 执行一次探索战斗
@@ -484,12 +500,53 @@ const runExploreCombat = async (zone, encounterCount, isIdleMode = false) => {
 
     if (!result) break
     if (result.state === 'victory') {
-      return { victory: true, manager, enemy }
+      const drops = grantCombatDrops(enemy)
+      return { victory: true, manager, enemy, drops }
     } else if (result.state === 'defeat') {
       return { victory: false, manager, enemy }
     }
   }
   return { victory: false, manager, enemy }
+}
+
+// 战斗掉落：妖丹（按敌人档位）/ 至宝（Boss 低概率）/ 高难奇遇包
+function grantCombatDrops(enemy) {
+  const drops = []
+  const tier = enemy?.tier || 'normal'
+  if (tier === 'boss') {
+    if (Math.random() < 0.6) {
+      const c = getRandomCore('boss')
+      playerStore.gainMaterial(c)
+      drops.push(c)
+    }
+    if (Math.random() < 0.08) {
+      const s = getRandomSpecial()
+      playerStore.gainMaterial(s)
+      drops.push(s)
+    }
+    // 高难奇遇包：悟道叶 / 渡厄莲
+    if (Math.random() < 0.25) {
+      const h = getRandomHerb({ difficulty: 9 })
+      playerStore.gainMaterial(h)
+      drops.push(h)
+    }
+  } else if (tier === 'elite') {
+    if (Math.random() < 0.5) {
+      const c = getRandomCore('elite')
+      playerStore.gainMaterial(c)
+      drops.push(c)
+    }
+    const beast = getRandomCore('normal') // 精英必带 1 个妖兽核
+    playerStore.gainMaterial(beast)
+    drops.push(beast)
+  } else {
+    if (Math.random() < 0.4) {
+      const c = getRandomCore('normal')
+      playerStore.gainMaterial(c)
+      drops.push(c)
+    }
+  }
+  return drops
 }
 
 // 奖励品质颜色和描述
@@ -521,10 +578,36 @@ const grantReward = (zone, isIdleMode = false, logs) => {
         playerStore.spiritStones += multiplied
         rewards.push({ type: 'spirit_stone', amount: multiplied, name: '灵石' })
       } else if (rw.type === 'herb') {
+        // 真实灵草对象（带 id/kind/quality），修复旧版占位"灵草"与丹方 id 对不上的 bug
         for (let i = 0; i < multiplied; i++) {
-          playerStore.herbs.push({ id: Date.now() + i, name: '灵草', rarity: 'common' })
+          const h = getRandomHerb(zone)
+          if (h) playerStore.gainMaterial(h)
         }
         rewards.push({ type: 'herb', amount: multiplied, name: '灵草' })
+      } else if (rw.type === 'ore') {
+        for (let i = 0; i < multiplied; i++) {
+          const o = getRandomOre(zone)
+          if (o) playerStore.gainMaterial(o)
+        }
+        rewards.push({ type: 'ore', amount: multiplied, name: '矿料' })
+      } else if (rw.type === 'liquid') {
+        for (let i = 0; i < multiplied; i++) {
+          const l = getRandomLiquid(zone)
+          if (l) playerStore.gainMaterial(l)
+        }
+        rewards.push({ type: 'liquid', amount: multiplied, name: '灵液' })
+      } else if (rw.type === 'fortune') {
+        // 奇遇：产出 1 件 rare+ 素材（高难矿料/灵液/至宝/稀有灵草）
+        const pool = [
+          getRandomHerb({ difficulty: 9 }),
+          ...(zone.difficulty >= 5 ? [getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 })] : []),
+          getRandomSpecial()
+        ].filter(Boolean)
+        const pick = pool[Math.floor(Math.random() * pool.length)]
+        if (pick) {
+          playerStore.gainMaterial(pick)
+          rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + pick.name, material: pick })
+        }
       } else if (rw.type === 'cultivation') {
         playerStore.cultivate(multiplied)
         rewards.push({ type: 'cultivation', amount: multiplied, name: '修为' })
@@ -613,6 +696,23 @@ const generatePet = (rarity, zone) => {
   }
 }
 
+// ========== 战斗丹药使用 ==========
+const useBattlePill = pill => {
+  if (!combatState.value.combatManager) return
+  const player = combatState.value.combatManager.player
+  const consumed = playerStore.consumeBattlePill(pill.uid)
+  if (!consumed) return
+  if (consumed.type === 'healBattle') {
+    const amount = Math.round(player.stats.maxHealth * (consumed.value || 0.3))
+    player.heal(amount)
+  } else if (consumed.type === 'cleanse') {
+    // 解除负面状态（清空效果并小幅回血）
+    const amount = Math.round(player.stats.maxHealth * 0.15)
+    player.heal(amount)
+    if (Array.isArray(player.effects)) player.effects = []
+  }
+}
+
 // ========== 宝物高亮弹窗 ==========
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
 let flashTimer = null
@@ -659,6 +759,10 @@ const startExplore = async () => {
 
   if (result.victory) {
     const rewards = grantReward(selectedZone.value, false, null)
+    // 战斗掉落（妖丹/至宝）并入奖励展示
+    if (result.drops && result.drops.length) {
+      result.drops.forEach(d => rewards.push({ type: 'core', amount: 1, name: d.name, material: d }))
+    }
     playerStore.dungeonTotalKills++
     playerStore.queueSave()
     // 高亮奖励
@@ -842,6 +946,20 @@ const runIdleEncounter = async () => {
     const rewards = grantReward(selectedZone.value, true, null)
     playerStore.dungeonTotalKills++
     playerStore.explorationCount++
+    // 奇遇事件：每 20 次遭遇，50% 触发，奖励 rare+ 素材
+    if (count % 20 === 0 && Math.random() < 0.5) {
+      const fortunePool = [
+        getRandomHerb({ difficulty: 9 }),
+        getRandomOre({ difficulty: 9 }),
+        getRandomLiquid({ difficulty: 9 }),
+        getRandomSpecial()
+      ].filter(Boolean)
+      const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
+      if (fp) {
+        playerStore.gainMaterial(fp)
+        currentIdleLogs.value.push({ type: 'reward-epic', text: `🌀【奇遇】机缘降临，获得${fp.name}！` })
+      }
+    }
     let logText = `[${count}] 击败${result.enemy.name}`
     if (rewards.length > 0) {
       const rewardStrs = rewards.map(r => {
@@ -1161,6 +1279,35 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.3);
   border-radius: 8px;
   margin-bottom: 12px;
+}
+.battle-pills {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+.battle-pills-label {
+  font-size: 13px;
+  color: #aaa;
+}
+.battle-pill-btn {
+  padding: 6px 14px;
+  border: none;
+  border-radius: 16px;
+  font-size: 13px;
+  color: #fff;
+  cursor: pointer;
+  transition: transform 0.15s ease;
+}
+.battle-pill-btn:hover {
+  transform: translateY(-1px);
+}
+.battle-pill-btn.healBattle {
+  background: linear-gradient(135deg, #2ecc71, #27ae60);
+}
+.battle-pill-btn.cleanse {
+  background: linear-gradient(135deg, #3498db, #2980b9);
 }
 .combat-round {
   text-align: center;

@@ -128,6 +128,73 @@ export const herbs = [
     baseValue: 90,
     category: 'special',
     chance: 0.01
+  },
+  // ===== 新增：丹药多元化所需灵草 =====
+  {
+    id: 'wash_marrow_herb',
+    name: '洗髓花',
+    description: '生于灵脉节点的奇花，可洗髓易筋，洗髓丹主料',
+    baseValue: 18,
+    category: 'spirit',
+    chance: 0.25
+  },
+  {
+    id: 'forge_bone_wood',
+    name: '锻骨木',
+    description: '木质如铁，久炼不腐，锻骨丹主料',
+    baseValue: 26,
+    category: 'attribute',
+    chance: 0.18
+  },
+  {
+    id: 'calm_mind_herb',
+    name: '静心草',
+    description: '闻之心神宁静，定灵丹辅料',
+    baseValue: 16,
+    category: 'spirit',
+    chance: 0.25
+  },
+  {
+    id: 'flesh_growth_herb',
+    name: '生肌草',
+    description: '断肢可生肌，疗伤圣草',
+    baseValue: 20,
+    category: 'spirit',
+    chance: 0.3
+  },
+  {
+    id: 'disaster_ward_flower',
+    name: '解厄花',
+    description: '化解厄难的花卉，解厄丹主料',
+    baseValue: 24,
+    category: 'special',
+    chance: 0.18
+  },
+  {
+    id: 'treasure_scent_herb',
+    name: '寻宝嗅',
+    description: '对宝物气息极敏感的灵草，寻宝丹主料',
+    baseValue: 22,
+    category: 'attribute',
+    chance: 0.15
+  },
+  {
+    id: 'enlightenment_leaf',
+    name: '悟道叶',
+    description: '蕴含道韵的叶瓣，悟道丹主料，极难寻觅',
+    baseValue: 70,
+    quality: 'rare',
+    category: 'special',
+    chance: 0.06
+  },
+  {
+    id: 'tribulation_lotus',
+    name: '渡厄莲',
+    description: '雷劫中绽放的莲花，渡厄丹必需要件，可遇不可求',
+    baseValue: 95,
+    quality: 'legendary',
+    category: 'special',
+    chance: 0.02
   }
 ]
 

@@ -402,6 +402,18 @@ export const difficultyTiers = {
   8: { name: '混沌', unlockLevel: 55 }
 }
 
+// 为各秘境补充素材类奖励（矿料/灵液/奇遇），按难度解锁高难素材
+zones.forEach(zone => {
+  const d = zone.difficulty
+  zone.rewards.push(
+    { type: 'ore', chance: 0.18 + d * 0.01, amount: [1, Math.max(1, Math.floor(d / 2))], name: '矿料' },
+    ...(d >= 2
+      ? [{ type: 'liquid', chance: 0.12 + d * 0.01, amount: [1, Math.max(1, Math.floor(d / 3))], name: '灵液' }]
+      : []),
+    { type: 'fortune', chance: 0.03 + d * 0.005, amount: 1, name: '奇遇' }
+  )
+})
+
 export const getZoneById = (id) => zones.find(z => z.id === id)
 
 export const getZonesByDifficulty = (difficulty) => zones.filter(z => z.difficulty <= difficulty)

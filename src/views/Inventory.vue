@@ -770,11 +770,13 @@
   // 强化装备
   const handleEnhanceEquipment = () => {
     if (!selectedEquipment.value) return
-    const result = enhanceEquipment(selectedEquipment.value, playerStore.reinforceStones)
+    const usedBonus = playerStore.enhanceBonus || 0 // 淬灵丹加成
+    const result = enhanceEquipment(selectedEquipment.value, playerStore.reinforceStones, usedBonus)
     if (result.success) {
       playerStore.reinforceStones -= result.cost
       selectedEquipment.value.stats = { ...result.newStats }
       selectedEquipment.value.enhanceLevel = result.newLevel
+      if (usedBonus > 0) playerStore.enhanceBonus = 0 // 消耗淬灵丹加成（下次强化）
       message.success('强化成功')
       playerStore.saveData()
     } else {
@@ -789,9 +791,11 @@
   // 洗练装备
   const handleReforgeEquipment = () => {
     if (!selectedEquipment.value) return
-    const result = reforgeEquipment(selectedEquipment.value, playerStore.refinementStones, false)
+    const usedSafe = playerStore.reforgeSafeCharges > 0 // 定灵丹保底
+    const result = reforgeEquipment(selectedEquipment.value, playerStore.refinementStones, false, usedSafe)
     if (result.success) {
       playerStore.refinementStones -= result.cost
+      result.usedSafe = usedSafe
       reforgeResult.value = result
       showReforgeConfirm.value = true
     } else {
@@ -806,6 +810,10 @@
       // 用户确认后，应用新属性
       selectedEquipment.value.stats = reforgeResult.value.newStats
       message.success('已确认新属性')
+      if (reforgeResult.value.usedSafe) {
+        // 消耗一次定灵丹保底
+        playerStore.reforgeSafeCharges = Math.max(0, playerStore.reforgeSafeCharges - 1)
+      }
     } else {
       // 用户取消，保留原属性
       message.info('已保留原有属性')

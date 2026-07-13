@@ -514,70 +514,70 @@ export const achievements = {
       id: 'collection_1',
       name: '初识灵草',
       description: '收集首株灵草',
-      condition: player => player.herbs.length >= 1,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').length >= 1,
       reward: { spirit: 100 }
     },
     {
       id: 'collection_2',
       name: '灵草学徒',
       description: '收集5种不同灵草',
-      condition: player => new Set(player.herbs.map(h => h.id)).size >= 5,
+      condition: player => new Set((player.materials || []).filter(m => m.kind === 'herb').map(h => h.id)).size >= 5,
       reward: { spirit: 500 }
     },
     {
       id: 'collection_3',
       name: '灵草收藏家',
       description: '收集10种不同灵草',
-      condition: player => new Set(player.herbs.map(h => h.id)).size >= 10,
+      condition: player => new Set((player.materials || []).filter(m => m.kind === 'herb').map(h => h.id)).size >= 10,
       reward: { spirit: 1000 }
     },
     {
       id: 'collection_4',
       name: '灵草猎人',
       description: '收集50株灵草',
-      condition: player => player.herbs.length >= 50,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').length >= 50,
       reward: { spirit: 2000, herbRate: 1 }
     },
     {
       id: 'collection_5',
       name: '灵草园主',
       description: '拥有100株灵草',
-      condition: player => player.herbs.length >= 100,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').length >= 100,
       reward: { spirit: 5000, herbRate: 1.5 }
     },
     {
       id: 'collection_6',
       name: '灵草之巅',
       description: '收集200株灵草',
-      condition: player => player.herbs.length >= 200,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').length >= 200,
       reward: { spirit: 30000, herbRate: 2 }
     },
     {
       id: 'collection_7',
       name: '仙品收藏',
       description: '收集100个稀有灵草',
-      condition: player => player.herbs.filter(h => h.quality === 'rare').length >= 100,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').filter(h => h.quality === 'rare').length >= 100,
       reward: { spirit: 2000, herbRate: 1 }
     },
     {
       id: 'collection_8',
       name: '灵草大师',
       description: '收集100株极品灵草',
-      condition: player => player.herbs.filter(h => h.quality === 'epic').length >= 100,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').filter(h => h.quality === 'epic').length >= 100,
       reward: { spirit: 5000, herbRate: 1.3 }
     },
     {
       id: 'collection_9',
       name: '仙草收集者',
       description: '收集100株仙品灵草',
-      condition: player => player.herbs.filter(h => h.quality === 'mythic').length >= 100,
+      condition: player => (player.materials || []).filter(m => m.kind === 'herb').filter(h => h.quality === 'mythic').length >= 100,
       reward: { spirit: 10000, herbRate: 1.5 }
     },
     {
       id: 'collection_10',
       name: '灵草大师',
       description: '收集所有种类灵草',
-      condition: player => new Set(player.herbs.map(h => h.id)).size >= 15,
+      condition: player => new Set((player.materials || []).filter(m => m.kind === 'herb').map(h => h.id)).size >= 15,
       reward: { spirit: 3000, herbRate: 1.2 }
     }
   ],
@@ -821,16 +821,16 @@ export const getAchievementProgress = (player, achievement) => {
       }
     } else if (achievement.id.startsWith('collection_')) {
       if (achievement.id === 'collection_1') {
-        return (player.herbs || []).length >= 1 ? 100 : 0
+        return ((player.materials || []).filter(m => m.kind === 'herb') || []).length >= 1 ? 100 : 0
       } else if (achievement.id === 'collection_2' || achievement.id === 'collection_3') {
         const matches = achievement.description.match(/\d+/)
         const targetTypes = matches ? parseInt(matches[0]) : 10
-        const uniqueHerbs = new Set((player.herbs || []).map(h => h.id)).size
+        const uniqueHerbs = new Set(((player.materials || []).filter(m => m.kind === 'herb') || []).map(h => h.id)).size
         return Math.min(100, (uniqueHerbs / targetTypes) * 100)
       } else if (achievement.id === 'collection_4') {
-        return (player.herbs || []).some(h => h.quality === 'legendary') ? 100 : 0
+        return ((player.materials || []).filter(m => m.kind === 'herb') || []).some(h => h.quality === 'legendary') ? 100 : 0
       } else {
-        return Math.min(100, ((player.herbs || []).length / 100) * 100)
+        return Math.min(100, (((player.materials || []).filter(m => m.kind === 'herb') || []).length / 100) * 100)
       }
     } else if (achievement.id.startsWith('resources_')) {
       const matches = achievement.description.match(/\d+/)

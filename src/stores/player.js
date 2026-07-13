@@ -90,7 +90,14 @@ export const usePlayerStore = defineStore('player', {
     spiritStones: 0, // 灵石数量
     reinforceStones: 0, // 强化石数量
     refinementStones: 0, // 洗练石数量
-    herbs: [], // 灵草库存
+    materials: [], // 统一素材库存（herb/ore/liquid/core/special）
+    // 丹药沉淀与系统加成
+    permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 永久属性加成（洗髓/锻骨丹）
+    breakthroughBonus: 0, // 突破成功率加成（如 0.1 = +10%，下次突破消耗）
+    enhanceBonus: 0, // 装备强化成功率加成（下次强化消耗）
+    reforgeSafeCharges: 0, // 洗练保底次数（定灵丹，洗练时不降属性）
+    battlePills: [], // 战斗中可使用的丹药（疗伤/解厄），每项 {uid,type,value,...}
+    pillEffects: [], // 临时增益（悟道丹 expGain / 寻宝丹 dropRate，带 expiry）
     items: [], // 物品库存
     artifacts: [], // 法宝装备
     // 装备栏位
@@ -284,6 +291,23 @@ export const usePlayerStore = defineStore('player', {
     },
     activeSetBonuses() {
       return getActiveSetBonuses(this.equippedArtifacts)
+    },
+    // 兼容旧 UI：灵草即素材库中 kind==='herb' 的子集
+    herbs() {
+      return (this.materials || []).filter(m => m.kind === 'herb')
+    },
+    // 临时增益聚合（悟道丹修为加成 / 寻宝丹掉落加成），仅统计未过期项
+    expBonus() {
+      const now = Date.now()
+      return (this.pillEffects || [])
+        .filter(e => e.type === 'expGain' && e.endTime > now)
+        .reduce((s, e) => s + (e.value || 0), 0)
+    },
+    dropBonus() {
+      const now = Date.now()
+      return (this.pillEffects || [])
+        .filter(e => e.type === 'dropRate' && e.endTime > now)
+        .reduce((s, e) => s + (e.value || 0), 0)
     }
   },
   actions: {
@@ -304,6 +328,19 @@ export const usePlayerStore = defineStore('player', {
           const decryptedData = decryptData(savedData)
           if (decryptedData && validateData(decryptedData)) {
             Object.assign(this.$state, decryptedData)
+            // 迁移：旧版灵草库存并入统一素材库（kind='herb'），随后移除遗留 herbs 键
+            if (Array.isArray(this.$state.herbs)) {
+              if (!Array.isArray(this.materials)) this.materials = []
+              for (const h of this.$state.herbs) {
+                this.materials.push({
+                  ...h,
+                  kind: 'herb',
+                  quality: h.quality || h.rarity || 'common',
+                  source: h.source || 'legacy'
+                })
+              }
+              delete this.$state.herbs
+            }
           } else {
             console.error('存档数据验证失败，使用初始数据')
           }
@@ -523,7 +560,9 @@ export const usePlayerStore = defineStore('player', {
       // 确保amount是数字类型
       const numAmount = Number(String(amount).replace(/[^0-9.-]/g, '')) || 0
       this.cultivation = Number(String(this.cultivation).replace(/[^0-9.-]/g, '')) || 0
-      this.cultivation += numAmount
+      // 悟道丹（expGain）提升修为获取
+      const bonus = 1 + (this.expBonus || 0)
+      this.cultivation += numAmount * bonus
       this.totalCultivationTime += 1 // 增加修炼时间统计
       if (this.cultivation >= this.maxCultivation) {
         this.tryBreakthrough()
@@ -536,6 +575,13 @@ export const usePlayerStore = defineStore('player', {
       const realmsLength = getRealmLength()
       // 检查是否可以突破到下一个境界
       if (this.level < realmsLength) {
+        // 突破成功率 = 基础(随境界缓降，保底 0.6) + 丹药加成(渡厄丹)
+        const baseChance = Math.max(0.6, 1 - (this.level - 1) * 0.015)
+        const chance = Math.min(1, baseChance + this.breakthroughBonus)
+        if (Math.random() > chance) {
+          // 突破受阻：修为已满但不重置，下次修炼将再次尝试（无惩罚）
+          return false
+        }
         const nextRealm = getRealmName(this.level)
         // 更新境界信息
         this.level += 1
@@ -543,6 +589,7 @@ export const usePlayerStore = defineStore('player', {
         this.maxCultivation = nextRealm.maxCultivation
         this.cultivation = 0 // 重置修为值
         this.breakthroughCount += 1 // 增加突破次数
+        this.breakthroughBonus = 0 // 消耗一次突破加成（渡厄丹为"下次突破"保险）
         // 解锁新境界
         if (!this.unlockedRealms.includes(nextRealm.name)) {
           this.unlockedRealms.push(nextRealm.name)
@@ -594,6 +641,77 @@ export const usePlayerStore = defineStore('player', {
       this.items.push(item)
       this.itemsFound++ // 增加获得物品统计
       this.queueSave()
+    },
+    // 获得单个素材（统一素材模型：{id,name,kind,quality,...}）
+    gainMaterial(material) {
+      if (!material) return
+      if (!Array.isArray(this.materials)) this.materials = []
+      this.materials.push(material)
+      this.queueSave()
+    },
+    // 批量获得素材
+    gainMaterials(arr) {
+      if (!Array.isArray(arr) || arr.length === 0) return
+      if (!Array.isArray(this.materials)) this.materials = []
+      this.materials.push(...arr)
+      this.queueSave()
+    },
+    // 清理过期临时增益
+    pruneExpiredEffects() {
+      const now = Date.now()
+      if (Array.isArray(this.pillEffects)) {
+        this.pillEffects = this.pillEffects.filter(e => (e.endTime || 0) > now)
+      }
+    },
+    // 应用丹药效果（按 baseEffect.type 分支）
+    applyPillEffect(effect) {
+      if (!effect) return { success: false, message: '无效丹药' }
+      const now = Date.now()
+      this.pruneExpiredEffects()
+      switch (effect.type) {
+        case 'permanentStat': {
+          // 永久提升基础属性并沉淀
+          const stat = effect.stat
+          const val = Math.round(effect.value)
+          if (this.permanentBonuses[stat] !== undefined) this.permanentBonuses[stat] += val
+          if (this.baseAttributes[stat] !== undefined) this.baseAttributes[stat] += val
+          return { success: true, message: `永久提升${stat} +${val}` }
+        }
+        case 'breakthroughRate':
+          this.breakthroughBonus = Math.min(0.9, this.breakthroughBonus + effect.value)
+          return { success: true, message: `突破成功率 +${Math.round(effect.value * 100)}%` }
+        case 'enhanceRate':
+          this.enhanceBonus = Math.min(0.9, this.enhanceBonus + effect.value)
+          return { success: true, message: `强化成功率 +${Math.round(effect.value * 100)}%` }
+        case 'reforgeSafe':
+          this.reforgeSafeCharges += Math.max(1, Math.round(effect.value))
+          return { success: true, message: `获得洗练保底 ${Math.max(1, Math.round(effect.value))} 次` }
+        case 'healBattle':
+        case 'cleanse':
+          // 进入战斗丹药队列，由战斗界面消耗
+          this.battlePills.push({ ...effect, uid: `${effect.type}_${now}_${Math.floor(Math.random() * 1e6)}`, used: false })
+          return { success: true, message: effect.type === 'healBattle' ? '疗伤丹已就绪（战斗中可使用）' : '解厄丹已就绪（战斗中可使用）' }
+        case 'expGain':
+        case 'dropRate':
+          // 临时增益，带过期时间
+          this.pillEffects.push({ ...effect, startTime: now, endTime: now + (effect.duration || 600) * 1000 })
+          return { success: true, message: effect.type === 'expGain' ? '修为获取提升' : '探索掉落提升' }
+        default:
+          // 原限时 buff 逻辑
+          this.activeEffects.push({ ...effect, startTime: now, endTime: now + (effect.duration || 0) * 1000 })
+          this.activeEffects = this.activeEffects.filter(e => e.endTime > now)
+          return { success: true, message: '使用丹药成功' }
+      }
+    },
+    // 战斗界面消耗一枚战斗丹药，返回其效果供战斗逻辑使用
+    consumeBattlePill(uid) {
+      if (!Array.isArray(this.battlePills)) return null
+      const idx = this.battlePills.findIndex(p => p.uid === uid)
+      if (idx === -1) return null
+      const p = this.battlePills[idx]
+      this.battlePills.splice(idx, 1)
+      this.queueSave()
+      return p
     },
     // 使用物品（丹药或灵宠）
     useItem(item) {
@@ -672,43 +790,38 @@ export const usePlayerStore = defineStore('player', {
     },
     // 使用丹药
     usePill(pill) {
-      const now = Date.now()
-      // 添加效果
-      this.activeEffects.push({
-        ...pill.effect,
-        startTime: now,
-        endTime: now + pill.effect.duration * 1000
-      })
+      const res = this.applyPillEffect(pill.effect)
       // 移除已使用的丹药
       const index = this.items.findIndex(i => i.id === pill.id)
       if (index > -1) {
         this.items.splice(index, 1)
         this.pillsConsumed++
       }
-      // 清理过期效果
-      this.activeEffects = this.activeEffects.filter(effect => effect.endTime > now)
       this.queueSave()
-      return { success: true, message: '使用丹药成功' }
+      return { success: true, message: res.message || '使用丹药成功' }
     },
     // 炼制丹药
     craftPill(recipeId) {
       const recipe = pillRecipes.find(r => r.id === recipeId)
       if (!recipe) return { success: false, message: '丹方不存在' }
-      // 尝试炼制丹药
+      // 尝试炼制丹药（以 player.materials 为材料来源）
       const result = tryCreatePill(
         recipe,
-        this.herbs,
+        this.materials,
         this,
         this.pillFragments[recipe.id] || 0,
         this.luck * this.alchemyRate
       )
       if (result.success) {
-        // 消耗材料
+        // 消耗材料（按 kind+id 精确扣减）
         for (const material of recipe.materials) {
-          for (let i = 0; i < material.count; i++) {
-            const index = this.herbs.findIndex(h => h.id === material.herb)
-            if (index > -1) {
-              this.herbs.splice(index, 1)
+          const kind = material.kind || 'herb'
+          const mid = material.id || material.herb
+          let remaining = material.count
+          for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+            if (this.materials[i].kind === kind && this.materials[i].id === mid) {
+              this.materials.splice(i, 1)
+              remaining--
             }
           }
         }
@@ -1127,14 +1240,17 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '未掌握丹方' }
       }
       const fragments = this.pillFragments[recipeId] || 0
-      const result = tryCreatePill(recipe, this.herbs, this, fragments, this.luck * this.alchemyRate)
+      const result = tryCreatePill(recipe, this.materials, this, fragments, this.luck * this.alchemyRate)
       if (result.success) {
-        // 消耗材料
+        // 消耗材料（按 kind+id 精确扣减）
         recipe.materials.forEach(material => {
-          for (let i = 0; i < material.count; i++) {
-            const index = this.herbs.findIndex(h => h.id === material.herb)
-            if (index > -1) {
-              this.herbs.splice(index, 1)
+          const kind = material.kind || 'herb'
+          const mid = material.id || material.herb
+          let remaining = material.count
+          for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+            if (this.materials[i].kind === kind && this.materials[i].id === mid) {
+              this.materials.splice(i, 1)
+              remaining--
             }
           }
         })
@@ -1153,26 +1269,10 @@ export const usePlayerStore = defineStore('player', {
       }
       return result
     },
-    // 使用丹药
+    // 使用丹药（与上方 usePill 统一逻辑）
     useItem(item) {
       if (item.type === 'pill') {
-        const now = Date.now()
-        // 添加效果
-        this.activeEffects.push({
-          ...item.effect,
-          startTime: now,
-          endTime: now + item.effect.duration * 1000
-        })
-        // 移除已使用的丹药
-        const index = this.items.findIndex(i => i.id === item.id)
-        if (index > -1) {
-          this.items.splice(index, 1)
-          this.pillsConsumed++
-        }
-        // 清理过期效果
-        this.activeEffects = this.activeEffects.filter(effect => effect.endTime > now)
-        this.queueSave()
-        return true
+        return this.usePill(item)
       }
       return false
     },

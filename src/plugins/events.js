@@ -105,11 +105,11 @@ export const handleReward = (reward, playerStore, showMessage) => {
       showMessage('success', `[灵石获取]获得${reward.amount}颗灵石`)
       break
     case 'herb':
-      // 获取指定数量的随机灵草
+      // 获取指定数量的随机灵草（统一素材库）
       for (let i = 0; i < reward.amount; i++) {
         const herb = getRandomHerb()
         if (herb) {
-          playerStore.herbs.push(herb)
+          playerStore.gainMaterial(herb)
           showMessage('success', `[灵草获取]获得${herbQualities[herb.quality].name}品质的${herb.name}`)
         }
       }

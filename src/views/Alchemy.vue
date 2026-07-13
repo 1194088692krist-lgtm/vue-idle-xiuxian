@@ -49,9 +49,9 @@
           <div class="section">
             <h3 class="section-title">材料需求</h3>
             <div class="materials-list">
-              <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.herb">
+              <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.id || material.herb">
                 <div class="material-info">
-                  <span class="material-name">{{ getHerbName(material.herb) }}</span>
+                  <span class="material-name">{{ getMaterialName(material) }}</span>
                   <span class="material-need">需要: {{ material.count }}</span>
                 </div>
                 <div
@@ -71,16 +71,16 @@
                 <div class="effect-value">{{ selectedRecipe.description }}</div>
               </div>
               <div class="effect-item">
-                <div class="effect-label">效果数值</div>
-                <div class="effect-value highlight">+{{ (currentEffect.value * 100).toFixed(1) }}%</div>
+                <div class="effect-label">{{ effectDescription.label }}</div>
+                <div class="effect-value highlight">{{ effectDescription.value }}</div>
               </div>
               <div class="effect-item">
                 <div class="effect-label">持续时间</div>
-                <div class="effect-value">{{ Math.floor(currentEffect.duration / 60) }}分钟</div>
+                <div class="effect-value">{{ Math.floor((currentEffect?.duration || 0) / 60) }}分钟</div>
               </div>
               <div class="effect-item">
                 <div class="effect-label">成功率</div>
-                <div class="effect-value">{{ (currentEffect.successRate * 100).toFixed(1) }}%</div>
+                <div class="effect-value">{{ (currentEffect?.successRate * 100).toFixed(1) }}%</div>
               </div>
             </div>
           </div>
@@ -110,7 +110,7 @@
   import { ref, computed } from 'vue'
   import { usePlayerStore } from '../stores/player'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
-  import { herbs } from '../plugins/herbs'
+  import { allMaterials } from '../plugins/materials'
   import LogPanel from '../components/LogPanel.vue'
   import {
     MedicineBoxOutlined,
@@ -134,24 +134,51 @@
   const checkMaterials = recipe => {
     if (!recipe) return false
     return recipe.materials.every(material => {
-      const count = playerStore.herbs.filter(h => h.id === material.herb).length
+      const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
       return count >= material.count
     })
   }
 
   const getMaterialStatus = material => {
-    const count = playerStore.herbs.filter(h => h.id === material.herb).length
+    const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
     return `${count}/${material.count}`
   }
 
-  const getHerbName = herbId => {
-    const herb = herbs.find(h => h.id === herbId)
-    return herb ? herb.name : herbId
+  const getMaterialName = material => {
+    const m = allMaterials.find(x => x.id === material.id && x.kind === (material.kind || 'herb'))
+    return m ? m.name : material.id
   }
 
   const currentEffect = computed(() => {
     if (!selectedRecipe.value) return null
     return calculatePillEffect(selectedRecipe.value, playerStore.level)
+  })
+
+  // 按丹药效果类型给出可读描述（支持新增值/突破/强化/洗练/战斗/探索类）
+  const effectDescription = computed(() => {
+    const e = currentEffect.value
+    if (!e) return { label: '效果', value: '-' }
+    const statNames = { attack: '攻击', defense: '防御', health: '生命', speed: '速度' }
+    switch (e.type) {
+      case 'permanentStat':
+        return { label: '永久属性', value: `+${Math.round(e.value)} ${statNames[e.stat] || e.stat}` }
+      case 'breakthroughRate':
+        return { label: '突破成功率', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'enhanceRate':
+        return { label: '强化成功率', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'reforgeSafe':
+        return { label: '洗练保底', value: `${Math.max(1, Math.round(e.value))} 次` }
+      case 'healBattle':
+        return { label: '战斗回血', value: '战斗中使用' }
+      case 'cleanse':
+        return { label: '战斗解控', value: '战斗中使用' }
+      case 'expGain':
+        return { label: '修为获取', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'dropRate':
+        return { label: '掉落加成', value: `+${(e.value * 100).toFixed(0)}%` }
+      default:
+        return { label: '效果数值', value: `+${(e.value * 100).toFixed(1)}%` }
+    }
   })
 
   const craftPill = () => {

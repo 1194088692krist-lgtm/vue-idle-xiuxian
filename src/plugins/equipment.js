@@ -34,7 +34,7 @@ const reforgeableStats = {
 }
 
 // 强化装备
-function enhanceEquipment(equipment, playerReinforceStones) {
+function enhanceEquipment(equipment, playerReinforceStones, enhanceBonus = 0) {
   if (!equipment || !equipment.stats) {
     return { success: false, message: '无效的装备' }
   }
@@ -46,8 +46,8 @@ function enhanceEquipment(equipment, playerReinforceStones) {
   if (playerReinforceStones < cost) {
     return { success: false, message: '强化石不足' }
   }
-  // 计算成功率
-  const successRate = enhanceConfig.baseSuccessRate - currentLevel * 0.05
+  // 计算成功率（淬灵丹 enhanceBonus 提升）
+  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - currentLevel * 0.05 + (enhanceBonus || 0))
   const isSuccess = Math.random() < successRate
   if (!isSuccess) {
     return {
@@ -88,7 +88,7 @@ function enhanceEquipment(equipment, playerReinforceStones) {
   }
 }
 
-function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true) {
+function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true, reforgeSafe = false) {
   if (!equipment || !equipment.stats || !equipment.type) {
     return { success: false, message: '无效的装备' }
   }
@@ -120,8 +120,8 @@ function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true)
         currentStat = newStat
       }
     }
-    // Step 2：强制数值调整（基于原始值±30%）
-    const delta = Math.random() * 0.6 - 0.3 // [-0.3, 0.3]
+    // Step 2：强制数值调整（基于原始值±30%；定灵丹保底时只增不减）
+    const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3 // [-0.3, 0.3] 或 [0, 0.3]
     const newValue = baseValue * (1 + delta)
     // 根据属性类型处理数值精度
     if (
