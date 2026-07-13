@@ -1,3 +1,16 @@
+// 每张秘境内置的 5 档难度（修仙风命名）
+// scale : 怪物属性相对「标准档(凶险)」的缩放系数
+// rmMul : 奖励倍率相对该图基础倍率的系数
+// cost  : 每场遭遇的灵力消耗
+// drop  : 掉落率/品质加成
+const DIFFICULTY_TEMPLATES = [
+  { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.5, cost: 20,  drop: 1.0 },
+  { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.8, cost: 35,  drop: 1.1 },
+  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.0, cost: 50,  drop: 1.2 },
+  { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.5, cost: 80,  drop: 1.4 },
+  { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.2, cost: 120, drop: 1.7 }
+]
+
 export const zones = [
   {
     id: 'forest_edge',
@@ -54,7 +67,7 @@ export const zones = [
     difficulty: 2,
     difficultyLabel: '普通',
     difficultyColor: '#1E90FF',
-    minLevel: 5,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 1.5,
     image: '',
@@ -102,7 +115,7 @@ export const zones = [
     difficulty: 3,
     difficultyLabel: '困难',
     difficultyColor: '#FF6347',
-    minLevel: 10,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 2.0,
     image: '',
@@ -151,7 +164,7 @@ export const zones = [
     difficulty: 4,
     difficultyLabel: '精英',
     difficultyColor: '#9932CC',
-    minLevel: 15,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 3.0,
     image: '',
@@ -200,7 +213,7 @@ export const zones = [
     difficulty: 5,
     difficultyLabel: '噩梦',
     difficultyColor: '#8B0000',
-    minLevel: 20,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 4.0,
     image: '',
@@ -249,7 +262,7 @@ export const zones = [
     difficulty: 6,
     difficultyLabel: '地狱',
     difficultyColor: '#00CED1',
-    minLevel: 25,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 5.0,
     image: '',
@@ -298,7 +311,7 @@ export const zones = [
     difficulty: 7,
     difficultyLabel: '仙境',
     difficultyColor: '#FFD700',
-    minLevel: 30,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 7.0,
     image: '',
@@ -347,7 +360,7 @@ export const zones = [
     difficulty: 8,
     difficultyLabel: '混沌',
     difficultyColor: '#4B0082',
-    minLevel: 35,
+    minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 10.0,
     image: '',
@@ -391,18 +404,7 @@ export const zones = [
   }
 ]
 
-export const difficultyTiers = {
-  1: { name: '入门', unlockLevel: 1 },
-  2: { name: '普通', unlockLevel: 1 },
-  3: { name: '困难', unlockLevel: 10 },
-  4: { name: '精英', unlockLevel: 15 },
-  5: { name: '噩梦', unlockLevel: 25 },
-  6: { name: '地狱', unlockLevel: 35 },
-  7: { name: '仙境', unlockLevel: 45 },
-  8: { name: '混沌', unlockLevel: 55 }
-}
-
-// 为各秘境补充素材类奖励（矿料/灵液/奇遇），按难度解锁高难素材
+// 为各秘境补充素材类奖励（矿料/灵液/奇遇），按秘境等级解锁高难素材
 zones.forEach(zone => {
   const d = zone.difficulty
   zone.rewards.push(
@@ -412,6 +414,28 @@ zones.forEach(zone => {
       : []),
     { type: 'fortune', chance: 0.03 + d * 0.005, amount: 1, name: '奇遇' }
   )
+})
+
+// 为每张秘境生成内置的 5 档难度（八图全开，minLevel 统一为 1）
+zones.forEach(zone => {
+  const baseAtk = zone.recommendedStats.attack
+  const baseHp = zone.recommendedStats.health
+  const baseRM = zone.rewardMultiplier
+  zone.difficulties = DIFFICULTY_TEMPLATES.map(t => ({
+    key: t.key,
+    label: t.label,
+    color: t.color,
+    spiritCost: t.cost,
+    rewardMultiplier: Math.round(baseRM * t.rmMul * 100) / 100,
+    enemyScale: t.scale,
+    dropBonus: t.drop,
+    recommendedStats: {
+      attack: Math.max(1, Math.round(baseAtk * t.scale)),
+      health: Math.max(1, Math.round(baseHp * t.scale))
+    }
+  }))
+  // 八图全开：移除等级锁
+  zone.minLevel = 1
 })
 
 export const getZoneById = (id) => zones.find(z => z.id === id)
@@ -425,16 +449,14 @@ export const calculateZoneDifficultyRating = (zone) => {
 }
 
 export const canEnterZone = (zone, playerStats) => {
-  if (!playerStats) return false
+  if (!playerStats) return true
   const req = zone.recommendedStats
   const attackOk = (playerStats.attack || 10) >= req.attack * 0.5
   const healthOk = (playerStats.health || 100) >= req.health * 0.5
   return attackOk && healthOk
 }
 
-export const isZoneUnlocked = (zone, playerLevel) => {
-  return playerLevel >= zone.minLevel
-}
+export const isZoneUnlocked = (zone, playerLevel) => playerLevel >= zone.minLevel
 
 export const getBossById = (zoneId, bossId) => {
   const zone = getZoneById(zoneId)
@@ -445,4 +467,10 @@ export const getBossById = (zoneId, bossId) => {
 export const getRandomBoss = (zone) => {
   if (!zone.bosses || zone.bosses.length === 0) return null
   return zone.bosses[Math.floor(Math.random() * zone.bosses.length)]
+}
+
+// 取某秘境指定难度的配置（缺省返回「标准档/凶险」）
+export const getZoneDifficulty = (zone, key) => {
+  if (!zone || !zone.difficulties) return null
+  return zone.difficulties.find(d => d.key === key) || zone.difficulties[2]
 }

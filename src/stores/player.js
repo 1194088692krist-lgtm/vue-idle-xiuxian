@@ -197,6 +197,7 @@ export const usePlayerStore = defineStore('player', {
     idleExploration: {
       isActive: false,
       zoneId: null,
+      difficultyKey: null,
       startTime: 0,
       duration: 0, // 总时长(ms)
       encounterCount: 0,
@@ -557,9 +558,9 @@ export const usePlayerStore = defineStore('player', {
     },
     // 修炼增加修为
     cultivate(amount) {
-      // 确保amount是数字类型
-      const numAmount = Number(String(amount).replace(/[^0-9.-]/g, '')) || 0
-      this.cultivation = Number(String(this.cultivation).replace(/[^0-9.-]/g, '')) || 0
+      const numAmount = Number(amount)
+      if (!Number.isFinite(numAmount)) return
+      this.cultivation = Number(this.cultivation) || 0
       // 悟道丹（expGain）提升修为获取
       const bonus = 1 + (this.expBonus || 0)
       this.cultivation += numAmount * bonus
@@ -1172,10 +1173,11 @@ export const usePlayerStore = defineStore('player', {
       return this.artifactBonuses[type] || 1
     },
     // 开始挂机探索
-    startIdleExploration(zoneId, durationMinutes) {
+    startIdleExploration(zoneId, difficultyKey, durationMinutes) {
       this.idleExploration = {
         isActive: true,
         zoneId,
+        difficultyKey,
         startTime: Date.now(),
         duration: durationMinutes * 60 * 1000,
         encounterCount: 0,

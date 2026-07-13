@@ -5,11 +5,11 @@
       <div class="header-icon">探索</div>
       <div class="header-info">
         <h2 class="card-title">探索秘境</h2>
-        <p class="card-subtitle">挑战八大秘境，寻找机缘造化</p>
+        <p class="card-subtitle">八大秘境全数开放，各藏五重修为试炼</p>
       </div>
     </div>
 
-    <!-- 难度筛选 -->
+    <!-- 难度筛选（按秘境等级） -->
     <div class="filter-bar">
       <div
         v-for="f in filters"
@@ -28,10 +28,7 @@
         v-for="zone in filteredZones"
         :key="zone.id"
         class="zone-card"
-        :class="{
-          locked: !canEnter(zone),
-          selected: selectedZone?.id === zone.id
-        }"
+        :class="{ selected: selectedZone?.id === zone.id }"
         @click="selectZone(zone)"
       >
         <div class="zone-banner" :style="{ borderTopColor: zone.difficultyColor }">
@@ -45,8 +42,8 @@
         <div class="zone-body">
           <div class="zone-name">{{ zone.name }}</div>
           <div class="zone-meta">
-            <span class="meta-item">Lv.{{ zone.minLevel }}+</span>
-            <span class="meta-item">x{{ zone.rewardMultiplier }}奖励</span>
+            <span class="meta-item">5 档难度</span>
+            <span class="meta-item">x{{ zone.difficulty === 8 ? 10 : zone.rewardMultiplier }}奖励</span>
           </div>
           <div class="zone-monsters">
             <span v-for="m in zone.monsters" :key="m" class="monster-tag">{{ m }}</span>
@@ -67,26 +64,49 @@
         </div>
       </div>
 
+      <!-- 难度档选择 -->
+      <div class="difficulty-selector">
+        <div class="diff-label">试炼难度</div>
+        <div class="diff-chips">
+          <div
+            v-for="d in selectedZone.difficulties"
+            :key="d.key"
+            class="diff-chip"
+            :class="{ active: selectedDifficultyKey === d.key }"
+            :style="{ '--chip-color': d.color }"
+            @click="setDifficulty(d.key)"
+          >
+            {{ d.label }}
+          </div>
+        </div>
+        <div v-if="currentDifficulty" class="diff-info">
+          <span>推荐攻击 {{ currentDifficulty.recommendedStats.attack }}</span>
+          <span>推荐生命 {{ currentDifficulty.recommendedStats.health }}</span>
+          <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
+          <span>{{ currentDifficulty.spiritCost }} 灵力/场</span>
+        </div>
+      </div>
+
       <div class="detail-stats">
         <div class="stat-row">
-          <span class="stat-label">推荐等级</span>
-          <span class="stat-value">Lv.{{ selectedZone.minLevel }}+</span>
+          <span class="stat-label">当前难度</span>
+          <span class="stat-value">{{ currentDifficulty?.label }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">推荐攻击</span>
-          <span class="stat-value">{{ selectedZone.recommendedStats.attack }}</span>
+          <span class="stat-value">{{ currentDifficulty?.recommendedStats.attack }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">推荐生命</span>
-          <span class="stat-value">{{ selectedZone.recommendedStats.health }}</span>
+          <span class="stat-value">{{ currentDifficulty?.recommendedStats.health }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">奖励倍率</span>
-          <span class="stat-value gold-text">x{{ selectedZone.rewardMultiplier }}</span>
+          <span class="stat-value gold-text">x{{ currentDifficulty?.rewardMultiplier }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">灵力消耗</span>
-          <span class="stat-value">50 灵力/次</span>
+          <span class="stat-value">{{ currentDifficulty?.spiritCost }} 灵力/场</span>
         </div>
       </div>
 
@@ -118,12 +138,7 @@
             <div class="hp-bar">
               <div
                 class="hp-fill"
-                :style="{
-                  width:
-                    (combatState.combatManager.player.currentHealth /
-                      combatState.combatManager.player.stats.maxHealth) *
-                    100 + '%'
-                }"
+                :style="{ width: (combatState.combatManager.player.currentHealth / combatState.combatManager.player.stats.maxHealth) * 100 + '%' }"
               ></div>
             </div>
             <div class="hp-text">
@@ -140,12 +155,7 @@
             <div class="hp-bar">
               <div
                 class="hp-fill enemy-hp"
-                :style="{
-                  width:
-                    (combatState.combatManager.enemy.currentHealth /
-                      combatState.combatManager.enemy.stats.maxHealth) *
-                    100 + '%'
-                }"
+                :style="{ width: (combatState.combatManager.enemy.currentHealth / combatState.combatManager.enemy.stats.maxHealth) * 100 + '%' }"
               ></div>
             </div>
             <div class="hp-text">
@@ -199,10 +209,10 @@
         <button
           v-if="!isIdling"
           class="btn btn-success"
-          :disabled="playerStore.spirit < 100 || !selectedZone"
-          @click="startIdle"
+          :disabled="!canStartIdle"
+          @click="startIdle(selectedDuration)"
         >
-          开始挂机 ({{ selectedDuration }}分钟，共{{ idleDurations.find(d=>d.minutes===selectedDuration)?.encounters || 0 }}次，{{ idleDurations.find(d=>d.minutes===selectedDuration)?.encounters || 0 * 100 }}灵力)
+          开始挂机（{{ selectedDuration }}分钟 · 约 {{ idleEncounterEstimate }} 场 · {{ idleSpiritEstimate }} 灵力）
         </button>
         <!-- 挂机进行中 -->
         <div v-if="isIdling" class="idle-running">
@@ -219,60 +229,52 @@
     </div>
 
     <!-- 挂机日志区域 -->
-    <div v-if="isIdling || lastIdleLog" class="idle-log-section glass-card">
+    <div v-if="isIdling || lastSummary" class="idle-log-section glass-card">
       <div class="idle-log-header">
         <h3 class="section-title">{{ isIdling ? '挂机日志（实时）' : '上次挂机日志' }}</h3>
-        <span v-if="lastIdleLog && !isIdling" class="log-meta">
-          {{ lastIdleLog.zoneName }} · {{ lastIdleLog.duration }}分钟 ·
-          {{ lastIdleLog.encounters }}次探索
+        <span v-if="lastSummary && !isIdling" class="log-meta">
+          {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 ·
+          {{ lastSummary.encounters }}次探索
         </span>
       </div>
       <div class="idle-log-body" ref="idleLogRef">
         <div
-          v-for="(log, idx) in displayIdleLogs"
+          v-for="(log, idx) in displayLogs"
           :key="idx"
           class="log-line"
           :class="log.type"
         >
-          <span v-if="log.type === 'reward-highlight'" class="log-highlight">
-            {{ log.text }}
-          </span>
-          <span v-else-if="log.type === 'reward-epic'" class="log-epic">
-            {{ log.text }}
-          </span>
-          <span v-else-if="log.type === 'reward-legendary'" class="log-legendary">
-            {{ log.text }}
-          </span>
-          <span v-else>
-            {{ log.text }}
-          </span>
+          <span v-if="log.type === 'reward-highlight'" class="log-highlight">{{ log.text }}</span>
+          <span v-else-if="log.type === 'reward-epic'" class="log-epic">{{ log.text }}</span>
+          <span v-else-if="log.type === 'reward-legendary'" class="log-legendary">{{ log.text }}</span>
+          <span v-else>{{ log.text }}</span>
         </div>
       </div>
       <!-- 挂机统计 -->
-      <div v-if="lastIdleLog && !isIdling" class="idle-summary">
+      <div v-if="lastSummary && !isIdling" class="idle-summary">
         <div class="summary-item">
           <span class="summary-label">总探索</span>
-          <span class="summary-value">{{ lastIdleLog.encounters }}次</span>
+          <span class="summary-value">{{ lastSummary.encounters }}次</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">胜利</span>
-          <span class="summary-value green">{{ lastIdleLog.victories }}次</span>
+          <span class="summary-value green">{{ lastSummary.victories }}次</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">失败</span>
-          <span class="summary-value red">{{ lastIdleLog.defeats }}次</span>
+          <span class="summary-value red">{{ lastSummary.defeats }}次</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得灵石</span>
-          <span class="summary-value gold">{{ lastIdleLog.totalStones }}</span>
+          <span class="summary-value gold">{{ lastSummary.totalStones }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得修为</span>
-          <span class="summary-value">{{ lastIdleLog.totalCultivation }}</span>
+          <span class="summary-value">{{ lastSummary.totalCultivation }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得装备</span>
-          <span class="summary-value">{{ lastIdleLog.totalEquipment }}</span>
+          <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
         </div>
       </div>
     </div>
@@ -293,41 +295,54 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
-import { zones, difficultyTiers } from '../plugins/zones'
-import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
-import { getRealmName } from '../plugins/realm'
-import { getAffixesForSlot, setBonuses } from '../plugins/buildSystem'
-import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
+import { zones } from '../plugins/zones'
+import { useIdleSystem } from '../composables/useIdleSystem'
 
 const playerStore = usePlayerStore()
+const {
+  selectedZone,
+  selectedDifficultyKey,
+  isIdling,
+  displayLogs,
+  idleEncounterCount,
+  idleProgress,
+  idleTimeRemaining,
+  lastSummary,
+  combatState,
+  animState,
+  treasureFlash,
+  canStartIdle,
+  setSelectedZone,
+  setDifficulty,
+  startIdle,
+  stopIdle,
+  runExploreCombat,
+  grantReward,
+  showTreasureFlash,
+  buildEffectiveZone,
+  getZoneDifficulty
+} = useIdleSystem()
 
-// 筛选
+// 筛选（按秘境等级）
 const filters = [
   { key: 'all', label: '全部' },
-  { key: 'easy', label: '入门' },
-  { key: 'normal', label: '普通' },
-  { key: 'hard', label: '困难+' }
+  { key: 'low', label: '初境' },
+  { key: 'mid', label: '中境' },
+  { key: 'high', label: '上境' }
 ]
 const activeFilter = ref('all')
-
 const filteredZones = computed(() => {
-  if (activeFilter.value === 'all') return zones
-  if (activeFilter.value === 'easy') return zones.filter(z => z.difficulty <= 2)
-  if (activeFilter.value === 'normal') return zones.filter(z => z.difficulty === 3 || z.difficulty === 4)
-  if (activeFilter.value === 'hard') return zones.filter(z => z.difficulty >= 5)
+  if (activeFilter.value === 'low') return zones.filter(z => z.difficulty <= 2)
+  if (activeFilter.value === 'mid') return zones.filter(z => z.difficulty >= 3 && z.difficulty <= 5)
+  if (activeFilter.value === 'high') return zones.filter(z => z.difficulty >= 6)
   return zones
 })
 
-const selectedZone = ref(null)
-
-const canEnter = (zone) => {
-  const tier = difficultyTiers[zone.difficulty]
-  return playerStore.level >= tier.unlockLevel
-}
-
+// 八图全开：不再等级锁
+const canEnter = () => true
 const selectZone = (zone) => {
-  if (!canEnter(zone)) return
-  selectedZone.value = zone
+  setSelectedZone(zone)
+  setDifficulty(zone.difficulties[2].key) // 默认选中「凶险」标准档
 }
 
 const getZoneIcon = (id) => {
@@ -338,447 +353,12 @@ const getZoneIcon = (id) => {
   return icons[id] || '⛰️'
 }
 
-// ========== 战斗系统 ==========
-const combatState = ref({
-  inCombat: false,
-  combatManager: null
-})
-const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
+// 当前选中难度信息
+const currentDifficulty = computed(() =>
+  selectedZone.value ? getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value) : null
+)
 
-const sleep = ms => new Promise(r => setTimeout(r, ms))
-
-// 创建玩家战斗实体
-const createPlayerEntity = () => {
-  const baseStats = {
-    health: playerStore.baseAttributes.health,
-    damage: playerStore.baseAttributes.attack,
-    defense: playerStore.baseAttributes.defense,
-    speed: playerStore.baseAttributes.speed,
-    critRate: playerStore.combatAttributes.critRate,
-    comboRate: playerStore.combatAttributes.comboRate,
-    counterRate: playerStore.combatAttributes.counterRate,
-    stunRate: playerStore.combatAttributes.stunRate,
-    dodgeRate: playerStore.combatAttributes.dodgeRate,
-    vampireRate: playerStore.combatAttributes.vampireRate,
-    critResist: playerStore.combatResistance.critResist,
-    comboResist: playerStore.combatResistance.comboResist,
-    counterResist: playerStore.combatResistance.counterResist,
-    stunResist: playerStore.combatResistance.stunResist,
-    dodgeResist: playerStore.combatResistance.dodgeResist,
-    vampireResist: playerStore.combatResistance.vampireResist,
-    healBoost: playerStore.specialAttributes.healBoost,
-    critDamageBoost: playerStore.specialAttributes.critDamageBoost,
-    critDamageReduce: playerStore.specialAttributes.critDamageReduce,
-    finalDamageBoost: playerStore.specialAttributes.finalDamageBoost,
-    finalDamageReduce: playerStore.specialAttributes.finalDamageReduce,
-    combatBoost: playerStore.specialAttributes.combatBoost,
-    resistanceBoost: playerStore.specialAttributes.resistanceBoost,
-    spiritDamage: playerStore.spirit * 0.1,
-    maxHealth: playerStore.baseAttributes.health
-  }
-  // 应用灵宠加成
-  const petBonus = playerStore.getPetBonus
-  if (petBonus) {
-    baseStats.damage += petBonus.attack || 0
-    baseStats.health += petBonus.health || 0
-    baseStats.maxHealth = baseStats.health
-    baseStats.defense += petBonus.defense || 0
-    baseStats.speed += petBonus.speed || 0
-  }
-  // 应用装备加成
-  if (playerStore.artifactBonuses) {
-    const ab = playerStore.artifactBonuses
-    baseStats.damage += ab.attack || 0
-    baseStats.health += ab.health || 0
-    baseStats.maxHealth = baseStats.health
-    baseStats.defense += ab.defense || 0
-    baseStats.speed += ab.speed || 0
-  }
-  return new CombatEntity(playerStore.name, playerStore.level, baseStats, playerStore.realm)
-}
-
-// 生成区域敌人（基于zone推荐属性，降低难度确保可通过）
-const generateZoneEnemy = (zone, encounterCount) => {
-  const isBoss = encounterCount > 0 && encounterCount % 10 === 0
-  const isElite = encounterCount > 0 && encounterCount % 5 === 0 && !isBoss
-  const type = isBoss ? CombatType.BOSS : isElite ? CombatType.ELITE : CombatType.NORMAL
-
-  const diff = zone.difficulty
-  const baseStats = {
-    health: Math.floor(zone.recommendedStats.health * 0.6),
-    damage: Math.floor(zone.recommendedStats.attack * 0.4),
-    defense: Math.floor(zone.recommendedStats.attack * 0.1),
-    speed: 5 + diff * 2,
-    critRate: Math.min(0.15, 0.02 + diff * 0.01),
-    comboRate: Math.min(0.1, 0.01 + diff * 0.005),
-    counterRate: Math.min(0.1, 0.01 + diff * 0.005),
-    stunRate: Math.min(0.08, 0.01 + diff * 0.003),
-    dodgeRate: Math.min(0.12, 0.02 + diff * 0.008),
-    vampireRate: Math.min(0.08, 0.01 + diff * 0.003),
-    critResist: Math.min(0.1, 0.01 + diff * 0.003),
-    comboResist: Math.min(0.1, 0.01 + diff * 0.003),
-    counterResist: Math.min(0.1, 0.01 + diff * 0.003),
-    stunResist: Math.min(0.1, 0.01 + diff * 0.003),
-    dodgeResist: Math.min(0.1, 0.01 + diff * 0.003),
-    vampireResist: Math.min(0.1, 0.01 + diff * 0.003),
-    healBoost: 0,
-    critDamageBoost: 0.3,
-    critDamageReduce: 0,
-    finalDamageBoost: Math.min(0.1, diff * 0.01),
-    finalDamageReduce: Math.min(0.1, diff * 0.01),
-    combatBoost: 0,
-    resistanceBoost: 0,
-    maxHealth: Math.floor(zone.recommendedStats.health * 0.6)
-  }
-
-  let monsterName
-  let entityType = zone.difficultyLabel
-
-  if (isBoss && zone.bosses && zone.bosses.length > 0) {
-    const boss = zone.bosses[Math.floor(Math.random() * zone.bosses.length)]
-    monsterName = boss.name
-    entityType = 'BOSS'
-    baseStats.health = boss.stats.health
-    baseStats.maxHealth = boss.stats.health
-    baseStats.damage = boss.stats.attack
-    baseStats.defense = boss.stats.defense || 0
-    baseStats.speed = boss.stats.speed || 10
-    baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.1)
-    baseStats.finalDamageBoost = Math.min(0.2, baseStats.finalDamageBoost + 0.1)
-  } else if (isElite) {
-    monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
-    entityType = '精英'
-    baseStats.health = Math.floor(baseStats.health * 1.5)
-    baseStats.maxHealth = baseStats.health
-    baseStats.damage = Math.floor(baseStats.damage * 1.3)
-    baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.05)
-  } else {
-    monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
-  }
-
-  const enemy = new CombatEntity(monsterName, zone.minLevel, baseStats, entityType)
-  enemy.tier = isBoss ? 'boss' : isElite ? 'elite' : 'normal'
-  return enemy
-}
-
-// 执行一次探索战斗
-const runExploreCombat = async (zone, encounterCount, isIdleMode = false) => {
-  const playerEntity = createPlayerEntity()
-  const enemy = generateZoneEnemy(zone, encounterCount)
-  const manager = new CombatManager(playerEntity, enemy)
-  manager.start()
-
-  if (!isIdleMode) {
-    combatState.value = { inCombat: true, combatManager: manager }
-  }
-
-  // 自动战斗
-  while (manager.state === 'in_progress') {
-    const result = manager.executeTurn()
-
-    if (!isIdleMode && result) {
-      // 动画效果
-      if (result.results && result.results.length > 0) {
-        const firstAttack = result.results[0]
-        if (firstAttack.attacker === playerEntity.name) {
-          animState.value.playerAttack = true
-          animState.value.enemyHurt = true
-          await sleep(400)
-          animState.value.playerAttack = false
-          animState.value.enemyHurt = false
-        } else {
-          animState.value.enemyAttack = true
-          animState.value.playerHurt = true
-          await sleep(400)
-          animState.value.enemyAttack = false
-          animState.value.playerHurt = false
-        }
-      }
-      if (!combatState.value.inCombat) break
-      await sleep(300)
-    }
-
-    if (!result) break
-    if (result.state === 'victory') {
-      const drops = grantCombatDrops(enemy)
-      return { victory: true, manager, enemy, drops }
-    } else if (result.state === 'defeat') {
-      return { victory: false, manager, enemy }
-    }
-  }
-  return { victory: false, manager, enemy }
-}
-
-// 战斗掉落：妖丹（按敌人档位）/ 至宝（Boss 低概率）/ 高难奇遇包
-function grantCombatDrops(enemy) {
-  const drops = []
-  const tier = enemy?.tier || 'normal'
-  if (tier === 'boss') {
-    if (Math.random() < 0.6) {
-      const c = getRandomCore('boss')
-      playerStore.gainMaterial(c)
-      drops.push(c)
-    }
-    if (Math.random() < 0.08) {
-      const s = getRandomSpecial()
-      playerStore.gainMaterial(s)
-      drops.push(s)
-    }
-    // 高难奇遇包：悟道叶 / 渡厄莲
-    if (Math.random() < 0.25) {
-      const h = getRandomHerb({ difficulty: 9 })
-      playerStore.gainMaterial(h)
-      drops.push(h)
-    }
-  } else if (tier === 'elite') {
-    if (Math.random() < 0.5) {
-      const c = getRandomCore('elite')
-      playerStore.gainMaterial(c)
-      drops.push(c)
-    }
-    const beast = getRandomCore('normal') // 精英必带 1 个妖兽核
-    playerStore.gainMaterial(beast)
-    drops.push(beast)
-  } else {
-    if (Math.random() < 0.4) {
-      const c = getRandomCore('normal')
-      playerStore.gainMaterial(c)
-      drops.push(c)
-    }
-  }
-  return drops
-}
-
-// 奖励品质颜色和描述
-const rarityInfo = {
-  common: { name: '凡品', color: '#aaaaaa', tier: 'normal' },
-  uncommon: { name: '良品', color: '#88cc44', tier: 'normal' },
-  rare: { name: '稀有', color: '#4488ff', tier: 'highlight' },
-  epic: { name: '史诗', color: '#aa44ff', tier: 'epic' },
-  legendary: { name: '传说', color: '#ff8800', tier: 'epic' },
-  mythic: { name: '仙品', color: '#ff4444', tier: 'legendary' },
-  mortal: { name: '凡品灵宠', color: '#32CD32', tier: 'normal' },
-  spiritual: { name: '灵品灵宠', color: '#1E90FF', tier: 'highlight' },
-  mystic: { name: '玄品灵宠', color: '#9932CC', tier: 'epic' },
-  celestial: { name: '仙品灵宠', color: '#FFD700', tier: 'legendary' },
-  divine: { name: '神品灵宠', color: '#FF0000', tier: 'legendary' }
-}
-
-// 发放奖励
-const grantReward = (zone, isIdleMode = false, logs) => {
-  const rewards = []
-  for (const rw of zone.rewards) {
-    if (Math.random() < rw.chance) {
-      const amount = Array.isArray(rw.amount)
-        ? Math.floor(Math.random() * (rw.amount[1] - rw.amount[0] + 1)) + rw.amount[0]
-        : rw.amount || 1
-      const multiplied = Math.floor(amount * zone.rewardMultiplier)
-
-      if (rw.type === 'spirit_stone') {
-        playerStore.spiritStones += multiplied
-        rewards.push({ type: 'spirit_stone', amount: multiplied, name: '灵石' })
-      } else if (rw.type === 'herb') {
-        // 真实灵草对象（带 id/kind/quality），修复旧版占位"灵草"与丹方 id 对不上的 bug
-        for (let i = 0; i < multiplied; i++) {
-          const h = getRandomHerb(zone)
-          if (h) playerStore.gainMaterial(h)
-        }
-        rewards.push({ type: 'herb', amount: multiplied, name: '灵草' })
-      } else if (rw.type === 'ore') {
-        for (let i = 0; i < multiplied; i++) {
-          const o = getRandomOre(zone)
-          if (o) playerStore.gainMaterial(o)
-        }
-        rewards.push({ type: 'ore', amount: multiplied, name: '矿料' })
-      } else if (rw.type === 'liquid') {
-        for (let i = 0; i < multiplied; i++) {
-          const l = getRandomLiquid(zone)
-          if (l) playerStore.gainMaterial(l)
-        }
-        rewards.push({ type: 'liquid', amount: multiplied, name: '灵液' })
-      } else if (rw.type === 'fortune') {
-        // 奇遇：产出 1 件 rare+ 素材（高难矿料/灵液/至宝/稀有灵草）
-        const pool = [
-          getRandomHerb({ difficulty: 9 }),
-          ...(zone.difficulty >= 5 ? [getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 })] : []),
-          getRandomSpecial()
-        ].filter(Boolean)
-        const pick = pool[Math.floor(Math.random() * pool.length)]
-        if (pick) {
-          playerStore.gainMaterial(pick)
-          rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + pick.name, material: pick })
-        }
-      } else if (rw.type === 'cultivation') {
-        playerStore.cultivate(multiplied)
-        rewards.push({ type: 'cultivation', amount: multiplied, name: '修为' })
-      } else if (rw.type === 'equipment') {
-        const rarity = rw.rarity[Math.floor(Math.random() * rw.rarity.length)]
-        const equip = generateEquipment(rarity, zone)
-        playerStore.items.push(equip)
-        playerStore.itemsFound++
-        const info = rarityInfo[rarity] || rarityInfo.common
-        rewards.push({ type: 'equipment', name: info.name + '装备', rarity, info })
-      } else if (rw.type === 'pet') {
-        const rarity = rw.rarity[Math.floor(Math.random() * rw.rarity.length)]
-        const pet = generatePet(rarity, zone)
-        playerStore.items.push(pet)
-        playerStore.itemsFound++
-        const info = rarityInfo[rarity] || rarityInfo.mortal
-        rewards.push({ type: 'pet', name: info.name, rarity, info })
-      }
-    }
-  }
-  return rewards
-}
-
-// 生成装备
-const generateEquipment = (rarity, zone) => {
-  const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
-  const slot = slots[Math.floor(Math.random() * slots.length)]
-  const rarityMultipliers = {
-    common: 1, uncommon: 1.3, rare: 1.8, epic: 2.5, legendary: 4, mythic: 7
-  }
-  const mult = rarityMultipliers[rarity] || 1
-  const affixes = getAffixesForSlot(slot, rarity)
-  let setId = null
-  if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
-    const availableSets = setBonuses.filter(s => s.pieces.includes(slot))
-    if (availableSets.length > 0) {
-      setId = availableSets[Math.floor(Math.random() * availableSets.length)].id
-    }
-  }
-  return {
-    id: Date.now() + Math.random(),
-    type: 'equipment',
-    slot,
-    name: getEquipName(slot, rarity, setId),
-    quality: rarity,
-    rarity,
-    stats: {
-      attack: Math.floor(zone.recommendedStats.attack * 0.15 * mult),
-      health: Math.floor(zone.recommendedStats.health * 0.1 * mult),
-      defense: Math.floor(zone.recommendedStats.attack * 0.08 * mult),
-      speed: Math.floor(5 * mult)
-    },
-    affixes,
-    setId,
-    enhanceLevel: 0,
-    value: Math.floor(50 * zone.difficulty * mult)
-  }
-}
-
-const getEquipName = (slot, rarity, setId = null) => {
-  const slotNames = { weapon: '剑', head: '冠', body: '袍', legs: '裤', feet: '靴', shoulder: '甲', hands: '套', wrist: '腕', necklace: '链', ring1: '戒', ring2: '戒', belt: '带' }
-  const rarityPrefix = { common: '凡品', uncommon: '良品', rare: '上品', epic: '极品', legendary: '仙品', mythic: '神品' }
-  if (setId) {
-    const setData = setBonuses.find(s => s.id === setId)
-    if (setData) {
-      return `${setData.name}·${slotNames[slot]}`
-    }
-  }
-  return (rarityPrefix[rarity] || '凡品') + slotNames[slot]
-}
-
-// 生成灵宠
-const generatePet = (rarity, zone) => {
-  const petNames = ['灵狐', '仙鹤', '青鸾', '玉兔', '玄龟', '朱雀', '白虎', '麒麟']
-  return {
-    id: Date.now() + Math.random(),
-    type: 'pet',
-    name: petNames[Math.floor(Math.random() * petNames.length)],
-    rarity,
-    level: 1,
-    stats: {
-      attack: Math.floor(zone.recommendedStats.attack * 0.1),
-      defense: Math.floor(zone.recommendedStats.attack * 0.05),
-      health: Math.floor(zone.recommendedStats.health * 0.05)
-    }
-  }
-}
-
-// ========== 战斗丹药使用 ==========
-const useBattlePill = pill => {
-  if (!combatState.value.combatManager) return
-  const player = combatState.value.combatManager.player
-  const consumed = playerStore.consumeBattlePill(pill.uid)
-  if (!consumed) return
-  if (consumed.type === 'healBattle') {
-    const amount = Math.round(player.stats.maxHealth * (consumed.value || 0.3))
-    player.heal(amount)
-  } else if (consumed.type === 'cleanse') {
-    // 解除负面状态（清空效果并小幅回血）
-    const amount = Math.round(player.stats.maxHealth * 0.15)
-    player.heal(amount)
-    if (Array.isArray(player.effects)) player.effects = []
-  }
-}
-
-// ========== 宝物高亮弹窗 ==========
-const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-let flashTimer = null
-
-const showTreasureFlash = (reward) => {
-  if (flashTimer) clearTimeout(flashTimer)
-  let tier = 'normal', icon = '', title = '', desc = ''
-
-  if (reward.type === 'equipment' || reward.type === 'pet') {
-    const info = reward.info || rarityInfo[reward.rarity] || rarityInfo.common
-    tier = info.tier
-    icon = reward.type === 'pet' ? '🐉' : '⚔️'
-
-    if (tier === 'legendary') {
-      title = '神品降临！'
-      desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！天降异象，金光万丈！`
-    } else if (tier === 'epic') {
-      title = '极品宝物！'
-      desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！紫气东来！`
-    } else if (tier === 'highlight') {
-      title = '稀有收获！'
-      desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！`
-    } else {
-      return // 普通品质不弹窗
-    }
-  } else {
-    return
-  }
-
-  treasureFlash.value = { show: true, tier, title, desc, icon }
-  flashTimer = setTimeout(() => {
-    treasureFlash.value.show = false
-  }, tier === 'legendary' ? 3000 : tier === 'epic' ? 2500 : 2000)
-}
-
-// ========== 手动探索 ==========
-const startExplore = async () => {
-  if (!selectedZone.value || combatState.value.inCombat || isIdling.value) return
-  playerStore.regenerateSpirit() // 先恢复灵力
-  playerStore.explorationCount++
-  playerStore.queueSave()
-
-  const result = await runExploreCombat(selectedZone.value, 0, false)
-
-  if (result.victory) {
-    const rewards = grantReward(selectedZone.value, false, null)
-    // 战斗掉落（妖丹/至宝）并入奖励展示
-    if (result.drops && result.drops.length) {
-      result.drops.forEach(d => rewards.push({ type: 'core', amount: 1, name: d.name, material: d }))
-    }
-    playerStore.dungeonTotalKills++
-    playerStore.queueSave()
-    // 高亮奖励
-    rewards.forEach(r => showTreasureFlash(r))
-  } else {
-    // 失败惩罚：损失少量修为
-    const loss = Math.floor(playerStore.cultivation * 0.1)
-    playerStore.cultivation = Math.max(0, playerStore.cultivation - loss)
-    playerStore.dungeonDeathCount++
-    playerStore.queueSave()
-  }
-
-  combatState.value = { inCombat: false, combatManager: null }
-}
-
-// ========== 挂机探索（持久化版） ==========
+// 挂机时长选项
 const idleDurations = [
   { minutes: 5, encounters: 1 },
   { minutes: 10, encounters: 2 },
@@ -787,263 +367,73 @@ const idleDurations = [
   { minutes: 30, encounters: 6 }
 ]
 const selectedDuration = ref(5)
-const isIdling = ref(false)
-const idleEncounterCount = ref(0)
-const idleTimeRemaining = ref('')
-const idleProgress = ref(0)
-const currentIdleLogs = ref([])
-const lastIdleLog = ref(null)
-const idleLogRef = ref(null)
+// 约 15 秒一场遭遇
+const idleEncounterEstimate = computed(() => Math.max(1, Math.round((selectedDuration.value * 60) / 15)))
+const idleSpiritEstimate = computed(() =>
+  currentDifficulty.value ? currentDifficulty.value.spiritCost * idleEncounterEstimate.value : 0
+)
 
-let idleInterval = null
-let idleTimer = null
-
-const displayIdleLogs = computed(() => {
-  if (isIdling.value) return currentIdleLogs.value
-  return lastIdleLog.value?.logs || []
-})
-
-const syncIdleStateFromStore = () => {
-  const idleState = playerStore.idleExploration
-  if (idleState && idleState.isActive) {
-    isIdling.value = true
-    idleEncounterCount.value = idleState.encounterCount
-    currentIdleLogs.value = idleState.logs ? [...idleState.logs] : []
-    if (!selectedZone.value && idleState.zoneId) {
-      selectedZone.value = zones.find(z => z.id === idleState.zoneId) || null
-    }
-    startIdleTimers()
-    processOfflineIdle()
-  }
-}
-
-const processOfflineIdle = () => {
-  const idleState = playerStore.idleExploration
-  if (!idleState || !idleState.isActive) return
-  const now = Date.now()
-  const elapsed = now - idleState.startTime
-  const totalDuration = idleState.duration
-  if (elapsed >= totalDuration) {
-    const expectedEncounters = Math.floor(totalDuration / 5000)
-    const missed = Math.max(0, expectedEncounters - idleState.encounterCount)
-    if (missed > 0) {
-      currentIdleLogs.value.push({ type: 'info', text: `离线期间进行了 ${missed} 次探索...` })
-      const zone = zones.find(z => z.id === idleState.zoneId)
-      if (zone) {
-        for (let i = 0; i < Math.min(missed, 200); i++) {
-          runOfflineEncounter(zone, idleState.encounterCount + i + 1)
-        }
-      }
-    }
-    finishIdle()
-    return
-  }
-  const expectedEncounters = Math.floor(elapsed / 5000)
-  const missed = Math.max(0, expectedEncounters - idleState.encounterCount)
-  if (missed > 0) {
-    currentIdleLogs.value.push({ type: 'info', text: `离线期间进行了 ${missed} 次探索...` })
-    const zone = zones.find(z => z.id === idleState.zoneId)
-    if (zone) {
-      for (let i = 0; i < Math.min(missed, 100); i++) {
-        runOfflineEncounter(zone, idleState.encounterCount + i + 1)
-      }
-    }
-  }
-}
-
-const runOfflineEncounter = (zone, count) => {
-  playerStore.regenerateSpirit() // 先恢复灵力
-  if (playerStore.spirit < 100) return false
-  playerStore.spirit -= 100
-  idleEncounterCount.value++
-  const recommended = zone.recommendedStats
-  const playerAttack = playerStore.baseAttributes.attack
-  const playerHealth = playerStore.baseAttributes.health
-  const winChance = Math.min(0.95, Math.max(0.3,
-    0.5 + (playerAttack - recommended.attack) * 0.02 + (playerHealth - recommended.health) * 0.002
-  ))
-  const isVictory = Math.random() < winChance
-  if (isVictory) {
-    const rewards = grantReward(zone, true, null)
-    playerStore.dungeonTotalKills++
-    playerStore.explorationCount++
-    if (rewards.length > 0) {
-      const rewardStrs = rewards.map(r => r.amount ? `${r.amount}${r.name}` : r.name).join('、')
-      currentIdleLogs.value.push({ type: 'victory', text: `[${count}] 胜利，获得：${rewardStrs}` })
-      for (const r of rewards) {
-        if (r.type === 'equipment' || r.type === 'pet') {
-          const tier = r.info?.tier || 'normal'
-          if (tier === 'legendary') {
-            currentIdleLogs.value.push({ type: 'reward-legendary', text: `🌟【神品降临】获得${r.name}！金光万丈！` })
-          } else if (tier === 'epic') {
-            currentIdleLogs.value.push({ type: 'reward-epic', text: `✨【极品宝物】获得${r.name}！紫气东来！` })
-          }
-        }
-      }
-    } else {
-      currentIdleLogs.value.push({ type: 'victory', text: `[${count}] 胜利，无掉落` })
-    }
-  } else {
-    const loss = Math.floor(playerStore.cultivation * 0.02)
-    playerStore.cultivation = Math.max(0, playerStore.cultivation - loss)
-    playerStore.dungeonDeathCount++
-    currentIdleLogs.value.push({ type: 'defeat', text: `[${count}] 战败` })
-  }
-  playerStore.updateIdleExploration({
-    encounterCount: idleEncounterCount.value,
-    lastEncounterTime: Date.now(),
-    logs: currentIdleLogs.value.slice(-500)
-  })
-  return isVictory
-}
-
-const startIdleTimers = () => {
-  if (idleInterval) clearInterval(idleInterval)
-  if (idleTimer) clearInterval(idleTimer)
-  idleInterval = setInterval(async () => {
-    await runIdleEncounter()
-  }, 300000)
-  idleTimer = setInterval(() => {
-    const remaining = playerStore.getIdleRemainingTime()
-    const elapsed = playerStore.idleExploration.duration - remaining
-    const total = playerStore.idleExploration.duration
-    idleProgress.value = total > 0 ? (elapsed / total) * 100 : 0
-    const min = Math.floor(remaining / 60000)
-    const sec = Math.floor((remaining % 60000) / 1000)
-    idleTimeRemaining.value = `${min}:${String(sec).padStart(2, '0')}`
-    if (remaining <= 0) {
-      finishIdle()
-    }
-  }, 1000)
-}
-
-const startIdle = () => {
-  if (!selectedZone.value || playerStore.spirit < 100) return
-  playerStore.regenerateSpirit() // 先恢复灵力
-  playerStore.startIdleExploration(selectedZone.value.id, selectedDuration.value)
-  isIdling.value = true
-  idleEncounterCount.value = 0
-  currentIdleLogs.value = []
-  currentIdleLogs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}】，预计 ${selectedDuration.value} 分钟，每5分钟消耗100灵力` })
-  startIdleTimers()
-  const min = selectedDuration.value
-  idleTimeRemaining.value = `${min}:00`
-}
-
-const runIdleEncounter = async () => {
-  if (!isIdling.value || !selectedZone.value) return
-  playerStore.regenerateSpirit() // 先恢复灵力
-  if (playerStore.spirit < 100) {
-    currentIdleLogs.value.push({ type: 'warning', text: '灵力不足，挂机探索停止' })
-    finishIdle()
-    return
-  }
-  playerStore.spirit -= 100
-  idleEncounterCount.value++
-  const count = idleEncounterCount.value
-  const result = await runExploreCombat(selectedZone.value, count, true)
+// 手动探索（战斗有动画）
+const startExplore = async () => {
+  if (!selectedZone.value || combatState.value.inCombat || isIdling.value) return
+  playerStore.regenerateSpirit()
+  playerStore.explorationCount++
+  playerStore.queueSave()
+  const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
+  const effectiveZone = buildEffectiveZone(selectedZone.value, diff)
+  const result = await runExploreCombat(effectiveZone, 0, false)
   if (result.victory) {
-    const rewards = grantReward(selectedZone.value, true, null)
+    const rewards = grantReward(effectiveZone, false)
+    if (result.drops && result.drops.length) {
+      result.drops.forEach(d => rewards.push({ type: 'core', amount: 1, name: d.name, material: d }))
+    }
     playerStore.dungeonTotalKills++
-    playerStore.explorationCount++
-    // 奇遇事件：每 20 次遭遇，50% 触发，奖励 rare+ 素材
-    if (count % 20 === 0 && Math.random() < 0.5) {
-      const fortunePool = [
-        getRandomHerb({ difficulty: 9 }),
-        getRandomOre({ difficulty: 9 }),
-        getRandomLiquid({ difficulty: 9 }),
-        getRandomSpecial()
-      ].filter(Boolean)
-      const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
-      if (fp) {
-        playerStore.gainMaterial(fp)
-        currentIdleLogs.value.push({ type: 'reward-epic', text: `🌀【奇遇】机缘降临，获得${fp.name}！` })
-      }
-    }
-    let logText = `[${count}] 击败${result.enemy.name}`
-    if (rewards.length > 0) {
-      const rewardStrs = rewards.map(r => {
-        if (r.type === 'equipment' || r.type === 'pet') {
-          return `${r.name}`
-        }
-        return `${r.amount}${r.name}`
-      })
-      logText += `，获得：${rewardStrs.join('、')}`
-      for (const r of rewards) {
-        if (r.type === 'equipment' || r.type === 'pet') {
-          const tier = r.info?.tier || 'normal'
-          if (tier === 'legendary') {
-            currentIdleLogs.value.push({ type: 'reward-legendary', text: `🌟【神品降临】获得${r.name}！金光万丈！` })
-            showTreasureFlash(r)
-          } else if (tier === 'epic') {
-            currentIdleLogs.value.push({ type: 'reward-epic', text: `✨【极品宝物】获得${r.name}！紫气东来！` })
-            showTreasureFlash(r)
-          } else if (tier === 'highlight') {
-            currentIdleLogs.value.push({ type: 'reward-highlight', text: `🎉 获得${r.name}` })
-          }
-        }
-      }
-    } else {
-      logText += `，无掉落`
-    }
-    currentIdleLogs.value.push({ type: 'victory', text: logText })
+    playerStore.queueSave()
+    rewards.forEach(showTreasureFlash)
   } else {
-    const loss = Math.floor(playerStore.cultivation * 0.05)
+    const loss = Math.floor(playerStore.cultivation * 0.1)
     playerStore.cultivation = Math.max(0, playerStore.cultivation - loss)
     playerStore.dungeonDeathCount++
-    currentIdleLogs.value.push({ type: 'defeat', text: `[${count}] 被${result.enemy.name}击败，损失${loss}修为` })
+    playerStore.queueSave()
   }
-  playerStore.updateIdleExploration({
-    encounterCount: idleEncounterCount.value,
-    lastEncounterTime: Date.now(),
-    logs: currentIdleLogs.value.slice(-500)
-  })
-  nextTick(() => {
-    if (idleLogRef.value) {
-      idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
-    }
-  })
+  combatState.value = { inCombat: false, combatManager: null }
 }
 
-const finishIdle = () => {
-  if (!isIdling.value) return
-  if (idleInterval) clearInterval(idleInterval)
-  if (idleTimer) clearInterval(idleTimer)
-  const summary = {
-    zoneName: selectedZone.value?.name || '未知',
-    duration: selectedDuration.value,
-    encounters: idleEncounterCount.value,
-    victories: currentIdleLogs.value.filter(l => l.type === 'victory').length,
-    defeats: currentIdleLogs.value.filter(l => l.type === 'defeat').length,
-    totalStones: 0,
-    totalCultivation: 0,
-    totalEquipment: 0,
-    logs: [...currentIdleLogs.value]
+// 战斗丹药
+const useBattlePill = (pill) => {
+  if (!combatState.value.combatManager) return
+  const player = combatState.value.combatManager.player
+  const consumed = playerStore.consumeBattlePill(pill.uid)
+  if (!consumed) return
+  if (consumed.type === 'healBattle') {
+    const amount = Math.round(player.stats.maxHealth * (consumed.value || 0.3))
+    player.heal(amount)
+  } else if (consumed.type === 'cleanse') {
+    const amount = Math.round(player.stats.maxHealth * 0.15)
+    player.heal(amount)
+    if (Array.isArray(player.effects)) player.effects = []
   }
-  lastIdleLog.value = summary
-  playerStore.stopIdleExploration()
-  isIdling.value = false
-  idleProgress.value = 100
-  idleTimeRemaining.value = '已完成'
-  currentIdleLogs.value.push({ type: 'info', text: `挂机结束！共探索 ${summary.encounters} 次` })
 }
 
-const stopIdle = () => {
-  finishIdle()
-}
+// 修复：挂机日志自动滚动到底部
+const idleLogRef = ref(null)
+watch(
+  () => displayLogs.value.length,
+  () => {
+    nextTick(() => {
+      if (idleLogRef.value) idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
+    })
+  }
+)
 
 onMounted(() => {
-  playerStore.regenerateSpirit() // 页面加载时恢复离线灵力
-  syncIdleStateFromStore()
-})
-
-onUnmounted(() => {
-  if (idleInterval) clearInterval(idleInterval)
-  if (idleTimer) clearInterval(idleTimer)
-  if (flashTimer) clearTimeout(flashTimer)
-  if (combatState.value.inCombat) {
-    combatState.value = { inCombat: false, combatManager: null }
+  playerStore.regenerateSpirit()
+  if (selectedZone.value && !selectedDifficultyKey.value) {
+    setDifficulty(selectedZone.value.difficulties[2].key)
   }
+})
+onUnmounted(() => {
+  // 挂机计时器由 useIdleSystem 单例常驻管理，组件卸载不清理（实现离开页面仍后台挂机）
 })
 </script>
 
@@ -1117,17 +507,13 @@ onUnmounted(() => {
   cursor: pointer;
   transition: all 0.3s;
 }
-.zone-card:hover:not(.locked) {
+.zone-card:hover {
   transform: translateY(-2px);
   border-color: rgba(218, 165, 32, 0.4);
 }
 .zone-card.selected {
   border-color: #DAA520;
   box-shadow: 0 0 12px rgba(218, 165, 32, 0.3);
-}
-.zone-card.locked {
-  opacity: 0.4;
-  cursor: not-allowed;
 }
 .zone-banner {
   height: 60px;
@@ -1230,6 +616,49 @@ onUnmounted(() => {
 .stat-label { color: #888; }
 .stat-value { color: #fff; font-weight: bold; }
 .gold-text { color: #DAA520; }
+
+/* 难度档选择 */
+.difficulty-selector {
+  padding: 10px 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+.diff-label {
+  font-size: 12px;
+  color: #888;
+  margin-bottom: 8px;
+}
+.diff-chips {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 8px;
+}
+.diff-chip {
+  padding: 6px 16px;
+  border-radius: 18px;
+  font-size: 13px;
+  cursor: pointer;
+  border: 1px solid var(--chip-color, #888);
+  color: #ccc;
+  background: rgba(255, 255, 255, 0.03);
+  transition: all 0.2s;
+}
+.diff-chip.active {
+  background: var(--chip-color, #DAA520);
+  color: #fff;
+  font-weight: bold;
+  box-shadow: 0 0 10px var(--chip-color, #DAA520);
+}
+.diff-info {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 12px;
+  font-size: 12px;
+  color: #aaa;
+}
 
 /* 奖励预览 */
 .rewards-preview {
@@ -1521,17 +950,19 @@ onUnmounted(() => {
   color: #888;
 }
 .idle-log-body {
-  max-height: 300px;
+  max-height: 320px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
   gap: 2px;
+  scroll-behavior: smooth;
 }
 .log-line {
   font-size: 12px;
   padding: 3px 6px;
   border-radius: 4px;
   line-height: 1.5;
+  word-break: break-word;
 }
 .log-line.victory {
   color: #66BB6A;

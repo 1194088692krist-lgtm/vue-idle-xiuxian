@@ -121,10 +121,12 @@
   } from '@ant-design/icons-vue'
   import { Moon, Sunny } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
+import { useIdleSystem } from './composables/useIdleSystem'
 
   const router = useRouter()
   const route = useRoute()
   const playerStore = usePlayerStore()
+  const idleSystem = useIdleSystem()
   const spiritWorker = ref(null)
   const menuItems = ref([])
   const isNewPlayer = ref(false)
@@ -145,6 +147,8 @@
     animatedStones.value = playerStore.spiritStones
     animatedCultivation.value = playerStore.cultivation
     getMenuItems()
+    // 常驻挂机探索：玩家数据就绪后恢复并启动后台推进（离开探索页仍持续）
+    idleSystem.initIdle()
   })
 
   watch(
