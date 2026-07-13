@@ -19,6 +19,25 @@ const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: fal
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
 const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 })
 
+// ============ 挂机血条（持久化气血，跨遭遇累积，归零则提前力竭） ============
+const idlePlayerHP = ref(0)
+const idlePlayerMaxHP = ref(0)
+const idlePlayerDefeated = ref(false)
+
+// 玩家当前 Build 强度（装备评分总和）
+const playerBuildStrength = computed(() => store().buildStrength)
+// 当前地图/难度推荐的 Build 强度（挂机能否成功的基础属性）
+const currentRecommendedBuild = computed(() => {
+  if (!selectedZone.value) return 0
+  const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
+  return diff ? (diff.recommendedBuild || 0) : 0
+})
+// Build 匹配度 = 自身 / 推荐，<1 表示强度不足，可能在挂机中因气血耗尽提前失败
+const buildRatio = computed(() => {
+  const rec = currentRecommendedBuild.value
+  return rec > 0 ? playerBuildStrength.value / rec : 1
+})
+
 // 在线每场遭遇间隔：15 秒，让日志密集滚动
 const ENCOUNTER_INTERVAL = 15000
 
@@ -543,6 +562,9 @@ async function runIdleEncounter() {
     const result = await runExploreCombat(effectiveZone, count, true)
     let rewards = []
     let loss = 0
+    const maxHP = idlePlayerMaxHP.value || 1
+    const ratio = buildRatio.value
+    const underBuilt = Math.max(0, 1 - ratio) // 0=达标，越大越弱
     if (result.victory) {
       rewards = grantReward(effectiveZone, true)
       s.dungeonTotalKills++; s.explorationCount++
@@ -553,15 +575,29 @@ async function runIdleEncounter() {
         if (fp) { s.gainMaterial(fp); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + fp.name, material: fp }) }
       }
       runStats.value.victories++
+      // 胜利：小幅擦伤后调息回血，Build 越强损耗越小
+      const scrape = Math.round(maxHP * (0.04 + 0.06 * underBuilt))
+      idlePlayerHP.value = Math.min(maxHP, idlePlayerHP.value + Math.round(maxHP * 0.12) - scrape)
     } else {
       loss = Math.floor(s.cultivation * 0.05)
       s.cultivation = Math.max(0, s.cultivation - loss)
       s.dungeonDeathCount++
       runStats.value.defeats++
+      // 失败：气血重创，Build 越弱受伤越重（25%~60% 最大气血）
+      const hurt = Math.round(maxHP * (0.25 + 0.35 * underBuilt))
+      idlePlayerHP.value -= hurt
     }
+    idlePlayerHP.value = Math.max(0, idlePlayerHP.value)
     logEncounter(zone, diff, count, result.enemy, result.victory, rewards, loss)
     s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
     s.queueSave()
+    // 气血归零 → 力竭提前失败
+    if (idlePlayerHP.value <= 0) {
+      idlePlayerDefeated.value = true
+      addLog('defeat', `💀 力竭血枯！你的 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
+      finishIdle()
+      return
+    }
   } finally {
     isRunning = false
   }
@@ -575,8 +611,11 @@ function runOfflineEncounter(zone, diff, count) {
   s.spiritStones -= diff.spiritCost
   const pAtk = s.baseAttributes.attack + (s.getPetBonus?.attack || 0) + (s.artifactBonuses?.attack || 0)
   const pHp = s.baseAttributes.health + (s.getPetBonus?.health || 0) + (s.artifactBonuses?.health || 0)
-  const winChance = Math.min(0.95, Math.max(0.3,
-    0.5 + (pAtk - diff.recommendedStats.attack) * 0.02 + (pHp - diff.recommendedStats.health) * 0.002))
+  // 离线胜率同样以 Build 匹配度为基准（兼容旧数值，做平滑过渡）
+  const recBuild = diff.recommendedBuild || 1
+  const ratio = (s.buildStrength || 1) / recBuild
+  const winChance = Math.min(0.97, Math.max(0.08,
+    0.5 + (ratio - 1) * 0.45 + (pAtk - diff.recommendedStats.attack) * 0.005 + (pHp - diff.recommendedStats.health) * 0.0005))
   const victory = Math.random() < winChance
   const effectiveZone = buildEffectiveZone(zone, diff)
   if (victory) {
@@ -620,9 +659,20 @@ function startIdle(durationMinutes) {
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterCount.value = 0
+  idlePlayerDefeated.value = false
+  // 初始化血条：以玩家真实最大生命为基准
+  const probe = createPlayerEntity()
+  idlePlayerMaxHP.value = probe.stats.maxHealth
+  idlePlayerHP.value = probe.stats.maxHealth
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 }
   logs.value = []
   logs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
+  const match = Math.round(buildRatio.value * 100)
+  if (buildRatio.value < 1) {
+    logs.value.push({ type: 'warning', text: `⚠️ 你的 Build 强度（${Math.round(playerBuildStrength.value)}）低于推荐值（${Math.round(currentRecommendedBuild.value)}），匹配度 ${match}%，气血可能不支、挂机或提前力竭。`, time: new Date().toLocaleTimeString() })
+  } else {
+    logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
+  }
   startIdleTimers()
 }
 
@@ -644,13 +694,19 @@ function finishIdle() {
     totalStones: runStats.value.spiritStones,
     totalCultivation: runStats.value.cultivation,
     totalEquipment: runStats.value.equipment,
+    defeated: idlePlayerDefeated.value,
     logs: [...logs.value]
   }
   s.stopIdleExploration()
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
-  if (logs.value.length) logs.value.push({ type: 'info', text: `挂机结束！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`, time: new Date().toLocaleTimeString() })
+  if (logs.value.length) {
+    const tail = idlePlayerDefeated.value
+      ? `挂机因气血耗尽提前终止！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
+      : `挂机结束！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
+    logs.value.push({ type: 'info', text: tail, time: new Date().toLocaleTimeString() })
+  }
 }
 
 function processOfflineIdle() {
@@ -686,6 +742,10 @@ function initIdle() {
       selectedDifficultyKey.value = idleState.difficultyKey || 'xiongxian'
       isIdling.value = true
       idleEncounterCount.value = idleState.encounterCount || 0
+      idlePlayerDefeated.value = false
+      const probe = createPlayerEntity()
+      idlePlayerMaxHP.value = probe.stats.maxHealth
+      idlePlayerHP.value = probe.stats.maxHealth
       runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 }
       logs.value = []
       startIdleTimers()
@@ -722,6 +782,13 @@ export function useIdleSystem() {
     animState,
     treasureFlash,
     canStartIdle,
+    // Build 强度 / 血条
+    playerBuildStrength,
+    currentRecommendedBuild,
+    buildRatio,
+    idlePlayerHP,
+    idlePlayerMaxHP,
+    idlePlayerDefeated,
     // 方法
     setSelectedZone: (z) => { selectedZone.value = z },
     setDifficulty: (k) => { selectedDifficultyKey.value = k },

@@ -11,6 +11,28 @@ const DIFFICULTY_TEMPLATES = [
   { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.2, cost: 120, drop: 1.7 }
 ]
 
+// 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
+// 量级与各区自有掉落装备的满装 Build 强度一致：低区弱、高区强，形成平滑梯度
+// 玩家挂机的“成功/提前失败”即以「自身 Build 强度 ÷ 推荐 Build」为判定基准
+const ZONE_BUILD_BASE = {
+  forest_edge: 3000,
+  misty_valley: 12000,
+  phoenix_cave: 55000,
+  dragon_abyss: 100000,
+  ghost_wasteland: 400000,
+  ice_palace: 800000,
+  immortal_ruins: 2000000,
+  chaos_realm: 7000000
+}
+
+// Build 强度参考阶梯（区间）：极品中的极品过于稀有，故给玩家一个“可达成的上限”参考
+export const BUILD_TIERS = {
+  entry: { name: '入门', value: 68000, desc: '全稀有(+10)基础满装' },
+  strong: { name: '强力', value: 686000, desc: '传说/史诗混搭(+20)含套装' },
+  top: { name: '顶级', value: 5090000, desc: '全神话(+50)含套装' },
+  apex: { name: '极限', value: 20000000, desc: '全神话(+100)双五件套·混沌级' }
+}
+
 export const zones = [
   {
     id: 'forest_edge',
@@ -421,6 +443,7 @@ zones.forEach(zone => {
   const baseAtk = zone.recommendedStats.attack
   const baseHp = zone.recommendedStats.health
   const baseRM = zone.rewardMultiplier
+  const baseBuild = ZONE_BUILD_BASE[zone.id] || 0
   zone.difficulties = DIFFICULTY_TEMPLATES.map(t => ({
     key: t.key,
     label: t.label,
@@ -432,7 +455,9 @@ zones.forEach(zone => {
     recommendedStats: {
       attack: Math.max(1, Math.round(baseAtk * t.scale)),
       health: Math.max(1, Math.round(baseHp * t.scale))
-    }
+    },
+    // Build 强度推荐值：以标准档为基准，按难度缩放（游历0.3 → 灭世2.5）
+    recommendedBuild: Math.max(1, Math.round(baseBuild * t.scale))
   }))
   // 八图全开：移除等级锁
   zone.minLevel = 1

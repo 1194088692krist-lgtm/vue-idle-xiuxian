@@ -80,8 +80,7 @@
           </div>
         </div>
         <div v-if="currentDifficulty" class="diff-info">
-          <span>推荐攻击 {{ currentDifficulty.recommendedStats.attack }}</span>
-          <span>推荐生命 {{ currentDifficulty.recommendedStats.health }}</span>
+          <span>推荐Build <b>{{ formatBuild(currentDifficulty.recommendedBuild) }}</b></span>
           <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
           <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
@@ -93,12 +92,16 @@
           <span class="stat-value">{{ currentDifficulty?.label }}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">推荐攻击</span>
-          <span class="stat-value">{{ currentDifficulty?.recommendedStats.attack }}</span>
+          <span class="stat-label">推荐Build</span>
+          <span class="stat-value">{{ formatBuild(currentDifficulty?.recommendedBuild) }}</span>
         </div>
         <div class="stat-row">
-          <span class="stat-label">推荐生命</span>
-          <span class="stat-value">{{ currentDifficulty?.recommendedStats.health }}</span>
+          <span class="stat-label">你的Build</span>
+          <span class="stat-value" :style="{ color: matchColor }">{{ formatBuild(playerBuildStrength) }}</span>
+        </div>
+        <div class="stat-row">
+          <span class="stat-label">匹配度</span>
+          <span class="stat-value" :style="{ color: matchColor }">{{ Math.round(buildRatio * 100) }}%</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">奖励倍率</span>
@@ -108,6 +111,13 @@
           <span class="stat-label">灵石消耗</span>
           <span class="stat-value">{{ currentDifficulty?.spiritCost }} 灵石/场</span>
         </div>
+      </div>
+
+      <!-- Build 强度提示 -->
+      <div class="build-hint" :style="{ borderColor: matchColor }">
+        <span class="build-hint-dot" :style="{ background: matchColor }"></span>
+        <span :style="{ color: matchColor }">{{ matchText }}</span>
+        <span class="build-hint-sub">（推荐 {{ formatBuild(currentRecommendedBuild) }} · 你的 {{ formatBuild(playerBuildStrength) }}）</span>
       </div>
 
       <!-- 奖励预览 -->
@@ -223,6 +233,21 @@
             </div>
             <div class="idle-count">已完成 {{ idleEncounterCount }} 次探索</div>
           </div>
+          <!-- 挂机血条 -->
+          <div class="idle-hp">
+            <div class="idle-hp-head">
+              <span class="idle-hp-label">气血</span>
+              <span class="idle-hp-num">{{ Math.ceil(idlePlayerHP) }} / {{ Math.ceil(idlePlayerMaxHP) }}</span>
+            </div>
+            <div class="hp-bar idle-hp-bar">
+              <div
+                class="hp-fill"
+                :class="{ 'hp-low': idleHpPercent <= 30 }"
+                :style="{ width: idleHpPercent + '%' }"
+              ></div>
+            </div>
+            <div v-if="buildRatio < 1" class="idle-hp-warn">⚠ Build 不足，气血可能不支</div>
+          </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
       </div>
@@ -293,7 +318,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
-import { zones } from '../plugins/zones'
+import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
 
 const playerStore = usePlayerStore()
@@ -310,6 +335,12 @@ const {
   animState,
   treasureFlash,
   canStartIdle,
+  playerBuildStrength,
+  currentRecommendedBuild,
+  buildRatio,
+  idlePlayerHP,
+  idlePlayerMaxHP,
+  idlePlayerDefeated,
   setSelectedZone,
   setDifficulty,
   startIdle,
@@ -320,6 +351,32 @@ const {
   buildEffectiveZone,
   getZoneDifficulty
 } = useIdleSystem()
+
+// Build 强度数值格式化（万/亿）
+const formatBuild = (v) => {
+  if (v == null || v === 0) return '0'
+  if (v >= 100000000) return (v / 100000000).toFixed(2) + '亿'
+  if (v >= 10000) return (v / 10000).toFixed(1) + '万'
+  return Math.round(v).toString()
+}
+// 匹配度配色
+const matchColor = computed(() => {
+  const r = buildRatio.value
+  if (r >= 1) return '#66BB6A'
+  if (r >= 0.6) return '#DAA520'
+  return '#EF5350'
+})
+const matchText = computed(() => {
+  const r = buildRatio.value
+  if (r >= 1) return '气血充盈，可稳定挂机'
+  if (r >= 0.6) return '稍有压力，需注意气血'
+  return 'Build 不足，挂机可能提前力竭'
+})
+// 血条百分比
+const idleHpPercent = computed(() => {
+  if (!idlePlayerMaxHP.value) return 0
+  return Math.max(0, Math.min(100, (idlePlayerHP.value / idlePlayerMaxHP.value) * 100))
+})
 
 // 筛选（按秘境等级）
 const filters = [
@@ -657,6 +714,36 @@ onUnmounted(() => {
   font-size: 12px;
   color: #aaa;
 }
+.diff-info b {
+  color: #DAA520;
+  font-size: 13px;
+}
+
+/* Build 强度提示条 */
+.build-hint {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-top: 10px;
+  padding: 8px 12px;
+  font-size: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-left-width: 3px;
+  border-radius: 8px;
+}
+.build-hint-dot {
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  flex-shrink: 0;
+  box-shadow: 0 0 6px currentColor;
+}
+.build-hint-sub {
+  color: #888;
+  font-size: 11px;
+}
 
 /* 奖励预览 */
 .rewards-preview {
@@ -925,6 +1012,53 @@ onUnmounted(() => {
   color: #888;
 }
 
+/* 挂机血条 */
+.idle-hp {
+  margin-top: 4px;
+  padding: 8px 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+}
+.idle-hp-head {
+  display: flex;
+  justify-content: space-between;
+  align-items: baseline;
+  margin-bottom: 5px;
+}
+.idle-hp-label {
+  font-size: 12px;
+  color: #aaa;
+}
+.idle-hp-num {
+  font-size: 12px;
+  color: #fff;
+  font-family: monospace;
+}
+.idle-hp-bar {
+  height: 12px;
+  background: rgba(0, 0, 0, 0.5);
+  border-radius: 6px;
+  overflow: hidden;
+}
+.idle-hp-bar .hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #2E7D32, #66BB6A);
+  transition: width 0.4s ease;
+}
+.idle-hp-bar .hp-fill.hp-low {
+  background: linear-gradient(90deg, #C62828, #EF5350);
+  animation: hpPulse 1s ease-in-out infinite;
+}
+@keyframes hpPulse {
+  0%, 100% { opacity: 1; }
+  50% { opacity: 0.55; }
+}
+.idle-hp-warn {
+  margin-top: 5px;
+  font-size: 11px;
+  color: #EF5350;
+}
+
 /* 挂机日志 */
 .idle-log-section {
   padding: 16px;
@@ -1004,34 +1138,19 @@ onUnmounted(() => {
   60% { transform: scale(1.04); letter-spacing: 0; }
   100% { transform: scale(1); }
 }
-/* 战斗动作：流光扫过 */
+/* 战斗动作：流光扫过（背景位移动画，避免绝对定位覆盖层在移动端遮挡文字） */
 .log-line.combat {
   color: #ffd9a0;
   border-left-color: rgba(255, 176, 64, 0.6);
-  background: linear-gradient(90deg, rgba(255, 176, 64, 0.08), rgba(255, 176, 64, 0));
-  position: relative;
-  overflow: hidden;
+  background: linear-gradient(90deg, rgba(255, 176, 64, 0.04), rgba(255, 176, 64, 0.14), rgba(255, 176, 64, 0.04));
+  background-size: 200% 100%;
+  animation: combatGlow 2.2s ease-in-out infinite;
   -webkit-font-smoothing: antialiased;
   -moz-osx-font-smoothing: grayscale;
 }
-.log-line.combat::after {
-  content: '';
-  position: absolute;
-  top: 0; bottom: 0; left: -40%;
-  width: 40%;
-  background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.18), transparent);
-  animation: combatSweep 2.2s ease-in-out infinite;
-  z-index: 0;
-  pointer-events: none;
-  will-change: left;
-}
-.log-line.combat .log-text {
-  position: relative;
-  z-index: 1;
-}
-@keyframes combatSweep {
-  0% { left: -40%; }
-  100% { left: 110%; }
+@keyframes combatGlow {
+  0%, 100% { background-position: 0% 50%; }
+  50% { background-position: 200% 50%; }
 }
 /* 胜利 */
 .log-line.victory {
