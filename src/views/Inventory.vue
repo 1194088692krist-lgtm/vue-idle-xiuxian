@@ -315,8 +315,8 @@
       <div v-if="selectedEquipment" class="modal-body">
         <div class="detail-row">
           <span>品质</span>
-          <span class="simple-tag" :style="{ color: selectedEquipment.qualityInfo.color }">
-            {{ selectedEquipment.qualityInfo.name }}
+          <span class="simple-tag" :style="{ color: qualityInfoOf(selectedEquipment).color }">
+            {{ qualityInfoOf(selectedEquipment).name }}
           </span>
         </div>
         <div class="detail-row">

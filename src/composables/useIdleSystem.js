@@ -3,7 +3,7 @@ import { usePlayerStore } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
-import { getAffixesForSlot, setBonuses } from '../plugins/buildSystem'
+import { getAffixesForSlot, setBonuses, rarityConfig } from '../plugins/buildSystem'
 
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
@@ -230,6 +230,7 @@ function generateEquipment(rarity, effectiveZone) {
     name: getEquipName(slot, rarity, setId),
     quality: rarity,
     rarity,
+    qualityInfo: { name: (rarityConfig[rarity] || {}).name || rarity, color: (rarityConfig[rarity] || {}).color || '#999' },
     stats: {
       attack: Math.floor(effectiveZone.recommendedStats.attack * 0.15 * mult),
       health: Math.floor(effectiveZone.recommendedStats.health * 0.1 * mult),
