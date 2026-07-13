@@ -74,6 +74,24 @@
                 </div>
               </div>
             </nav>
+
+            <!-- 第二排导航栏 -->
+            <nav class="bottom-nav bottom-nav-secondary">
+              <div class="bottom-nav-inner">
+                <div
+                  v-for="item in secondaryMenuItems"
+                  :key="item.key"
+                  class="nav-item"
+                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  @click="handleMenuClick(item.key)"
+                >
+                  <n-icon class="nav-icon">
+                    <component :is="item.icon" />
+                  </n-icon>
+                  <span class="nav-label">{{ item.label }}</span>
+                </div>
+              </div>
+            </nav>
           </div>
         </n-spin>
       </n-dialog-provider>
@@ -154,11 +172,23 @@
   })
 
   const visibleMenuItems = computed(() => {
-    return menuItems.value.filter(item => {
+    const items = menuItems.value.filter(item => {
       if (item.key === '') return isNewPlayer.value
       if (item.key === 'gm') return playerStore.isGMMode
       return true
     })
+    // 前半部分放第一排
+    return items.slice(0, Math.ceil(items.length / 2))
+  })
+
+  const secondaryMenuItems = computed(() => {
+    const items = menuItems.value.filter(item => {
+      if (item.key === '') return isNewPlayer.value
+      if (item.key === 'gm') return playerStore.isGMMode
+      return true
+    })
+    // 后半部分放第二排
+    return items.slice(Math.ceil(items.length / 2))
   })
 
   const realmColors = [
@@ -474,6 +504,10 @@
     background: rgba(20, 25, 30, 0.98);
     backdrop-filter: blur(20px);
     border-top: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .bottom-nav-secondary {
+    border-top: none;
     padding-bottom: env(safe-area-inset-bottom, 0px);
   }
 
@@ -481,7 +515,7 @@
     display: flex;
     justify-content: space-around;
     align-items: center;
-    height: 56px;
+    height: 50px;
     padding: 0 4px;
   }
 
@@ -490,14 +524,14 @@
     flex-direction: column;
     align-items: center;
     justify-content: center;
-    gap: 3px;
+    gap: 2px;
     flex: 1;
     height: 100%;
     cursor: pointer;
     transition: all 0.2s ease;
     color: #8B8B8B;
     border-radius: 8px;
-    max-width: 72px;
+    max-width: 80px;
   }
 
   .nav-item:active {
@@ -599,7 +633,7 @@
     }
 
     .bottom-nav-inner {
-      height: 44px;
+      height: 40px;
     }
 
     .nav-icon {
