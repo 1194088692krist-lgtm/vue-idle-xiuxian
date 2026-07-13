@@ -158,6 +158,12 @@
             <div class="value-item full">
               <label>背景图片URL (留空使用渐变色)</label>
               <input type="text" v-model="themeData.startScreen.background.image" placeholder="assets/bg/start.png" />
+              <div class="asset-selector">
+                <select v-model="themeData.startScreen.background.image">
+                  <option value="">选择已上传图片...</option>
+                  <option v-for="asset in imageAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item">
               <label>背景色1</label>
@@ -182,16 +188,28 @@
         </div>
 
         <div v-if="themeSection === 'cultivation'" class="theme-section">
-          <h3>修炼界面配置</h3>
-          <div class="value-grid">
-            <div class="value-item full">
-              <label>修士立绘URL</label>
-              <input type="text" v-model="themeData.cultivationScreen.character.image" placeholder="assets/char/monk.png" />
-            </div>
-            <div class="value-item full">
-              <label>背景图片URL</label>
-              <input type="text" v-model="themeData.cultivationScreen.background.image" placeholder="assets/bg/cultivation.png" />
-            </div>
+    <h3>修炼界面配置</h3>
+    <div class="value-grid">
+      <div class="value-item full">
+        <label>修士立绘URL</label>
+        <input type="text" v-model="themeData.cultivationScreen.character.image" placeholder="assets/char/monk.png" />
+        <div class="asset-selector">
+          <select v-model="themeData.cultivationScreen.character.image">
+            <option value="">选择已上传图片...</option>
+            <option v-for="asset in imageAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+          </select>
+        </div>
+      </div>
+      <div class="value-item full">
+        <label>背景图片URL</label>
+        <input type="text" v-model="themeData.cultivationScreen.background.image" placeholder="assets/bg/cultivation.png" />
+        <div class="asset-selector">
+          <select v-model="themeData.cultivationScreen.background.image">
+            <option value="">选择已上传图片...</option>
+            <option v-for="asset in imageAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+          </select>
+        </div>
+      </div>
             <div class="value-item">
               <label>背景色1</label>
               <input type="color" v-model="themeData.cultivationScreen.background.gradient[0]" />
@@ -225,22 +243,52 @@
             <div class="value-item full">
               <label>开始界面BGM</label>
               <input type="text" v-model="themeData.audio.bgm.startScreen" placeholder="assets/audio/bgm_start.mp3" />
+              <div class="asset-selector">
+                <select v-model="themeData.audio.bgm.startScreen">
+                  <option value="">选择已上传音频...</option>
+                  <option v-for="asset in audioAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item full">
               <label>修炼界面BGM</label>
               <input type="text" v-model="themeData.audio.bgm.cultivation" placeholder="assets/audio/bgm_cultivate.mp3" />
+              <div class="asset-selector">
+                <select v-model="themeData.audio.bgm.cultivation">
+                  <option value="">选择已上传音频...</option>
+                  <option v-for="asset in audioAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item full">
               <label>点击音效</label>
               <input type="text" v-model="themeData.audio.sfx.click" placeholder="assets/audio/sfx_click.mp3" />
+              <div class="asset-selector">
+                <select v-model="themeData.audio.sfx.click">
+                  <option value="">选择已上传音频...</option>
+                  <option v-for="asset in audioAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item full">
               <label>修炼音效</label>
               <input type="text" v-model="themeData.audio.sfx.cultivate" placeholder="assets/audio/sfx_cultivate.mp3" />
+              <div class="asset-selector">
+                <select v-model="themeData.audio.sfx.cultivate">
+                  <option value="">选择已上传音频...</option>
+                  <option v-for="asset in audioAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item full">
               <label>突破音效</label>
               <input type="text" v-model="themeData.audio.sfx.breakthrough" placeholder="assets/audio/sfx_break.mp3" />
+              <div class="asset-selector">
+                <select v-model="themeData.audio.sfx.breakthrough">
+                  <option value="">选择已上传音频...</option>
+                  <option v-for="asset in audioAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                </select>
+              </div>
             </div>
             <div class="value-item">
               <label>BGM音量</label>
@@ -594,6 +642,7 @@
 import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
+import { equipmentQualities, equipmentTypeNames, petRarities, equipmentNameParts, petNameParts, petDescriptions, equipmentStatPool } from '../plugins/gacha'
 
 const playerStore = usePlayerStore()
 const activeTab = ref('values')
@@ -901,6 +950,98 @@ const deleteMonster = (index) => {
   saveToStorage()
 }
 
+const generateDefaultEquipment = () => {
+  const equipment = []
+  const types = Object.keys(equipmentTypeNames)
+  const qualities = Object.keys(equipmentQualities)
+  
+  types.forEach(type => {
+    qualities.forEach(quality => {
+      const qualityInfo = equipmentQualities[quality]
+      const parts = equipmentNameParts[type] || equipmentNameParts.weapon
+      const namePart = parts[Math.floor(Math.random() * parts.length)]
+      
+      let baseStats = {}
+      const statKeys = Object.keys(equipmentStatPool)
+      const numStats = type === 'weapon' ? 2 : type === 'artifact' ? 3 : 2
+      
+      for (let i = 0; i < numStats; i++) {
+        const stat = statKeys[Math.floor(Math.random() * statKeys.length)]
+        const pool = equipmentStatPool[stat]
+        const qualityIndex = qualities.indexOf(quality)
+        const min = pool.min[qualityIndex] || pool.min[0]
+        const max = pool.max[qualityIndex] || pool.max[0]
+        baseStats[stat] = Math.floor(min + Math.random() * (max - min)) * (1 + qualityIndex * 0.2)
+      }
+      
+      equipment.push({
+        id: `eq_${type}_${quality}_${Date.now()}_${Math.random().toString(36).substr(2, 9)}`,
+        name: `${qualityInfo.name}${namePart}`,
+        type,
+        quality,
+        qualityInfo,
+        levelReq: qualityIndex * 5 + 1,
+        stats: baseStats,
+        enhanceLevel: 0,
+        image: ''
+      })
+    })
+  })
+  
+  return equipment.slice(0, 30)
+}
+
+const generateDefaultPets = () => {
+  const pets = []
+  const rarities = Object.keys(petRarities)
+  
+  rarities.forEach(rarity => {
+    const rarityInfo = petRarities[rarity]
+    const rarityIndex = rarities.indexOf(rarity)
+    
+    for (let i = 0; i < 3; i++) {
+      const namePart1 = petNameParts[Math.floor(Math.random() * petNameParts.length)]
+      const namePart2 = petNameParts[Math.floor(Math.random() * petNameParts.length)]
+      const desc = petDescriptions[Math.floor(Math.random() * petDescriptions.length)]
+      
+      pets.push({
+        id: `pet_${rarity}_${Date.now()}_${i}`,
+        name: `${namePart1}${namePart2}`,
+        rarity,
+        rarityInfo,
+        levelReq: rarityIndex * 10 + 1,
+        stats: {
+          attack: (5 + rarityIndex * 10) * (1 + Math.random() * 0.3),
+          defense: (3 + rarityIndex * 6) * (1 + Math.random() * 0.3),
+          health: (20 + rarityIndex * 50) * (1 + Math.random() * 0.3),
+          critRate: 0.02 + rarityIndex * 0.03,
+          comboRate: 0.01 + rarityIndex * 0.02
+        },
+        description: desc,
+        image: ''
+      })
+    }
+  })
+  
+  return pets
+}
+
+const generateDefaultMonsters = () => {
+  const monsters = [
+    { id: 'monster_1', name: '野猪精', level: 3, difficulty: 'easy', stats: { health: 50, damage: 8, defense: 3, speed: 8 }, rewards: { spiritStones: [5, 15], experience: 10 } },
+    { id: 'monster_2', name: '山匪', level: 5, difficulty: 'easy', stats: { health: 80, damage: 12, defense: 5, speed: 10 }, rewards: { spiritStones: [10, 25], experience: 15 } },
+    { id: 'monster_3', name: '猛虎', level: 8, difficulty: 'normal', stats: { health: 150, damage: 20, defense: 10, speed: 15 }, rewards: { spiritStones: [20, 50], experience: 30 } },
+    { id: 'monster_4', name: '骷髅兵', level: 12, difficulty: 'normal', stats: { health: 200, damage: 25, defense: 15, speed: 8 }, rewards: { spiritStones: [30, 80], experience: 45 } },
+    { id: 'monster_5', name: '妖狼', level: 15, difficulty: 'normal', stats: { health: 300, damage: 35, defense: 18, speed: 20 }, rewards: { spiritStones: [50, 120], experience: 60 } },
+    { id: 'monster_6', name: '僵尸王', level: 20, difficulty: 'hard', stats: { health: 500, damage: 50, defense: 25, speed: 12 }, rewards: { spiritStones: [100, 200], experience: 100 } },
+    { id: 'monster_7', name: '毒蛇', level: 25, difficulty: 'hard', stats: { health: 400, damage: 60, defense: 20, speed: 25 }, rewards: { spiritStones: [150, 300], experience: 150 } },
+    { id: 'monster_8', name: '血魔', level: 30, difficulty: 'expert', stats: { health: 800, damage: 80, defense: 35, speed: 18 }, rewards: { spiritStones: [300, 500], experience: 250 } },
+    { id: 'monster_9', name: '噬魂鬼', level: 35, difficulty: 'expert', stats: { health: 1000, damage: 100, defense: 40, speed: 22 }, rewards: { spiritStones: [500, 800], experience: 350 } },
+    { id: 'monster_10', name: '远古妖龙', level: 40, difficulty: 'expert', stats: { health: 2000, damage: 150, defense: 60, speed: 25 }, rewards: { spiritStones: [1000, 2000], experience: 500 } }
+  ]
+  return monsters
+}
+
 // 素材管理
 const fileInput = ref(null)
 const assetType = ref('images')
@@ -1008,12 +1149,15 @@ const loadFromStorage = () => {
 
     const equipment = localStorage.getItem('gm_equipment')
     if (equipment) equipmentList.value = JSON.parse(equipment)
+    if (equipmentList.value.length === 0) equipmentList.value = generateDefaultEquipment()
 
     const pets = localStorage.getItem('gm_pets')
     if (pets) petList.value = JSON.parse(pets)
+    if (petList.value.length === 0) petList.value = generateDefaultPets()
 
     const monsters = localStorage.getItem('gm_monsters')
     if (monsters) monsterList.value = JSON.parse(monsters)
+    if (monsterList.value.length === 0) monsterList.value = generateDefaultMonsters()
 
     const assets = localStorage.getItem('gm_assets')
     if (assets) assetsList.value = JSON.parse(assets)
@@ -1525,12 +1669,24 @@ onMounted(() => {
   border-bottom: none;
 }
 
-.resource-list code {
-  background: rgba(218, 165, 32, 0.1);
-  padding: 2px 6px;
-  border-radius: 4px;
-  color: #FFD700;
-  font-size: 12px;
+.asset-selector {
+  margin-top: 8px;
+}
+
+.asset-selector select {
+  width: 100%;
+  padding: 8px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 6px;
+  color: #F5DEB3;
+  font-size: 13px;
+  cursor: pointer;
+}
+
+.asset-selector select option {
+  background: #1A1A2E;
+  color: #F5DEB3;
 }
 
 @media (max-width: 600px) {
