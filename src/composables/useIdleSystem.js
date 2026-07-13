@@ -135,19 +135,20 @@ function addLog(type, text, detail = null) {
 function formatItemDetail(item, type, rarity) {
   if (!item) return ''
   const st = item.stats || {}
+  // 使用普通空格和 ASCII 分隔符替代全角空格（U+3000），避免部分设备渲染为乱码方块
   if (type === 'equipment') {
-    let s = `攻+${st.attack ?? 0}　生+${st.health ?? 0}　防+${st.defense ?? 0}　速+${st.speed ?? 0}`
+    let s = `攻+${st.attack ?? 0} 生+${st.health ?? 0} 防+${st.defense ?? 0} 速+${st.speed ?? 0}`
     const affixes = item.affixes || []
-    if (affixes.length) s += '　｜ ' + affixes.map(a => a.name).join('·')
+    if (affixes.length) s += ' | ' + affixes.map(a => a.name).join('·')
     if (item.setId) {
       const setData = setBonuses.find(x => x.id === item.setId)
-      if (setData) s += `　｜ 套装·${setData.name}`
+      if (setData) s += ' | 套装·' + setData.name
     }
     return s
   }
   if (type === 'pet') {
     const rName = (rarityInfo[rarity] && rarityInfo[rarity].name) || ''
-    return `${rName}灵宠　攻+${st.attack ?? 0}　防+${st.defense ?? 0}　生+${st.health ?? 0}`
+    return `${rName}灵宠 攻+${st.attack ?? 0} 防+${st.defense ?? 0} 生+${st.health ?? 0}`
   }
   return ''
 }

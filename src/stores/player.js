@@ -1029,6 +1029,38 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: '装备成功' }
     },
+    // 一键装备最强装备：遍历所有槽位，自动装备背包中评分最高且满足境界要求的装备
+    autoEquipBest() {
+      const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+      const equipped = []
+      let total = 0
+      for (const slot of slots) {
+        // 找到该槽位下所有可装备物品（按 slot 字段匹配，兼容 type=槽位 与 type='equipment' 两种形态）
+        const candidates = this.items.filter(item => {
+          if (!isEquipmentItem(item)) return false
+          const itemSlot = item.slot || item.type
+          if (itemSlot !== slot) return false
+          // 满足境界要求
+          if (item.requiredRealm && this.level < item.requiredRealm) return false
+          return true
+        })
+        if (candidates.length === 0) continue
+        // 按评分排序，取最高的
+        candidates.sort((a, b) => (calculateEquipmentScore(b) || 0) - (calculateEquipmentScore(a) || 0))
+        const best = candidates[0]
+        // 如果当前已装备的评分更低，则替换（否则也替换，因为用户明确点了"一键装备"）
+        this.equipArtifact(best, slot)
+        equipped.push(`${this.equipmentSlotNames[slot] || slot}：${best.name}（${calculateEquipmentScore(best)}分）`)
+        total++
+      }
+      this.queueSave()
+      if (total === 0) {
+        return { success: false, message: '没有可装备的装备' }
+      }
+      return { success: true, message: `已一键装备 ${total} 件最强装备`, equipped }
+    },
+    // 装备槽位中文名映射（供 autoEquipBest 使用）
+    equipmentSlotNames: { weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子', shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链', ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝' },
     // 卸下装备
     unequipArtifact(slot) {
       const artifact = this.equippedArtifacts[slot]

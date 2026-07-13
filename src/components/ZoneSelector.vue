@@ -963,6 +963,7 @@ onUnmounted(() => {
   word-break: break-word;
   border-left: 2px solid transparent;
   animation: logIn 0.35s ease;
+  font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
 }
 .log-text { display: block; }
 @keyframes logIn {
@@ -1111,7 +1112,7 @@ onUnmounted(() => {
   background: rgba(0, 0, 0, 0.35);
   border-radius: 0 0 6px 6px;
   border-top: 1px dashed rgba(255, 255, 255, 0.12);
-  font-family: 'Consolas', 'Menlo', monospace;
+  font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Consolas, Menlo, monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   letter-spacing: 0.3px;
 }
 

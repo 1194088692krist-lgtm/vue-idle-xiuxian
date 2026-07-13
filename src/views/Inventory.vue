@@ -15,6 +15,11 @@
       <div class="tab-content">
         <!-- 装备 -->
         <div v-if="activeTab === 'equipment'" class="tab-pane">
+          <div class="equip-toolbar">
+            <button class="btn-small btn-primary auto-equip-btn" @click="handleAutoEquipBest" :disabled="!hasEquipableItems">
+              ⚡ 一键装备最强
+            </button>
+          </div>
           <div class="simple-grid" :class="{ mobile: isMobile }">
             <div
               v-for="(name, type) in equipmentTypes"
@@ -726,6 +731,25 @@
   const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
   const isEquipmentItem = item => !!item && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
+  // 是否有可装备物品（用于禁用一键按钮）
+  const hasEquipableItems = computed(() => {
+    return playerStore.items.some(item => {
+      if (!isEquipmentItem(item)) return false
+      const req = item.requiredRealm || 1
+      return playerStore.level >= req
+    })
+  })
+
+  // 一键装备最强装备
+  const handleAutoEquipBest = () => {
+    const result = playerStore.autoEquipBest()
+    if (result.success) {
+      message.success(result.message + (result.equipped ? '\n' + result.equipped.join('\n') : ''))
+    } else {
+      message.warning(result.message)
+    }
+  }
+
   // 当前选中的装备类型
   const selectedType = ref('')
 
@@ -1141,6 +1165,37 @@
   @keyframes fadeIn {
     from { opacity: 0; }
     to { opacity: 1; }
+  }
+
+  /* 装备操作栏 */
+  .equip-toolbar {
+    display: flex;
+    justify-content: flex-end;
+    margin-bottom: 10px;
+  }
+
+  .auto-equip-btn {
+    padding: 8px 16px !important;
+    font-size: 13px !important;
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.7), rgba(255, 215, 0, 0.5)) !important;
+    color: #1a1a2e !important;
+    border: 1px solid rgba(255, 215, 0, 0.6) !important;
+    border-radius: 8px !important;
+    cursor: pointer;
+    transition: all 0.25s ease;
+    font-weight: bold;
+    letter-spacing: 0.5px;
+  }
+
+  .auto-equip-btn:hover:not(:disabled) {
+    background: linear-gradient(135deg, rgba(255, 215, 0, 0.85), rgba(218, 165, 32, 0.7)) !important;
+    box-shadow: 0 0 12px rgba(255, 215, 0, 0.4);
+    transform: translateY(-1px);
+  }
+
+  .auto-equip-btn:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
   }
 
   .simple-grid {
