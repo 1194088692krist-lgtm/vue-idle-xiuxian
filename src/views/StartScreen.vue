@@ -2,7 +2,7 @@
   <div class="start-screen">
     <div class="start-bg"></div>
     <div class="start-content">
-      <div class="game-title">
+      <div class="game-title" @click="handleTitleClick">
         <div class="title-main">修仙问道</div>
         <div class="title-sub">Idle Cultivation</div>
         <div class="title-version">v1.0.5</div>
@@ -129,6 +129,23 @@ const formatTime = (timestamp) => {
     return `${Math.floor(diff / 86400000)}天前`
   } else {
     return date.toLocaleDateString('zh-CN')
+  }
+}
+
+let clickCount = 0
+let clickTimer = null
+
+const handleTitleClick = () => {
+  clickCount++
+  if (clickTimer) clearTimeout(clickTimer)
+  if (clickCount >= 5) {
+    playerStore.isGMMode = !playerStore.isGMMode
+    alert(playerStore.isGMMode ? 'GM模式已开启' : 'GM模式已关闭')
+    clickCount = 0
+  } else {
+    clickTimer = setTimeout(() => {
+      clickCount = 0
+    }, 2000)
   }
 }
 

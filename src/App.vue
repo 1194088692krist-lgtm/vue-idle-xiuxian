@@ -152,9 +152,6 @@
     bool => {
       isNewPlayer.value = bool
       getMenuItems()
-      if (!bool && route.path === '/') {
-        router.push('/cultivation')
-      }
     }
   )
 
