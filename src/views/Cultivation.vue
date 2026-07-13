@@ -8,15 +8,19 @@
         </div>
         <div class="char-info">
           <div class="char-name-row">
-            <h2 class="char-name">{{ playerStore.name }}</h2>
-            <span v-if="playerStore.rebirthCount > 0" class="rebirth-badge">
-              第{{ playerStore.rebirthCount }}世
-            </span>
-          </div>
-          <div class="char-realm" :style="{ color: getRealmColor(playerStore.level) }">
-            {{ getRealmName(playerStore.level)?.name || playerStore.realm }}
-          </div>
-          <div class="char-level">Lv.{{ playerStore.level }}</div>
+          <h2 class="char-name">{{ playerStore.name }}</h2>
+          <span v-if="playerStore.rebirthCount > 0" class="rebirth-badge">
+            第{{ playerStore.rebirthCount }}世
+          </span>
+        </div>
+        <div class="char-realm" :style="{ color: getRealmColor(playerStore.level) }">
+          {{ getRealmName(playerStore.level)?.name || playerStore.realm }}
+        </div>
+        <div class="char-level">Lv.{{ playerStore.level }}</div>
+        <div class="build-strength">
+          <span class="build-label">Build强度</span>
+          <span class="build-value">{{ playerStore.buildStrength }}</span>
+        </div>
         </div>
       </div>
 
@@ -451,6 +455,27 @@ onUnmounted(() => {
 .char-level {
   font-size: 13px;
   color: #888;
+}
+.build-strength {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  margin-top: 6px;
+  padding: 4px 8px;
+  background: rgba(255, 215, 0, 0.1);
+  border-radius: 4px;
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  inline-size: fit-content;
+}
+.build-label {
+  font-size: 12px;
+  color: #FFD700;
+}
+.build-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
 }
 
 /* 修为进度 */

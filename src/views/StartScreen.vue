@@ -180,7 +180,7 @@ onMounted(() => {
   left: 0;
   right: 0;
   bottom: 0;
-  background-image: url('https://trae-api-cn.mchost.guru/api/ide/v1/text_to_image?prompt=Chinese%20ink%20wash%20painting%20style%2C%20a%20sword-wielding%20Taoist%20cultivator%20standing%20on%20a%20mountain%20peak%20overlooking%20a%20sea%20of%20clouds%20at%20sunrise%2C%20golden%20light%20rays%2C%20majestic%20mountains%2C%20winding%20river%2C%20traditional%20Chinese%20landscape%2C%20epic%2C%20serene&image_size=portrait_9_16');
+  background-image: url('https://i.postimg.cc/MpkhQqtd/start.png');
   background-size: cover;
   background-position: center top;
 }

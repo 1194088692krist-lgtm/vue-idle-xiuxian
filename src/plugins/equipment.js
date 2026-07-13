@@ -161,4 +161,6 @@ function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true)
   }
 }
 
-export { enhanceConfig, reforgeConfig, reforgeableStats, enhanceEquipment, reforgeEquipment }
+import { calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
+
+export { enhanceConfig, reforgeConfig, reforgeableStats, enhanceEquipment, reforgeEquipment, calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses }

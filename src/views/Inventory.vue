@@ -296,8 +296,31 @@
         <div class="detail-row">
           <span>强化等级</span><span>+{{ selectedEquipment.enhanceLevel || 0 }}</span>
         </div>
+        <div class="detail-row">
+          <span>装备评分</span><span class="equipment-score">{{ calculateEquipmentScore(selectedEquipment) }}</span>
+        </div>
+        <div v-if="selectedEquipment.setId" class="detail-row">
+          <span>套装</span>
+          <span class="set-tag" :style="{ color: getSetInfo(selectedEquipment.setId)?.color }">
+            {{ getSetInfo(selectedEquipment.setId)?.name }}
+          </span>
+        </div>
+        <div class="simple-divider">基础属性</div>
         <div v-for="(value, stat) in selectedEquipment.stats" :key="stat" class="detail-row">
           <span>{{ getStatName(stat) }}</span><span>{{ formatStatValue(stat, value) }}</span>
+        </div>
+        <div v-if="selectedEquipment.affixes && selectedEquipment.affixes.length > 0" class="affixes-section">
+          <div class="simple-divider">词条</div>
+          <div v-for="affix in selectedEquipment.affixes" :key="affix.id" class="affix-row">
+            <span class="affix-name" :class="'affix-tier-' + affix.tier">{{ affix.name }}</span>
+            <span>{{ getStatName(affix.stat) }} {{ affix.valueType === 'percent' ? '+' + (affix.value * 100).toFixed(1) + '%' : '+' + affix.value }}</span>
+          </div>
+        </div>
+        <div v-if="selectedEquipment.setId" class="set-bonus-section">
+          <div class="simple-divider">套装效果</div>
+          <div v-for="bonus in getSetBonuses(selectedEquipment.setId)" :key="bonus.stat" class="set-bonus-row">
+            <span>{{ bonus.label }}</span>
+          </div>
         </div>
         <div v-if="equipmentComparison && selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot]?.id" class="stats-comparison">
           <div class="simple-divider">属性对比</div>
@@ -403,7 +426,7 @@
   import { getStatName, formatStatValue } from '../plugins/stats'
   import { getRealmName } from '../plugins/realm'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
-  import { enhanceEquipment, reforgeEquipment } from '../plugins/equipment'
+  import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
 
   // 移动端适配
   const isMobile = ref(window.innerWidth <= 768)
@@ -802,6 +825,21 @@
     } else {
       message.error(result.message || '装备失败')
     }
+  }
+
+  const getSetInfo = setId => {
+    return setBonuses.find(s => s.id === setId)
+  }
+
+  const getSetBonuses = setId => {
+    const setData = setBonuses.find(s => s.id === setId)
+    if (!setData) return []
+    const bonuses = []
+    if (setData.bonus2) bonuses.push(setData.bonus2)
+    if (setData.bonus3) bonuses.push(setData.bonus3)
+    if (setData.bonus4) bonuses.push(setData.bonus4)
+    if (setData.bonus5) bonuses.push(setData.bonus5)
+    return bonuses
   }
 
   // 计算灵草分组
@@ -1278,6 +1316,60 @@
     margin-top: 0;
     margin-bottom: 8px;
     font-size: 14px;
+    color: #F5DEB3;
+  }
+
+  .equipment-score {
+    font-size: 18px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+
+  .set-tag {
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .affixes-section {
+    margin-top: 8px;
+  }
+
+  .affix-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .affix-name {
+    font-weight: bold;
+  }
+
+  .affix-tier-1 {
+    color: #32CD32;
+  }
+
+  .affix-tier-2 {
+    color: #1E90FF;
+  }
+
+  .affix-tier-3 {
+    color: #FFD700;
+    text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
+  }
+
+  .set-bonus-section {
+    margin-top: 8px;
+  }
+
+  .set-bonus-row {
+    padding: 4px 8px;
+    background: rgba(139, 69, 19, 0.1);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 13px;
     color: #F5DEB3;
   }
 </style>

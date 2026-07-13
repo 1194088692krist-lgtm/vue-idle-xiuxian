@@ -280,7 +280,7 @@
 <script setup>
 import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
-import { zones } from '../plugins/zones'
+import { zones, difficultyTiers } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRealmName } from '../plugins/realm'
 import { getAffixesForSlot, setBonuses } from '../plugins/buildSystem'
@@ -306,7 +306,10 @@ const filteredZones = computed(() => {
 
 const selectedZone = ref(null)
 
-const canEnter = (zone) => playerStore.level >= zone.minLevel
+const canEnter = (zone) => {
+  const tier = difficultyTiers[zone.difficulty]
+  return playerStore.level >= tier.unlockLevel
+}
 
 const selectZone = (zone) => {
   if (!canEnter(zone)) return
@@ -386,7 +389,6 @@ const generateZoneEnemy = (zone, encounterCount) => {
   const isElite = encounterCount > 0 && encounterCount % 5 === 0 && !isBoss
   const type = isBoss ? CombatType.BOSS : isElite ? CombatType.ELITE : CombatType.NORMAL
 
-  // 基于zone推荐属性生成敌人，敌人属性为推荐值的60%，确保玩家可击败
   const diff = zone.difficulty
   const baseStats = {
     health: Math.floor(zone.recommendedStats.health * 0.6),
@@ -415,18 +417,32 @@ const generateZoneEnemy = (zone, encounterCount) => {
     maxHealth: Math.floor(zone.recommendedStats.health * 0.6)
   }
 
-  if (isElite) {
+  let monsterName
+  let entityType = zone.difficultyLabel
+
+  if (isBoss && zone.bosses && zone.bosses.length > 0) {
+    const boss = zone.bosses[Math.floor(Math.random() * zone.bosses.length)]
+    monsterName = boss.name
+    entityType = 'BOSS'
+    baseStats.health = boss.stats.health
+    baseStats.maxHealth = boss.stats.health
+    baseStats.damage = boss.stats.attack
+    baseStats.defense = boss.stats.defense || 0
+    baseStats.speed = boss.stats.speed || 10
+    baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.1)
+    baseStats.finalDamageBoost = Math.min(0.2, baseStats.finalDamageBoost + 0.1)
+  } else if (isElite) {
+    monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
+    entityType = '精英'
     baseStats.health = Math.floor(baseStats.health * 1.5)
     baseStats.maxHealth = baseStats.health
     baseStats.damage = Math.floor(baseStats.damage * 1.3)
-  } else if (isBoss) {
-    baseStats.health = Math.floor(baseStats.health * 2.5)
-    baseStats.maxHealth = baseStats.health
-    baseStats.damage = Math.floor(baseStats.damage * 1.8)
+    baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.05)
+  } else {
+    monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
   }
 
-  const monsterName = zone.monsters[Math.floor(Math.random() * zone.monsters.length)]
-  return new CombatEntity(monsterName, zone.minLevel, baseStats, zone.difficultyLabel)
+  return new CombatEntity(monsterName, zone.minLevel, baseStats, entityType)
 }
 
 // 执行一次探索战斗
