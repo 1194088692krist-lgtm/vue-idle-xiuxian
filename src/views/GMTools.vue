@@ -95,6 +95,198 @@
         </div>
       </div>
 
+      <!-- 主题配置面板 -->
+      <div v-if="activeTab === 'theme'" class="panel">
+        <div class="theme-import-export">
+          <button class="btn-primary" @click="bulkExport">📦 一键导出全部</button>
+          <button class="btn-secondary" @click="bulkImport">📥 一键批量导入</button>
+        </div>
+
+        <div class="theme-tabs">
+          <button :class="{ active: themeSection === 'colors' }" @click="themeSection = 'colors'">色彩</button>
+          <button :class="{ active: themeSection === 'start' }" @click="themeSection = 'start'">开始界面</button>
+          <button :class="{ active: themeSection === 'cultivation' }" @click="themeSection = 'cultivation'">修炼界面</button>
+          <button :class="{ active: themeSection === 'audio' }" @click="themeSection = 'audio'">音效</button>
+          <button :class="{ active: themeSection === 'effects' }" @click="themeSection = 'effects'">特效</button>
+        </div>
+
+        <div v-if="themeSection === 'colors'" class="theme-section">
+          <h3>主题色彩</h3>
+          <div class="value-grid">
+            <div class="value-item">
+              <label>主色调</label>
+              <input type="color" v-model="themeData.colors.primary" />
+            </div>
+            <div class="value-item">
+              <label>亮色</label>
+              <input type="color" v-model="themeData.colors.primaryLight" />
+            </div>
+            <div class="value-item">
+              <label>暗色</label>
+              <input type="color" v-model="themeData.colors.primaryDark" />
+            </div>
+            <div class="value-item">
+              <label>主背景</label>
+              <input type="color" v-model="themeData.colors.bgMain" />
+            </div>
+            <div class="value-item">
+              <label>主文字</label>
+              <input type="color" v-model="themeData.colors.textMain" />
+            </div>
+            <div class="value-item">
+              <label>副文字</label>
+              <input type="color" v-model="themeData.colors.textSecondary" />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="themeSection === 'start'" class="theme-section">
+          <h3>开始界面配置</h3>
+          <div class="value-grid">
+            <div class="value-item full">
+              <label>游戏标题</label>
+              <input type="text" v-model="themeData.startScreen.logo.title" />
+            </div>
+            <div class="value-item full">
+              <label>副标题</label>
+              <input type="text" v-model="themeData.startScreen.logo.subtitle" />
+            </div>
+            <div class="value-item full">
+              <label>底部文字</label>
+              <input type="text" v-model="themeData.startScreen.footerText" />
+            </div>
+            <div class="value-item full">
+              <label>背景图片URL (留空使用渐变色)</label>
+              <input type="text" v-model="themeData.startScreen.background.image" placeholder="assets/bg/start.png" />
+            </div>
+            <div class="value-item">
+              <label>背景色1</label>
+              <input type="color" v-model="themeData.startScreen.background.gradient[0]" />
+            </div>
+            <div class="value-item">
+              <label>背景色2</label>
+              <input type="color" v-model="themeData.startScreen.background.gradient[1]" />
+            </div>
+          </div>
+          <div class="resource-list">
+            <h4>📋 开始界面资源清单</h4>
+            <ul>
+              <li>✅ 背景图 (1080x1920 / 1920x1080) - <code>bg_start.png</code></li>
+              <li>✅ Logo图 (512x512 透明PNG) - <code>logo.png</code></li>
+              <li>✅ 新的开始按钮图标 - <code>btn_newgame.png</code></li>
+              <li>✅ 读取存档按钮图标 - <code>btn_load.png</code></li>
+              <li>✅ 开始界面BGM - <code>bgm_start.mp3</code></li>
+              <li>✅ 按钮点击音效 - <code>sfx_click.mp3</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div v-if="themeSection === 'cultivation'" class="theme-section">
+          <h3>修炼界面配置</h3>
+          <div class="value-grid">
+            <div class="value-item full">
+              <label>修士立绘URL</label>
+              <input type="text" v-model="themeData.cultivationScreen.character.image" placeholder="assets/char/monk.png" />
+            </div>
+            <div class="value-item full">
+              <label>背景图片URL</label>
+              <input type="text" v-model="themeData.cultivationScreen.background.image" placeholder="assets/bg/cultivation.png" />
+            </div>
+            <div class="value-item">
+              <label>背景色1</label>
+              <input type="color" v-model="themeData.cultivationScreen.background.gradient[0]" />
+            </div>
+            <div class="value-item">
+              <label>背景色2</label>
+              <input type="color" v-model="themeData.cultivationScreen.background.gradient[1]" />
+            </div>
+            <div class="value-item">
+              <label>进度条光效色</label>
+              <input type="color" v-model="themeData.cultivationScreen.progressBar.glowColor" />
+            </div>
+          </div>
+          <div class="resource-list">
+            <h4>📋 修炼界面资源清单</h4>
+            <ul>
+              <li>✅ 背景图 - <code>bg_cultivation.png</code></li>
+              <li>✅ 修士打坐立绘 (多境界版本) - <code>char_stage1.png ~ char_stage12.png</code></li>
+              <li>✅ 修炼灵气粒子特效 - <code>effect_qi.png</code></li>
+              <li>✅ 境界突破特效 - <code>effect_breakthrough.png</code></li>
+              <li>✅ 修炼界面BGM - <code>bgm_cultivation.mp3</code></li>
+              <li>✅ 修炼音效 - <code>sfx_cultivate.mp3</code></li>
+              <li>✅ 突破音效 - <code>sfx_breakthrough.mp3</code></li>
+            </ul>
+          </div>
+        </div>
+
+        <div v-if="themeSection === 'audio'" class="theme-section">
+          <h3>音效配置</h3>
+          <div class="value-grid">
+            <div class="value-item full">
+              <label>开始界面BGM</label>
+              <input type="text" v-model="themeData.audio.bgm.startScreen" placeholder="assets/audio/bgm_start.mp3" />
+            </div>
+            <div class="value-item full">
+              <label>修炼界面BGM</label>
+              <input type="text" v-model="themeData.audio.bgm.cultivation" placeholder="assets/audio/bgm_cultivate.mp3" />
+            </div>
+            <div class="value-item full">
+              <label>点击音效</label>
+              <input type="text" v-model="themeData.audio.sfx.click" placeholder="assets/audio/sfx_click.mp3" />
+            </div>
+            <div class="value-item full">
+              <label>修炼音效</label>
+              <input type="text" v-model="themeData.audio.sfx.cultivate" placeholder="assets/audio/sfx_cultivate.mp3" />
+            </div>
+            <div class="value-item full">
+              <label>突破音效</label>
+              <input type="text" v-model="themeData.audio.sfx.breakthrough" placeholder="assets/audio/sfx_break.mp3" />
+            </div>
+            <div class="value-item">
+              <label>BGM音量</label>
+              <input type="range" min="0" max="1" step="0.1" v-model.number="themeData.audio.volume.bgm" />
+            </div>
+            <div class="value-item">
+              <label>音效音量</label>
+              <input type="range" min="0" max="1" step="0.1" v-model.number="themeData.audio.volume.sfx" />
+            </div>
+          </div>
+        </div>
+
+        <div v-if="themeSection === 'effects'" class="theme-section">
+          <h3>特效配置</h3>
+          <div class="value-grid">
+            <div class="value-item">
+              <label>灵气粒子数量</label>
+              <input type="number" v-model.number="themeData.effects.cultivation.particleCount" />
+            </div>
+            <div class="value-item">
+              <label>粒子速度</label>
+              <input type="number" step="0.5" v-model.number="themeData.effects.cultivation.speed" />
+            </div>
+            <div class="value-item">
+              <label>粒子颜色</label>
+              <input type="color" v-model="themeData.effects.cultivation.particleColor" />
+            </div>
+            <div class="value-item">
+              <label>突破特效时长(ms)</label>
+              <input type="number" v-model.number="themeData.effects.breakthrough.duration" />
+            </div>
+            <div class="value-item">
+              <label>突破特效颜色</label>
+              <input type="color" v-model="themeData.effects.breakthrough.color" />
+            </div>
+          </div>
+        </div>
+
+        <div class="panel-actions">
+          <button class="btn-primary" @click="saveTheme">保存应用</button>
+          <button class="btn-secondary" @click="exportThemeConfig">导出主题</button>
+          <button class="btn-secondary" @click="importThemeConfig">导入主题</button>
+          <button class="btn-danger" @click="resetThemeConfig">重置默认</button>
+        </div>
+      </div>
+
       <!-- 装备编辑器 -->
       <div v-if="activeTab === 'equipment'" class="panel">
         <div class="editor-header">
@@ -401,11 +593,13 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '../stores/player'
+import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
 
 const playerStore = usePlayerStore()
 const activeTab = ref('values')
 const tabs = [
   { key: 'values', label: '数值调整' },
+  { key: 'theme', label: '主题配置' },
   { key: 'equipment', label: '装备编辑' },
   { key: 'pets', label: '灵宠编辑' },
   { key: 'monsters', label: '怪物编辑' },
@@ -430,6 +624,123 @@ const defaultValues = {
 }
 
 const gameValues = ref({ ...defaultValues })
+
+// 主题配置
+const themeData = ref({ ...defaultTheme })
+const themeSection = ref('start')
+
+const loadThemeData = () => {
+  themeData.value = getCurrentTheme()
+}
+
+const saveTheme = () => {
+  importTheme(themeData.value)
+  alert('主题配置已保存并应用！')
+}
+
+const exportThemeConfig = () => {
+  const data = exportTheme()
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'theme-config.json'
+  a.click()
+}
+
+const importThemeConfig = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = e.target.files[0]
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const result = importTheme(e.target.result)
+        if (result.success) {
+          themeData.value = result.theme
+          alert('主题配置导入成功！')
+        } else {
+          alert('导入失败：' + result.error)
+        }
+      } catch (err) {
+        alert('导入失败：无效的JSON文件')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+const bulkImport = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = e.target.files[0]
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result)
+        let count = 0
+        if (data.gameValues) {
+          gameValues.value = { ...gameValues.value, ...data.gameValues }
+          localStorage.setItem('gm_gameValues', JSON.stringify(gameValues.value))
+          count++
+        }
+        if (data.equipment) {
+          equipmentList.value = data.equipment
+          count++
+        }
+        if (data.pets) {
+          petList.value = data.pets
+          count++
+        }
+        if (data.monsters) {
+          monsterList.value = data.monsters
+          count++
+        }
+        if (data.theme) {
+          importTheme(data.theme)
+          themeData.value = getCurrentTheme()
+          count++
+        }
+        saveToStorage()
+        alert(`批量导入成功！导入了 ${count} 项配置`)
+      } catch (err) {
+        alert('批量导入失败：' + err.message)
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
+}
+
+const bulkExport = () => {
+  const data = {
+    version: '1.0.0',
+    exportTime: new Date().toISOString(),
+    gameValues: gameValues.value,
+    equipment: equipmentList.value,
+    pets: petList.value,
+    monsters: monsterList.value,
+    theme: getCurrentTheme()
+  }
+  const blob = new Blob([JSON.stringify(data, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'game-config-full.json'
+  a.click()
+}
+
+const resetThemeConfig = () => {
+  if (confirm('确定要重置主题为默认值吗？')) {
+    resetTheme()
+    themeData.value = getCurrentTheme()
+  }
+}
 
 // 装备数据
 const equipmentList = ref([])
@@ -713,6 +1024,7 @@ const loadFromStorage = () => {
 
 onMounted(() => {
   loadFromStorage()
+  loadThemeData()
 })
 </script>
 
@@ -1123,13 +1435,112 @@ onMounted(() => {
   right: 5px;
 }
 
+.theme-import-export {
+  display: flex;
+  gap: 10px;
+  margin-bottom: 20px;
+}
+
+.theme-tabs {
+  display: flex;
+  gap: 8px;
+  margin-bottom: 20px;
+  flex-wrap: wrap;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+  padding-bottom: 15px;
+}
+
+.theme-tabs button {
+  padding: 8px 16px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 8px;
+  color: #8B8B8B;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.theme-tabs button.active {
+  background: rgba(218, 165, 32, 0.2);
+  border-color: #DAA520;
+  color: #FFD700;
+}
+
+.theme-section {
+  margin-bottom: 25px;
+}
+
+.theme-section h3 {
+  font-size: 16px;
+  color: #DAA520;
+  margin-bottom: 15px;
+  padding-bottom: 8px;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+}
+
+.value-item.full {
+  grid-column: span 2;
+}
+
+.value-item input[type="color"] {
+  width: 100%;
+  height: 40px;
+  padding: 2px;
+  cursor: pointer;
+}
+
+.value-item input[type="range"] {
+  width: 100%;
+  cursor: pointer;
+}
+
+.resource-list {
+  margin-top: 20px;
+  padding: 15px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(218, 165, 32, 0.1);
+}
+
+.resource-list h4 {
+  font-size: 14px;
+  color: #FFD700;
+  margin-bottom: 10px;
+}
+
+.resource-list ul {
+  list-style: none;
+  padding: 0;
+  margin: 0;
+}
+
+.resource-list li {
+  font-size: 13px;
+  color: #F5DEB3;
+  padding: 6px 0;
+  border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.resource-list li:last-child {
+  border-bottom: none;
+}
+
+.resource-list code {
+  background: rgba(218, 165, 32, 0.1);
+  padding: 2px 6px;
+  border-radius: 4px;
+  color: #FFD700;
+  font-size: 12px;
+}
+
 @media (max-width: 600px) {
   .value-grid,
   .form-grid {
     grid-template-columns: 1fr;
   }
   
-  .form-item.full {
+  .form-item.full,
+  .value-item.full {
     grid-column: span 1;
   }
 }

@@ -1,21 +1,22 @@
 <template>
   <div class="start-screen">
-    <div class="start-bg"></div>
+    <div class="start-bg" :style="bgStyle"></div>
     <div class="start-content">
       <div class="game-title" @click="handleTitleClick">
-        <div class="title-main">修仙问道</div>
-        <div class="title-sub">Idle Cultivation</div>
-        <div class="title-version">v1.0.5</div>
+        <img v-if="theme.startScreen.logo.image" :src="getAssetUrl(theme.startScreen.logo.image)" class="logo-image" alt="logo">
+        <div class="title-main">{{ theme.startScreen.logo.title }}</div>
+        <div class="title-sub">{{ theme.startScreen.logo.subtitle }}</div>
+        <div class="title-version">{{ theme.startScreen.logo.version }}</div>
       </div>
 
       <div class="start-buttons" v-if="!showLoadMenu">
         <button class="btn-primary" @click="startNewGame">
-          <span class="btn-icon">🌱</span>
-          <span class="btn-text">新的开始</span>
+          <span class="btn-icon">{{ theme.startScreen.buttons.newGame.icon }}</span>
+          <span class="btn-text">{{ theme.startScreen.buttons.newGame.text }}</span>
         </button>
         <button class="btn-secondary" @click="showLoadMenu = true">
-          <span class="btn-icon">📂</span>
-          <span class="btn-text">读取存档</span>
+          <span class="btn-icon">{{ theme.startScreen.buttons.loadGame.icon }}</span>
+          <span class="btn-text">{{ theme.startScreen.buttons.loadGame.text }}</span>
         </button>
       </div>
 
@@ -58,21 +59,37 @@
       </div>
 
       <div class="start-footer">
-        <span>心诚则灵 · 大道可期</span>
+        <span>{{ theme.startScreen.footerText }}</span>
       </div>
     </div>
   </div>
 </template>
 
 <script setup>
-import { ref, onMounted } from 'vue'
+import { ref, onMounted, computed } from 'vue'
 import { useRouter } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
+import { getCurrentTheme, getAssetUrl, loadTheme } from '../plugins/theme'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
 const showLoadMenu = ref(false)
 const saveSlots = ref([])
+const theme = ref(getCurrentTheme())
+
+const bgStyle = computed(() => {
+  const bg = theme.value.startScreen.background
+  if (bg.image) {
+    return {
+      backgroundImage: `url(${getAssetUrl(bg.image)})`,
+      backgroundSize: 'cover',
+      backgroundPosition: 'center'
+    }
+  }
+  return {
+    background: `linear-gradient(135deg, ${bg.gradient[0]} 0%, ${bg.gradient[1]} 50%, ${bg.gradient[2] || bg.gradient[1]} 100%)`
+  }
+})
 
 const loadSlots = async () => {
   try {
@@ -151,6 +168,8 @@ const handleTitleClick = () => {
 }
 
 onMounted(() => {
+  loadTheme()
+  theme.value = getCurrentTheme()
   loadSlots()
 })
 </script>
@@ -208,6 +227,14 @@ onMounted(() => {
 
 .game-title {
   margin-bottom: 60px;
+}
+
+.logo-image {
+  max-width: 200px;
+  max-height: 200px;
+  margin: 0 auto 20px;
+  display: block;
+  filter: drop-shadow(0 0 20px rgba(255, 215, 0, 0.3));
 }
 
 .title-main {
