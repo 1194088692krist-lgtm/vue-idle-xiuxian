@@ -711,6 +711,8 @@ function startIdle(durationMinutes) {
     logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
   }
   startIdleTimers()
+  // 挂机开始即触发一次自动存档（落盘挂机状态，防止意外丢失）
+  s.queueSave()
 }
 
 function stopIdle() { finishIdle() }
@@ -735,6 +737,8 @@ function finishIdle() {
     logs: [...logs.value]
   }
   s.stopIdleExploration()
+  // 挂机结束（正常结束 / 力竭 / 手动停止）均触发一次自动存档，落盘本次收益
+  s.queueSave()
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
