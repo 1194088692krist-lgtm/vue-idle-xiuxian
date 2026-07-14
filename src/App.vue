@@ -43,13 +43,17 @@
               <div class="resource-bar">
                 <div class="resource-item crystal">
                   <n-icon class="resource-icon"><StarOutlined /></n-icon>
-                  <span class="resource-value">{{ animatedCrystals }}</span>
-                  <span class="resource-label">幻灵结晶</span>
+                  <div class="resource-content">
+                    <span class="resource-label">幻灵结晶</span>
+                    <span class="resource-value">{{ animatedCrystals }}</span>
+                  </div>
                 </div>
                 <div class="resource-item gold">
                   <n-icon class="resource-icon"><DollarOutlined /></n-icon>
-                  <span class="resource-value">{{ animatedStones }}</span>
-                  <span class="resource-label">灵石</span>
+                  <div class="resource-content">
+                    <span class="resource-label">灵石</span>
+                    <span class="resource-value">{{ animatedStones }}</span>
+                  </div>
                 </div>
               </div>
               <div class="top-actions">
@@ -469,12 +473,11 @@ import SaveButton from './components/SaveButton.vue'
   .resource-item {
     display: flex;
     align-items: center;
-    gap: 4px;
-    padding: 4px 10px;
+    gap: 6px;
+    padding: 6px 12px;
     background: rgba(0, 0, 0, 0.3);
-    border-radius: 16px;
+    border-radius: 12px;
     border: 1px solid rgba(139, 69, 19, 0.2);
-    font-size: 12px;
   }
 
   .resource-item.gold {
@@ -496,19 +499,29 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   .resource-icon {
-    font-size: 14px;
+    font-size: 16px;
     color: #DAA520;
+    flex-shrink: 0;
+  }
+
+  .resource-content {
+    display: flex;
+    flex-direction: column;
+    align-items: flex-start;
+    gap: 1px;
   }
 
   .resource-value {
     font-weight: bold;
     color: #F5DEB3;
+    font-size: 14px;
     min-width: auto;
   }
 
   .resource-label {
-    font-size: 11px;
+    font-size: 10px;
     color: #8B8B8B;
+    white-space: nowrap;
   }
 
   .top-actions {

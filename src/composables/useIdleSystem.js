@@ -954,7 +954,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
   const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
   addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
 
-  // 队伍角色各自行动描写
+  // 队伍角色各自行动描写 - 每个角色只显示一条综合信息
   if (team.length > 0) {
     for (const member of team) {
       const memberState = teamMemberStates.value.find(ms => ms.memberId === member.id)
@@ -968,25 +968,25 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
       text = text.replace(/\$\{n\}/g, member.name)
       const otherMember = team.find(m => m.id !== member.id)
       text = text.replace(/\$\{n2\}/g, otherMember?.name || '队友')
-      addLog('combat', text)
+      
+      const extras = []
+      if (member.talentName) {
+        extras.push(`【${member.talentName}】`)
+      }
+      const passiveSkills = (member.skills || []).filter(s => s.type === 'passive')
+      passiveSkills.forEach(skill => extras.push(`【${skill.name}】`))
       
       const artifacts = member.equippedArtifacts || {}
       for (const [slot, eq] of Object.entries(artifacts)) {
-        if (!eq) continue
-        if (eq.affixes && eq.affixes.length > 0) {
-          const affix = eq.affixes[0]
-          addLog('combat', `  ${member.name}装备${eq.name}，${affix.name}！`)
-        }
+        if (!eq || !eq.affixes || eq.affixes.length === 0) continue
+        extras.push(eq.name)
       }
       
-      if (member.talentName) {
-        addLog('combat', `  ${member.name}发动天赋【${member.talentName}】！`)
+      if (extras.length > 0) {
+        text += `（${extras.join('·')}）`
       }
       
-      const passiveSkills = (member.skills || []).filter(s => s.type === 'passive')
-      for (const skill of passiveSkills) {
-        addLog('combat', `  ${member.name}触发被动技能【${skill.name}】！`)
-      }
+      addLog('combat', text)
     }
   } else {
     // 无队伍时回退到原有通用战斗描写
@@ -1425,7 +1425,7 @@ function startIdle(durationMinutes) {
   isIdling.value = true
   idleEncounterErrorCount = 0
   idleEncounterCount.value = 0
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
   logs.value = []
   currentEncounterSummary.value = null
@@ -1566,7 +1566,7 @@ function initIdle() {
       const probe = createPlayerEntity()
       idlePlayerMaxHP.value = probe.stats.maxHealth
       idlePlayerHP.value = probe.stats.maxHealth
-      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 }
+      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
       logs.value = []
       startIdleTimers()
       processOfflineIdle()

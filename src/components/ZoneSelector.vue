@@ -375,7 +375,7 @@
           <h4 class="sub-title">词条</h4>
           <div v-for="a in dashEqDetail.affixes" :key="a.id" class="attr-row">
             <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
-            <span class="attr-col-final">{{ a.value }}</span>
+            <span class="attr-col-final">{{ a.valueType === 'percent' ? (a.value * 100).toFixed(1) + '%' : a.value }}</span>
           </div>
         </div>
         <button class="btn btn-warning" style="margin-top: 12px" @click="showDashEqModal = false">关闭</button>
@@ -462,7 +462,7 @@
             <div class="eq-type">{{ eq.typeName || eq.type }}</div>
             <div class="eq-stats">
               <span v-for="(value, key) in eq.mainAttributes" :key="key" class="eq-stat">
-                {{ getStatName(key) }} +{{ value }}
+                {{ getStatName(key) }} +{{ formatStatValue(key, value) }}
               </span>
             </div>
             <div v-if="eq.affixes && eq.affixes.length > 0" class="eq-affixes">
@@ -543,6 +543,7 @@
           <h4 class="sub-title">词条</h4>
           <div v-for="a in battleRewardEqDetail.affixes" :key="a.id" class="attr-row">
             <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
+            <span class="attr-col-final">{{ a.valueType === 'percent' ? (a.value * 100).toFixed(1) + '%' : a.value }}</span>
           </div>
         </div>
       </div>
