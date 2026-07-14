@@ -130,6 +130,7 @@ export const usePlayerStore = defineStore('player', {
     },
     // 资源
     spiritStones: 0, // 灵石数量
+    phantomCrystals: 0, // 幻灵结晶数量
     reinforceStones: 0, // 强化石数量
     refinementStones: 0, // 洗练石数量
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
@@ -940,6 +941,17 @@ export const usePlayerStore = defineStore('player', {
       this.recallPet()
       return this.deployPet(pet)
     },
+    // 幻灵结晶兑换（50灵石 = 1幻灵结晶）
+    exchangeCrystals(amount) {
+      const cost = amount * 50
+      if (this.spiritStones < cost) {
+        return { success: false, message: `灵石不足，需要 ${cost} 灵石` }
+      }
+      this.spiritStones -= cost
+      this.phantomCrystals += amount
+      this.queueSave()
+      return { success: true, message: `成功兑换 ${amount} 幻灵结晶` }
+    },
     // 召回灵宠
     recallPet() {
       if (!this.activePet) {
@@ -1473,11 +1485,37 @@ export const usePlayerStore = defineStore('player', {
     // 获取单个角色的Build强度
     getCharacterBuildStrength(character) {
       if (!character) return 0
-      const baseScore = character.baseStats.attack * 5 + character.baseStats.health * 0.5 +
-                        character.baseStats.defense * 3 + character.baseStats.speed * 8
-      const talentScore = Object.values(character.talentStats || {}).reduce((sum, val) => sum + val * 100, 0)
-      const levelMult = 1 + (character.level - 1) * 0.02
-      return Math.round((baseScore + talentScore) * levelMult)
+      // Base stat score
+      const bs = character.baseStats || {}
+      const ts = character.talentStats || {}
+      const baseScore = ((bs.attack || 0) + (ts.attack || 0)) * 5 +
+                        ((bs.health || 0) + (ts.health || 0)) * 0.5 +
+                        ((bs.defense || 0) + (ts.defense || 0)) * 3 +
+                        ((bs.speed || 0) + (ts.speed || 0)) * 8
+      // Equipment score
+      let equipScore = 0
+      const artifacts = character.equippedArtifacts || {}
+      Object.values(artifacts).forEach(eq => {
+        if (!eq) return
+        equipScore += calculateEquipmentScore(eq)
+      })
+      // Pet score (flat contribution from pet combat attributes)
+      let petScore = 0
+      if (character.equippedPet) {
+        const ca = character.equippedPet.combatAttributes || {}
+        petScore = (ca.attack || 0) * 5 + (ca.health || 0) * 0.5 + (ca.defense || 0) * 3 + (ca.speed || 0) * 8
+      }
+      // Set bonus score
+      let setScore = 0
+      const activeSets = getActiveSetBonuses(artifacts)
+      for (const sb of activeSets) {
+        if (sb.count >= 2) setScore += 200
+        if (sb.count >= 3) setScore += 100
+        if (sb.count >= 4) setScore += 200
+        if (sb.count >= 5) setScore += 300
+      }
+      const levelMult = 1 + ((character.level || 1) - 1) * 0.02
+      return Math.round((baseScore + equipScore + petScore + setScore) * levelMult)
     },
     // 角色升级
     levelUpCharacter(memberId) {

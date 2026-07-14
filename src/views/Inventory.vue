@@ -145,8 +145,8 @@
             <div v-for="pet in displayPets" :key="pet.id" class="simple-card">
               <div class="card-header">
                 <span>{{ pet.name }}</span>
-                <button class="btn-small btn-primary" @click="useItem(pet)">
-                  {{ playerStore.activePet?.id === pet.id ? '召回' : '出战' }}
+                <button class="btn-small btn-primary" @click="showPetDetails(pet)">
+                  详情
                 </button>
               </div>
               <div class="card-body">
@@ -1147,14 +1147,7 @@
 
   // 使用物品
   const useItem = item => {
-    if (item.type === 'pet') {
-      const result = playerStore.usePet(item)
-      if (result.success) {
-        message.success(result.message)
-      } else {
-        message.error(result.message || '操作失败')
-      }
-    }
+    // 灵宠已改由详情弹窗操作，不再从此处出战/召回
   }
 
   // 装备属性对比计算

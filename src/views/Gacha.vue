@@ -7,7 +7,7 @@
         </div>
         <div class="header-info">
           <h2 class="card-title gold-gradient-text">天机阁</h2>
-          <p class="card-subtitle">消耗灵石抽取珍稀人物、武器、法宝与灵宠</p>
+          <p class="card-subtitle">消耗幻灵结晶抽取珍稀人物、武器、法宝与灵宠</p>
         </div>
       </div>
       <div class="card-body">
@@ -16,7 +16,7 @@
             <div class="beginner-reward-icon">🎁</div>
             <div class="beginner-reward-text">
               <div class="beginner-reward-title">新手福利</div>
-              <div class="beginner-reward-desc">新修士专属，领取 20,000 灵石开启修仙之旅！</div>
+              <div class="beginner-reward-desc">新修士专属，领取 20,000 幻灵结晶开启修仙之旅！</div>
             </div>
           </div>
           <button class="btn btn-beginner" @click="claimBeginnerReward">
@@ -38,31 +38,43 @@
             @click="switchPool(pool.key)"
           >
             <div class="pool-name">{{ pool.name }}</div>
-            <div class="pool-cost">{{ pool.cost }} 灵石/次</div>
+            <div class="pool-cost">{{ pool.cost }} 幻灵结晶/次</div>
             <div class="pool-desc">{{ pool.desc }}</div>
           </div>
         </div>
 
         <div class="gacha-actions">
           <div class="spirit-stone-display">
-            <span class="label">当前灵石：</span>
-            <span class="value">{{ formatNumber(playerStore.spiritStones) }}</span>
+            <span class="label">当前幻灵结晶：</span>
+            <span class="value">{{ formatNumber(playerStore.phantomCrystals) }}</span>
           </div>
           <div class="action-buttons">
             <button
               class="btn btn-primary"
-              :class="{ disabled: playerStore.spiritStones < currentPoolConfig.cost }"
+              :class="{ disabled: playerStore.phantomCrystals < currentPoolConfig.cost }"
               @click="doSingleGacha"
             >
-              <span>单抽（{{ currentPoolConfig.cost }}灵石）</span>
+              <span>单抽（{{ currentPoolConfig.cost }}幻灵结晶）</span>
             </button>
             <button
               class="btn btn-success"
-              :class="{ disabled: playerStore.spiritStones < currentPoolConfig.cost * 10 }"
+              :class="{ disabled: playerStore.phantomCrystals < currentPoolConfig.cost * 10 }"
               @click="doTenGacha"
             >
-              <span>十连（{{ currentPoolConfig.cost * 10 }}灵石）</span>
+              <span>十连（{{ currentPoolConfig.cost * 10 }}幻灵结晶）</span>
             </button>
+          </div>
+        </div>
+
+        <div class="crystal-exchange">
+          <div class="exchange-info">
+            <span class="label">灵石 → 幻灵结晶</span>
+            <span class="rate">50 灵石 = 1 幻灵结晶</span>
+          </div>
+          <div class="exchange-actions">
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 500" @click="exchangeCrystals(10)">兑换10</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 2500" @click="exchangeCrystals(50)">兑换50</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 5000" @click="exchangeCrystals(100)">兑换100</button>
           </div>
         </div>
 
@@ -233,9 +245,9 @@
   // 新手福利领取
   const claimBeginnerReward = () => {
     if (playerStore.beginnerRewardClaimed) return
-    playerStore.spiritStones += 20000
+    playerStore.phantomCrystals += 20000
     playerStore.beginnerRewardClaimed = true
-    showMessage('success', '恭喜领取新手福利！获得 20,000 灵石！')
+    showMessage('success', '恭喜领取新手福利！获得 20,000 幻灵结晶！')
     playerStore.queueSave()
   }
 
@@ -298,11 +310,11 @@
   // 单抽
   const doSingleGacha = () => {
     const cost = currentPoolConfig.value.cost
-    if (playerStore.spiritStones < cost) {
-      showMessage('error', '灵石不足！')
+    if (playerStore.phantomCrystals < cost) {
+      showMessage('error', '幻灵结晶不足！')
       return
     }
-    playerStore.spiritStones -= cost
+    playerStore.phantomCrystals -= cost
     const result = doGacha(currentPool.value, playerStore.level)
     if (!result) return
     grantReward(result)
@@ -320,11 +332,11 @@
   // 十连
   const doTenGacha = () => {
     const cost = currentPoolConfig.value.cost * 10
-    if (playerStore.spiritStones < cost) {
-      showMessage('error', '灵石不足！')
+    if (playerStore.phantomCrystals < cost) {
+      showMessage('error', '幻灵结晶不足！')
       return
     }
-    playerStore.spiritStones -= cost
+    playerStore.phantomCrystals -= cost
     const results = doMultiGacha(currentPool.value, 10, playerStore.level)
     results.forEach(r => grantReward(r))
     gachaResults.value = results
@@ -367,6 +379,13 @@
   const closeCharModal = () => {
     showCharModal.value = false
     selectedCharacter.value = null
+  }
+
+  // 幻灵结晶兑换
+  const exchangeCrystals = (amount) => {
+    const result = playerStore.exchangeCrystals(amount)
+    if (result.success) showMessage('success', result.message)
+    else showMessage('error', result.message)
   }
 
   const clearLogPanel = () => {
@@ -665,6 +684,50 @@
 
   .btn.disabled {
     opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  /* 幻灵结晶兑换 */
+  .crystal-exchange {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px;
+    background: rgba(140, 80, 255, 0.08);
+    border: 1px solid rgba(140, 80, 255, 0.25);
+    border-radius: 10px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .exchange-info {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .exchange-info .label {
+    font-size: 14px;
+    color: #c0a0ff;
+    font-weight: bold;
+  }
+  .exchange-info .rate {
+    font-size: 11px;
+    color: #888;
+  }
+  .exchange-actions {
+    display: flex;
+    gap: 6px;
+  }
+  .exchange-actions .btn {
+    padding: 6px 12px;
+    font-size: 12px;
+    min-height: 32px;
+    background: linear-gradient(135deg, rgba(140, 80, 255, 0.6), rgba(100, 50, 200, 0.4));
+    color: #fff;
+    border: 1px solid rgba(140, 80, 255, 0.4);
+  }
+  .exchange-actions .btn:disabled {
+    opacity: 0.4;
     cursor: not-allowed;
   }
 

@@ -61,27 +61,47 @@
       </div>
 
       <div class="attr-block">
-        <h4 class="sub-title">基础属性</h4>
+        <h4 class="sub-title">属性面板</h4>
         <div class="attr-table">
           <div class="attr-row attr-head">
             <span class="attr-col-label">属性</span>
-            <span class="attr-col-final">数值</span>
+            <span class="attr-col-base">基础</span>
+            <span class="attr-col-delta">加成</span>
+            <span class="attr-col-final">最终</span>
           </div>
-          <div class="attr-row">
-            <span class="attr-col-label">攻击</span>
-            <span class="attr-col-final">{{ Math.floor(selectedMember.attack || 0) }}</span>
+          <div v-for="stat in mainStats" :key="stat.key" class="attr-row">
+            <span class="attr-col-label">{{ stat.name }}</span>
+            <span class="attr-col-base">{{ stat.base }}</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+            <span class="attr-col-final">{{ stat.final }}</span>
           </div>
-          <div class="attr-row">
-            <span class="attr-col-label">生命</span>
-            <span class="attr-col-final">{{ Math.floor(selectedMember.health || 0) }}</span>
+        </div>
+        <div class="attr-table" style="margin-top:10px">
+          <div class="attr-row attr-head">
+            <span class="attr-col-label">战斗属性</span>
+            <span class="attr-col-base">基础</span>
+            <span class="attr-col-delta">加成</span>
+            <span class="attr-col-final">最终</span>
           </div>
-          <div class="attr-row">
-            <span class="attr-col-label">防御</span>
-            <span class="attr-col-final">{{ Math.floor(selectedMember.defense || 0) }}</span>
+          <div v-for="stat in combatStats" :key="stat.key" class="attr-row">
+            <span class="attr-col-label">{{ stat.name }}</span>
+            <span class="attr-col-base">{{ stat.base }}</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+            <span class="attr-col-final">{{ stat.final }}</span>
           </div>
-          <div class="attr-row">
-            <span class="attr-col-label">速度</span>
-            <span class="attr-col-final">{{ Math.floor(selectedMember.speed || 0) }}</span>
+        </div>
+        <div class="attr-table" style="margin-top:10px">
+          <div class="attr-row attr-head">
+            <span class="attr-col-label">特殊属性</span>
+            <span class="attr-col-base">基础</span>
+            <span class="attr-col-delta">加成</span>
+            <span class="attr-col-final">最终</span>
+          </div>
+          <div v-for="stat in specialStats" :key="stat.key" class="attr-row">
+            <span class="attr-col-label">{{ stat.name }}</span>
+            <span class="attr-col-base">{{ stat.base }}</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+            <span class="attr-col-final">{{ stat.final }}</span>
           </div>
         </div>
       </div>
@@ -262,6 +282,145 @@ const availableItemsForSlot = computed(() => {
 
 const availablePets = computed(() => {
   return (playerStore.pets || []).filter(pet => true)
+})
+
+// 角色属性计算系统
+const STAT_NAMES = {
+  attack: '攻击', health: '生命', defense: '防御', speed: '速度',
+  critRate: '暴击率', comboRate: '连击率', counterRate: '反击率', stunRate: '眩晕率',
+  dodgeRate: '闪避率', vampireRate: '吸血率',
+  critResist: '抗暴击', comboResist: '抗连击', counterResist: '抗反击',
+  stunResist: '抗眩晕', dodgeResist: '抗闪避', vampireResist: '抗吸血',
+  healBoost: '治疗强化', critDamageBoost: '暴伤强化', critDamageReduce: '暴伤减免',
+  finalDamageBoost: '最终增伤', finalDamageReduce: '最终减伤',
+  combatBoost: '战意', resistanceBoost: '抗性'
+}
+
+const isPercentStat = (key) => ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
+  'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
+  'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
+  'combatBoost','resistanceBoost'].includes(key)
+
+const formatStat = (key, val) => {
+  if (isPercentStat(key)) return (val * 100).toFixed(1) + '%'
+  return Math.floor(val)
+}
+
+const getMemberBaseStats = (member) => {
+  if (!member) return {}
+  const bs = member.baseStats || {}
+  const ts = member.talentStats || {}
+  const stats = {}
+  // Main stats
+  for (const k of ['attack','health','defense','speed']) {
+    stats[k] = (bs[k] || 0) + (ts[k] || 0)
+  }
+  // Combat stats
+  for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
+    'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
+    'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
+    'combatBoost','resistanceBoost']) {
+    stats[k] = (bs[k] || 0) + (ts[k] || 0)
+  }
+  return stats
+}
+
+const getMemberEquipBonus = (member) => {
+  if (!member) return {}
+  const bonus = {}
+  const artifacts = member.equippedArtifacts || {}
+  Object.values(artifacts).forEach(eq => {
+    if (!eq) return
+    if (eq.stats) {
+      Object.entries(eq.stats).forEach(([k, v]) => {
+        bonus[k] = (bonus[k] || 0) + (v || 0)
+      })
+    }
+    if (eq.affixes) {
+      eq.affixes.forEach(a => {
+        if (a.stat && a.valueType === 'percent') {
+          bonus['__pct_' + a.stat] = (bonus['__pct_' + a.stat] || 0) + a.value
+        } else if (a.stat) {
+          bonus[a.stat] = (bonus[a.stat] || 0) + a.value
+        }
+      })
+    }
+  })
+  return bonus
+}
+
+const getMemberPetBonus = (member) => {
+  if (!member || !member.equippedPet) return {}
+  const pet = member.equippedPet
+  const ca = pet.combatAttributes || {}
+  const bonus = {}
+  // Pet provides flat stat bonuses from its combat attributes
+  for (const k of ['attack','health','defense','speed']) {
+    if (ca[k]) bonus[k] = (bonus[k] || 0) + ca[k]
+  }
+  for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate']) {
+    if (ca[k]) bonus[k] = (bonus[k] || 0) + ca[k]
+  }
+  for (const k of ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist']) {
+    if (ca[k]) bonus[k] = (bonus[k] || 0) + ca[k]
+  }
+  for (const k of ['healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost']) {
+    if (ca[k]) bonus[k] = (bonus[k] || 0) + ca[k]
+  }
+  return bonus
+}
+
+const getMemberFinalStats = (member) => {
+  const base = getMemberBaseStats(member)
+  const equipBonus = getMemberEquipBonus(member)
+  const petBonus = getMemberPetBonus(member)
+  const final = {}
+  const allKeys = new Set([...Object.keys(base), ...Object.keys(equipBonus), ...Object.keys(petBonus)])
+  allKeys.forEach(k => {
+    if (k.startsWith('__pct_')) return
+    const b = base[k] || 0
+    const eFlat = equipBonus[k] || 0
+    const ePct = equipBonus['__pct_' + k] || 0
+    const p = petBonus[k] || 0
+    final[k] = (b + eFlat + p) * (1 + ePct)
+  })
+  return final
+}
+
+const buildStatRows = (member, keys) => {
+  const base = getMemberBaseStats(member)
+  const equipBonus = getMemberEquipBonus(member)
+  const petBonus = getMemberPetBonus(member)
+  const final = getMemberFinalStats(member)
+  return keys.map(k => {
+    const b = base[k] || 0
+    const eFlat = equipBonus[k] || 0
+    const ePct = equipBonus['__pct_' + k] || 0
+    const p = petBonus[k] || 0
+    const totalBonus = (b + eFlat + p) * (1 + ePct) - b
+    return {
+      key: k,
+      name: STAT_NAMES[k] || k,
+      base: formatStat(k, b),
+      delta: isPercentStat(k) ? (totalBonus * 100).toFixed(1) : Math.floor(Math.abs(totalBonus)),
+      final: formatStat(k, final[k] || 0)
+    }
+  })
+}
+
+const mainStats = computed(() => {
+  if (!selectedMember.value) return []
+  return buildStatRows(selectedMember.value, ['attack','health','defense','speed'])
+})
+
+const combatStats = computed(() => {
+  if (!selectedMember.value) return []
+  return buildStatRows(selectedMember.value, ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate'])
+})
+
+const specialStats = computed(() => {
+  if (!selectedMember.value) return []
+  return buildStatRows(selectedMember.value, ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost'])
 })
 
 // 方法

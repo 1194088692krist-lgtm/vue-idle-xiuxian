@@ -557,6 +557,13 @@ function grantReward(effectiveZone, isIdleMode = false) {
       }
     }
   }
+  // 幻灵结晶：每场遭遇独立产出（青萝林·游历5min≈50，混沌界·灭世30min<3000）
+  const diff = effectiveZone.difficulty || 1
+  const scale = effectiveZone.enemyScale || 1
+  const crystalBase = Math.floor(2 + diff * 1.5 + scale * 3)
+  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4)))
+  s.phantomCrystals += crystalAmount
+  rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
   return rewards
 }
 
