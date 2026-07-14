@@ -60,7 +60,10 @@
 
     <!-- 2. 角色选择区 -->
     <div class="member-select glass-card">
-      <label>选择角色</label>
+      <div class="member-select-header">
+        <label>选择角色</label>
+        <button v-if="selectedMember" class="btn btn-small btn-outline" @click="viewMemberDetail(selectedMember.id)">详情</button>
+      </div>
       <select v-model="selectedMemberId" @change="selectMember(selectedMemberId)">
         <optgroup v-if="teamMembers.length" label="出战队伍">
           <option v-for="m in teamMembers" :key="m.id" :value="m.id">{{ m.name }}</option>
@@ -105,28 +108,32 @@
             <div class="attr-row attr-head sticky-head">
               <span class="attr-col-label">属性</span>
               <span class="attr-col-base">基础</span>
-              <span class="attr-col-delta">加成</span>
+              <span class="attr-col-equip">装备</span>
+              <span class="attr-col-pet">灵宠</span>
               <span class="attr-col-final">最终</span>
             </div>
             <div class="attr-group-title">基础属性</div>
             <div v-for="stat in mainStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
+              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
             </div>
             <div class="attr-group-title">战斗属性</div>
             <div v-for="stat in combatStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
+              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
             </div>
             <div class="attr-group-title">特殊属性</div>
             <div v-for="stat in specialStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
+              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
             </div>
           </div>
@@ -413,7 +420,18 @@ const allocateMax = () => {
 
 const allocateToNextLevel = () => {
   if (!selectedMember.value) return
-  const required = calculateLevelExp(selectedMember.value.level) - (selectedMember.value.experience || 0)
+  let required = calculateLevelExp(selectedMember.value.level) - (selectedMember.value.experience || 0)
+  if (required <= 0) {
+    let level = selectedMember.value.level + 1
+    while (required <= 0 && level <= 100) {
+      required += calculateLevelExp(level)
+      level++
+    }
+  }
+  if (required <= 0) {
+    message.warning('该角色等级已达上限')
+    return
+  }
   allocateAmount.value = Math.min(required, playerStore.getCultivationPool())
 }
 
@@ -622,11 +640,15 @@ const buildStatRows = (member, keys) => {
     const eFlat = equipBonus[k] || 0
     const ePct = equipBonus['__pct_' + k] || 0
     const p = petBonus[k] || 0
+    const equipDelta = isPercentStat(k) ? ((b * (1 + ePct) - b) * 100).toFixed(1) : Math.floor(eFlat * (1 + ePct))
+    const petDelta = isPercentStat(k) ? (p * 100).toFixed(1) : Math.floor(p)
     const totalBonus = (b + eFlat + p) * (1 + ePct) - b
     return {
       key: k,
       name: STAT_NAMES[k] || k,
       base: formatStat(k, b),
+      equipDelta: equipDelta,
+      petDelta: petDelta,
       delta: isPercentStat(k) ? (totalBonus * 100).toFixed(1) : Math.floor(Math.abs(totalBonus)),
       final: formatStat(k, final[k] || 0)
     }
@@ -1689,10 +1711,11 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: center;
+  align-items: flex-end;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
+  padding-bottom: 80px;
 }
 .modal-content {
   width: 100%;

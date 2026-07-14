@@ -432,6 +432,10 @@
           <span class="summary-value gold">{{ lastSummary.totalStones }}</span>
         </div>
         <div class="summary-item">
+          <span class="summary-label">获得幻灵结晶</span>
+          <span class="summary-value" style="color:#9370db">{{ lastSummary.totalPhantomCrystals || 0 }}</span>
+        </div>
+        <div class="summary-item">
           <span class="summary-label">获得修为</span>
           <span class="summary-value">{{ lastSummary.totalCultivation }}</span>
         </div>
