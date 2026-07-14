@@ -644,14 +644,10 @@ const detailMember = ref(null)
 const memberDetailPosition = ref({ x: 0, y: 0 })
 
 const modalPositionStyle = computed(() => {
-  const { x, y } = memberDetailPosition.value
-  if (x === 0 && y === 0) return {}
-  const maxX = window.innerWidth - 400
-  const maxY = window.innerHeight - 500
   return {
-    position: 'fixed',
-    left: Math.min(x, maxX) + 'px',
-    top: Math.min(y, maxY) + 'px',
+    position: 'relative',
+    left: 'auto',
+    top: 'auto',
     transform: 'none'
   }
 })
@@ -976,7 +972,7 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
 .attr-table {
   display: flex;
   flex-direction: column;
-  gap: 4px;
+  gap: 2px;
 }
 .scrollable-table {
   max-height: 200px;
@@ -1003,12 +999,12 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
 }
 .attr-row {
   display: grid;
-  grid-template-columns: 1.2fr 1fr 1fr 1fr;
+  grid-template-columns: 1.1fr 0.9fr 0.9fr 0.9fr;
   align-items: center;
-  padding: 7px 10px;
+  padding: 5px 8px;
   background: rgba(0, 0, 0, 0.18);
-  border-radius: 6px;
-  font-size: 13px;
+  border-radius: 4px;
+  font-size: 12px;
 }
 .attr-head {
   background: rgba(218, 165, 32, 0.12);
@@ -1596,10 +1592,53 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
 }
 
 .sect-member-modal-content {
-  max-width: 90%;
-  max-height: 80vh;
-  padding: 24px;
+  width: 95%;
+  max-width: 400px;
+  max-height: 85vh;
+  padding: 16px;
   overflow-y: auto;
+  border-radius: 12px;
+  background: rgba(15, 20, 25, 0.98);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+}
+
+.char-detail-header {
+  display: flex;
+  align-items: flex-start;
+  gap: 12px;
+  margin-bottom: 16px;
+}
+
+.char-detail-header .char-avatar.large {
+  width: 70px;
+  height: 70px;
+  flex-shrink: 0;
+}
+
+.char-detail-header .char-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.char-detail-header .char-name {
+  font-size: 18px;
+}
+
+.char-detail-header .char-meta {
+  font-size: 11px;
+  gap: 6px;
+  flex-wrap: wrap;
+}
+
+.char-detail-header .char-talent-info {
+  font-size: 11px;
+  margin-top: 4px;
+  line-height: 1.4;
+}
+
+.char-detail-header .char-level {
+  font-size: 12px;
+  margin-top: 2px;
 }
 
 .skill-list {
