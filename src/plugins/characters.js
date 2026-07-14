@@ -146,7 +146,8 @@ export async function initCharacterDefs() {
 }
 
 // 共享立绘（随站点部署，所有玩家同源可见）：id -> 资源 URL。
-// 由开发者通过 GMTools「导出共享立绘包」→ 落盘到 public/portraits/ → 提交部署 后对所有玩家生效。
+// 直接把图片放进 public/portraits/（文件名用角色名或ID），构建前 prebuild 会自动生成
+// public/portraits/manifest.json（scripts/gen-portraits-manifest.mjs），提交推送即对所有玩家生效。
 export const sharedPortraitMap = reactive({})
 
 export async function loadSharedPortraits() {

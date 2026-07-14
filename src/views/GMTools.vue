@@ -673,12 +673,11 @@
         <!-- 批量导入立绘 -->
         <div class="batch-portrait">
           <div class="batch-portrait-bar">
-            <span class="batch-title">🖼️ 批量导入立绘</span>
+            <span class="batch-title">🖼️ 批量导入立绘（本地预览）</span>
             <button class="btn-secondary" @click="triggerBatchPortrait">选择图片（可多选 / 拖拽）</button>
             <input type="file" ref="batchPortraitInput" @change="handleBatchPortraitSelect" accept="image/*" multiple hidden />
-            <button class="btn-secondary" @click="exportSharedPortraitBundle" title="导出当前已上传的立绘，交由开发者落盘到 public/portraits/ 并部署，即可让所有玩家看到">导出共享立绘包</button>
           </div>
-          <p class="batch-hint">本地上传仅自己可见（IndexedDB）。点「导出共享立绘包」下载 <code>portraits-bundle.json</code>，由开发者执行 <code>node scripts/apply-portraits.mjs</code> 落盘并提交部署后，<b>所有玩家</b>同源可见。</p>
+          <p class="batch-hint">此处上传仅本机预览（IndexedDB）。要让 <b>所有玩家</b>都能看到，把立绘图片放进项目的 <code>public/portraits/</code> 目录（文件名用角色名或ID，如 <code>墨风.png</code> / <code>char_001.png</code>），提交推送后 CI 构建会自动生成清单并同源部署，无需再导出或另行共享。</p>
           <div class="batch-dropzone" @click="triggerBatchPortrait" @dragover.prevent @drop.prevent="handleBatchPortraitDrop">
             将多张立绘拖到此处，按文件名自动匹配角色（如 <code>李青.png</code> 或 <code>char_001.png</code>），匹配项可下拉改配
           </div>
@@ -1590,29 +1589,6 @@ const exportCharacters = () => {
   a.href = url
   a.download = 'characters.json'
   a.click()
-}
-
-// 导出「共享立绘包」：收集当前已上传的立绘（data URI），打包为 portraits-bundle.json。
-// 开发者拿到后执行 node scripts/apply-portraits.mjs 落盘到 public/portraits/ 并提交部署，
-// 即可让所有玩家同源加载这些立绘（本地 IndexedDB 上传仅自己可见，不在此列）。
-const exportSharedPortraitBundle = () => {
-  const images = {}
-  characterListGM.value.forEach(c => {
-    const av = (characterDefMap[c.id] && characterDefMap[c.id].avatar) || c.avatar
-    if (av && typeof av === 'string' && av.startsWith('data:')) images[c.id] = av
-  })
-  if (!Object.keys(images).length) {
-    alert('当前没有任何已上传的立绘可导出。请先批量导入或单张上传立绘。')
-    return
-  }
-  const blob = new Blob([JSON.stringify({ images }, null, 2)], { type: 'application/json' })
-  const url = URL.createObjectURL(blob)
-  const a = document.createElement('a')
-  a.href = url
-  a.download = 'portraits-bundle.json'
-  a.click()
-  URL.revokeObjectURL(url)
-  alert(`已导出 ${Object.keys(images).length} 张立绘到 portraits-bundle.json。交由开发者执行 node scripts/apply-portraits.mjs 并提交部署即可对所有玩家生效。`)
 }
 
 const importCharacters = () => {
