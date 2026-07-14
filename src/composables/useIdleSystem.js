@@ -24,6 +24,11 @@ const foundEquipment = ref([])       // 本次挂机获得的装备列表
 // ============ 队伍成员挂机状态（每人独立血条和build） ============
 const teamMemberStates = ref([])
 
+// 兼容旧版血条变量（ZoneSelector.vue 使用）
+const idlePlayerHP = ref(100)
+const idlePlayerMaxHP = ref(100)
+const idlePlayerDefeated = ref(false)
+
 // 队伍总 Build 强度（所有出战成员之和）
 const playerBuildStrength = computed(() => {
   const s = store()
@@ -1001,6 +1006,9 @@ export function useIdleSystem() {
     canStartIdle,
     teamMemberStates,
     foundEquipment,
+    idlePlayerHP,
+    idlePlayerMaxHP,
+    idlePlayerDefeated,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,

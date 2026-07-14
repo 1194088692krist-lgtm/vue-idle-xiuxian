@@ -100,6 +100,15 @@ export const gachaPools = {
     petRate: 0.03,
     resourceRate: 0.02
   },
+  equipment: {
+    name: '装备池',
+    cost: 120,
+    characterRate: 0,
+    weaponRate: 0.50,
+    artifactRate: 0.45,
+    petRate: 0,
+    resourceRate: 0.05
+  },
   weapon: {
     name: '武器池',
     cost: 120,
