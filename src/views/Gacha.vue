@@ -6,8 +6,8 @@
           <GiftOutlined />
         </div>
         <div class="header-info">
-          <h2 class="card-title gold-gradient-text">天机阁</h2>
-          <p class="card-subtitle">消耗幻灵结晶抽取珍稀人物、武器、法宝与灵宠</p>
+          <h2 class="card-title gold-gradient-text">仙缘祈福</h2>
+          <p class="card-subtitle">消耗幻灵结晶祈求仙缘，获得人物、武器、法宝与灵宠</p>
         </div>
       </div>
       <div class="card-body">
@@ -58,10 +58,10 @@
             </button>
             <button
               class="btn btn-success"
-              :class="{ disabled: playerStore.phantomCrystals < currentPoolConfig.cost * 10 }"
+              :class="{ disabled: playerStore.phantomCrystals < currentPoolConfig.cost * 9 }"
               @click="doTenGacha"
             >
-              <span>十连（{{ currentPoolConfig.cost * 10 }}幻灵结晶）</span>
+              <span>九连（{{ currentPoolConfig.cost * 9 }}幻灵结晶）</span>
             </button>
           </div>
         </div>
@@ -79,7 +79,7 @@
         </div>
 
         <div v-if="gachaResults.length > 0" class="gacha-results">
-          <h3 class="section-title">抽奖结果</h3>
+          <h3 class="section-title">祈福结果</h3>
           <div class="results-grid">
             <div
               v-for="(result, index) in gachaResults"
@@ -133,7 +133,7 @@
 
         <div class="log-section">
           <div class="log-header">
-            <h3 class="section-title gold-gradient-text">抽奖日志</h3>
+            <h3 class="section-title gold-gradient-text">祈福日志</h3>
             <button class="btn btn-small btn-danger" @click="clearLogPanel">清空</button>
           </div>
           <log-panel ref="logRef" />
@@ -285,7 +285,7 @@
     if (!result) return
     grantReward(result)
     gachaResults.value = [result]
-    showMessage('success', `抽奖获得：${getRewardName(result)}`)
+    showMessage('success', `祈福获得：${getRewardName(result)}`)
     // 抽到4星/5星人物自动弹出立绘
     if (result.category === 'character' && result.item.star >= 4) {
       selectedCharacter.value = result.item
@@ -295,15 +295,15 @@
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
 
-  // 十连
+  // 九连
   const doTenGacha = () => {
-    const cost = currentPoolConfig.value.cost * 10
+    const cost = currentPoolConfig.value.cost * 9
     if (playerStore.phantomCrystals < cost) {
       showMessage('error', '幻灵结晶不足！')
       return
     }
     playerStore.phantomCrystals -= cost
-    const results = doMultiGacha(currentPool.value, 10, playerStore.level)
+    const results = doMultiGacha(currentPool.value, 9, playerStore.level)
     results.forEach(r => grantReward(r))
     gachaResults.value = results
     const summary = {}
@@ -320,7 +320,7 @@
     if (summary.reinforce_stone) parts.push(`强化石奖励×${summary.reinforce_stone}`)
     if (summary.refinement_stone) parts.push(`洗练石奖励×${summary.refinement_stone}`)
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
-    showMessage('success', `十连抽奖完成：${parts.join('，')}`)
+    showMessage('success', `九连祈福完成：${parts.join('，')}`)
     // 十连中抽到4星/5星人物自动弹出立绘（取最高星级）
     const bestChar = results
       .filter(r => r.category === 'character' && r.item.star >= 4)
@@ -385,7 +385,11 @@
 
   const getResultTypeName = (result) => {
     if (result.category === 'character') return `人物`
-    if (result.category === 'equipment') return '装备'
+    if (result.category === 'equipment') {
+      // 区分武器和法宝
+      if (result.item.slot === 'artifact' || result.item.type === 'artifact') return '法宝'
+      return '武器'
+    }
     if (result.category === 'pet') return '灵宠'
     return resourceNames[result.item.type] || '资源'
   }

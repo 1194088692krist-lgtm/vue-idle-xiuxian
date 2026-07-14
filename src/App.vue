@@ -221,9 +221,9 @@ import SaveButton from './components/SaveButton.vue'
       ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
       { label: '宗门', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
-      { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
+      { label: '丹药/丹方', key: 'alchemy', icon: MedicineBoxOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
-      { label: '抽奖', key: 'gacha', icon: GiftOutlined },
+      { label: '仙缘祈福', key: 'gacha', icon: GiftOutlined },
       { label: '攻略', key: 'guide', icon: FileTextOutlined },
       { label: '设置', key: 'settings', icon: SettingOutlined },
       ...(playerStore.isGMMode ? [{ label: 'GM', key: 'gm', icon: SmileOutlined }] : [])

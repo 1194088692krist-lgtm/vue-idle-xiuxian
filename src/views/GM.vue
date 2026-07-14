@@ -47,6 +47,18 @@
           <n-form-item label="灵宠精华">
             <n-input-number v-model:value="baseAttributes.petEssence" />
           </n-form-item>
+          <n-form-item label="幻灵结晶">
+            <n-input-number v-model:value="baseAttributes.phantomCrystals" />
+          </n-form-item>
+          <n-form-item label="人精华">
+            <n-input-number v-model:value="baseAttributes.characterEssence" />
+          </n-form-item>
+          <n-form-item label="强化石">
+            <n-input-number v-model:value="baseAttributes.reinforceStones" />
+          </n-form-item>
+          <n-form-item label="洗练石">
+            <n-input-number v-model:value="baseAttributes.refinementStones" />
+          </n-form-item>
         </n-form>
         <template #footer>
           <n-space justify="end">
@@ -81,7 +93,11 @@
     herbRate: playerStore.herbRate,
     alchemyRate: playerStore.alchemyRate,
     spiritStones: playerStore.spiritStones,
-    petEssence: playerStore.petEssence
+    petEssence: playerStore.petEssence,
+    phantomCrystals: playerStore.phantomCrystals || 0,
+    characterEssence: playerStore.characterEssence || 0,
+    reinforceStones: playerStore.reinforceStones || 0,
+    refinementStones: playerStore.refinementStones || 0
   })
 
   // 更新玩家属性
