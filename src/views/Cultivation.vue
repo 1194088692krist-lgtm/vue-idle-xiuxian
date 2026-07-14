@@ -49,70 +49,61 @@
     <!-- 属性面板 -->
     <div class="stats-card glass-card">
       <h3 class="section-title">人物属性</h3>
-      <p class="base-note">
-        基础数值（含出战灵宠 · 不含装备）；最终数值为叠加装备后；差值为装备提供的加成。
-        灵宠增益见下方「灵宠增益」卡片。
-      </p>
+      <p class="base-note">左列为基础值（裸身 · 含出战灵宠），中列为装备后最终值，右列为装备与套装带来的增量</p>
 
-      <!-- 基础属性 -->
-      <div class="attr-group">
-        <h4 class="sub-title">基础属性</h4>
+      <!-- 基础数值：基础值 / 装备后 / +装备加成 -->
+      <div class="attr-block">
+        <h4 class="sub-title">基础数值</h4>
         <div class="attr-table">
           <div class="attr-row attr-head">
-            <span class="attr-name">属性</span>
-            <span class="attr-base">基础</span>
-            <span class="attr-final">最终</span>
-            <span class="attr-delta">加成</span>
+            <span class="attr-col-label">属性</span>
+            <span class="attr-col-base">基础值</span>
+            <span class="attr-col-final">装备后</span>
+            <span class="attr-col-delta">+装备加成</span>
           </div>
-          <div class="attr-row" v-for="s in baseStatDefs" :key="s.key">
-            <span class="attr-name">{{ s.label }}</span>
-            <span class="attr-base">{{ fmtFlat(naturalStats[s.key]) }}</span>
-            <span class="attr-final">{{ fmtFlat(finalStats[s.key]) }}</span>
-            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
-              {{ deltaText(finalStats[s.key] - naturalStats[s.key], false) }}
-            </span>
+          <div class="attr-row" v-for="row in baseCompare" :key="row.key">
+            <span class="attr-col-label">{{ row.label }}</span>
+            <span class="attr-col-base">{{ row.base }}</span>
+            <span class="attr-col-final">{{ row.final }}</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': row.delta === 0 }">+{{ row.delta }}</span>
           </div>
         </div>
       </div>
 
       <!-- 战斗属性 -->
-      <div class="attr-group">
+      <div class="attr-block">
         <h4 class="sub-title">战斗属性</h4>
         <div class="attr-table">
           <div class="attr-row attr-head">
-            <span class="attr-name">属性</span>
-            <span class="attr-base">基础</span>
-            <span class="attr-final">最终</span>
-            <span class="attr-delta">加成</span>
+            <span class="attr-col-label">属性</span>
+            <span class="attr-col-base">基础值</span>
+            <span class="attr-col-final">装备后</span>
+            <span class="attr-col-delta">+装备加成</span>
           </div>
-          <div class="attr-row" v-for="s in combatStatDefs" :key="s.key">
-            <span class="attr-name">{{ s.label }}</span>
-            <span class="attr-base">{{ fmtRate(naturalStats[s.key]) }}</span>
-            <span class="attr-final">{{ fmtRate(finalStats[s.key]) }}</span>
-            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
-              {{ deltaText(finalStats[s.key] - naturalStats[s.key], true) }}
-            </span>
+          <div class="attr-row" v-for="row in combatCompare" :key="row.key">
+            <span class="attr-col-label">{{ row.label }}</span>
+            <span class="attr-col-base">{{ row.base }}%</span>
+            <span class="attr-col-final">{{ row.final }}%</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': row.delta === 0 }">+{{ row.delta }}%</span>
           </div>
         </div>
       </div>
 
       <!-- 抗性属性 -->
-      <div class="attr-group">
+      <div class="attr-block">
         <h4 class="sub-title">抗性属性</h4>
         <div class="attr-table">
           <div class="attr-row attr-head">
-            <span class="attr-name">属性</span>
-            <span class="attr-base">基础</span>
-            <span class="attr-final">最终</span>
-            <span class="attr-delta">加成</span>
+            <span class="attr-col-label">属性</span>
+            <span class="attr-col-base">基础值</span>
+            <span class="attr-col-final">装备后</span>
+            <span class="attr-col-delta">+装备加成</span>
           </div>
-          <div class="attr-row" v-for="s in resistanceStatDefs" :key="s.key">
-            <span class="attr-name">{{ s.label }}</span>
-            <span class="attr-base">{{ fmtRate(naturalStats[s.key]) }}</span>
-            <span class="attr-final">{{ fmtRate(finalStats[s.key]) }}</span>
-            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
-              {{ deltaText(finalStats[s.key] - naturalStats[s.key], true) }}
-            </span>
+          <div class="attr-row" v-for="row in resistCompare" :key="row.key">
+            <span class="attr-col-label">{{ row.label }}</span>
+            <span class="attr-col-base">{{ row.base }}%</span>
+            <span class="attr-col-final">{{ row.final }}%</span>
+            <span class="attr-col-delta" :class="{ 'is-zero': row.delta === 0 }">+{{ row.delta }}%</span>
           </div>
         </div>
       </div>
@@ -306,6 +297,7 @@ const breakthroughRealm = ref('')
 const breakthroughColor = ref('#DAA520')
 
 // 灵宠增益展示：基础属性已含出战灵宠，此处单独列出其加成占比
+// 注意：getPetBonus 是 Pinia getter（派生状态），必须直接取值 playerStore.getPetBonus，不能加 () 调用，否则会抛 TypeError 导致人物界面卡死
 const petRarityMap = {
   mortal: { rarityName: '凡品灵宠', color: '#32CD32' },
   spiritual: { rarityName: '灵品灵宠', color: '#1E90FF' },
@@ -320,46 +312,45 @@ const activePetInfo = computed(() => {
   return { name: p.name, ...(petRarityMap[p.rarity] || { rarityName: p.rarity, color: '#aaa' }) }
 })
 
-// 属性定义（用于「基础/最终/加成」对照表）
-const baseStatDefs = [
-  { key: 'attack', label: '攻击' },
-  { key: 'health', label: '生命' },
-  { key: 'defense', label: '防御' },
-  { key: 'speed', label: '速度' }
-]
-const combatStatDefs = [
-  { key: 'critRate', label: '暴击率' },
-  { key: 'comboRate', label: '连击率' },
-  { key: 'counterRate', label: '反击率' },
-  { key: 'stunRate', label: '眩晕率' },
-  { key: 'dodgeRate', label: '闪避率' },
-  { key: 'vampireRate', label: '吸血率' }
-]
-const resistanceStatDefs = [
-  { key: 'critResist', label: '抗暴击' },
-  { key: 'comboResist', label: '抗连击' },
-  { key: 'counterResist', label: '抗反击' },
-  { key: 'stunResist', label: '抗眩晕' },
-  { key: 'dodgeResist', label: '抗闪避' },
-  { key: 'vampireResist', label: '抗吸血' }
-]
-// 自然属性（含灵宠·不含装备）与最终属性（叠加装备+套装）
-const naturalStats = computed(() => playerStore.getNaturalStats)
-const finalStats = computed(() => playerStore.getEffectiveStats)
-// 格式化：基础数值为整数，战斗/抗性为百分比
-const fmtFlat = (v) => Math.floor(Number(v) || 0)
-const fmtRate = (v) => ((Number(v) || 0) * 100).toFixed(1) + '%'
-const deltaText = (d, isRate) => {
-  const v = Number(d) || 0
-  if (Math.abs(v) < 1e-9) return '—'
-  const sign = v > 0 ? '+' : ''
-  return sign + (isRate ? (v * 100).toFixed(1) + '%' : Math.floor(v).toString())
+// 人物属性对比：基础值（裸身·含出战灵宠） vs 装备后最终值 vs 装备/套装增量
+const attrLabelMap = { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }
+const combatLabelMap = {
+  critRate: '暴击率', comboRate: '连击率', counterRate: '反击率',
+  stunRate: '眩晕率', dodgeRate: '闪避率', vampireRate: '吸血率'
 }
-const deltaClass = (d) => {
-  const v = Number(d) || 0
-  if (Math.abs(v) < 1e-9) return 'delta-zero'
-  return v > 0 ? 'delta-pos' : 'delta-neg'
+const resistLabelMap = {
+  critResist: '抗暴击', comboResist: '抗连击', counterResist: '抗反击',
+  stunResist: '抗眩晕', dodgeResist: '抗闪避', vampireResist: '抗吸血'
 }
+const BASE_ATTR_KEYS = ['attack', 'health', 'defense', 'speed']
+const COMBAT_KEYS = ['critRate', 'comboRate', 'counterRate', 'stunRate', 'dodgeRate', 'vampireRate']
+const RESIST_KEYS = ['critResist', 'comboResist', 'counterResist', 'stunResist', 'dodgeResist', 'vampireResist']
+
+const baseCompare = computed(() => BASE_ATTR_KEYS.map(k => {
+  const base = playerStore.nakedBaseAttributes[k] || 0
+  const final = playerStore.baseAttributes[k] || 0
+  return { key: k, label: attrLabelMap[k], base: Math.floor(base), final: Math.floor(final), delta: Math.floor(final - base) }
+}))
+const combatCompare = computed(() => COMBAT_KEYS.map(k => {
+  const base = playerStore.nakedCombatAttributes[k] || 0
+  const final = playerStore.combatAttributes[k] || 0
+  return {
+    key: k, label: combatLabelMap[k],
+    base: +(base * 100).toFixed(1),
+    final: +(final * 100).toFixed(1),
+    delta: +((final - base) * 100).toFixed(1)
+  }
+}))
+const resistCompare = computed(() => RESIST_KEYS.map(k => {
+  const base = playerStore.nakedCombatResistance[k] || 0
+  const final = playerStore.combatResistance[k] || 0
+  return {
+    key: k, label: resistLabelMap[k],
+    base: +(base * 100).toFixed(1),
+    final: +(final * 100).toFixed(1),
+    delta: +((final - base) * 100).toFixed(1)
+  }
+}))
 
 const baseGainRate = 1
 const baseCultivationCost = 8
@@ -620,37 +611,31 @@ onUnmounted(() => {
   color: #aaa;
   font-weight: bold;
 }
-/* 属性对照表：基础 / 最终 / 加成 */
-.attr-group { margin-top: 12px; }
+.attr-block { margin-top: 12px; }
 .attr-table {
   display: flex;
   flex-direction: column;
-  border-radius: 8px;
-  overflow: hidden;
-  border: 1px solid rgba(218, 165, 32, 0.12);
+  gap: 4px;
 }
 .attr-row {
   display: grid;
-  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  grid-template-columns: 1.2fr 1fr 1fr 1fr;
   align-items: center;
   padding: 7px 10px;
-  font-size: 13px;
   background: rgba(0, 0, 0, 0.18);
+  border-radius: 6px;
+  font-size: 13px;
 }
-.attr-row:nth-child(even) { background: rgba(0, 0, 0, 0.1); }
 .attr-head {
-  background: rgba(218, 165, 32, 0.1);
-  color: #DAA520;
+  background: rgba(218, 165, 32, 0.12);
+  color: #b9c0d4;
   font-weight: bold;
-  font-size: 12px;
 }
-.attr-name { color: #c9c2b0; }
-.attr-base { color: #9aa0b0; text-align: right; }
-.attr-final { color: #fff; font-weight: bold; text-align: right; }
-.attr-delta { text-align: right; font-weight: bold; }
-.delta-pos { color: #66BB6A; }
-.delta-neg { color: #EF5350; }
-.delta-zero { color: #6b7280; }
+.attr-col-label { color: #c9d1e8; }
+.attr-col-base { color: #9aa3b8; text-align: right; }
+.attr-col-final { color: #DAA520; font-weight: bold; text-align: right; }
+.attr-col-delta { color: #66BB6A; font-weight: bold; text-align: right; }
+.attr-col-delta.is-zero { color: #5a6378; font-weight: normal; }
 
 .resource-stats { margin-top: 12px; }
 .resource-grid {
