@@ -111,7 +111,7 @@
     BookOutlined,
     ExperimentOutlined,
     CompassOutlined,
-    TrophyOutlined,
+    FileTextOutlined,
     SettingOutlined,
     MedicineBoxOutlined,
     GiftOutlined,
@@ -223,7 +223,7 @@ import SaveButton from './components/SaveButton.vue'
       { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
       { label: '抽奖', key: 'gacha', icon: GiftOutlined },
-      { label: '成就', key: 'achievements', icon: TrophyOutlined },
+      { label: '攻略', key: 'guide', icon: FileTextOutlined },
       { label: '设置', key: 'settings', icon: SettingOutlined },
       ...(playerStore.isGMMode ? [{ label: 'GM', key: 'gm', icon: SmileOutlined }] : [])
     ]

@@ -5,7 +5,7 @@ import Home from '../views/Home.vue'
 import Cultivation from '../views/Cultivation.vue'
 import Inventory from '../views/Inventory.vue'
 import Exploration from '../views/Exploration.vue'
-import Achievements from '../views/Achievements.vue'
+import Guide from '../views/Guide.vue'
 import Settings from '../views/Settings.vue'
 import GM from '../views/GM.vue'
 import GMTools from '../views/GMTools.vue'
@@ -43,9 +43,9 @@ const routes = [
     meta: { requiresGame: true }
   },
   {
-    path: '/achievements',
-    name: 'Achievements',
-    component: Achievements,
+    path: '/guide',
+    name: 'Guide',
+    component: Guide,
     meta: { requiresGame: true }
   },
   {

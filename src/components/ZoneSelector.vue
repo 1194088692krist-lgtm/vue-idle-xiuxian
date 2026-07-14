@@ -304,7 +304,7 @@
 
     <!-- 宝物高亮弹窗 -->
     <transition name="flash">
-      <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier">
+      <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }">
         <div class="flash-content">
           <div class="flash-icon">{{ treasureFlash.icon }}</div>
           <div class="flash-title">{{ treasureFlash.title }}</div>
@@ -1208,6 +1208,84 @@ onUnmounted(() => {
   0%, 100% { box-shadow: 0 0 6px rgba(255, 215, 0, 0.4); }
   50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.9); }
 }
+/* 掉落分级特效：凡品/凡品灵宠保持普通(reward-normal)；其余品质按稀有度递增发光/流光/脉冲 */
+.log-line.drop-uncommon,
+.log-line.drop-spiritual {
+  color: #88cc44;
+  font-weight: bold;
+  border-left-color: #88cc44;
+  background: rgba(136, 204, 68, 0.1);
+  text-shadow: 0 0 6px rgba(136, 204, 68, 0.5);
+}
+.log-line.drop-rare,
+.log-line.drop-mystic {
+  color: #7db4ff;
+  font-weight: bold;
+  border-left-color: #4488ff;
+  background: rgba(68, 136, 255, 0.12);
+  box-shadow: 0 0 6px rgba(68, 136, 255, 0.35);
+}
+.log-line.drop-epic,
+.log-line.drop-celestial {
+  color: #c89bff;
+  font-weight: bold;
+  border-left-color: #aa44ff;
+  background: rgba(170, 68, 255, 0.15);
+  box-shadow: 0 0 4px rgba(170, 68, 255, 0.3);
+  animation: logIn 0.35s ease, epicGlowLoop 1.4s ease-in-out infinite;
+}
+.log-line.drop-legendary {
+  color: #FFD700;
+  font-weight: bold;
+  border-left-color: #FFD700;
+  background: rgba(255, 215, 0, 0.18);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+  animation: logIn 0.35s ease, legendaryGlowLoop 1.8s ease-in-out infinite, dropPulse 2.6s ease-in-out infinite;
+}
+.log-line.drop-divine {
+  color: #ff5a5a;
+  font-weight: bold;
+  border-left-color: #FF0000;
+  background: rgba(255, 0, 0, 0.16);
+  border: 1px solid rgba(255, 0, 0, 0.55);
+  box-shadow: 0 0 8px rgba(255, 0, 0, 0.5);
+  animation: logIn 0.35s ease, epicGlowLoop 1.2s ease-in-out infinite, dropPulse 2.2s ease-in-out infinite;
+}
+.log-line.drop-mythic {
+  color: #FF4500;
+  font-weight: bold;
+  border-left-color: #FF4500;
+  background: rgba(255, 69, 0, 0.2);
+  border: 1px solid rgba(255, 69, 0, 0.6);
+  box-shadow: 0 0 10px rgba(255, 69, 0, 0.6);
+  animation: logIn 0.35s ease, mythicGlowLoop 1.5s ease-in-out infinite, dropPulse 2s ease-in-out infinite;
+}
+/* 极品及以上：文字流光（渐变扫过），越稀有越华丽 */
+.log-line.drop-epic .log-text,
+.log-line.drop-celestial .log-text,
+.log-line.drop-legendary .log-text,
+.log-line.drop-divine .log-text,
+.log-line.drop-mythic .log-text {
+  background: linear-gradient(100deg, currentColor 20%, #ffffff 50%, currentColor 80%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: dropShimmer 3s linear infinite;
+}
+@keyframes dropShimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: 0% center; }
+}
+@keyframes dropPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.018); }
+}
+@keyframes mythicGlowLoop {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 69, 0, 0.5); }
+  50% { box-shadow: 0 0 22px rgba(255, 69, 0, 1); }
+}
 /* 奇遇：流光溢彩 */
 .log-line.fortune {
   color: #ffd1f0;
@@ -1346,6 +1424,44 @@ onUnmounted(() => {
   0% { transform: rotate(0deg) scale(1); }
   50% { transform: rotate(180deg) scale(1.3); }
   100% { transform: rotate(360deg) scale(1); }
+}
+/* 宝物弹窗：颜色随稀有度(var(--flash-color)由 JS 传入)，发光强度随档位递增 */
+.treasure-flash .flash-content {
+  border: 2px solid var(--flash-color, #FFD700);
+  box-shadow: 0 0 30px var(--flash-color, #FFD700);
+}
+.treasure-flash .flash-title,
+.treasure-flash .flash-icon {
+  color: var(--flash-color, #FFD700);
+}
+.treasure-flash.uncommon .flash-content {
+  box-shadow: 0 0 16px var(--flash-color, #88cc44);
+}
+.treasure-flash.rare .flash-content {
+  box-shadow: 0 0 28px var(--flash-color, #4488ff);
+}
+.treasure-flash.epic .flash-content {
+  box-shadow: 0 0 44px var(--flash-color, #aa44ff);
+  animation: epicPulse 2.5s ease;
+}
+.treasure-flash.legendary .flash-content {
+  box-shadow: 0 0 64px var(--flash-color, #FFD700);
+  animation: legendaryPulse 3s ease;
+  background: linear-gradient(135deg, rgba(0,0,0,0.9), rgba(50,30,0,0.95));
+}
+.treasure-flash.mythic .flash-content {
+  box-shadow: 0 0 100px var(--flash-color, #FF4500);
+  animation: mythicFlashPulse 3.4s ease;
+  background: linear-gradient(135deg, rgba(0,0,0,0.92), rgba(60,12,0,0.96));
+}
+.treasure-flash.legendary .flash-icon,
+.treasure-flash.mythic .flash-icon {
+  animation: spinFlash 3s ease;
+}
+@keyframes mythicFlashPulse {
+  0% { box-shadow: 0 0 30px var(--flash-color, #FF4500); transform: scale(0.9); }
+  30% { box-shadow: 0 0 120px var(--flash-color, #FF4500); transform: scale(1); }
+  100% { box-shadow: 0 0 50px var(--flash-color, #FF4500); transform: scale(1); }
 }
 .flash-enter-active, .flash-leave-active {
   transition: all 0.3s ease;

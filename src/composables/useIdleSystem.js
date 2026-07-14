@@ -188,6 +188,34 @@ const rarityInfo = {
   divine: { name: '神品灵宠', color: '#FF0000', tier: 'legendary' }
 }
 
+// 稀有度 → 特效档位（用于日志/弹窗的分级表现）。凡品/凡品灵宠为 plain（不改动显示规则）。
+const RARITY_TIER = {
+  common: 'plain', uncommon: 'uncommon', rare: 'rare', epic: 'epic', legendary: 'legendary', mythic: 'mythic',
+  mortal: 'plain', spiritual: 'uncommon', mystic: 'epic', celestial: 'legendary', divine: 'mythic'
+}
+
+// 各品质掉落的日志文案（越稀有描写越华丽）。plain 单独走普通格式。
+const DROP_TEXT = {
+  uncommon:  { icon: '🌿', word: '获得', flair: '，微光初绽' },
+  rare:      { icon: '💎', word: '获得', flair: '，蓝光流转' },
+  spiritual: { icon: '🌿', word: '收服', flair: '，灵光乍现' },
+  epic:      { icon: '🌟', word: '获得', flair: '，紫气东来' },
+  mystic:    { icon: '✨', word: '收服', flair: '，玄光环绕' },
+  legendary: { icon: '🔥', word: '获得', flair: '，金光万丈，天地同贺' },
+  celestial: { icon: '🌟', word: '收服', flair: '，仙光普照' },
+  mythic:    { icon: '⚡', word: '获得', flair: '，神辉冲霄，异象惊世' },
+  divine:    { icon: '🔆', word: '收服', flair: '，神兽降世，瑞彩千条' }
+}
+
+function buildDropText(reward, info) {
+  const rarity = reward.rarity
+  if (rarity === 'common' || rarity === 'mortal') {
+    return `⚔️ ${reward.type === 'pet' ? '收服' : '获得'}【${reward.name}】（${info.name}）`
+  }
+  const t = DROP_TEXT[rarity] || DROP_TEXT.uncommon
+  return `${t.icon} ${t.word}【${reward.name}】${t.flair}！`
+}
+
 // 合并难度参数，生成一个「有效区域」供战斗/奖励逻辑使用
 function buildEffectiveZone(zone, diff) {
   return {
@@ -521,17 +549,31 @@ async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = fals
 let flashTimer = null
 function showTreasureFlash(reward) {
   if (flashTimer) clearTimeout(flashTimer)
-  let tier = 'normal', icon = '', title = '', desc = ''
-  if (reward.type === 'equipment' || reward.type === 'pet') {
-    const info = reward.info || rarityInfo[reward.rarity] || rarityInfo.common
-    tier = info.tier; icon = reward.type === 'pet' ? '🐉' : '⚔️'
-    if (tier === 'legendary') { title = '神品降临！'; desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！天降异象，金光万丈！` }
-    else if (tier === 'epic') { title = '极品宝物！'; desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！紫气东来！` }
-    else if (tier === 'highlight') { title = '稀有收获！'; desc = `获得${info.name}${reward.type === 'pet' ? '' : '装备'}！` }
-    else return
-  } else return
-  treasureFlash.value = { show: true, tier, title, desc, icon }
-  flashTimer = setTimeout(() => { treasureFlash.value.show = false }, tier === 'legendary' ? 3000 : tier === 'epic' ? 2500 : 2000)
+  const info = reward.info || rarityInfo[reward.rarity] || rarityInfo.common
+  const tier = RARITY_TIER[reward.rarity] || 'plain'
+  // 仅 稀有(上品) 及以上品质触发全屏宝物弹窗；良品/灵品等仅保留日志特效，避免频繁打断
+  if (tier === 'plain' || tier === 'uncommon') return
+  const isPet = reward.type === 'pet'
+  const kind = isPet ? '灵宠' : '装备'
+  const flashTitles = {
+    rare: '稀有宝物！',
+    epic: '极品宝物！',
+    legendary: '仙品降临！',
+    mythic: '神品现世！'
+  }
+  const flashDescs = {
+    rare: `获得${info.name}${kind}！蓝光流转，瑞气盈门。`,
+    epic: `获得${info.name}${kind}！紫气东来，瑞光环绕。`,
+    legendary: `获得${info.name}${kind}！金光万丈，天地同贺！`,
+    mythic: `获得${info.name}${kind}！神辉冲霄，异象惊世，万法臣服！`
+  }
+  const title = flashTitles[tier] || '宝物现世！'
+  const desc = flashDescs[tier] || `获得${info.name}${kind}！`
+  const icon = isPet ? '🐉' : '⚔️'
+  // 越稀有弹窗停留越久
+  const duration = tier === 'mythic' ? 3500 : tier === 'legendary' ? 3000 : tier === 'epic' ? 2500 : 1800
+  treasureFlash.value = { show: true, tier, title, desc, icon, color: info.color }
+  flashTimer = setTimeout(() => { treasureFlash.value.show = false }, duration)
 }
 
 // ============ 生动日志：单场遭遇 ============
@@ -554,11 +596,10 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
       if (r.type === 'equipment' || r.type === 'pet') {
         const info = r.info
         const detail = formatItemDetail(r.item, r.type, r.rarity)
-        if (info.tier === 'legendary') addLog('reward-legendary', `🔥 金光万丈！获得【${r.name}】，异象冲霄，天地同贺！`, detail)
-        else if (info.tier === 'epic') addLog('reward-epic', `🌟 紫气东来！获得【${r.name}】，瑞光环绕！`, detail)
-        else if (info.tier === 'highlight') addLog('reward-highlight', `💎 稀有收获：【${r.name}】`, detail)
-        // 普通品质也显示完整名称 + 数据（不再只显示"凡品/良品"）
-        else addLog('reward-normal', `⚔️ 获得【${r.name}】（${info.name}）`, detail)
+        const rarity = r.rarity
+        // 凡品/凡品灵宠保持普通显示（不改显示规则）；其余品质按稀有度套用 drop-{rarity} 分级特效
+        const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
+        addLog(cls, buildDropText(r, info), detail)
       } else if (r.type === 'fortune') {
         addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
       } else {
