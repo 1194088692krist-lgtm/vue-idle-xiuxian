@@ -202,27 +202,32 @@
       <div class="team-actions">
         <button class="btn btn-success" @click="autoPickBestTeam">一键组建最强队伍</button>
       </div>
-      <h4 class="sub-title">未出战成员</h4>
-      <div v-if="benchMembers.length" class="bench-list">
+      <div v-if="allMembers.length" class="bench-list">
         <div class="bench-pagination">
           <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
           <span class="page-info">{{ benchPage }} / {{ totalBenchPages }}</span>
           <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
         </div>
-        <div v-for="m in pagedBenchMembers" :key="m.id" class="bench-card">
+        <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
             <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
-            <div class="bench-name">{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
+            <div class="bench-name">{{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
             <div class="bench-strength">战力 {{ playerStore.getCharacterBuildStrength(m) }}</div>
           </div>
           <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id, $event)">详情</button>
-          <button class="btn btn-success btn-small" @click="toggleTeam(m.id)">加入</button>
+          <button
+            class="btn btn-small"
+            :class="isInTeam(m.id) ? 'btn-warning' : 'btn-success'"
+            @click="toggleTeam(m.id)"
+          >
+            {{ isInTeam(m.id) ? '退出' : '加入' }}
+          </button>
         </div>
       </div>
-      <div v-else class="bench-empty">所有成员均已出战</div>
+      <div v-else class="bench-empty">暂无成员</div>
     </div>
 
     <!-- 人物详情弹窗（独立弹窗，不再切换顶部面板） -->
@@ -487,12 +492,10 @@ const sortedMembers = computed(() => {
     return 0
   })
 })
-const selectedMember = computed(() => playerStore.sectMembers.find(m => m.id === selectedMemberId.value))
-const benchMembers = computed(() => playerStore.sectMembers.filter(m => !playerStore.teamMembers.includes(m.id)))
-const totalBenchPages = computed(() => Math.max(1, Math.ceil(benchMembers.value.length / benchPageSize)))
-const pagedBenchMembers = computed(() => {
+const totalBenchPages = computed(() => Math.max(1, Math.ceil(sortedMembers.value.length / benchPageSize)))
+const pagedSortedMembers = computed(() => {
   const start = (benchPage.value - 1) * benchPageSize
-  return benchMembers.value.slice(start, start + benchPageSize)
+  return sortedMembers.value.slice(start, start + benchPageSize)
 })
 
 const sectSize = computed(() => playerStore.sectMembers?.length || 0)

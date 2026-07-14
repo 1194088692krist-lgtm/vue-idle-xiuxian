@@ -66,7 +66,7 @@ const ROLE_EFFECTS = {
     name: '掌阵阵法',
     effect: (memberState, teamStates) => {
       const buffAmount = 0.1
-      return { type: 'attack_buff', value: buffAmount, desc: `${memberState.name}布置掌阵阵法，全队攻击力提升 ${(buffAmount * 100).toFixed(0)}%` }
+      return { type: 'attack_buff', value: buffAmount, desc: `${memberState.name}布置掌阵阵法，全队攻击力提升 ${Math.round(buffAmount * 100)}%` }
     }
   }
 }
@@ -1033,7 +1033,7 @@ function triggerSkit(team) {
   idleBuffs.value.push(buff)
   const buffTypeNames = { cultivation: '修炼效率', combat: '战斗能力', attack: '攻击力', speed: '速度', luck: '气运' }
   const buffTypeName = buffTypeNames[buff.type] || buff.type
-  addLog('skit', `📊 获得「${buff.name}」效果：${buffTypeName}${buff.value > 0 ? '+' : ''}${(buff.value * 100).toFixed(0)}%，持续 ${buff.duration} 场`)
+  addLog('skit', `📊 获得「${buff.name}」效果：${buffTypeName}${buff.value > 0 ? '+' : ''}${Math.round(buff.value * 100)}%，持续 ${buff.duration} 场`)
 }
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
