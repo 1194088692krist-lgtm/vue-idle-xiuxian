@@ -124,6 +124,7 @@
   import { Moon, Sunny } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
+import { initCharacterDefs } from './plugins/characters'
 import SaveButton from './components/SaveButton.vue'
 
   const router = useRouter()
@@ -251,6 +252,8 @@ import SaveButton from './components/SaveButton.vue'
   onMounted(() => {
     startAutoGain()
     window.addEventListener('beforeunload', flushSave)
+    // 启动时从 IndexedDB 载入人物定义（含已上传立绘），保证 Gacha/阵容/战斗等界面无需先打开 GM 工具即可显示立绘
+    initCharacterDefs().catch(err => console.error('载入人物立绘定义失败:', err))
   })
 
   onUnmounted(() => {

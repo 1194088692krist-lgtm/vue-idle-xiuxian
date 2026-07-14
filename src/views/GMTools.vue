@@ -669,6 +669,48 @@
           <button class="btn-secondary" @click="exportCharacters">📤 导出</button>
           <button class="btn-secondary" @click="importCharacters">📥 导入</button>
         </div>
+
+        <!-- 批量导入立绘 -->
+        <div class="batch-portrait">
+          <div class="batch-portrait-bar">
+            <span class="batch-title">🖼️ 批量导入立绘</span>
+            <button class="btn-secondary" @click="triggerBatchPortrait">选择图片（可多选 / 拖拽）</button>
+            <input type="file" ref="batchPortraitInput" @change="handleBatchPortraitSelect" accept="image/*" multiple hidden />
+            <button class="btn-secondary" @click="exportSharedPortraitBundle" title="导出当前已上传的立绘，交由开发者落盘到 public/portraits/ 并部署，即可让所有玩家看到">导出共享立绘包</button>
+          </div>
+          <p class="batch-hint">本地上传仅自己可见（IndexedDB）。点「导出共享立绘包」下载 <code>portraits-bundle.json</code>，由开发者执行 <code>node scripts/apply-portraits.mjs</code> 落盘并提交部署后，<b>所有玩家</b>同源可见。</p>
+          <div class="batch-dropzone" @click="triggerBatchPortrait" @dragover.prevent @drop.prevent="handleBatchPortraitDrop">
+            将多张立绘拖到此处，按文件名自动匹配角色（如 <code>李青.png</code> 或 <code>char_001.png</code>），匹配项可下拉改配
+          </div>
+          <div v-if="batchMatches.length" class="batch-preview">
+            <table class="batch-table">
+              <thead>
+                <tr><th>文件名</th><th>匹配角色</th><th>预览</th><th>状态</th></tr>
+              </thead>
+              <tbody>
+                <tr v-for="(m, i) in batchMatches" :key="i">
+                  <td class="batch-file">{{ m.fileName }}</td>
+                  <td>
+                    <select v-model="m.matchedId">
+                      <option value="">— 未匹配，手动选择 —</option>
+                      <option v-for="c in characterListGM" :key="c.id" :value="c.id">{{ c.name }} ({{ c.id }})</option>
+                    </select>
+                  </td>
+                  <td><img :src="m.base64" class="batch-thumb" alt="预览" /></td>
+                  <td>
+                    <span v-if="m.matchedId" class="batch-ok">✓ {{ batchMatchedName(m.matchedId) }}</span>
+                    <span v-else class="batch-warn">未匹配</span>
+                  </td>
+                </tr>
+              </tbody>
+            </table>
+            <div class="batch-actions">
+              <button class="btn-primary" @click="confirmBatchPortrait">确认导入（{{ batchMatchedCount }} 张）</button>
+              <button class="btn-secondary" @click="batchMatches = []">清空</button>
+            </div>
+          </div>
+        </div>
+
         <div class="character-list">
           <div 
             v-for="(char, index) in filteredCharacters" 
@@ -991,10 +1033,11 @@
 <script setup>
 import { ref, computed, onMounted } from 'vue'
 import { usePlayerStore } from '../stores/player'
+import { GameDB } from '../stores/db'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
 import { equipmentQualities, equipmentTypeNames, petRarities, equipmentNameParts, petNameParts, petDescriptions, equipmentStatPool } from '../plugins/gacha'
 import { rarityConfig, affixPool, setBonuses, calculateEquipmentScore, getAffixesForSlot } from '../plugins/buildSystem'
-import { characterList, characterSchools, characterTalents, generateCharacterById } from '../plugins/characters'
+import { characterList, characterSchools, characterTalents, generateCharacterById, getCharacterAvatar, initCharacterDefs, characterDefMap, syncCharacterDefs } from '../plugins/characters'
 
 const playerStore = usePlayerStore()
 const activeTab = ref('values')
@@ -1464,6 +1507,8 @@ const handleAvatarUpload = (e) => {
   reader.onload = (e) => {
     if (editingCharacter.value) {
       editingCharacter.value.avatar = e.target.result
+      const cid = editingCharacter.value.id
+      if (cid) characterDefMap[cid] = { ...(characterDefMap[cid] || {}), avatar: e.target.result }
     }
   }
   reader.readAsDataURL(file)
@@ -1475,6 +1520,68 @@ const removeAvatar = () => {
   }
 }
 
+// ===== 批量导入立绘 =====
+const batchPortraitInput = ref(null)
+const batchMatches = ref([])
+
+const triggerBatchPortrait = () => batchPortraitInput.value?.click()
+
+const matchPortraitToCharacter = (fileName) => {
+  const base = fileName.replace(/\.[^.]+$/, '').trim()
+  const lower = base.toLowerCase()
+  const byId = characterListGM.value.find(c => c.id && c.id.toLowerCase() === lower)
+  if (byId) return byId
+  const byName = characterListGM.value.find(c => c.name && c.name.trim().toLowerCase() === lower)
+  if (byName) return byName
+  return characterListGM.value.find(c =>
+    (c.id && lower.includes(c.id.toLowerCase())) ||
+    (c.name && (lower.includes(c.name.toLowerCase()) || c.name.toLowerCase().includes(lower)))
+  ) || null
+}
+
+const processPortraitFiles = (fileList) => {
+  const files = Array.from(fileList || [])
+  if (!files.length) return
+  files.forEach(file => {
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      const base64 = e.target.result
+      const matched = matchPortraitToCharacter(file.name)
+      batchMatches.value.push({
+        fileName: file.name,
+        base64,
+        matchedId: matched ? matched.id : ''
+      })
+    }
+    reader.readAsDataURL(file)
+  })
+}
+
+const handleBatchPortraitSelect = (e) => processPortraitFiles(e.target.files)
+const handleBatchPortraitDrop = (e) => processPortraitFiles(e.dataTransfer.files)
+
+const batchMatchedName = (id) => {
+  const c = characterListGM.value.find(x => x.id === id)
+  return c ? `${c.name} (${c.id})` : ''
+}
+const batchMatchedCount = computed(() => batchMatches.value.filter(m => m.matchedId).length)
+
+const confirmBatchPortrait = () => {
+  let n = 0
+  batchMatches.value.forEach(m => {
+    if (!m.matchedId) return
+    const idx = characterListGM.value.findIndex(c => c.id === m.matchedId)
+    if (idx >= 0) {
+      characterListGM.value[idx] = { ...characterListGM.value[idx], avatar: m.base64 }
+      characterDefMap[m.matchedId] = { ...(characterDefMap[m.matchedId] || {}), avatar: m.base64 }
+      n++
+    }
+  })
+  saveToStorage()
+  batchMatches.value = []
+  alert(`已批量导入 ${n} 张人物立绘（base64 内嵌，离线可用，大陆稳定加载）`)
+}
+
 const exportCharacters = () => {
   const data = JSON.stringify(characterListGM.value, null, 2)
   const blob = new Blob([data], { type: 'application/json' })
@@ -1483,6 +1590,29 @@ const exportCharacters = () => {
   a.href = url
   a.download = 'characters.json'
   a.click()
+}
+
+// 导出「共享立绘包」：收集当前已上传的立绘（data URI），打包为 portraits-bundle.json。
+// 开发者拿到后执行 node scripts/apply-portraits.mjs 落盘到 public/portraits/ 并提交部署，
+// 即可让所有玩家同源加载这些立绘（本地 IndexedDB 上传仅自己可见，不在此列）。
+const exportSharedPortraitBundle = () => {
+  const images = {}
+  characterListGM.value.forEach(c => {
+    const av = (characterDefMap[c.id] && characterDefMap[c.id].avatar) || c.avatar
+    if (av && typeof av === 'string' && av.startsWith('data:')) images[c.id] = av
+  })
+  if (!Object.keys(images).length) {
+    alert('当前没有任何已上传的立绘可导出。请先批量导入或单张上传立绘。')
+    return
+  }
+  const blob = new Blob([JSON.stringify({ images }, null, 2)], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'portraits-bundle.json'
+  a.click()
+  URL.revokeObjectURL(url)
+  alert(`已导出 ${Object.keys(images).length} 张立绘到 portraits-bundle.json。交由开发者执行 node scripts/apply-portraits.mjs 并提交部署即可对所有玩家生效。`)
 }
 
 const importCharacters = () => {
@@ -1799,20 +1929,29 @@ const resetValues = () => {
 // 本地存储
 const saveToStorage = () => {
   localStorage.setItem('gm_characters', JSON.stringify(characterListGM.value))
+  // 立绘 base64 容量大，持久化到 IndexedDB（gm_characters）以免 localStorage 5MB 上限
+  GameDB.setData('gm_characters', characterListGM.value).catch(err => console.error('保存立绘失败:', err))
+  syncCharacterDefs(characterListGM.value)
   localStorage.setItem('gm_equipment', JSON.stringify(equipmentList.value))
   localStorage.setItem('gm_pets', JSON.stringify(petList.value))
   localStorage.setItem('gm_monsters', JSON.stringify(monsterList.value))
   localStorage.setItem('gm_assets', JSON.stringify(assetsList.value))
 }
 
-const loadFromStorage = () => {
+const loadFromStorage = async () => {
   try {
     const values = localStorage.getItem('gm_gameValues')
     if (values) gameValues.value = JSON.parse(values)
 
-    const characters = localStorage.getItem('gm_characters')
-    if (characters) {
-      characterListGM.value = JSON.parse(characters)
+    // 角色：优先 IndexedDB（容量大，可存 base64 立绘），回退 localStorage / 静态表
+    let characters = null
+    try { characters = await GameDB.getData('gm_characters') } catch (e) { characters = null }
+    if (!Array.isArray(characters) || !characters.length) {
+      const raw = localStorage.getItem('gm_characters')
+      if (raw) characters = JSON.parse(raw)
+    }
+    if (Array.isArray(characters) && characters.length) {
+      characterListGM.value = characters
     } else {
       characterListGM.value = characterList.map(c => ({
         id: c.id,
@@ -1828,6 +1967,7 @@ const loadFromStorage = () => {
         avatarUrl: ''
       }))
     }
+    syncCharacterDefs(characterListGM.value)
 
     const equipment = localStorage.getItem('gm_equipment')
     if (equipment) equipmentList.value = JSON.parse(equipment)
@@ -1848,8 +1988,8 @@ const loadFromStorage = () => {
   }
 }
 
-onMounted(() => {
-  loadFromStorage()
+onMounted(async () => {
+  await loadFromStorage()
   loadThemeData()
 })
 </script>
@@ -2674,6 +2814,135 @@ onMounted(() => {
 .bonus-detail select,
 .bonus-detail input {
   flex: 1;
+}
+
+.batch-portrait {
+  margin: 16px 0;
+  padding: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 12px;
+}
+
+.batch-portrait-bar {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  flex-wrap: wrap;
+  margin-bottom: 12px;
+}
+
+.batch-title {
+  font-size: 16px;
+  font-weight: 600;
+  color: #FFD700;
+}
+
+.batch-hint {
+  margin: 10px 0 0;
+  font-size: 12px;
+  line-height: 1.6;
+  color: rgba(245, 222, 179, 0.7);
+}
+
+.batch-hint code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #FFD700;
+  font-size: 11px;
+}
+
+.batch-dropzone {
+  padding: 24px 16px;
+  border: 2px dashed rgba(218, 165, 32, 0.45);
+  border-radius: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  color: #F5DEB3;
+  text-align: center;
+  cursor: pointer;
+  transition: all 0.2s;
+  font-size: 14px;
+  line-height: 1.6;
+}
+
+.batch-dropzone:hover {
+  border-color: #FFD700;
+  background: rgba(218, 165, 32, 0.12);
+}
+
+.batch-dropzone code {
+  background: rgba(0, 0, 0, 0.4);
+  padding: 1px 6px;
+  border-radius: 4px;
+  color: #FFD700;
+  font-size: 13px;
+}
+
+.batch-preview {
+  margin-top: 14px;
+  overflow-x: auto;
+}
+
+.batch-table {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 13px;
+  color: #F5DEB3;
+}
+
+.batch-table th,
+.batch-table td {
+  padding: 8px 10px;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+  text-align: left;
+  vertical-align: middle;
+}
+
+.batch-table th {
+  color: #FFD700;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.batch-table select {
+  padding: 6px 8px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 6px;
+  color: #F5DEB3;
+  max-width: 220px;
+}
+
+.batch-file {
+  max-width: 200px;
+  word-break: break-all;
+}
+
+.batch-thumb {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(218, 165, 32, 0.4);
+}
+
+.batch-ok {
+  color: #32CD32;
+  font-weight: 600;
+  white-space: nowrap;
+}
+
+.batch-warn {
+  color: #FFA500;
+  white-space: nowrap;
+}
+
+.batch-actions {
+  display: flex;
+  gap: 12px;
+  margin-top: 14px;
+  flex-wrap: wrap;
 }
 
 @media (max-width: 600px) {

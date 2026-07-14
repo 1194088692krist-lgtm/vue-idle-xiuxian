@@ -1,3 +1,6 @@
+import { reactive } from 'vue'
+import { GameDB } from '../stores/db'
+
 export const characterSchools = {
   sword: { name: '剑宗', color: '#4169E1', icon: '🗡️' },
   dao: { name: '道宗', color: '#9370DB', icon: '☯️' },
@@ -111,6 +114,74 @@ export const characterList = [
   { id: 'char_050', name: '永夜天尊', star: 5, school: 'dark', talent: 'dark_pact', description: '吞噬光明的永夜之主', role: 'vanguard', baseStats: { attack: 65, health: 150, defense: 15, speed: 40 }, avatar: null }
 ]
 
+// ===== 立绘解析与持久化（批量导入 + 大陆稳定加载）=====
+// 合并定义表：templateId -> 角色定义（含 avatar），运行时由 GMTools / 存档覆盖静态 characterList
+export const characterDefMap = reactive({})
+
+export function syncCharacterDefs(list) {
+  if (Array.isArray(list)) {
+    list.forEach(c => { if (c && c.id) characterDefMap[c.id] = c })
+  }
+  // 静态角色作为兜底，保证 map 永不为空
+  characterList.forEach(c => { if (!characterDefMap[c.id]) characterDefMap[c.id] = c })
+}
+
+// 应用启动时调用：从 IndexedDB（ gm_characters ）载入立绘定义，回退 localStorage / 静态表
+export async function initCharacterDefs() {
+  let list = null
+  try {
+    list = await GameDB.getData('gm_characters')
+  } catch (e) { list = null }
+  if (!Array.isArray(list) || !list.length) {
+    try { list = JSON.parse(localStorage.getItem('gm_characters') || 'null') } catch (e) { list = null }
+  }
+  if (Array.isArray(list) && list.length) {
+    syncCharacterDefs(list)
+  } else {
+    syncCharacterDefs(characterList)
+  }
+  // 载入随站点部署的「共享立绘包」：所有玩家同源可见（开发者发布后生效）
+  try { await loadSharedPortraits() } catch (e) { /* 无共享包时静默降级 */ }
+  return characterDefMap
+}
+
+// 共享立绘（随站点部署，所有玩家同源可见）：id -> 资源 URL。
+// 由开发者通过 GMTools「导出共享立绘包」→ 落盘到 public/portraits/ → 提交部署 后对所有玩家生效。
+export const sharedPortraitMap = reactive({})
+
+export async function loadSharedPortraits() {
+  const base = import.meta.env.BASE_URL || './'
+  const res = await fetch(`${base}portraits/manifest.json`)
+  if (!res.ok) return
+  const manifest = await res.json()
+  if (manifest && typeof manifest === 'object') {
+    Object.entries(manifest).forEach(([id, file]) => {
+      sharedPortraitMap[id] = `${base}portraits/${file}`
+    })
+  }
+}
+
+// 立绘解析优先级：
+//   1) 成员自带 base64（data URI，运行时/招募后已烘焙）
+//   2) 本地 GMTools 上传的立绘（IndexedDB，个人覆盖，仅自己可见）
+//   3) 共享立绘包（随站点部署，所有玩家可见）
+//   4) 静态表兜底
+// 本地/共享均为同源资源：本地走 data URI（零网络、离线可用），共享走部署站点（大陆可达性取决于部署域名）
+export function getCharacterAvatar(member) {
+  if (!member) return null
+  if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
+    return member.avatar
+  }
+  const id = member.templateId || member.id
+  if (!id) return null
+  if (characterDefMap[id] && characterDefMap[id].avatar) {
+    return characterDefMap[id].avatar
+  }
+  if (sharedPortraitMap[id]) return sharedPortraitMap[id]
+  const t = characterList.find(c => c.id === id)
+  return (t && t.avatar) || null
+}
+
 export function generateCharacterById(charId) {
   const template = characterList.find(c => c.id === charId)
   if (!template) return null
@@ -162,7 +233,7 @@ export function generateCharacterById(charId) {
       belt: null,
       artifact: null
     },
-    avatar: template.avatar,
+    avatar: (characterDefMap[charId] && characterDefMap[charId].avatar) || template.avatar,
     isActive: false,
     combatAttributes: {
       critRate: 0,

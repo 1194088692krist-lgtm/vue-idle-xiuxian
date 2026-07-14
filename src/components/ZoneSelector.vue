@@ -89,7 +89,8 @@
             class="team-member-card"
           >
             <div class="member-avatar">
-              <span>{{ member.name[0] }}</span>
+              <img v-if="getCharacterAvatar(member)" :src="getCharacterAvatar(member)" class="member-avatar-img" :alt="member.name" />
+              <span v-else>{{ member.name[0] }}</span>
               <div class="member-stars">
                 <span v-for="i in member.star" :key="i" class="star">★</span>
               </div>
@@ -395,7 +396,8 @@
                   @click="toggleMemberInTeam(member.id)"
                 >
                   <div class="sect-avatar">
-                    <span>{{ member.name[0] }}</span>
+                    <img v-if="getCharacterAvatar(member)" :src="getCharacterAvatar(member)" class="sect-avatar-img" :alt="member.name" />
+                    <span v-else>{{ member.name[0] }}</span>
                   </div>
                   <div class="sect-member-info">
                     <div class="sect-member-name">{{ member.name }}</div>
@@ -436,7 +438,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
-import { characterSchools } from '../plugins/characters'
+import { characterSchools, getCharacterAvatar } from '../plugins/characters'
 import { getStatName } from '../plugins/stats'
 
 const playerStore = usePlayerStore()
@@ -1720,6 +1722,14 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: bold;
   color: #fff;
+  overflow: hidden;
+}
+
+.member-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .member-stars {
@@ -1886,6 +1896,14 @@ onUnmounted(() => {
   font-weight: bold;
   color: #fff;
   margin-bottom: 8px;
+  overflow: hidden;
+}
+
+.sect-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  display: block;
 }
 
 .sect-member-info {

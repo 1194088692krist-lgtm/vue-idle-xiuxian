@@ -76,6 +76,9 @@
               :class="getResultClass(result)"
               @click="showCharacterDetail(result)"
             >
+              <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar">
+                <img :src="getCharacterAvatar(result.item)" :alt="result.item.name" />
+              </div>
               <div class="result-type" :style="{ color: getResultColor(result) }">
                 {{ getResultTypeName(result) }}
               </div>
@@ -132,8 +135,8 @@
           <div class="char-modal-close" @click="closeCharModal">✕</div>
           <div class="char-modal-content">
             <div class="char-portrait">
-              <div v-if="selectedCharacter?.avatar" class="char-image">
-                <img :src="selectedCharacter.avatar" :alt="selectedCharacter.name" />
+              <div v-if="getCharacterAvatar(selectedCharacter)" class="char-image">
+                <img :src="getCharacterAvatar(selectedCharacter)" :alt="selectedCharacter?.name" />
               </div>
               <div v-else class="char-placeholder">
                 <UserOutlined />
@@ -200,7 +203,7 @@
   } from '../plugins/gacha'
   import { setBonuses } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
-  import { characterSchools, characterTalents, characterRoles } from '../plugins/characters'
+  import { characterSchools, characterTalents, characterRoles, getCharacterAvatar } from '../plugins/characters'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -690,6 +693,23 @@
     border-radius: 8px;
     text-align: center;
     transition: all 0.2s;
+  }
+
+  .result-avatar {
+    width: 64px;
+    height: 64px;
+    margin: 0 auto 8px;
+    border-radius: 10px;
+    overflow: hidden;
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    background: rgba(0, 0, 0, 0.4);
+  }
+
+  .result-avatar img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    display: block;
   }
 
   .result-card.quality-mythic,

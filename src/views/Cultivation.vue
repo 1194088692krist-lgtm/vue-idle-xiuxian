@@ -40,7 +40,7 @@
     <div v-if="selectedMember" class="char-card glass-card">
       <div class="char-header">
         <div class="char-avatar">
-          <img v-if="selectedMember.avatar" :src="selectedMember.avatar" />
+          <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterAvatar(selectedMember)" />
           <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
         </div>
         <div class="char-info">
@@ -150,7 +150,7 @@
       <div v-if="benchMembers.length" class="bench-list">
         <div v-for="m in benchMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
-            <img v-if="m.avatar" :src="m.avatar" />
+            <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
@@ -209,7 +209,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar } from '../plugins/characters'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
