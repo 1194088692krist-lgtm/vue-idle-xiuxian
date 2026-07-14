@@ -2,7 +2,7 @@
   <div class="character-page fade-in-up">
     <!-- 1. 宗门概览 -->
     <div class="sect-overview glass-card">
-      <h2 class="sect-title">宗门</h2>
+      <h2 class="sect-title">宗门【{{ playerStore.name }}】</h2>
       <div class="sect-stats">
         <div class="sect-stat-item">
           <span class="sect-stat-label">成员</span>
@@ -243,78 +243,23 @@
           <button class="btn btn-warning btn-close" @click="closeMemberDetail">关闭</button>
         </div>
 
-        <!-- 独特数值信息（基础 / 突破后 / 加成 / 最终） -->
+        <!-- 综合属性面板（合并基础/战斗/特殊属性，含灵宠加成，最多7条） -->
         <div class="attr-block">
-          <h4 class="sub-title">独特基础数值</h4>
-          <div class="attr-table">
-            <div class="attr-row attr-head">
-              <span class="attr-col-label">属性</span>
-              <span class="attr-col-base">基础</span>
-              <span class="attr-col-delta">突破加成</span>
-              <span class="attr-col-final">最终</span>
-            </div>
-            <div v-for="stat in detailBaseStats" :key="stat.key" class="attr-row">
-              <span class="attr-col-label">{{ stat.name }}</span>
-              <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-              <span class="attr-col-final">{{ stat.final }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 战斗属性（基于定位） -->
-        <div class="attr-block" v-if="detailMember.combatAttributes">
-          <h4 class="sub-title">战斗属性 <span class="role-hint">（根据定位：{{ detailMember.roleName }}）</span></h4>
-          <div class="attr-table">
-            <div class="attr-row attr-head">
-              <span class="attr-col-label">属性</span>
-              <span class="attr-col-base">基础</span>
-              <span class="attr-col-delta">加成</span>
-              <span class="attr-col-final">最终</span>
-            </div>
-            <div v-for="stat in detailCombatStats" :key="stat.key" class="attr-row">
-              <span class="attr-col-label">{{ stat.name }}</span>
-              <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-              <span class="attr-col-final">{{ stat.final }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 抗性 -->
-        <div class="attr-block" v-if="detailMember.combatResistance">
-          <h4 class="sub-title">抗性</h4>
-          <div class="attr-table">
-            <div class="attr-row attr-head">
-              <span class="attr-col-label">属性</span>
-              <span class="attr-col-base">基础</span>
-              <span class="attr-col-delta">加成</span>
-              <span class="attr-col-final">最终</span>
-            </div>
-            <div v-for="stat in detailResistanceStats" :key="stat.key" class="attr-row">
-              <span class="attr-col-label">{{ stat.name }}</span>
-              <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-              <span class="attr-col-final">{{ stat.final }}</span>
-            </div>
-          </div>
-        </div>
-
-        <!-- 特殊属性 -->
-        <div class="attr-block" v-if="detailMember.specialAttributes">
-          <h4 class="sub-title">特殊属性</h4>
-          <div class="attr-table">
-            <div class="attr-row attr-head">
-              <span class="attr-col-label">属性</span>
-              <span class="attr-col-base">基础</span>
-              <span class="attr-col-delta">加成</span>
-              <span class="attr-col-final">最终</span>
-            </div>
-            <div v-for="stat in detailSpecialStats" :key="stat.key" class="attr-row">
-              <span class="attr-col-label">{{ stat.name }}</span>
-              <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-              <span class="attr-col-final">{{ stat.final }}</span>
+          <h4 class="sub-title">属性面板 <span class="scroll-hint">（下滑查看更多）</span></h4>
+          <div class="attr-table-wrap">
+            <div class="attr-table scrollable-table">
+              <div class="attr-row attr-head sticky-head">
+                <span class="attr-col-label">属性</span>
+                <span class="attr-col-base">基础</span>
+                <span class="attr-col-delta">加成</span>
+                <span class="attr-col-final">最终</span>
+              </div>
+              <div v-for="stat in mergedDetailStats" :key="stat.key" class="attr-row">
+                <span class="attr-col-label">{{ stat.name }}</span>
+                <span class="attr-col-base">{{ stat.base }}</span>
+                <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+                <span class="attr-col-final">{{ stat.final }}</span>
+              </div>
             </div>
           </div>
         </div>
@@ -804,6 +749,109 @@ const detailSpecialStats = computed(() => {
     { name: '战意', key: 'combatBoost', base: c.combatBoost || 0, delta: 0, final: c.combatBoost || 0 },
     { name: '抗性', key: 'resistanceBoost', base: c.resistanceBoost || 0, delta: 0, final: c.resistanceBoost || 0 }
   ]
+})
+
+const detailPetStats = computed(() => {
+  if (!detailMember.value || !detailMember.value.equippedPet) return {}
+  const pet = detailMember.value.equippedPet
+  const ca = pet.combatAttributes || {}
+  const stats = {}
+  for (const k of ['attack','health','defense','speed']) {
+    if (ca[k]) stats[k] = ca[k]
+  }
+  for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate']) {
+    if (ca[k]) stats[k] = ca[k]
+  }
+  for (const k of ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist']) {
+    if (ca[k]) stats[k] = ca[k]
+  }
+  for (const k of ['healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost']) {
+    if (ca[k]) stats[k] = ca[k]
+  }
+  return stats
+})
+
+const percentStatKeys = ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
+  'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
+  'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
+  'combatBoost','resistanceBoost']
+
+const formatStatValue = (key, val) => {
+  if (percentStatKeys.includes(key)) return (val * 100).toFixed(1) + '%'
+  return Math.floor(val)
+}
+
+const mergedDetailStats = computed(() => {
+  if (!detailMember.value) return []
+  const m = detailMember.value
+  const b = m.baseStats || {}
+  const bt = m.breakThrough || 0
+  const mult = Math.pow(1.2, bt)
+  const ca = m.combatAttributes || {}
+  const cr = m.combatResistance || {}
+  const sa = m.specialAttributes || {}
+  const petStats = detailPetStats.value || {}
+  
+  const allStats = []
+  
+  const baseKeys = ['attack','health','defense','speed']
+  baseKeys.forEach(k => {
+    const baseVal = Math.round((b[k] || 0) / mult)
+    const breakthroughDelta = Math.round((b[k] || 0) - baseVal)
+    const petBonus = petStats[k] || 0
+    const finalVal = (b[k] || 0) + petBonus
+    allStats.push({
+      name: { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }[k] || k,
+      key: k,
+      base: baseVal,
+      delta: formatStatValue(k, breakthroughDelta + petBonus),
+      final: formatStatValue(k, finalVal)
+    })
+  })
+  
+  const combatKeys = ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate']
+  combatKeys.forEach(k => {
+    const baseVal = ca[k] || 0
+    const petBonus = petStats[k] || 0
+    const finalVal = baseVal + petBonus
+    allStats.push({
+      name: { critRate: '暴击率', comboRate: '连击率', counterRate: '反击率', stunRate: '眩晕率', dodgeRate: '闪避率', vampireRate: '吸血率' }[k] || k,
+      key: k,
+      base: formatStatValue(k, baseVal),
+      delta: formatStatValue(k, petBonus),
+      final: formatStatValue(k, finalVal)
+    })
+  })
+  
+  const resistanceKeys = ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist']
+  resistanceKeys.forEach(k => {
+    const baseVal = cr[k] || 0
+    const petBonus = petStats[k] || 0
+    const finalVal = baseVal + petBonus
+    allStats.push({
+      name: { critResist: '抗暴', comboResist: '抗连', counterResist: '抗反击', stunResist: '抗眩晕', dodgeResist: '抗闪避', vampireResist: '抗吸血' }[k] || k,
+      key: k,
+      base: formatStatValue(k, baseVal),
+      delta: formatStatValue(k, petBonus),
+      final: formatStatValue(k, finalVal)
+    })
+  })
+  
+  const specialKeys = ['healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost']
+  specialKeys.forEach(k => {
+    const baseVal = sa[k] || 0
+    const petBonus = petStats[k] || 0
+    const finalVal = baseVal + petBonus
+    allStats.push({
+      name: { healBoost: '治疗效果', critDamageBoost: '暴伤加成', critDamageReduce: '暴伤减免', finalDamageBoost: '最终增伤', finalDamageReduce: '最终减伤', combatBoost: '战意', resistanceBoost: '抗性' }[k] || k,
+      key: k,
+      base: formatStatValue(k, baseVal),
+      delta: formatStatValue(k, petBonus),
+      final: formatStatValue(k, finalVal)
+    })
+  })
+  
+  return allStats.slice(0, 7)
 })
 const detailBiography = computed(() => {
   if (!detailMember.value) return null
@@ -1776,10 +1824,23 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   align-items: center;
 }
 
+.character-detail-modal {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: flex-end;
+  padding-bottom: 20px;
+}
+
 .sect-member-modal-content {
   width: 95%;
   max-width: 400px;
-  max-height: 85vh;
+  max-height: 80vh;
   padding: 16px;
   overflow-y: auto;
   border-radius: 12px;

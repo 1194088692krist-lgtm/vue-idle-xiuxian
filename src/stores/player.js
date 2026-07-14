@@ -62,6 +62,8 @@ export const usePlayerStore = defineStore('player', {
     spirit: 1000, // 灵力值
     maxSpirit: 1000, // 灵力上限
     spiritRate: 1, // 灵力获取倍率
+    currentSlot: null, // 当前手动选择的存档槽位
+    autoSaveSlot: null, // 自动保存槽位（null表示使用临时自动保存位置）
     lastSpiritUpdate: Date.now(), // 上次灵力更新时间
     luck: 1, // 幸运值
     cultivationRate: 1, // 修炼速率
@@ -601,7 +603,6 @@ export const usePlayerStore = defineStore('player', {
     // 保存到指定槽位
     async saveToSlot(slot) {
       try {
-        // 先保存当前数据到主存档
         await this.saveData()
         const currentData = await GameDB.getData('playerData')
         if (!currentData) {
@@ -615,18 +616,30 @@ export const usePlayerStore = defineStore('player', {
         const encryptedSlotData = encryptData(decryptedData)
         await GameDB.setData(`saveSlot_${slot}`, encryptedSlotData)
         this.currentSlot = slot
+        this.autoSaveSlot = slot
         return true
       } catch (error) {
         console.error('保存到槽位失败:', error)
         throw error
       }
     },
-    // 保存到"当前所在槽位"：底部存档按钮与抽奖后自动存档均走此接口
-    // 若尚未指定槽位，则默认写入槽位 1
     async saveToCurrentSlot() {
-      const target = this.currentSlot ?? 1
-      await this.saveToSlot(target)
-      return target
+      if (this.autoSaveSlot !== null) {
+        await this.saveToSlot(this.autoSaveSlot)
+        return this.autoSaveSlot
+      }
+      const currentData = await GameDB.getData('playerData')
+      if (!currentData) {
+        throw new Error('当前没有可保存的存档数据')
+      }
+      const decryptedData = decryptData(currentData)
+      if (!decryptedData) {
+        throw new Error('数据解密失败')
+      }
+      decryptedData._saveTime = Date.now()
+      const encryptedAutoSaveData = encryptData(decryptedData)
+      await GameDB.setData('autoSaveTemp', encryptedAutoSaveData)
+      return 'auto'
     },
     // 从指定槽位加载
     async loadFromSlot(slot) {
@@ -1602,27 +1615,23 @@ export const usePlayerStore = defineStore('player', {
     // 获取单个角色的Build强度
     getCharacterBuildStrength(character) {
       if (!character) return 0
-      // Base stat score
       const bs = character.baseStats || {}
       const ts = character.talentStats || {}
       const baseScore = ((bs.attack || 0) + (ts.attack || 0)) * 5 +
                         ((bs.health || 0) + (ts.health || 0)) * 0.5 +
                         ((bs.defense || 0) + (ts.defense || 0)) * 3 +
                         ((bs.speed || 0) + (ts.speed || 0)) * 8
-      // Equipment score
       let equipScore = 0
       const artifacts = character.equippedArtifacts || {}
       Object.values(artifacts).forEach(eq => {
         if (!eq) return
         equipScore += calculateEquipmentScore(eq)
       })
-      // Pet score (flat contribution from pet combat attributes)
       let petScore = 0
       if (character.equippedPet) {
         const ca = character.equippedPet.combatAttributes || {}
         petScore = (ca.attack || 0) * 5 + (ca.health || 0) * 0.5 + (ca.defense || 0) * 3 + (ca.speed || 0) * 8
       }
-      // Set bonus score
       let setScore = 0
       const activeSets = getActiveSetBonuses(artifacts)
       for (const sb of activeSets) {
@@ -1631,8 +1640,27 @@ export const usePlayerStore = defineStore('player', {
         if (sb.count >= 4) setScore += 200
         if (sb.count >= 5) setScore += 300
       }
+      let skillScore = 0
+      const skills = character.skills || []
+      for (const skill of skills) {
+        const effect = skill.effect || {}
+        if (skill.type === 'passive') {
+          if (effect.stat === 'attack') skillScore += (effect.value || 0) * 1000
+          if (effect.stat === 'health') skillScore += (effect.value || 0) * 500
+          if (effect.stat === 'defense') skillScore += (effect.value || 0) * 800
+          if (effect.stat === 'speed') skillScore += (effect.value || 0) * 1200
+          if (effect.armorPenetration) skillScore += effect.armorPenetration * 800
+          if (effect.damagePercent) skillScore += effect.damagePercent * 500
+          if (effect.finalDamageReduce) skillScore += effect.finalDamageReduce * 600
+          if (effect.vampireRate) skillScore += effect.vampireRate * 400
+        } else {
+          if (effect.damagePercent) skillScore += effect.damagePercent * 200
+          if (effect.stat === 'attack') skillScore += (effect.value || 0) * 400
+          if (effect.stat === 'defense') skillScore += (effect.value || 0) * 300
+        }
+      }
       const levelMult = 1 + ((character.level || 1) - 1) * 0.02
-      return Math.round((baseScore + equipScore + petScore + setScore) * levelMult)
+      return Math.round((baseScore + equipScore + petScore + setScore + skillScore) * levelMult)
     },
     // 角色升级
     levelUpCharacter(memberId) {

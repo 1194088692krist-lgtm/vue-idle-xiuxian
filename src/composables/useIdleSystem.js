@@ -965,11 +965,28 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
       const role = member.role || 'vanguard'
       const actionPool = MEMBER_ACTIONS[role] || MEMBER_ACTIONS.vanguard
       let text = pick(actionPool)
-      // 替换占位符
       text = text.replace(/\$\{n\}/g, member.name)
       const otherMember = team.find(m => m.id !== member.id)
       text = text.replace(/\$\{n2\}/g, otherMember?.name || '队友')
       addLog('combat', text)
+      
+      const artifacts = member.equippedArtifacts || {}
+      for (const [slot, eq] of Object.entries(artifacts)) {
+        if (!eq) continue
+        if (eq.affixes && eq.affixes.length > 0) {
+          const affix = eq.affixes[0]
+          addLog('combat', `  ${member.name}装备${eq.name}，${affix.name}！`)
+        }
+      }
+      
+      if (member.talentName) {
+        addLog('combat', `  ${member.name}发动天赋【${member.talentName}】！`)
+      }
+      
+      const passiveSkills = (member.skills || []).filter(s => s.type === 'passive')
+      for (const skill of passiveSkills) {
+        addLog('combat', `  ${member.name}触发被动技能【${skill.name}】！`)
+      }
     }
   } else {
     // 无队伍时回退到原有通用战斗描写
@@ -1080,11 +1097,11 @@ async function runIdleEncounter() {
       
       if (result.victory) {
         const maxHP = memberState.maxHP
-        const scrape = Math.round(maxHP * (0.04 + 0.06 * memberUnderBuilt))
-        memberState.hp = Math.min(maxHP, memberState.hp + Math.round(maxHP * 0.12) - scrape)
+        const scrape = Math.round(maxHP * (0.05 + 0.15 * memberUnderBuilt))
+        memberState.hp = Math.min(maxHP, memberState.hp + Math.round(maxHP * 0.10) - scrape)
       } else {
         const maxHP = memberState.maxHP
-        const hurt = Math.round(maxHP * (0.25 + 0.35 * memberUnderBuilt))
+        const hurt = Math.round(maxHP * (0.30 + 0.40 * memberUnderBuilt))
         memberState.hp -= hurt
         memberState.hp = Math.max(0, memberState.hp)
       }
@@ -1484,6 +1501,7 @@ function finishIdle() {
     totalStones: runStats.value.spiritStones,
     totalCultivation: runStats.value.cultivation,
     totalEquipment: runStats.value.equipment,
+    totalPhantomCrystals: runStats.value.phantomCrystals,
     totalExp: runStats.value.exp,
     defeated: allDead,
     logs: [...logs.value],

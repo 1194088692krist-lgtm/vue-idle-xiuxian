@@ -17,11 +17,8 @@
           <n-form-item label="境界名称">
             <n-input v-model:value="baseAttributes.realm" />
           </n-form-item>
-          <n-form-item label="当前修为">
-            <n-input-number v-model:value="baseAttributes.cultivation" />
-          </n-form-item>
-          <n-form-item label="最大修为">
-            <n-input-number v-model:value="baseAttributes.maxCultivation" />
+          <n-form-item label="修为公共池">
+            <n-input-number v-model:value="baseAttributes.cultivationPool" />
           </n-form-item>
           <n-form-item label="灵力">
             <n-input-number v-model:value="baseAttributes.spirit" />
@@ -84,8 +81,7 @@
     name: playerStore.name,
     level: playerStore.level,
     realm: playerStore.realm,
-    cultivation: playerStore.cultivation,
-    maxCultivation: playerStore.maxCultivation,
+    cultivationPool: playerStore.cultivationPool || 0,
     spirit: playerStore.spirit,
     spiritRate: playerStore.spiritRate,
     luck: playerStore.luck,
