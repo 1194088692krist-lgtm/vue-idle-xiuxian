@@ -16,45 +16,25 @@
         <!-- 装备 -->
         <div v-if="activeTab === 'equipment'" class="tab-pane">
           <div class="equip-toolbar">
-            <button class="btn-small btn-warning all-equip-btn" @click="showEquipmentList('all')">
-              📦 全部装备
-            </button>
-            <button class="btn-small btn-primary auto-equip-btn" @click="handleAutoEquipBest" :disabled="!hasEquipableItems">
-              ⚡ 一键装备最强
-            </button>
+            <span class="equip-count">共 {{ playerStore.items.length }} 件装备</span>
           </div>
           <div class="simple-grid" :class="{ mobile: isMobile }">
             <div
-              v-for="(name, type) in equipmentTypes"
-              :key="type"
+              v-for="item in playerStore.items"
+              :key="item.id || item.name"
               class="simple-card"
-              @click="showEquipmentList(type)"
+              @click="showEquipmentDetails(item)"
             >
               <div class="card-header">
-                <span>{{ name }}</span>
-                <div v-if="playerStore.equippedArtifacts[type]" class="card-actions">
-                  <button
-                    class="btn-small btn-info"
-                    @click.stop="showEquipmentDetails(playerStore.equippedArtifacts[type])"
-                  >
-                    详情
-                  </button>
-                  <button
-                    class="btn-small btn-danger"
-                    @click.stop="unequipItem(type)"
-                  >
-                    卸下
-                  </button>
-                </div>
+                <span :style="{ color: getItemColor(item) }">{{ item.name }}</span>
               </div>
               <div class="card-body">
-                <p v-if="playerStore.equippedArtifacts[type]">
-                  {{ playerStore.equippedArtifacts[type].name }}
-                </p>
-                <p v-else>未装备</p>
+                <p v-if="item.slot">{{ equipmentTypes[item.slot] || item.slot }}</p>
+                <p v-if="item.qualityInfo" :style="{ color: item.qualityInfo.color }">{{ item.qualityInfo.name }}</p>
               </div>
             </div>
           </div>
+          <div v-if="!playerStore.items.length" class="empty-hint">暂无装备</div>
         </div>
         <!-- 灵草 -->
         <div v-if="activeTab === 'herbs'" class="tab-pane">
@@ -613,16 +593,11 @@
   // 执行放生
   const releasePet = () => {
     if (petToRelease.value) {
-      // 如果灵宠正在出战，先取消出战
-      if (playerStore.activePet?.id === petToRelease.value.id) {
-        playerStore.activePet = null
-      }
-      // 从背包中移除灵宠
-      const index = playerStore.items.findIndex(item => item.id === petToRelease.value.id)
-      if (index > -1) {
-        playerStore.items.splice(index, 1)
-        playerStore.saveData()
-        message.success('已放生灵宠')
+      const result = playerStore.releasePet(petToRelease.value.uid || petToRelease.value.id)
+      if (result.success) {
+        message.success(result.message)
+      } else {
+        message.error(result.message)
       }
       // 关闭所有相关弹窗
       showReleaseConfirm.value = false
@@ -1043,6 +1018,8 @@
     if (cfg) return { name: cfg.name, color: cfg.color }
     return { name: item?.quality || '未知', color: '#999' }
   }
+
+  const getItemColor = (item) => item?.color || item?.qualityInfo?.color || '#DAA520'
 
   // 将词条压缩为紧凑展示文本
   const formatAffixNames = affixes => {

@@ -168,7 +168,7 @@
       </div>
       <h4 class="sub-title">未出战成员</h4>
       <div v-if="benchMembers.length" class="bench-list">
-        <div v-for="m in benchMembers" :key="m.id" class="bench-card">
+        <div v-for="m in pagedBenchMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
             <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
@@ -177,7 +177,13 @@
             <div class="bench-name">{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
             <div class="bench-strength">战力 {{ playerStore.getCharacterBuildStrength(m) }}</div>
           </div>
-          <button class="btn btn-info btn-small" @click="toggleTeam(m.id)">加入队伍</button>
+          <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id)">详情</button>
+          <button class="btn btn-success btn-small" @click="toggleTeam(m.id)">加入</button>
+        </div>
+        <div class="bench-pagination">
+          <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
+          <span class="page-info">{{ benchPage }} / {{ totalBenchPages }}</span>
+          <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
         </div>
       </div>
       <div v-else class="bench-empty">所有成员均已出战</div>
@@ -238,12 +244,19 @@ const selectedMemberId = ref('')
 const showEquipSelect = ref(false)
 const selectSlot = ref('')
 const showPetSelect = ref(false)
+const benchPage = ref(1)
+const benchPageSize = 10
 
 // 计算属性
 const teamMembers = computed(() => playerStore.teamMembers.map(id => playerStore.sectMembers.find(m => m.id === id)).filter(Boolean))
 const allMembers = computed(() => playerStore.sectMembers || [])
 const selectedMember = computed(() => playerStore.sectMembers.find(m => m.id === selectedMemberId.value))
 const benchMembers = computed(() => playerStore.sectMembers.filter(m => !playerStore.teamMembers.includes(m.id)))
+const totalBenchPages = computed(() => Math.max(1, Math.ceil(benchMembers.value.length / benchPageSize)))
+const pagedBenchMembers = computed(() => {
+  const start = (benchPage.value - 1) * benchPageSize
+  return benchMembers.value.slice(start, start + benchPageSize)
+})
 
 const sectSize = computed(() => playerStore.sectMembers?.length || 0)
 const sectMax = computed(() => playerStore.maxSectSize || 0)
@@ -281,7 +294,7 @@ const availableItemsForSlot = computed(() => {
 })
 
 const availablePets = computed(() => {
-  return (playerStore.pets || []).filter(pet => true)
+  return (playerStore.items || []).filter(item => item.type === 'pet')
 })
 
 // 角色属性计算系统
@@ -425,6 +438,9 @@ const specialStats = computed(() => {
 
 // 方法
 const selectMember = (id) => { selectedMemberId.value = id }
+const viewMemberDetail = (id) => {
+  selectedMemberId.value = id
+}
 const isInTeam = (id) => playerStore.teamMembers.includes(id)
 const toggleTeam = (id) => {
   if (isInTeam(id)) {
@@ -1146,5 +1162,30 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   padding: 20px;
   color: #5a6378;
   font-size: 13px;
+}
+
+.bench-pagination {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  gap: 12px;
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.1);
+}
+.page-info {
+  color: #aaa;
+  font-size: 13px;
+  min-width: 60px;
+  text-align: center;
+}
+.bench-card {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 12px;
+  background: rgba(255,255,255,0.03);
+  border-radius: 8px;
+  margin-bottom: 6px;
 }
 </style>

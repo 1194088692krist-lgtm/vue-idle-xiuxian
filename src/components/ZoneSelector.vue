@@ -293,6 +293,56 @@
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
+        <!-- 挂机仪表盘 -->
+        <div v-if="isIdling && idleDashboard" class="idle-dashboard">
+          <div class="dashboard-title">📊 挂机仪表盘</div>
+          <div class="dashboard-grid">
+            <div class="dash-item">
+              <span class="dash-label">胜率</span>
+              <span class="dash-value">{{ idleDashboard.winRate }}</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">胜/负</span>
+              <span class="dash-value">{{ idleDashboard.victories }}/{{ idleDashboard.defeats }}</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">匹配度</span>
+              <span class="dash-value" :style="{ color: idleDashboard.buildRatio >= 1 ? '#4caf50' : '#ff5252' }">{{ Math.round(idleDashboard.buildRatio * 100) }}%</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">灵石</span>
+              <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">修为</span>
+              <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">装备</span>
+              <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
+            </div>
+          </div>
+          <!-- 生效中的小剧场 Buff -->
+          <div v-if="idleDashboard.activeBuffs.length" class="dash-buffs">
+            <div class="dash-buffs-title">🎭 生效增益</div>
+            <div v-for="buff in idleDashboard.activeBuffs" :key="buff.name" class="dash-buff-item" :class="{ positive: buff.value > 0, negative: buff.value < 0 }">
+              <span class="buff-name">{{ buff.name }}</span>
+              <span class="buff-effect">{{ buff.typeName }}{{ buff.valueText }}</span>
+              <span class="buff-remaining">剩{{ buff.remaining }}场</span>
+            </div>
+          </div>
+          <!-- 队伍气血 -->
+          <div v-if="idleDashboard.teamHP.length" class="dash-team">
+            <div class="dash-team-title">🏥 队伍状态</div>
+            <div v-for="m in idleDashboard.teamHP" :key="m.name" class="dash-team-member">
+              <span class="team-name">{{ m.name }}</span>
+              <div class="team-hp-bar">
+                <div class="team-hp-fill" :class="{ 'hp-low': parseInt(m.hpPercent) <= 30 }" :style="{ width: m.hpPercent }"></div>
+              </div>
+              <span class="team-hp-text">{{ m.hpPercent }}</span>
+            </div>
+          </div>
+        </div>
       </div>
     </div>
 
@@ -462,6 +512,7 @@ const {
   idlePlayerHP,
   idlePlayerMaxHP,
   idlePlayerDefeated,
+  idleDashboard,
   setSelectedZone,
   setDifficulty,
   startIdle,
@@ -2046,5 +2097,122 @@ onUnmounted(() => {
   padding: 2px 6px;
   background: rgba(255, 165, 0, 0.1);
   border-radius: 4px;
+}
+
+/* 挂机仪表盘 */
+.idle-dashboard {
+  margin-top: 12px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 215, 0, 0.15);
+}
+.dashboard-title {
+  font-size: 15px;
+  font-weight: bold;
+  color: #FFD700;
+  margin-bottom: 10px;
+}
+.dashboard-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.dash-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 6px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+}
+.dash-label {
+  font-size: 11px;
+  color: #888;
+}
+.dash-value {
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+}
+.dash-buffs {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.dash-buffs-title {
+  font-size: 13px;
+  color: #FFD700;
+  margin-bottom: 6px;
+}
+.dash-buff-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+}
+.dash-buff-item.positive {
+  background: rgba(76, 175, 80, 0.12);
+  color: #4caf50;
+}
+.dash-buff-item.negative {
+  background: rgba(255, 82, 82, 0.12);
+  color: #ff5252;
+}
+.buff-name {
+  font-weight: bold;
+}
+.buff-effect {
+  flex: 1;
+}
+.buff-remaining {
+  color: #888;
+  font-size: 11px;
+}
+.dash-team {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.dash-team-title {
+  font-size: 13px;
+  color: #FFD700;
+  margin-bottom: 6px;
+}
+.dash-team-member {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  margin-bottom: 4px;
+  font-size: 12px;
+}
+.team-name {
+  min-width: 50px;
+  color: #ccc;
+}
+.team-hp-bar {
+  flex: 1;
+  height: 8px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+  overflow: hidden;
+}
+.team-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #4caf50, #8bc34a);
+  border-radius: 4px;
+  transition: width 0.3s;
+}
+.team-hp-fill.hp-low {
+  background: linear-gradient(90deg, #ff5252, #ff9800);
+}
+.team-hp-text {
+  min-width: 36px;
+  text-align: right;
+  color: #aaa;
+  font-size: 11px;
 }
 </style>

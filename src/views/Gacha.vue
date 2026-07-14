@@ -146,51 +146,17 @@
         <div class="char-modal" @click.stop>
           <div class="char-modal-close" @click="closeCharModal">✕</div>
           <div class="char-modal-content">
-            <div class="char-portrait">
-              <div v-if="getCharacterAvatar(selectedCharacter)" class="char-image">
+            <div class="char-portrait-large">
+              <div v-if="getCharacterAvatar(selectedCharacter)" class="char-image-large">
                 <img :src="getCharacterAvatar(selectedCharacter)" :alt="selectedCharacter?.name" />
               </div>
-              <div v-else class="char-placeholder">
+              <div v-else class="char-placeholder-large">
                 <UserOutlined />
               </div>
-              <div class="char-star-rating">
-                <span v-for="i in selectedCharacter?.star" :key="i" class="star">★</span>
-              </div>
             </div>
-            <div class="char-info">
-              <h2 class="char-name">{{ selectedCharacter?.name }}</h2>
-              <p class="char-desc">{{ selectedCharacter?.description }}</p>
-              <div class="char-school">
-                <span class="label">流派：</span>
-                <span class="value">{{ characterSchools[selectedCharacter?.school]?.name }}</span>
-              </div>
-              <div class="char-talent">
-                <span class="label">天赋：</span>
-                <span class="value">{{ characterTalents[selectedCharacter?.talent]?.name }}</span>
-              </div>
-              <div class="char-role">
-                <span class="label">定位：</span>
-                <span class="value">{{ characterRoles[selectedCharacter?.role]?.icon }} {{ characterRoles[selectedCharacter?.role]?.name }}</span>
-                <span class="role-desc">{{ characterRoles[selectedCharacter?.role]?.desc }}</span>
-              </div>
-              <div class="char-stats">
-                <div class="stat-item">
-                  <span class="stat-label">攻击</span>
-                  <span class="stat-value">{{ selectedCharacter?.baseStats?.attack }}</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-label">生命</span>
-                  <span class="stat-value">{{ selectedCharacter?.baseStats?.health }}</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-label">防御</span>
-                  <span class="stat-value">{{ selectedCharacter?.baseStats?.defense }}</span>
-                </div>
-                <div class="stat-item">
-                  <span class="stat-label">速度</span>
-                  <span class="stat-value">{{ selectedCharacter?.baseStats?.speed }}</span>
-                </div>
-              </div>
+            <div class="char-modal-footer">
+              <h2 class="char-name-large">{{ selectedCharacter?.name }}</h2>
+              <div class="char-stars-large">{{ '⭐'.repeat(selectedCharacter?.star || 1) }}</div>
             </div>
           </div>
         </div>
@@ -900,206 +866,82 @@
   /* 人物弹窗 */
   .char-modal-overlay {
     position: fixed;
-    top: 0;
-    left: 0;
-    right: 0;
-    bottom: 0;
+    top: 0; left: 0; right: 0; bottom: 0;
     background: rgba(0, 0, 0, 0.85);
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
-    backdrop-filter: blur(8px);
+    z-index: 9999;
+    animation: fadeIn 0.3s ease;
   }
-
   .char-modal {
-    background: linear-gradient(135deg, rgba(20, 20, 30, 0.95), rgba(40, 30, 20, 0.95));
-    border: 2px solid rgba(218, 165, 32, 0.5);
-    border-radius: 16px;
-    padding: 24px;
-    max-width: 480px;
-    width: 90%;
-    max-height: 80vh;
-    overflow-y: auto;
     position: relative;
-    animation: modalAppear 0.3s ease-out;
+    max-width: 400px;
+    width: 90%;
+    animation: scaleIn 0.4s ease;
   }
-
-  @keyframes modalAppear {
-    from {
-      opacity: 0;
-      transform: scale(0.9);
-    }
-    to {
-      opacity: 1;
-      transform: scale(1);
-    }
-  }
-
   .char-modal-close {
     position: absolute;
-    top: 12px;
-    right: 12px;
-    font-size: 20px;
-    color: #888;
+    top: -12px; right: -12px;
+    width: 36px; height: 36px;
+    background: rgba(255, 50, 50, 0.9);
+    border-radius: 50%;
+    display: flex; align-items: center; justify-content: center;
     cursor: pointer;
-    padding: 4px 8px;
-    border-radius: 8px;
-    transition: all 0.2s;
-  }
-
-  .char-modal-close:hover {
+    font-size: 18px;
     color: #fff;
-    background: rgba(255, 255, 255, 0.1);
+    z-index: 10;
+    border: 2px solid rgba(255,255,255,0.3);
   }
-
   .char-modal-content {
     display: flex;
-    gap: 20px;
-    align-items: flex-start;
-  }
-
-  .char-portrait {
-    flex-shrink: 0;
-    width: 140px;
-    height: 180px;
-    position: relative;
-  }
-
-  .char-image {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
+    flex-direction: column;
+    align-items: center;
+    background: linear-gradient(180deg, #1a0a2e 0%, #0d1b2a 100%);
+    border-radius: 16px;
+    border: 2px solid rgba(218, 165, 32, 0.4);
     overflow: hidden;
-    border: 2px solid rgba(218, 165, 32, 0.5);
+    box-shadow: 0 0 40px rgba(218, 165, 32, 0.3);
   }
-
-  .char-image img {
+  .char-portrait-large {
     width: 100%;
-    height: 100%;
-    object-fit: cover;
-  }
-
-  .char-placeholder {
-    width: 100%;
-    height: 100%;
-    border-radius: 12px;
-    border: 2px solid rgba(218, 165, 32, 0.5);
+    aspect-ratio: 3/4;
     display: flex;
     align-items: center;
     justify-content: center;
-    background: rgba(0, 0, 0, 0.3);
-    font-size: 48px;
-    color: rgba(218, 165, 32, 0.5);
+    background: linear-gradient(180deg, rgba(218,165,32,0.1) 0%, transparent 100%);
+    overflow: hidden;
   }
-
-  .char-star-rating {
-    position: absolute;
-    bottom: -8px;
-    left: 50%;
-    transform: translateX(-50%);
-    display: flex;
-    gap: 2px;
-    background: rgba(0, 0, 0, 0.8);
-    padding: 4px 12px;
-    border-radius: 12px;
-    border: 1px solid rgba(218, 165, 32, 0.5);
-  }
-
-  .char-star-rating .star {
-    font-size: 16px;
-    color: #FFD700;
-  }
-
-  .char-info {
-    flex: 1;
-  }
-
-  .char-name {
-    margin: 0 0 8px;
-    font-size: 24px;
-    font-weight: bold;
-    color: #FFD700;
-    font-family: var(--font-family-heading);
-  }
-
-  .char-desc {
-    margin: 0 0 12px;
-    font-size: 13px;
-    color: #aaa;
-    line-height: 1.5;
-  }
-
-  .char-school,
-  .char-talent {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-size: 13px;
-  }
-
-  .char-school .label,
-  .char-talent .label {
-    color: #888;
-  }
-
-  .char-school .value,
-  .char-talent .value {
-    color: #F5DEB3;
-    font-weight: bold;
-  }
-
-  .char-role {
-    display: flex;
-    gap: 8px;
-    margin-bottom: 8px;
-    font-size: 13px;
-    flex-wrap: wrap;
-    align-items: center;
-  }
-
-  .char-role .label {
-    color: #888;
-  }
-
-  .char-role .value {
-    color: #F5DEB3;
-    font-weight: bold;
-  }
-
-  .role-desc {
-    font-size: 11px;
-    color: #888;
+  .char-image-large {
     width: 100%;
-    margin-top: 2px;
+    height: 100%;
   }
-
-  .char-stats {
-    display: grid;
-    grid-template-columns: repeat(2, 1fr);
-    gap: 8px;
-    margin-top: 16px;
-    padding-top: 12px;
-    border-top: 1px solid rgba(218, 165, 32, 0.2);
+  .char-image-large img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+    object-position: top center;
   }
-
-  .stat-item {
-    display: flex;
-    justify-content: space-between;
-    align-items: center;
-    padding: 6px 10px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 6px;
+  .char-placeholder-large {
+    font-size: 120px;
+    color: rgba(218, 165, 32, 0.3);
   }
-
-  .stat-label {
-    font-size: 12px;
-    color: #888;
+  .char-modal-footer {
+    padding: 16px 20px 24px;
+    text-align: center;
+    width: 100%;
+    background: linear-gradient(180deg, transparent, rgba(0,0,0,0.6));
   }
-
-  .stat-value {
-    font-size: 14px;
-    font-weight: bold;
+  .char-name-large {
+    font-size: 24px;
     color: #FFD700;
+    margin: 0 0 8px;
+    text-shadow: 0 0 15px rgba(255, 215, 0, 0.5);
   }
+  .char-stars-large {
+    font-size: 22px;
+    letter-spacing: 4px;
+  }
+  @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
+  @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
 </style>
