@@ -737,8 +737,8 @@ function finishIdle() {
     logs: [...logs.value]
   }
   s.stopIdleExploration()
-  // 挂机结束（正常结束 / 力竭 / 手动停止）均触发一次自动存档，落盘本次收益
-  s.queueSave()
+  // 挂机结束（正常结束 / 力竭 / 手动停止）立即同步落盘，确保本次收益不丢失
+  s.saveData()
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
@@ -767,6 +767,8 @@ function processOfflineIdle() {
     for (let i = 0; i < missed; i++) {
       runOfflineEncounter(zone, diff, idleState.encounterCount + i + 1)
     }
+    // 离线补算结算后立即同步落盘，防止补算收益丢失
+    s.saveData()
   }
   finishIdle()
 }
