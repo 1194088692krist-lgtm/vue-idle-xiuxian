@@ -336,21 +336,41 @@ export const doGacha = (poolType, playerLevel = 1) => {
 }
 
 // 批量抽奖（保底规则：人物池/综合池每 5 次保底一次 4 星或以上）
-// 5星基础概率3%、4星基础概率20%。若 5 次内未出现 4 星或以上人物，则把第 5 次替换为 4 星人物
+// 5星基础概率1%、4星基础概率19%。若 5 次内未出现 4 星或以上人物，则把第 5 次替换为 4 星人物
+// 每轮最多获得 2 个人物
 export const doMultiGacha = (poolType, count, playerLevel = 1) => {
   const results = []
   const isCharacterPool = poolType === 'character' || poolType === 'all'
   const PITY_INTERVAL = 5
+  let characterCount = 0
+  const MAX_CHARACTERS = 2
+  
   for (let i = 0; i < count; i++) {
     const result = doGacha(poolType, playerLevel)
-    if (result) results.push(result)
+    
+    // 限制每轮最多获得 2 个人物
+    if (result && result.category === 'character' && characterCount >= MAX_CHARACTERS) {
+      // 超出限制，替换为资源
+      results.push({ category: 'resource', item: generateResource() })
+    } else {
+      if (result && result.category === 'character') {
+        characterCount++
+      }
+      if (result) results.push(result)
+    }
+    
     // 每 5 次保底：人物池/综合池 5 次内若没有 4 星或以上人物，则把本次替换为 4 星
     if (isCharacterPool && (i + 1) % PITY_INTERVAL === 0) {
       const startIdx = i + 1 - PITY_INTERVAL
       const window = results.slice(startIdx, i + 1)
       const hasHighStar = window.some(r => r.category === 'character' && r.item.star >= 4)
       if (!hasHighStar) {
-        results[i] = { category: 'character', item: generateRandomCharacter(4) }
+        // 保底时，如果人物数量未超限，则替换为4星人物
+        if (characterCount < MAX_CHARACTERS) {
+          results[i] = { category: 'character', item: generateRandomCharacter(4) }
+          characterCount++
+        }
+        // 若已超限，则不触发保底
       }
     }
   }

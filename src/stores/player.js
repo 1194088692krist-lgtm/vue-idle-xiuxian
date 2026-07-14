@@ -4,6 +4,7 @@ import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pill
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
+import { getSkillsForBreakthrough } from '../plugins/skills'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -1523,6 +1524,12 @@ export const usePlayerStore = defineStore('player', {
       growAttr(member.combatAttributes)
       growAttr(member.combatResistance)
       growAttr(member.specialAttributes)
+      // 突破获得新技能（每突破一次获得2个）
+      const newSkills = getSkillsForBreakthrough(member.role, member.breakThrough)
+      if (newSkills.length > 0) {
+        if (!member.skills) member.skills = []
+        member.skills.push(...newSkills)
+      }
       this.queueSave()
       return { success: true, message: `${member.name} 突破成功（${member.breakThrough}/5）`, breakThrough: member.breakThrough }
     },

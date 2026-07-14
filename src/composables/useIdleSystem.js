@@ -3,7 +3,7 @@ import { usePlayerStore } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
-import { getAffixesForSlot, setBonuses, rarityConfig } from '../plugins/buildSystem'
+import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
 
 // ============ 单例状态（模块级，跨组件共享） ============
@@ -18,12 +18,57 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 
-// 小剧场 buff 系统
+// 角色定位特殊作用（每场战斗后触发）
+const ROLE_EFFECTS = {
+  vanguard: {
+    name: '先锋冲锋',
+    effect: (memberState, teamStates) => {
+      const bonus = Math.floor(memberState.buildStrength * 0.05)
+      return { type: 'damage_boost', value: bonus, desc: `${memberState.name}发动先锋冲锋，全队攻击力提升 ${bonus}` }
+    }
+  },
+  blade: {
+    name: '刀锋连击',
+    effect: (memberState, teamStates) => {
+      const bleed = Math.floor(memberState.baseStats.attack * 0.15)
+      return { type: 'damage_over_time', value: bleed, desc: `${memberState.name}触发刀锋连击，敌人陷入流血状态，每秒受到 ${bleed} 伤害` }
+    }
+  },
+  herb: {
+    name: '药引治疗',
+    effect: (memberState, teamStates) => {
+      const healAmount = Math.floor(memberState.baseStats.health * 0.15)
+      let healed = 0
+      for (const ts of teamStates) {
+        if (ts.hp > 0 && ts.hp < ts.maxHP) {
+          const actualHeal = Math.min(healAmount, ts.maxHP - ts.hp)
+          ts.hp += actualHeal
+          healed += actualHeal
+        }
+      }
+      return { type: 'heal', value: healed, desc: `${memberState.name}施展药引治疗，为全队恢复 ${healed} 气血` }
+    }
+  },
+  shield: {
+    name: '护法护盾',
+    effect: (memberState, teamStates) => {
+      const absorb = Math.floor(memberState.baseStats.defense * 0.2)
+      return { type: 'shield', value: absorb, desc: `${memberState.name}开启护法护盾，全队获得吸收 ${absorb} 伤害的护盾` }
+    }
+  },
+  tactician: {
+    name: '掌阵阵法',
+    effect: (memberState, teamStates) => {
+      const buffAmount = 0.1
+      return { type: 'attack_buff', value: buffAmount, desc: `${memberState.name}布置掌阵阵法，全队攻击力提升 ${(buffAmount * 100).toFixed(0)}%` }
+    }
+  }
+}
 const SKITS = [
   { text: '${m1}在篝火旁给${m2}讲了个笑话，${m2}笑得差点岔气，修炼效率提升了！', buff: { type: 'cultivation', value: 0.15, duration: 5, name: '心情愉悦' } },
   { text: '${m1}发现了一株灵草，${m2}却抢先一步摘走，两人争执不下，${m3}出面调停才平息。', buff: { type: 'combat', value: -0.10, duration: 3, name: '内讧' } },
@@ -958,6 +1003,33 @@ async function runIdleEncounter() {
           foundEquipment.value.push(r.item)
         }
       })
+      
+      // 触发角色定位特殊效果
+      const roleEffects = []
+      for (const memberState of teamMemberStates.value) {
+        if (memberState.hp <= 0) continue
+        const member = s.sectMembers.find(m => m.id === memberState.memberId)
+        if (!member) continue
+        const role = member.role || 'vanguard'
+        const roleEffect = ROLE_EFFECTS[role]
+        if (roleEffect) {
+          const effectResult = roleEffect.effect(memberState, teamMemberStates.value)
+          if (effectResult) {
+            roleEffects.push(effectResult)
+            addLog('combat', effectResult.desc)
+            // 更新统计数据
+            if (effectResult.type === 'heal') {
+              runStats.value.healAmount += effectResult.value
+            } else if (effectResult.type === 'shield') {
+              runStats.value.shieldAmount += effectResult.value
+            } else if (effectResult.type === 'damage_boost' || effectResult.type === 'attack_buff') {
+              runStats.value.damageBoost += effectResult.value
+            } else if (effectResult.type === 'damage_over_time') {
+              runStats.value.buffCount++
+            }
+          }
+        }
+      }
     } else {
       loss = Math.floor(s.cultivation * 0.05)
       s.cultivation = Math.max(0, s.cultivation - loss)
@@ -1259,6 +1331,14 @@ const idleDashboard = computed(() => {
     totalEquipment: runStats.value.equipment,
     encounterCount: idleEncounterCount.value,
     buildRatio: buildRatio.value,
+    totalPhantomCrystals: s.phantomCrystals,
+    // 角色定位效果统计
+    roleEffects: {
+      healAmount: runStats.value.healAmount,
+      shieldAmount: runStats.value.shieldAmount,
+      damageBoost: runStats.value.damageBoost,
+      buffCount: runStats.value.buffCount
+    },
     activeBuffs: idleBuffs.value.map(b => ({
       name: b.name,
       type: b.type,
@@ -1282,7 +1362,7 @@ const idleDashboard = computed(() => {
       rarity: eq.rarity,
       rarityName: (eq.qualityInfo && eq.qualityInfo.name) || eq.rarity || '',
       color: (eq.qualityInfo && eq.qualityInfo.color) || '#9e9e9e',
-      score: eq.score,
+      score: calculateEquipmentScore(eq),
       stats: eq.stats,
       affixes: eq.affixes,
       time: eq._pickedAt || Date.now()

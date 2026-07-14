@@ -295,6 +295,19 @@
               <span class="dash-label">装备</span>
               <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
             </div>
+            <!-- 角色定位效果统计 -->
+            <div class="dash-item" v-if="idleDashboard.roleEffects.healAmount > 0">
+              <span class="dash-label">💚 治疗</span>
+              <span class="dash-value" style="color:#4caf50">+{{ idleDashboard.roleEffects.healAmount }}</span>
+            </div>
+            <div class="dash-item" v-if="idleDashboard.roleEffects.shieldAmount > 0">
+              <span class="dash-label">🛡️ 护盾</span>
+              <span class="dash-value" style="color:#2196f3">+{{ idleDashboard.roleEffects.shieldAmount }}</span>
+            </div>
+            <div class="dash-item" v-if="idleDashboard.roleEffects.damageBoost > 0">
+              <span class="dash-label">⚔️ 攻击加成</span>
+              <span class="dash-value" style="color:#ff5722">+{{ idleDashboard.roleEffects.damageBoost }}</span>
+            </div>
           </div>
           <!-- 生效中的小剧场 Buff -->
           <div v-if="idleDashboard.activeBuffs.length" class="dash-buffs">
@@ -353,8 +366,8 @@
           <h4 class="sub-title">基础数据</h4>
           <div class="attr-table">
             <div v-for="(v, k) in dashEqDetail.stats" :key="k" class="attr-row">
-              <span class="attr-col-label">{{ k }}</span>
-              <span class="attr-col-final">{{ v }}</span>
+              <span class="attr-col-label">{{ getStatName(k) }}</span>
+              <span class="attr-col-final">{{ formatStatValue(k, v) }}</span>
             </div>
           </div>
         </div>
@@ -438,10 +451,12 @@
             :key="index"
             class="equipment-detail-item"
             :style="{ borderColor: eq.qualityInfo?.color || '#888' }"
+            @click="openBattleRewardEquipDetail(eq)"
           >
             <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
               {{ eq.name }}
               <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
+              <span class="eq-score">评分 {{ eq.score || 0 }}</span>
             </div>
             <div class="eq-type">{{ eq.typeName || eq.type }}</div>
             <div class="eq-stats">
@@ -454,6 +469,7 @@
                 {{ affix.name }}
               </span>
             </div>
+            <div class="eq-click-hint">点击查看详情</div>
           </div>
         </div>
       </div>
@@ -503,6 +519,33 @@
       </div>
     </Teleport>
 
+    <!-- 战斗奖励装备详情弹窗 -->
+    <div v-if="showBattleRewardEqDetail && battleRewardEqDetail" class="equip-select-modal" @click.self="closeBattleRewardEquipDetail">
+      <div class="modal-content glass-card" @click.stop>
+        <button class="btn btn-warning btn-close" @click="closeBattleRewardEquipDetail">关闭</button>
+        <div class="modal-header" :style="{ borderColor: battleRewardEqDetail.color }">
+          <span class="modal-title" :style="{ color: battleRewardEqDetail.color }">{{ battleRewardEqDetail.name }}</span>
+          <span>{{ battleRewardEqDetail.rarityName }}</span>
+          <span>·</span>
+          <span>评分 {{ battleRewardEqDetail.score || 0 }}</span>
+        </div>
+        <div v-if="battleRewardEqDetail.stats && Object.keys(battleRewardEqDetail.stats).length" class="attr-block">
+          <h4 class="sub-title">基础数据</h4>
+          <div class="attr-table">
+            <div v-for="(v, k) in battleRewardEqDetail.stats" :key="k" class="attr-row">
+              <span class="attr-col-label">{{ getStatName(k) }}</span>
+              <span class="attr-col-final">{{ formatStatValue(k, v) }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="battleRewardEqDetail.affixes && battleRewardEqDetail.affixes.length" class="attr-block">
+          <h4 class="sub-title">词条</h4>
+          <div v-for="a in battleRewardEqDetail.affixes" :key="a.id" class="attr-row">
+            <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
+          </div>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -512,7 +555,7 @@ import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { characterSchools, getCharacterAvatar } from '../plugins/characters'
-import { getStatName } from '../plugins/stats'
+import { getStatName, formatStatValue } from '../plugins/stats'
 
 const playerStore = usePlayerStore()
 const {
@@ -722,6 +765,31 @@ watch(
     })
   }
 )
+
+// 战斗奖励装备详情弹窗
+const battleRewardEqDetail = ref(null)
+const showBattleRewardEqDetail = ref(false)
+
+const openBattleRewardEquipDetail = (eq) => {
+  battleRewardEqDetail.value = {
+    id: eq.id,
+    name: eq.name,
+    type: eq.type,
+    typeName: eq.typeName,
+    rarity: eq.rarity,
+    rarityName: eq.qualityInfo?.name || '',
+    color: eq.qualityInfo?.color || '#9e9e9e',
+    score: eq.score || 0,
+    stats: eq.mainAttributes || eq.stats || {},
+    affixes: eq.affixes || []
+  }
+  showBattleRewardEqDetail.value = true
+}
+
+const closeBattleRewardEquipDetail = () => {
+  showBattleRewardEqDetail.value = false
+  battleRewardEqDetail.value = null
+}
 
 onMounted(() => {
   playerStore.regenerateSpirit()

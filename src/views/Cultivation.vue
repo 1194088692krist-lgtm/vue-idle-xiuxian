@@ -39,9 +39,12 @@
     <!-- 3. 选中角色详情面板 -->
     <div v-if="selectedMember" class="char-card glass-card">
       <div class="char-header">
-        <div class="char-avatar">
-          <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterAvatar(selectedMember)" />
-          <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
+        <div class="char-avatar-container">
+          <div class="char-avatar" @click="openAvatarViewer">
+            <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterAvatar(selectedMember)" />
+            <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
+          </div>
+          <span class="char-avatar-hint">点击查看立绘</span>
         </div>
         <div class="char-info">
           <div class="char-name-row">
@@ -182,7 +185,7 @@
             <div class="bench-name">{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
             <div class="bench-strength">战力 {{ playerStore.getCharacterBuildStrength(m) }}</div>
           </div>
-          <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id)">详情</button>
+          <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id, $event)">详情</button>
           <button class="btn btn-success btn-small" @click="toggleTeam(m.id)">加入</button>
         </div>
       </div>
@@ -191,7 +194,7 @@
 
     <!-- 人物详情弹窗（独立弹窗，不再切换顶部面板） -->
     <div v-if="showMemberDetailModal && detailMember" class="equip-select-modal character-detail-modal" @click.self="closeMemberDetail">
-      <div class="modal-content glass-card character-detail-content" @click.stop>
+      <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
         <div class="char-detail-header">
           <div class="char-avatar large">
             <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterAvatar(detailMember)" />
@@ -201,9 +204,6 @@
             <div class="char-name-row">
               <h2 class="char-name">{{ detailMember.name }}</h2>
               <span class="star-badge">{{ '★'.repeat(detailMember.star || 1) }}</span>
-              <span class="breakthrough-badge" v-if="(detailMember.breakThrough || 0) > 0">
-                突破 {{ detailMember.breakThrough }}/5
-              </span>
             </div>
             <div class="char-meta">
               <span class="char-school" :style="{ color: detailMember.schoolColor }">
@@ -295,24 +295,21 @@
           </div>
         </div>
 
-        <!-- 突破按钮 -->
-        <div class="attr-block">
-          <h4 class="sub-title">人物突破</h4>
-          <p class="breakthrough-desc">
-            每突破一次，基础数值 ×1.2（复利），最多 5 次。抽到同名角色时自动突破一次。
-          </p>
-          <div class="breakthrough-bar">
-            <div
-              v-for="i in 5"
-              :key="i"
-              class="breakthrough-dot"
-              :class="{ active: i <= (detailMember.breakThrough || 0) }"
-            >{{ i }}</div>
+        <!-- 技能面板 -->
+        <div class="attr-block" v-if="detailMember && detailMember.skills && detailMember.skills.length">
+          <h4 class="sub-title">技能 <span v-if="detailMember.skillSchoolName">{{ detailMember.skillSchoolIcon }} {{ detailMember.skillSchoolName }}</span></h4>
+          <div class="skill-list">
+            <div v-for="skill in detailMember.skills" :key="skill.id" class="skill-item" :class="skill.type">
+              <div class="skill-icon">{{ getSkillCategoryIcon(skill.category) }}</div>
+              <div class="skill-info">
+                <div class="skill-name">{{ skill.name }}</div>
+                <div class="skill-type">{{ getSkillTypeName(skill.type) }}</div>
+              </div>
+              <div class="skill-desc">{{ skill.description }}</div>
+            </div>
           </div>
-          <div class="breakthrough-actions" v-if="(detailMember.breakThrough || 0) < 5">
-            <button class="btn btn-info btn-small" @click="tryManualBreakthrough">
-              使用 1 人精华手动突破（当前：{{ playerStore.characterEssence || 0 }}）
-            </button>
+          <div v-if="detailMember.breakThrough < 5" class="skill-unlock-hint">
+            ⚡ 每突破一次可获得 2 个新技能
           </div>
         </div>
 
@@ -338,6 +335,18 @@
             <h5 class="bio-title">第三段 · 终极目标</h5>
             <p>🔒 需要人物突破至 4 次以上解锁</p>
           </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 立绘查看器弹窗 -->
+    <div v-if="showAvatarViewer" class="equip-select-modal avatar-viewer-modal" @click.self="closeAvatarViewer">
+      <div class="modal-content glass-card avatar-viewer-content" @click.stop>
+        <button class="btn btn-warning btn-close" @click="closeAvatarViewer">关闭</button>
+        <div class="avatar-viewer-title">{{ avatarViewerMember?.name || '' }} - 立绘</div>
+        <div class="avatar-viewer-image">
+          <img v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)" :src="getCharacterAvatar(avatarViewerMember)" />
+          <div v-else class="avatar-viewer-placeholder">暂无立绘</div>
         </div>
       </div>
     </div>
@@ -401,6 +410,7 @@ import { usePlayerStore } from '../stores/player'
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar } from '../plugins/characters'
+import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 
@@ -626,17 +636,53 @@ const selectMember = (id) => { selectedMemberId.value = id }
 const showMemberDetailModal = ref(false)
 const detailMember = ref(null)
 
-const viewMemberDetail = (id) => {
-  // 找到角色（包括宗门成员、候补、未出战等所有数据源）
+const memberDetailPosition = ref({ x: 0, y: 0 })
+
+const modalPositionStyle = computed(() => {
+  const { x, y } = memberDetailPosition.value
+  if (x === 0 && y === 0) return {}
+  const maxX = window.innerWidth - 400
+  const maxY = window.innerHeight - 500
+  return {
+    position: 'fixed',
+    left: Math.min(x, maxX) + 'px',
+    top: Math.min(y, maxY) + 'px',
+    transform: 'none'
+  }
+})
+
+const viewMemberDetail = (id, event) => {
   const member = playerStore.sectMembers.find(m => m.id === id)
     || playerStore.benchMembers?.find(m => m.id === id)
     || (playerStore.player && playerStore.player.id === id ? playerStore.player : null)
   detailMember.value = member
+  if (event) {
+    const rect = event.target.getBoundingClientRect()
+    memberDetailPosition.value = {
+      x: rect.left,
+      y: rect.top
+    }
+  } else {
+    memberDetailPosition.value = { x: 0, y: 0 }
+  }
   showMemberDetailModal.value = true
 }
+
 const closeMemberDetail = () => {
   showMemberDetailModal.value = false
-  detailMember.value = null
+}
+
+// 立绘查看器状态
+const showAvatarViewer = ref(false)
+const avatarViewerMember = ref(null)
+
+const openAvatarViewer = () => {
+  avatarViewerMember.value = selectedMember.value
+  showAvatarViewer.value = true
+}
+
+const closeAvatarViewer = () => {
+  showAvatarViewer.value = false
 }
 
 // 详情弹窗中的属性统计
@@ -1460,5 +1506,133 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
   margin-bottom: 6px;
+}
+.char-avatar-container {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+}
+
+.char-avatar-hint {
+  font-size: 10px;
+  color: #9e9e9e;
+}
+
+.avatar-viewer-modal {
+  z-index: 100;
+}
+
+.avatar-viewer-content {
+  max-width: 80%;
+  max-height: 80vh;
+  padding: 20px;
+}
+
+.avatar-viewer-title {
+  text-align: center;
+  font-size: 18px;
+  font-weight: bold;
+  margin-bottom: 16px;
+  color: #fff;
+}
+
+.avatar-viewer-image {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  max-height: 60vh;
+}
+
+.avatar-viewer-image img {
+  max-width: 100%;
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 8px;
+  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+}
+
+.avatar-viewer-placeholder {
+  font-size: 24px;
+  color: #9e9e9e;
+  padding: 40px;
+}
+
+.sect-member-modal {
+  z-index: 100;
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+}
+
+.sect-member-modal-content {
+  max-width: 90%;
+  max-height: 80vh;
+  padding: 24px;
+  overflow-y: auto;
+}
+
+.skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.skill-item {
+  display: flex;
+  gap: 12px;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  border-left: 3px solid;
+}
+
+.skill-item.active {
+  border-left-color: #4caf50;
+}
+
+.skill-item.passive {
+  border-left-color: #2196f3;
+}
+
+.skill-icon {
+  font-size: 24px;
+  flex-shrink: 0;
+}
+
+.skill-info {
+  flex-shrink: 0;
+}
+
+.skill-name {
+  font-weight: bold;
+  color: #fff;
+}
+
+.skill-type {
+  font-size: 10px;
+  color: #9e9e9e;
+  margin-top: 2px;
+}
+
+.skill-desc {
+  flex: 1;
+  font-size: 12px;
+  color: #ccc;
+  display: flex;
+  align-items: center;
+}
+
+.skill-unlock-hint {
+  font-size: 12px;
+  color: #ff9800;
+  margin-top: 8px;
+  text-align: center;
 }
 </style>

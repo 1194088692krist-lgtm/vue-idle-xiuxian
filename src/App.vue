@@ -19,10 +19,10 @@
                 </div>
               </div>
               <div class="resource-bar">
-                <div class="resource-item">
-                  <n-icon class="resource-icon"><ArrowUpOutlined /></n-icon>
-                  <span class="resource-value">{{ animatedSpirit }}</span>
-                  <span class="resource-label">灵力</span>
+                <div class="resource-item crystal">
+                  <n-icon class="resource-icon"><StarOutlined /></n-icon>
+                  <span class="resource-value">{{ animatedCrystals }}</span>
+                  <span class="resource-label">幻灵结晶</span>
                 </div>
                 <div class="resource-item gold">
                   <n-icon class="resource-icon"><DollarOutlined /></n-icon>
@@ -138,9 +138,11 @@ import SaveButton from './components/SaveButton.vue'
   const animatedSpirit = ref(0)
   const animatedStones = ref(0)
   const animatedCultivation = ref(0)
+  const animatedCrystals = ref(0)
   const spiritRaf = ref(null)
   const stonesRaf = ref(null)
   const cultivationRaf = ref(null)
+  const crystalsRaf = ref(null)
 
   const isStartScreen = computed(() => route.path === '/')
 
@@ -150,6 +152,7 @@ import SaveButton from './components/SaveButton.vue'
     animatedSpirit.value = playerStore.spirit.toFixed(2)
     animatedStones.value = playerStore.spiritStones
     animatedCultivation.value = playerStore.cultivation
+    animatedCrystals.value = playerStore.phantomCrystals
     getMenuItems()
     // 常驻挂机探索：玩家数据就绪后恢复并启动后台推进（离开探索页仍持续）
     idleSystem.initIdle()
@@ -173,6 +176,10 @@ import SaveButton from './components/SaveButton.vue'
 
   watch(() => playerStore.cultivation, val => {
     animateValue(animatedCultivation, val, 300, cultivationRaf)
+  })
+
+  watch(() => playerStore.phantomCrystals, val => {
+    animateValue(animatedCrystals, val, 500, crystalsRaf)
   })
 
   watch(() => playerStore.isGMMode, () => {
@@ -436,6 +443,19 @@ import SaveButton from './components/SaveButton.vue'
   .resource-item.gold {
     border-color: rgba(218, 165, 32, 0.4);
     background: rgba(218, 165, 32, 0.05);
+  }
+
+  .resource-item.crystal {
+    border-color: rgba(147, 112, 219, 0.4);
+    background: rgba(147, 112, 219, 0.05);
+  }
+
+  .resource-item.crystal .resource-icon {
+    color: #9370DB;
+  }
+
+  .resource-item.crystal .resource-value {
+    color: #E6E6FA;
   }
 
   .resource-icon {

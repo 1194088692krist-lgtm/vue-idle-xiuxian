@@ -1,5 +1,6 @@
 import { reactive } from 'vue'
 import { GameDB } from '../stores/db'
+import { getInitialSkills, getSkillSchoolByRole, skillSchools } from './skills'
 
 export const characterSchools = {
   sword: { name: '剑宗', color: '#4169E1', icon: '🗡️' },
@@ -62,56 +63,56 @@ export const characterTalents = {
 }
 
 export const characterList = [
-  { id: 'char_001', name: '苏浅雪', star: 3, school: 'sword', talent: 'sword_mastery', description: '寒门孤女，偶得残卷踏上修仙路', role: 'vanguard', baseStats: { attack: 15, health: 80, defense: 8, speed: 12 }, avatar: null },
-  { id: 'char_002', name: '林清瑶', star: 3, school: 'dao', talent: 'dao_insight', description: '道姑出身，精通风水堪舆之术', role: 'tactician', baseStats: { attack: 10, health: 90, defense: 10, speed: 10 }, avatar: null },
-  { id: 'char_003', name: '炎红袖', star: 3, school: 'fire', talent: 'flame_body', description: '火山脚下走出的少女，性情如火', role: 'vanguard', baseStats: { attack: 18, health: 70, defense: 6, speed: 11 }, avatar: null },
-  { id: 'char_004', name: '冷月', star: 3, school: 'ice', talent: 'ice_barrier', description: '雪山派弃徒，修炼冰心诀', role: 'shield', baseStats: { attack: 12, health: 95, defense: 12, speed: 9 }, avatar: null },
-  { id: 'char_005', name: '惊鸿', star: 3, school: 'thunder', talent: 'thunder_speed', description: '轻功卓绝的飞贼，从不取人性命', role: 'blade', baseStats: { attack: 14, health: 75, defense: 7, speed: 18 }, avatar: null },
-  { id: 'char_006', name: '蛇姬', star: 3, school: 'poison', talent: 'poison_breath', description: '苗疆毒女，以蛇虫为友', role: 'blade', baseStats: { attack: 13, health: 78, defense: 6, speed: 13 }, avatar: null },
-  { id: 'char_007', name: '熊娇娇', star: 3, school: 'beast', talent: 'beast_tamer', description: '山中猎户之女，天生神力', role: 'shield', baseStats: { attack: 16, health: 110, defense: 11, speed: 8 }, avatar: null },
-  { id: 'char_008', name: '夜鸢', star: 3, school: 'ghost', talent: 'ghost_pact', description: '夜行刺客，来去无踪', role: 'blade', baseStats: { attack: 15, health: 65, defense: 5, speed: 14 }, avatar: null },
-  { id: 'char_009', name: '云隐', star: 3, school: 'light', talent: 'light_blessing', description: '行医济世的游医，心怀慈悲', role: 'herb', baseStats: { attack: 11, health: 85, defense: 9, speed: 10 }, avatar: null },
-  { id: 'char_010', name: '影杀', star: 3, school: 'dark', talent: 'dark_pact', description: '暗影门杀手，精通潜伏暗杀', role: 'blade', baseStats: { attack: 17, health: 68, defense: 5, speed: 15 }, avatar: null },
-  { id: 'char_011', name: '铁扇娘', star: 3, school: 'sword', talent: 'iron_wall', description: '铁扇门弟子，攻守兼备', role: 'shield', baseStats: { attack: 12, health: 100, defense: 14, speed: 7 }, avatar: null },
-  { id: 'char_012', name: '飞絮', star: 3, school: 'dao', talent: 'agile_step', description: '轻功绝顶的女侠，身法如柳絮', role: 'blade', baseStats: { attack: 13, health: 72, defense: 6, speed: 16 }, avatar: null },
-  { id: 'char_013', name: '血罗刹', star: 3, school: 'fire', talent: 'blood_lust', description: '嗜血狂女，越战越疯狂', role: 'vanguard', baseStats: { attack: 19, health: 60, defense: 4, speed: 12 }, avatar: null },
-  { id: 'char_014', name: '逆鳞', star: 3, school: 'ice', talent: 'counter_master', description: '防守反击的高手，后发制人', role: 'shield', baseStats: { attack: 14, health: 82, defense: 10, speed: 9 }, avatar: null },
-  { id: 'char_015', name: '连珠', star: 3, school: 'thunder', talent: 'combo_master', description: '快剑手，一剑快过一剑', role: 'blade', baseStats: { attack: 15, health: 70, defense: 6, speed: 14 }, avatar: null },
-  { id: 'char_016', name: '幻雾', star: 3, school: 'poison', talent: 'stun_master', description: '用毒烟迷惑敌人的诡道修士', role: 'tactician', baseStats: { attack: 12, health: 75, defense: 7, speed: 11 }, avatar: null },
-  { id: 'char_017', name: '裂魂', star: 3, school: 'beast', talent: 'crit_master', description: '追求极致一击的狂刀', role: 'vanguard', baseStats: { attack: 20, health: 55, defense: 4, speed: 13 }, avatar: null },
-  { id: 'char_018', name: '磐石', star: 3, school: 'ghost', talent: 'tank_master', description: '不动如山的守卫者', role: 'shield', baseStats: { attack: 10, health: 120, defense: 16, speed: 6 }, avatar: null },
-  { id: 'char_019', name: '焚天', star: 3, school: 'light', talent: 'dps_master', description: '以命换命的拼命三郎', role: 'vanguard', baseStats: { attack: 22, health: 50, defense: 3, speed: 12 }, avatar: null },
-  { id: 'char_020', name: '回春', star: 3, school: 'dark', talent: 'support_master', description: '杏林高手，擅长续命之术', role: 'herb', baseStats: { attack: 8, health: 88, defense: 8, speed: 10 }, avatar: null },
-  { id: 'char_021', name: '凌霜剑姬', star: 4, school: 'sword', talent: 'sword_mastery', description: '剑宗圣女，剑气如霜雪纷飞', role: 'vanguard', baseStats: { attack: 25, health: 120, defense: 14, speed: 18 }, avatar: null },
-  { id: 'char_022', name: '玄玑仙子', star: 4, school: 'dao', talent: 'dao_insight', description: '道门高人，推演天机断人祸福', role: 'tactician', baseStats: { attack: 18, health: 140, defense: 16, speed: 15 }, avatar: null },
-  { id: 'char_023', name: '赤焰灵尊', star: 4, school: 'fire', talent: 'flame_body', description: '火宗圣女，控火之术出神入化', role: 'vanguard', baseStats: { attack: 32, health: 100, defense: 10, speed: 16 }, avatar: null },
-  { id: 'char_024', name: '寒渊仙子', star: 4, school: 'ice', talent: 'ice_barrier', description: '冰宫传人，所到之处寒冰万里', role: 'shield', baseStats: { attack: 22, health: 145, defense: 20, speed: 14 }, avatar: null },
-  { id: 'char_025', name: '紫电圣母', star: 4, school: 'thunder', talent: 'thunder_speed', description: '雷宗奇才，双手蕴含雷霆之力', role: 'blade', baseStats: { attack: 26, health: 110, defense: 12, speed: 26 }, avatar: null },
-  { id: 'char_026', name: '百毒仙姑', star: 4, school: 'poison', talent: 'poison_breath', description: '毒宗长老，万蛊噬身之术无人能解', role: 'blade', baseStats: { attack: 24, health: 115, defense: 10, speed: 19 }, avatar: null },
-  { id: 'char_027', name: '驭兽天女', star: 4, school: 'beast', talent: 'beast_tamer', description: '兽宗宗主，号令万兽如臂使指', role: 'shield', baseStats: { attack: 28, health: 170, defense: 18, speed: 12 }, avatar: null },
-  { id: 'char_028', name: '九幽鬼母', star: 4, school: 'ghost', talent: 'ghost_pact', description: '鬼修大能，执掌幽冥生死簿', role: 'blade', baseStats: { attack: 28, health: 100, defense: 8, speed: 22 }, avatar: null },
-  { id: 'char_029', name: '净世光使', star: 4, school: 'light', talent: 'light_blessing', description: '光宗使者，以圣光净化邪祟', role: 'herb', baseStats: { attack: 20, health: 130, defense: 15, speed: 16 }, avatar: null },
-  { id: 'char_030', name: '噬影魔女', star: 4, school: 'dark', talent: 'dark_pact', description: '暗宗殿主，吞噬光影为食', role: 'vanguard', baseStats: { attack: 30, health: 95, defense: 9, speed: 24 }, avatar: null },
-  { id: 'char_031', name: '九天玄女', star: 4, school: 'sword', talent: 'iron_wall', description: '刀枪不入的护法金刚', role: 'shield', baseStats: { attack: 20, health: 180, defense: 24, speed: 10 }, avatar: null },
-  { id: 'char_032', name: '风无形', star: 4, school: 'dao', talent: 'agile_step', description: '身法绝伦的独行侠', role: 'blade', baseStats: { attack: 24, health: 105, defense: 10, speed: 28 }, avatar: null },
-  { id: 'char_033', name: '血魔女', star: 4, school: 'fire', talent: 'blood_lust', description: '以血为道的魔修女祖', role: 'vanguard', baseStats: { attack: 35, health: 90, defense: 7, speed: 18 }, avatar: null },
-  { id: 'char_034', name: '镜花影', star: 4, school: 'ice', talent: 'counter_master', description: '以镜反射攻击的冰修高手', role: 'shield', baseStats: { attack: 25, health: 130, defense: 16, speed: 14 }, avatar: null },
-  { id: 'char_035', name: '千手修罗', star: 4, school: 'thunder', talent: 'combo_master', description: '多臂连环攻击的雷修罗刹', role: 'blade', baseStats: { attack: 28, health: 100, defense: 10, speed: 20 }, avatar: null },
-  { id: 'char_036', name: '摄魂音', star: 4, school: 'poison', talent: 'stun_master', description: '以音律摄魂的毒修琴师', role: 'tactician', baseStats: { attack: 22, health: 110, defense: 12, speed: 16 }, avatar: null },
-  { id: 'char_037', name: '天怒', star: 4, school: 'beast', talent: 'crit_master', description: '追求暴击极致的兽修狂战', role: 'vanguard', baseStats: { attack: 38, health: 80, defense: 6, speed: 18 }, avatar: null },
-  { id: 'char_038', name: '不灭金身', star: 4, school: 'ghost', talent: 'tank_master', description: '修炼不死金身的鬼修护法', role: 'shield', baseStats: { attack: 18, health: 200, defense: 28, speed: 8 }, avatar: null },
-  { id: 'char_039', name: '杀生佛', star: 4, school: 'light', talent: 'dps_master', description: '以杀证道的佛门怒僧', role: 'vanguard', baseStats: { attack: 42, health: 75, defense: 5, speed: 16 }, avatar: null },
-  { id: 'char_040', name: '慈航道人', star: 4, school: 'dark', talent: 'support_master', description: '救苦救难的药修仙人', role: 'herb', baseStats: { attack: 15, health: 140, defense: 14, speed: 14 }, avatar: null },
-  { id: 'char_041', name: '太虚剑帝', star: 5, school: 'sword', talent: 'battle_master', description: '剑道通神，一剑可斩天裂地', role: 'vanguard', baseStats: { attack: 50, health: 200, defense: 25, speed: 30 }, avatar: null },
-  { id: 'char_042', name: '混元道母', star: 5, school: 'dao', talent: 'cultivation_master', description: '参悟大道本源，一念可定乾坤', role: 'tactician', baseStats: { attack: 40, health: 250, defense: 30, speed: 25 }, avatar: null },
-  { id: 'char_043', name: '九阳炎皇', star: 5, school: 'fire', talent: 'dps_master', description: '驾驭九阳真火，焚尽世间万物', role: 'vanguard', baseStats: { attack: 60, health: 180, defense: 20, speed: 28 }, avatar: null },
-  { id: 'char_044', name: '万古冰皇', star: 5, school: 'ice', talent: 'resistance_master', description: '万载寒冰加身，冰封三千世界', role: 'shield', baseStats: { attack: 45, health: 280, defense: 35, speed: 22 }, avatar: null },
-  { id: 'char_045', name: '紫霄雷母', star: 5, school: 'thunder', talent: 'speed_master', description: '掌控天劫雷霆，速度天下无双', role: 'blade', baseStats: { attack: 52, health: 160, defense: 18, speed: 45 }, avatar: null },
-  { id: 'char_046', name: '天毒圣母', star: 5, school: 'poison', talent: 'ghost_pact', description: '万毒之体，天地间无药可解其毒', role: 'blade', baseStats: { attack: 55, health: 170, defense: 15, speed: 32 }, avatar: null },
-  { id: 'char_047', name: '光明佛母', star: 5, school: 'light', talent: 'light_blessing', description: '普度众生的光明之尊', role: 'herb', baseStats: { attack: 42, health: 300, defense: 30, speed: 26 }, avatar: null },
-  { id: 'char_048', name: '洪荒兽神', star: 5, school: 'beast', talent: 'survival_master', description: '唤醒洪荒血脉，肉身堪比神兽', role: 'shield', baseStats: { attack: 48, health: 350, defense: 32, speed: 20 }, avatar: null },
-  { id: 'char_049', name: '十殿阎罗', star: 5, school: 'ghost', talent: 'blood_lust', description: '执掌幽冥十殿，掌控生死轮回', role: 'vanguard', baseStats: { attack: 58, health: 220, defense: 22, speed: 35 }, avatar: null },
-  { id: 'char_050', name: '永夜天尊', star: 5, school: 'dark', talent: 'dark_pact', description: '吞噬光明的永夜之主', role: 'vanguard', baseStats: { attack: 65, health: 150, defense: 15, speed: 40 }, avatar: null },
+  { id: 'char_001', name: '苏浅雪', star: 3, school: 'sword', talent: 'sword_mastery', description: '曾于青萝林剑斩三头狼王，剑身未沾一滴血', role: 'vanguard', baseStats: { attack: 15, health: 80, defense: 8, speed: 12 }, avatar: null },
+  { id: 'char_002', name: '林清瑶', star: 3, school: 'dao', talent: 'dao_insight', description: '能以铜钱占卜吉凶，百算百中，人称"活神仙"', role: 'tactician', baseStats: { attack: 10, health: 90, defense: 10, speed: 10 }, avatar: null },
+  { id: 'char_003', name: '炎红袖', star: 3, school: 'fire', talent: 'flame_body', description: '赤足踏过岩浆如履平地，指尖焰火可点燃百丈开外的枯枝', role: 'vanguard', baseStats: { attack: 18, health: 70, defense: 6, speed: 11 }, avatar: null },
+  { id: 'char_004', name: '冷月', star: 3, school: 'ice', talent: 'ice_barrier', description: '眼神所及之处寸草不生，皆化为冰晶', role: 'shield', baseStats: { attack: 12, health: 95, defense: 12, speed: 9 }, avatar: null },
+  { id: 'char_005', name: '惊鸿', star: 3, school: 'thunder', talent: 'thunder_speed', description: '轻功冠绝天下，曾在暴雨夜踏雷电而行，如履平地', role: 'blade', baseStats: { attack: 14, health: 75, defense: 7, speed: 18 }, avatar: null },
+  { id: 'char_006', name: '蛇姬', star: 3, school: 'poison', talent: 'poison_breath', description: '腰间常挂着一条翡翠小蛇，那是她唯一的伙伴', role: 'blade', baseStats: { attack: 13, health: 78, defense: 6, speed: 13 }, avatar: null },
+  { id: 'char_007', name: '熊娇娇', star: 3, school: 'beast', talent: 'beast_tamer', description: '能与百兽对话，曾骑着一头白熊从山崖跃下毫发无损', role: 'shield', baseStats: { attack: 16, health: 110, defense: 11, speed: 8 }, avatar: null },
+  { id: 'char_008', name: '夜鸢', star: 3, school: 'ghost', talent: 'ghost_pact', description: '只在午夜出现，来去无声，江湖人称"午夜幽灵"', role: 'blade', baseStats: { attack: 15, health: 65, defense: 5, speed: 14 }, avatar: null },
+  { id: 'char_009', name: '云隐', star: 3, school: 'light', talent: 'light_blessing', description: '随身带着一个破旧药箱，无论多重的伤都能妙手回春', role: 'herb', baseStats: { attack: 11, health: 85, defense: 9, speed: 10 }, avatar: null },
+  { id: 'char_010', name: '影杀', star: 3, school: 'dark', talent: 'dark_pact', description: '能融入任何阴影之中，敌人永远看不见她的刀刃', role: 'blade', baseStats: { attack: 17, health: 68, defense: 5, speed: 15 }, avatar: null },
+  { id: 'char_011', name: '铁扇娘', star: 3, school: 'sword', talent: 'iron_wall', description: '一柄铁扇攻守兼备，曾挡住数十名高手的围攻', role: 'shield', baseStats: { attack: 12, health: 100, defense: 14, speed: 7 }, avatar: null },
+  { id: 'char_012', name: '飞絮', star: 3, school: 'dao', talent: 'agile_step', description: '身法轻盈如柳絮飘飞，没人能看清她的招式', role: 'blade', baseStats: { attack: 13, health: 72, defense: 6, speed: 16 }, avatar: null },
+  { id: 'char_013', name: '血罗刹', star: 3, school: 'fire', talent: 'blood_lust', description: '每战必浴血，血溅三尺时反而越战越勇', role: 'vanguard', baseStats: { attack: 19, health: 60, defense: 4, speed: 12 }, avatar: null },
+  { id: 'char_014', name: '逆鳞', star: 3, school: 'ice', talent: 'counter_master', description: '从不主动攻击，但若被触碰到逆鳞，后果不堪设想', role: 'shield', baseStats: { attack: 14, health: 82, defense: 10, speed: 9 }, avatar: null },
+  { id: 'char_015', name: '连珠', star: 3, school: 'thunder', talent: 'combo_master', description: '快剑如连珠炮发，一剑快过一剑，让人目不暇接', role: 'blade', baseStats: { attack: 15, health: 70, defense: 6, speed: 14 }, avatar: null },
+  { id: 'char_016', name: '幻雾', star: 3, school: 'poison', talent: 'stun_master', description: '擅长用毒烟制造幻境，曾让整支军队迷失在山谷之中', role: 'tactician', baseStats: { attack: 12, health: 75, defense: 7, speed: 11 }, avatar: null },
+  { id: 'char_017', name: '裂魂', star: 3, school: 'beast', talent: 'crit_master', description: '一刀斩出可裂山石，据说他的刀下亡魂已有百数', role: 'vanguard', baseStats: { attack: 20, health: 55, defense: 4, speed: 13 }, avatar: null },
+  { id: 'char_018', name: '磐石', star: 3, school: 'ghost', talent: 'tank_master', description: '站如磐石，曾一人挡住千军万马，岿然不动', role: 'shield', baseStats: { attack: 10, health: 120, defense: 16, speed: 6 }, avatar: null },
+  { id: 'char_019', name: '焚天', star: 3, school: 'light', talent: 'dps_master', description: '以命换命的打法，同归于尽前必定拉上对手陪葬', role: 'vanguard', baseStats: { attack: 22, health: 50, defense: 3, speed: 12 }, avatar: null },
+  { id: 'char_020', name: '回春', star: 3, school: 'dark', talent: 'support_master', description: '虽出身暗宗，却心怀慈悲，救人无数', role: 'herb', baseStats: { attack: 8, health: 88, defense: 8, speed: 10 }, avatar: null },
+  { id: 'char_021', name: '凌霜剑姬', star: 4, school: 'sword', talent: 'sword_mastery', description: '剑宗圣女，一剑霜寒十四州，所到之处冰雪纷飞', role: 'vanguard', baseStats: { attack: 25, health: 120, defense: 14, speed: 18 }, avatar: null },
+  { id: 'char_022', name: '玄玑仙子', star: 4, school: 'dao', talent: 'dao_insight', description: '推演天机如探囊取物，能预测百年后的天劫', role: 'tactician', baseStats: { attack: 18, health: 140, defense: 16, speed: 15 }, avatar: null },
+  { id: 'char_023', name: '赤焰灵尊', star: 4, school: 'fire', talent: 'flame_body', description: '火宗圣女，能召唤九天神火，焚尽世间一切污秽', role: 'vanguard', baseStats: { attack: 32, health: 100, defense: 10, speed: 16 }, avatar: null },
+  { id: 'char_024', name: '寒渊仙子', star: 4, school: 'ice', talent: 'ice_barrier', description: '冰宫传人，挥手间万里冰封，连时间都仿佛凝固', role: 'shield', baseStats: { attack: 22, health: 145, defense: 20, speed: 14 }, avatar: null },
+  { id: 'char_025', name: '紫电圣母', star: 4, school: 'thunder', talent: 'thunder_speed', description: '雷宗奇才，双掌拍出如雷霆万钧，无人能挡', role: 'blade', baseStats: { attack: 26, health: 110, defense: 12, speed: 26 }, avatar: null },
+  { id: 'char_026', name: '百毒仙姑', star: 4, school: 'poison', talent: 'poison_breath', description: '毒宗长老，万毒不侵，一滴毒液可让方圆十里寸草不生', role: 'blade', baseStats: { attack: 24, health: 115, defense: 10, speed: 19 }, avatar: null },
+  { id: 'char_027', name: '驭兽天女', star: 4, school: 'beast', talent: 'beast_tamer', description: '兽宗宗主，能号令万兽，曾驱使一群巨龙守护宗门', role: 'shield', baseStats: { attack: 28, health: 170, defense: 18, speed: 12 }, avatar: null },
+  { id: 'char_028', name: '九幽鬼母', star: 4, school: 'ghost', talent: 'ghost_pact', description: '鬼修大能，能召唤九幽厉鬼，执掌幽冥生死簿', role: 'blade', baseStats: { attack: 28, health: 100, defense: 8, speed: 22 }, avatar: null },
+  { id: 'char_029', name: '净世光使', star: 4, school: 'light', talent: 'light_blessing', description: '光宗使者，以圣光净化邪祟，让亡灵安息', role: 'herb', baseStats: { attack: 20, health: 130, defense: 15, speed: 16 }, avatar: null },
+  { id: 'char_030', name: '噬影魔女', star: 4, school: 'dark', talent: 'dark_pact', description: '暗宗殿主，能吞噬光影为食，与黑暗融为一体', role: 'vanguard', baseStats: { attack: 30, health: 95, defense: 9, speed: 24 }, avatar: null },
+  { id: 'char_031', name: '九天玄女', star: 4, school: 'sword', talent: 'iron_wall', description: '刀枪不入，曾以肉身硬抗天劫而毫发无损', role: 'shield', baseStats: { attack: 20, health: 180, defense: 24, speed: 10 }, avatar: null },
+  { id: 'char_032', name: '风无形', star: 4, school: 'dao', talent: 'agile_step', description: '身法绝伦，来无影去无踪，从未有人见过她的真面目', role: 'blade', baseStats: { attack: 24, health: 105, defense: 10, speed: 28 }, avatar: null },
+  { id: 'char_033', name: '血魔女', star: 4, school: 'fire', talent: 'blood_lust', description: '以血为道，每饮一滴血便增一分修为，令人闻风丧胆', role: 'vanguard', baseStats: { attack: 35, health: 90, defense: 7, speed: 18 }, avatar: null },
+  { id: 'char_034', name: '镜花影', star: 4, school: 'ice', talent: 'counter_master', description: '以镜反射攻击，敌人的招式会原封不动地还回去', role: 'shield', baseStats: { attack: 25, health: 130, defense: 16, speed: 14 }, avatar: null },
+  { id: 'char_035', name: '千手修罗', star: 4, school: 'thunder', talent: 'combo_master', description: '多臂连环攻击，如修罗降世，让人防不胜防', role: 'blade', baseStats: { attack: 28, health: 100, defense: 10, speed: 20 }, avatar: null },
+  { id: 'char_036', name: '摄魂音', star: 4, school: 'poison', talent: 'stun_master', description: '以音律摄魂，琴声一起，敌人便会不由自主地起舞', role: 'tactician', baseStats: { attack: 22, health: 110, defense: 12, speed: 16 }, avatar: null },
+  { id: 'char_037', name: '天怒', star: 4, school: 'beast', talent: 'crit_master', description: '追求暴击极致，一拳打出可震碎山岳', role: 'vanguard', baseStats: { attack: 38, health: 80, defense: 6, speed: 18 }, avatar: null },
+  { id: 'char_038', name: '不灭金身', star: 4, school: 'ghost', talent: 'tank_master', description: '修炼不死金身，无论受到多重的伤都能快速恢复', role: 'shield', baseStats: { attack: 18, health: 200, defense: 28, speed: 8 }, avatar: null },
+  { id: 'char_039', name: '杀生佛', star: 4, school: 'light', talent: 'dps_master', description: '以杀证道，佛挡杀佛，魔挡杀魔', role: 'vanguard', baseStats: { attack: 42, health: 75, defense: 5, speed: 16 }, avatar: null },
+  { id: 'char_040', name: '慈航道人', star: 4, school: 'dark', talent: 'support_master', description: '救苦救难，能以暗力治愈百病，人称"暗中医仙"', role: 'herb', baseStats: { attack: 15, health: 140, defense: 14, speed: 14 }, avatar: null },
+  { id: 'char_041', name: '太虚剑帝', star: 5, school: 'sword', talent: 'battle_master', description: '剑道通神，一剑可斩天裂地，连天道都要退避三分', role: 'vanguard', baseStats: { attack: 50, health: 200, defense: 25, speed: 30 }, avatar: null },
+  { id: 'char_042', name: '混元道母', star: 5, school: 'dao', talent: 'cultivation_master', description: '参悟大道本源，一念可定乾坤，万法皆空', role: 'tactician', baseStats: { attack: 40, health: 250, defense: 30, speed: 25 }, avatar: null },
+  { id: 'char_043', name: '九阳炎皇', star: 5, school: 'fire', talent: 'dps_master', description: '驾驭九阳真火，焚尽世间万物，连虚空都能点燃', role: 'vanguard', baseStats: { attack: 60, health: 180, defense: 20, speed: 28 }, avatar: null },
+  { id: 'char_044', name: '万古冰皇', star: 5, school: 'ice', talent: 'resistance_master', description: '万载寒冰加身，冰封三千世界，时间在她面前静止', role: 'shield', baseStats: { attack: 45, health: 280, defense: 35, speed: 22 }, avatar: null },
+  { id: 'char_045', name: '紫霄雷母', star: 5, school: 'thunder', talent: 'speed_master', description: '掌控天劫雷霆，速度天下无双，眨眼间可跨越万里', role: 'blade', baseStats: { attack: 52, health: 160, defense: 18, speed: 45 }, avatar: null },
+  { id: 'char_046', name: '天毒圣母', star: 5, school: 'poison', talent: 'ghost_pact', description: '万毒之体，天地间无药可解其毒，一滴血便可毒杀一界', role: 'blade', baseStats: { attack: 55, health: 170, defense: 15, speed: 32 }, avatar: null },
+  { id: 'char_047', name: '光明佛母', star: 5, school: 'light', talent: 'light_blessing', description: '普度众生的光明之尊，圣光所到之处，万物复苏', role: 'herb', baseStats: { attack: 42, health: 300, defense: 30, speed: 26 }, avatar: null },
+  { id: 'char_048', name: '洪荒兽神', star: 5, school: 'beast', talent: 'survival_master', description: '唤醒洪荒血脉，肉身堪比神兽，一拳可打碎星辰', role: 'shield', baseStats: { attack: 48, health: 350, defense: 32, speed: 20 }, avatar: null },
+  { id: 'char_049', name: '十殿阎罗', star: 5, school: 'ghost', talent: 'blood_lust', description: '执掌幽冥十殿，掌控生死轮回，一念可判人生死', role: 'vanguard', baseStats: { attack: 58, health: 220, defense: 22, speed: 35 }, avatar: null },
+  { id: 'char_050', name: '永夜天尊', star: 5, school: 'dark', talent: 'dark_pact', description: '吞噬光明的永夜之主，一念之间可让世界陷入永恒黑暗', role: 'vanguard', baseStats: { attack: 65, health: 150, defense: 15, speed: 40 }, avatar: null },
 ]
 
 // ===== 立绘解析与持久化（批量导入 + 大陆稳定加载）=====
@@ -252,6 +253,11 @@ export function generateCharacterById(charId) {
     baseStats: { ...baseStats },
     // 人物突破次数：0~5，每次抽到同名角色时 +1（最多 5 次）
     breakThrough: 0,
+    // 技能系统
+    skillSchool: getSkillSchoolByRole(template.role),
+    skillSchoolName: skillSchools[getSkillSchoolByRole(template.role)]?.name || '',
+    skillSchoolIcon: skillSchools[getSkillSchoolByRole(template.role)]?.icon || '',
+    skills: getInitialSkills(template.role),
     level: 1,
     experience: 0,
     maxExperience: 100,
@@ -304,11 +310,11 @@ export function generateCharacterById(charId) {
 }
 
 export function generateRandomCharacter(forceStar = null) {
-  // 概率：5星 3%，4星 20%，3星 77%
+  // 概率：5星 1%，4星 19%，3星 80%
   // forceStar: 保底/锁定星数时使用（如十连保底）
-  const STAR_5_RATE = 0.03
-  const STAR_4_RATE = 0.20
-  const STAR_3_RATE = 0.77
+  const STAR_5_RATE = 0.01
+  const STAR_4_RATE = 0.19
+  const STAR_3_RATE = 0.80
   let star
   if (forceStar) {
     star = forceStar
