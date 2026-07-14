@@ -1397,7 +1397,17 @@ export const usePlayerStore = defineStore('player', {
       }
       const existing = this.sectMembers.find(m => m.templateId === character.templateId)
       if (existing) {
-        return { success: false, message: `${character.name}已在宗门中` }
+        // 重复人物自动转换为人精华（用于突破境界）
+        const essenceAmount = character.star * 10 + (character.star >= 4 ? 20 : 0)
+        if (!this.characterEssence) this.characterEssence = 0
+        this.characterEssence += essenceAmount
+        this.queueSave()
+        return {
+          success: true,
+          message: `${character.name}已是宗门弟子，自动转换为 ${essenceAmount} 人精华`,
+          duplicate: true,
+          essence: essenceAmount
+        }
       }
       this.sectMembers.push(character)
       this.queueSave()
@@ -1541,6 +1551,76 @@ export const usePlayerStore = defineStore('player', {
       member.avatar = avatarData
       this.queueSave()
       return { success: true, message: '头像更新成功' }
+    },
+    // 给角色装备灵宠
+    equipCharacterPet(memberId, pet) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedPet) member.equippedPet = null
+      // 卸下旧灵宠
+      if (member.equippedPet) {
+        this.pets.push(member.equippedPet)
+      }
+      const petIndex = this.pets.findIndex(p => p.uid === pet.uid)
+      if (petIndex !== -1) this.pets.splice(petIndex, 1)
+      member.equippedPet = pet
+      this.queueSave()
+      return { success: true, message: `${pet.name} 已装备给 ${member.name}` }
+    },
+    // 给角色卸下灵宠
+    unequipCharacterPet(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedPet) return { success: false, message: '该角色没有装备灵宠' }
+      const pet = member.equippedPet
+      this.pets.push(pet)
+      member.equippedPet = null
+      this.queueSave()
+      return { success: true, message: `${pet.name} 已卸下` }
+    },
+    // 一键为角色穿脱所有最佳装备
+    autoEquipCharacter(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedArtifacts) member.equippedArtifacts = {}
+      const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
+      let equippedCount = 0
+      for (const slot of slots) {
+        // 找到该槽位最佳装备
+        const candidates = this.items.filter(i => i.slot === slot)
+        if (candidates.length === 0) continue
+        // 按评分排序取最佳
+        candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
+        const best = candidates[0]
+        // 卸下旧装备
+        if (member.equippedArtifacts[slot]) {
+          this.items.push(member.equippedArtifacts[slot])
+        }
+        // 穿上新装备
+        const itemIndex = this.items.findIndex(i => i.id === best.id)
+        if (itemIndex !== -1) this.items.splice(itemIndex, 1)
+        member.equippedArtifacts[slot] = best
+        equippedCount++
+      }
+      this.queueSave()
+      return { success: true, message: `已为 ${member.name} 自动装备 ${equippedCount} 件装备` }
+    },
+    // 一键卸下角色所有装备
+    autoUnequipCharacter(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedArtifacts) return { success: false, message: '该角色没有装备' }
+      let unequippedCount = 0
+      for (const slot in member.equippedArtifacts) {
+        const artifact = member.equippedArtifacts[slot]
+        if (artifact) {
+          this.items.push(artifact)
+          member.equippedArtifacts[slot] = null
+          unequippedCount++
+        }
+      }
+      this.queueSave()
+      return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件装备` }
     }
   }
 })

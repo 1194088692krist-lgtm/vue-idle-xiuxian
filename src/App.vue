@@ -218,7 +218,7 @@ import SaveButton from './components/SaveButton.vue'
   const getMenuItems = () => {
     menuItems.value = [
       ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
-      { label: '人物', key: 'cultivation', icon: BookOutlined },
+      { label: '宗门', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
       { label: '炼丹', key: 'alchemy', icon: MedicineBoxOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
