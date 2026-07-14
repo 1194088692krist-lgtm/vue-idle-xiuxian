@@ -272,10 +272,6 @@
           <div class="dashboard-title">📊 挂机仪表盘</div>
           <div class="dashboard-grid">
             <div class="dash-item">
-              <span class="dash-label">胜率</span>
-              <span class="dash-value">{{ idleDashboard.winRate }}</span>
-            </div>
-            <div class="dash-item">
               <span class="dash-label">胜/负</span>
               <span class="dash-value">{{ idleDashboard.victories }}/{{ idleDashboard.defeats }}</span>
             </div>
@@ -286,6 +282,10 @@
             <div class="dash-item">
               <span class="dash-label">灵石</span>
               <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
+            </div>
+            <div class="dash-item">
+              <span class="dash-label">幻灵结晶</span>
+              <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
             </div>
             <div class="dash-item">
               <span class="dash-label">修为</span>
@@ -378,6 +378,16 @@
           {{ lastSummary.encounters }}次探索
         </span>
       </div>
+      <!-- 宝物高亮弹窗（日志上方） -->
+      <transition name="flash">
+        <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }" @click="hideTreasureFlash">
+          <div class="flash-content">
+            <div class="flash-icon">{{ treasureFlash.icon }}</div>
+            <div class="flash-title">{{ treasureFlash.title }}</div>
+            <div class="flash-desc">{{ treasureFlash.desc }}</div>
+          </div>
+        </div>
+      </transition>
       <div class="idle-log-body" ref="idleLogRef">
         <div
           v-for="(log, idx) in displayLogs"
@@ -493,16 +503,6 @@
       </div>
     </Teleport>
 
-    <!-- 宝物高亮弹窗 -->
-    <transition name="flash">
-      <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }" @click="hideTreasureFlash">
-        <div class="flash-content">
-          <div class="flash-icon">{{ treasureFlash.icon }}</div>
-          <div class="flash-title">{{ treasureFlash.title }}</div>
-          <div class="flash-desc">{{ treasureFlash.desc }}</div>
-        </div>
-      </div>
-    </transition>
   </div>
 </template>
 
@@ -1303,6 +1303,7 @@ onUnmounted(() => {
 
 /* 挂机日志 */
 .idle-log-section {
+  position: relative;
   padding: 16px;
   border-radius: 12px;
   background: rgba(0, 0, 0, 0.2);
@@ -1598,12 +1599,11 @@ onUnmounted(() => {
 
 /* 宝物高亮弹窗 */
 .treasure-flash {
-  position: fixed;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  z-index: 9999;
-  pointer-events: none;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  pointer-events: auto;
+  margin-bottom: 8px;
 }
 .flash-content {
   text-align: center;

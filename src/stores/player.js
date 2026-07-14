@@ -786,6 +786,35 @@ export const usePlayerStore = defineStore('player', {
       this.materials.push(...arr)
       this.queueSave()
     },
+    // 出售素材（按种类+id，指定数量）
+    sellMaterial(kind, materialId, count) {
+      if (!Array.isArray(this.materials)) return { success: false, message: '没有素材' }
+      let totalCount = 0
+      for (const m of this.materials) {
+        if (m.kind === kind && m.id === materialId) totalCount++
+      }
+      if (totalCount === 0) return { success: false, message: '没有该素材' }
+      const sellCount = Math.min(count, totalCount)
+      let pricePerUnit = 0
+      const priceMap = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, mythic: 400 }
+      for (const m of this.materials) {
+        if (m.kind === kind && m.id === materialId) {
+          pricePerUnit = priceMap[m.quality] || 5
+          break
+        }
+      }
+      let removed = 0
+      for (let i = this.materials.length - 1; i >= 0 && removed < sellCount; i--) {
+        if (this.materials[i].kind === kind && this.materials[i].id === materialId) {
+          this.materials.splice(i, 1)
+          removed++
+        }
+      }
+      const totalPrice = sellCount * pricePerUnit
+      this.spiritStones += totalPrice
+      this.queueSave()
+      return { success: true, message: `出售 ${sellCount} 个，获得 ${totalPrice} 灵石`, sellCount, totalPrice }
+    },
     // 清理过期临时增益
     pruneExpiredEffects() {
       const now = Date.now()
@@ -1411,25 +1440,24 @@ export const usePlayerStore = defineStore('player', {
       return { success: true, message: '升级成功' }
     },
     // 升星灵宠
-    evolvePet(pet, foodPet) {
-      // 检查是否是相同品质和名字的灵宠
-      if (pet.rarity != foodPet.rarity || pet.name != foodPet.name) {
-        return { success: false, message: '只能使用相同品质和名字的灵宠进行升星' }
-      }
+    evolvePet(pet) {
       const petIndex = this.items.findIndex(item => item.id === pet.id)
-      const foodPetIndex = this.items.findIndex(item => item.id === foodPet.id)
-      if (petIndex > -1 && foodPetIndex > -1) {
-        // 返还作为升星材料的灵宠已消耗的精华
-        const returnEssence = (foodPet.level - 1) * 10 // 假设每级消耗10精华
-        this.petEssence += returnEssence
-        // 移除作为材料的灵宠
-        this.items.splice(foodPetIndex, 1)
-        // 提升目标灵宠星级
-        this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
-        this.queueSave()
-        return { success: true, message: '升星成功' }
+      if (petIndex === -1) {
+        return { success: false, message: '灵宠不存在' }
       }
-      return { success: false, message: '升星失败' }
+      const cost = this.getEvolveCost(pet)
+      if (this.petFragments < cost) {
+        return { success: false, message: `升星碎片不足，需要 ${cost} 个` }
+      }
+      this.petFragments -= cost
+      this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
+      this.queueSave()
+      return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
+    },
+    getEvolveCost(pet) {
+      const baseCost = { divine: 50, celestial: 30, mystic: 15, spiritual: 8, mortal: 3 }
+      const starMult = 1 + (pet.star || 0) * 0.5
+      return Math.floor((baseCost[pet.rarity] || 5) * starMult)
     },
     // === 宗门系统 ===
     // 添加宗门成员
@@ -1766,17 +1794,9 @@ export const usePlayerStore = defineStore('player', {
       // 返还升星碎片（根据星级返还）
       const fragmentReturn = (pet.star || 0) * 2 + Math.floor((rarityReturnMap[pet.rarity] || 5) / 10)
       this.petFragments += fragmentReturn
-      // 报恩：额外返还素材
-      const materialReturn = Math.floor(returnAmount * 0.3)
-      const matTypes = ['herb', 'ore', 'liquid', 'core']
-      const matPerType = Math.max(1, Math.floor(materialReturn / matTypes.length))
-      for (const mt of matTypes) {
-        if (!this.materials[mt]) this.materials[mt] = 0
-        this.materials[mt] += matPerType
-      }
       this.items.splice(petIndex, 1)
       this.queueSave()
-      return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华、${fragmentReturn} 升星碎片和 ${materialReturn} 素材作为报恩`, returnAmount }
+      return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华、${fragmentReturn} 升星碎片作为报恩`, returnAmount }
     }
   }
 })

@@ -62,14 +62,14 @@
 
       <div class="attr-block">
         <h4 class="sub-title">属性面板</h4>
-        <div class="attr-table">
+        <div class="attr-table scrollable-table">
           <div class="attr-row attr-head">
             <span class="attr-col-label">属性</span>
             <span class="attr-col-base">基础</span>
             <span class="attr-col-delta">加成</span>
             <span class="attr-col-final">最终</span>
           </div>
-          <div v-for="stat in mainStats" :key="stat.key" class="attr-row">
+          <div v-for="stat in mainStats.slice(0, 7)" :key="stat.key" class="attr-row">
             <span class="attr-col-label">{{ stat.name }}</span>
             <span class="attr-col-base">{{ stat.base }}</span>
             <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
@@ -926,6 +926,10 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   display: flex;
   flex-direction: column;
   gap: 4px;
+}
+.scrollable-table {
+  max-height: 280px;
+  overflow-y: auto;
 }
 .attr-row {
   display: grid;

@@ -60,7 +60,10 @@
               @click="showEquipmentDetails(item)"
             >
               <div class="card-header">
-                <span :style="{ color: qualityInfoOf(item).color }">{{ item.name }}</span>
+                <span :style="{ color: qualityInfoOf(item).color }">
+                  {{ item.name }}
+                  <span class="equip-category-tag">{{ getEquipCategoryName(item.slot) }}</span>
+                </span>
                 <button
                   v-if="!isEquipped(item)"
                   class="btn-small btn-primary"
@@ -105,10 +108,43 @@
               {{ cat.label }}
             </button>
           </div>
+          <div class="material-toolbar">
+            <button
+              class="btn-small"
+              :class="{ active: isMaterialSelectMode }"
+              @click="toggleMaterialSelectMode"
+              :disabled="filteredMaterials.length === 0"
+            >
+              {{ isMaterialSelectMode ? '取消多选' : '多选卖出' }}
+            </button>
+            <button
+              v-if="isMaterialSelectMode"
+              class="btn-small btn-danger"
+              :disabled="selectedMaterials.length === 0"
+              @click="showMaterialSellModal = true"
+            >
+              批量卖出 ({{ selectedMaterials.length }})
+            </button>
+          </div>
           <div v-if="filteredMaterials.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="mat in filteredMaterials" :key="mat.id" class="simple-card">
+            <div
+              v-for="mat in filteredMaterials"
+              :key="mat.id"
+              class="simple-card material-card"
+              :class="{ selected: isMaterialSelected(mat) }"
+              @click="handleMaterialClick(mat)"
+            >
               <div class="card-header">
-                <span>{{ mat.name }}({{ mat.count }})</span>
+                <span>
+                  <input
+                    v-if="isMaterialSelectMode"
+                    type="checkbox"
+                    :checked="isMaterialSelected(mat)"
+                    @click.stop="toggleMaterialSelect(mat)"
+                    class="material-checkbox"
+                  />
+                  {{ mat.name }}({{ mat.count }})
+                </span>
                 <span class="simple-tag" :style="{ color: getMaterialColor(mat) }">
                   {{ getMaterialQualityName(mat) }}
                 </span>
@@ -261,14 +297,13 @@
           >
             升级({{ getUpgradeCost(selectedPet) }}精华)
           </button>
-          <select v-model="selectedFoodPet" class="simple-select">
-            <option value="">选择升星材料</option>
-            <option v-for="opt in getAvailableFoodPets(selectedPet)" :key="opt.value" :value="opt.value">
-              {{ opt.label }}
-            </option>
-          </select>
-          <button class="btn-small btn-warning" @click="evolvePet(selectedPet)" :disabled="!selectedFoodPet">
-            升星
+          <button
+            class="btn-small btn-warning"
+            @click="evolvePet(selectedPet)"
+            :disabled="!canEvolve(selectedPet)"
+            :title="`需要 ${getEvolveCost(selectedPet)} 升星碎片`"
+          >
+            升星({{ getEvolveCost(selectedPet) }}碎片)
           </button>
           <button class="btn-small btn-danger" @click="confirmReleasePet(selectedPet)">放生</button>
         </div>
@@ -548,6 +583,44 @@
     </div>
   </div>
 
+  <!-- 素材批量卖出弹窗 -->
+  <div v-if="showMaterialSellModal" class="simple-modal" @click.self="showMaterialSellModal = false">
+    <div class="simple-modal-content">
+      <div class="modal-header">
+        <h3>批量卖出素材</h3>
+        <button class="btn-small" @click="showMaterialSellModal = false">关闭</button>
+      </div>
+      <div class="modal-body">
+        <p>已选择 {{ selectedMaterials.length }} 种素材</p>
+        <div class="material-sell-list">
+          <div v-for="mat in selectedMaterials" :key="mat.id" class="material-sell-row">
+            <span>{{ mat.name }}</span>
+            <span class="material-sell-count">
+              <button class="btn-mini" @click="decreaseSellCount(mat)" :disabled="materialSellCounts[mat.id] <= 1">-</button>
+              <input
+                type="number"
+                v-model.number="materialSellCounts[mat.id]"
+                :min="1"
+                :max="mat.count"
+                class="count-input"
+              />
+              <button class="btn-mini" @click="increaseSellCount(mat)" :disabled="materialSellCounts[mat.id] >= mat.count">+</button>
+              <span class="sell-max-btn" @click="setMaxSellCount(mat)">全部</span>
+            </span>
+            <span>× {{ getMaterialPrice(mat) }} = {{ getMaterialPrice(mat) * (materialSellCounts[mat.id] || 1) }} 灵石</span>
+          </div>
+        </div>
+        <div class="sell-total">
+          总计: <strong>{{ totalSellPrice }} 灵石</strong>
+        </div>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-small" @click="showMaterialSellModal = false">取消</button>
+        <button class="btn-small btn-danger" @click="confirmSellMaterials">确认卖出</button>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -665,6 +738,79 @@
   const getMaterialColor = (mat) => materialQualityColors[mat.quality] || '#9e9e9e'
   const getMaterialKindName = (kind) => materialKindNames[kind] || '素材'
 
+  // 素材多选模式
+  const isMaterialSelectMode = ref(false)
+  const selectedMaterialIds = ref([])
+  const materialSellCounts = ref({})
+  const showMaterialSellModal = ref(false)
+
+  const toggleMaterialSelectMode = () => {
+    isMaterialSelectMode.value = !isMaterialSelectMode.value
+    selectedMaterialIds.value = []
+    materialSellCounts.value = {}
+  }
+
+  const isMaterialSelected = (mat) => selectedMaterialIds.value.includes(mat.id)
+
+  const toggleMaterialSelect = (mat) => {
+    const idx = selectedMaterialIds.value.indexOf(mat.id)
+    if (idx >= 0) {
+      selectedMaterialIds.value.splice(idx, 1)
+      delete materialSellCounts.value[mat.id]
+    } else {
+      selectedMaterialIds.value.push(mat.id)
+      materialSellCounts.value[mat.id] = mat.count
+    }
+  }
+
+  const handleMaterialClick = (mat) => {
+    if (isMaterialSelectMode.value) {
+      toggleMaterialSelect(mat)
+    }
+  }
+
+  const selectedMaterials = computed(() => {
+    return filteredMaterials.value.filter(m => selectedMaterialIds.value.includes(m.id))
+  })
+
+  const materialPriceMap = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, mythic: 400 }
+  const getMaterialPrice = (mat) => materialPriceMap[mat.quality] || 5
+
+  const increaseSellCount = (mat) => {
+    const cur = materialSellCounts.value[mat.id] || 1
+    if (cur < mat.count) materialSellCounts.value[mat.id] = cur + 1
+  }
+  const decreaseSellCount = (mat) => {
+    const cur = materialSellCounts.value[mat.id] || 1
+    if (cur > 1) materialSellCounts.value[mat.id] = cur - 1
+  }
+  const setMaxSellCount = (mat) => {
+    materialSellCounts.value[mat.id] = mat.count
+  }
+
+  const totalSellPrice = computed(() => {
+    let total = 0
+    selectedMaterials.value.forEach(mat => {
+      const cnt = materialSellCounts.value[mat.id] || 1
+      total += getMaterialPrice(mat) * cnt
+    })
+    return total
+  })
+
+  const confirmSellMaterials = () => {
+    let totalGot = 0
+    selectedMaterials.value.forEach(mat => {
+      const cnt = materialSellCounts.value[mat.id] || 1
+      const result = playerStore.sellMaterial(mat.kind, mat.id, cnt)
+      if (result.success) totalGot += result.totalPrice
+    })
+    message.success(`卖出完成，共获得 ${totalGot} 灵石`)
+    showMaterialSellModal.value = false
+    isMaterialSelectMode.value = false
+    selectedMaterialIds.value = []
+    materialSellCounts.value = {}
+  }
+
   // 使用丹药
   const usePill = pill => {
     const result = playerStore.usePill(pill)
@@ -695,7 +841,6 @@
   // 灵宠详情相关
   const showPetModal = ref(false)
   const selectedPet = ref(null)
-  const selectedFoodPet = ref(null)
 
   // 放生确认弹窗
   const showReleaseConfirm = ref(false)
@@ -752,7 +897,6 @@
   // 显示灵宠详情
   const showPetDetails = pet => {
     selectedPet.value = pet
-    selectedFoodPet.value = null
     showPetModal.value = true
   }
 
@@ -813,22 +957,16 @@
     return playerStore.petEssence >= cost
   }
 
-  // 获取可用作升星材料的灵宠列表
-  const getAvailableFoodPets = pet => {
-    if (!pet) return []
-    return playerStore.items
-      .filter(
-        item =>
-          item.type === 'pet' &&
-          item.id !== pet.id &&
-          item.star === pet.star &&
-          item.rarity === pet.rarity &&
-          item.name === pet.name
-      )
-      .map(item => ({
-        label: `${item.name} (${item.level || 1}级 ${item.star || 0}星)`,
-        value: item.id
-      }))
+  // 获取升星所需碎片数量
+  const getEvolveCost = pet => {
+    if (!pet) return 0
+    return playerStore.getEvolveCost(pet)
+  }
+
+  // 检查是否可以升星
+  const canEvolve = pet => {
+    if (!pet) return false
+    return playerStore.petFragments >= getEvolveCost(pet)
   }
 
   // 升级灵宠
@@ -843,20 +981,9 @@
 
   // 升星灵宠
   const evolvePet = pet => {
-    if (!selectedFoodPet.value) {
-      message.error('请选择用于升星的灵宠')
-      return
-    }
-    // 通过id查找对应的灵宠对象
-    const foodPet = playerStore.items.find(item => item.id === selectedFoodPet.value)
-    if (!foodPet) {
-      message.error('升星材料灵宠不存在')
-      return
-    }
-    const result = playerStore.evolvePet(pet, foodPet)
+    const result = playerStore.evolvePet(pet)
     if (result.success) {
       message.success(result.message)
-      selectedFoodPet.value = null
       showPetModal.value = false
     } else {
       message.error(result.message)
@@ -947,6 +1074,14 @@
     artifact: ['artifact'],
     armor: ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'belt'],
     accessory: ['necklace', 'ring1', 'ring2']
+  }
+
+  const getEquipCategoryName = (slot) => {
+    if (equipmentCategoryMap.weapon.includes(slot)) return '武器'
+    if (equipmentCategoryMap.artifact.includes(slot)) return '法宝'
+    if (equipmentCategoryMap.armor.includes(slot)) return '防具'
+    if (equipmentCategoryMap.accessory.includes(slot)) return '饰品'
+    return slot
   }
 
   // 装备标签页过滤后的列表
@@ -1866,5 +2001,112 @@
     margin-bottom: 4px;
     font-size: 13px;
     color: #F5DEB3;
+  }
+
+  /* 素材多选 */
+  .material-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+    align-items: center;
+  }
+
+  .material-card.selected {
+    border-color: #DAA520;
+    background: rgba(218, 165, 32, 0.1);
+  }
+
+  .material-checkbox {
+    margin-right: 6px;
+    cursor: pointer;
+  }
+
+  .material-kind {
+    display: inline-block;
+    margin-top: 4px;
+    font-size: 11px;
+    color: #888;
+  }
+
+  /* 素材卖出弹窗 */
+  .material-sell-list {
+    max-height: 300px;
+    overflow-y: auto;
+    margin: 10px 0;
+  }
+
+  .material-sell-row {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 8px 4px;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    gap: 8px;
+  }
+
+  .material-sell-count {
+    display: flex;
+    align-items: center;
+    gap: 4px;
+  }
+
+  .btn-mini {
+    padding: 2px 8px;
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    background: rgba(0, 0, 0, 0.3);
+    color: #F5DEB3;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+
+  .btn-mini:disabled {
+    opacity: 0.4;
+    cursor: not-allowed;
+  }
+
+  .count-input {
+    width: 50px;
+    text-align: center;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(139, 69, 19, 0.3);
+    color: #F5DEB3;
+    border-radius: 4px;
+    padding: 2px 4px;
+    font-size: 12px;
+  }
+
+  .sell-max-btn {
+    font-size: 11px;
+    color: #DAA520;
+    cursor: pointer;
+    padding: 2px 6px;
+    border: 1px solid rgba(218, 165, 32, 0.4);
+    border-radius: 4px;
+  }
+
+  .sell-total {
+    margin-top: 12px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    text-align: right;
+    font-size: 14px;
+  }
+
+  .sell-total strong {
+    color: #DAA520;
+    font-size: 16px;
+  }
+
+  /* 装备分类标签 */
+  .equip-category-tag {
+    font-size: 11px;
+    padding: 1px 6px;
+    background: rgba(30, 144, 255, 0.2);
+    color: #64B5F6;
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: normal;
   }
 </style>

@@ -1,5 +1,7 @@
 # 《修仙挂机录》完整攻略手册
 
+**当前版本：v1.1.0 · 宗门崛起（2025-08-15）**
+
 > 一份基于游戏真实代码与数值的详尽攻略，覆盖宗门体系、角色定位、资源体系、修炼突破、装备 Build、灵宠、挂机探索（含小剧场）、分区难度、抽卡、丹药、战斗公式与进阶策略。
 > 数据均来自源码（`src/plugins/*`、`src/stores/player.js`、`src/composables/useIdleSystem.js`、`src/views/Cultivation.vue`、`src/views/Gacha.vue` 等），可直接用于规划成长路线。
 

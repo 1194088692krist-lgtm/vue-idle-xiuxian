@@ -8,6 +8,7 @@
         <div class="header-info">
           <h2 class="card-title gold-gradient-text">凡人修仙</h2>
           <p class="card-subtitle">踏上修仙之路，成就无上仙途</p>
+          <p class="version-tag">v{{ GAME_VERSION }} · {{ GAME_VERSION_NAME }}</p>
         </div>
       </div>
       <div class="card-body">
@@ -81,6 +82,7 @@
 
 <script setup>
   import { usePlayerStore } from '../stores/player'
+  import { GAME_VERSION, GAME_VERSION_NAME } from '../plugins/version'
   import { useMessage } from 'naive-ui'
   import { useRouter } from 'vue-router'
   import { getRealmName } from '../plugins/realm'

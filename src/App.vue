@@ -252,9 +252,11 @@ import SaveButton from './components/SaveButton.vue'
   // 玩家按 ESC 关闭当前最表层弹窗
   const handleEscKey = (e) => {
     if (e.key !== 'Escape') return
+    e.preventDefault()
+    e.stopPropagation()
     // 1) 找到页面上所有可见的弹窗/遮罩/对话框
     const candidates = document.querySelectorAll(
-      '.n-modal, .n-modal-container, .n-dialog, .modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal, .n-drawer, .n-popselect, .n-base-selection, [class*="-modal"], [class*="overlay"]'
+      '.n-modal, .n-modal-container, .n-dialog, .modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal, .simple-modal, [class*="detail-modal"], .n-drawer, .n-popselect, .n-base-selection, [class*="-modal"], [class*="overlay"]'
     )
     const visibleList = []
     candidates.forEach(el => {
@@ -276,7 +278,7 @@ import SaveButton from './components/SaveButton.vue'
       closeBtn.click()
     } else {
       // 对自定义 modal，直接点击 .modal-overlay 自身即可让外层 click.self 触发关闭
-      const overlay = top.matches('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal') ? top : top.querySelector('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal')
+      const overlay = top.matches('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal, .simple-modal, [class*="detail-modal"]') ? top : top.querySelector('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal, .simple-modal, [class*="detail-modal"]')
       if (overlay) {
         overlay.click()
       } else {
