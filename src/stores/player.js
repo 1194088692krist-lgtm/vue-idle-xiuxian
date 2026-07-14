@@ -105,6 +105,29 @@ export const usePlayerStore = defineStore('player', {
       combatBoost: 0, // 战斗属性提升
       resistanceBoost: 0 // 战斗抗性提升
     },
+    // 裸身基线（无装备·无套装·含出战灵宠）——用于人物面板展示「基础值 vs 装备后最终值」对比
+    nakedBaseAttributes: {
+      attack: 10,
+      health: 100,
+      defense: 5,
+      speed: 10
+    },
+    nakedCombatAttributes: {
+      critRate: 0,
+      comboRate: 0,
+      counterRate: 0,
+      stunRate: 0,
+      dodgeRate: 0,
+      vampireRate: 0
+    },
+    nakedCombatResistance: {
+      critResist: 0,
+      comboResist: 0,
+      counterResist: 0,
+      stunResist: 0,
+      dodgeResist: 0,
+      vampireResist: 0
+    },
     // 资源
     spiritStones: 0, // 灵石数量
     reinforceStones: 0, // 强化石数量
@@ -1046,13 +1069,29 @@ export const usePlayerStore = defineStore('player', {
         defense: INTRINSIC.defense + (this.rebirthBonus.defense || 0) + (this.permanentBonuses.defense || 0),
         speed: INTRINSIC.speed + (this.rebirthBonus.speed || 0) + (this.permanentBonuses.speed || 0)
       }
-      // 1) 重置为裸属性
-      this.baseAttributes.attack = intrinsic.attack
-      this.baseAttributes.health = intrinsic.health
-      this.baseAttributes.defense = intrinsic.defense
-      this.baseAttributes.speed = intrinsic.speed
-      Object.keys(this.combatAttributes).forEach(k => { this.combatAttributes[k] = 0 })
-      Object.keys(this.combatResistance).forEach(k => { this.combatResistance[k] = 0 })
+      // 1) 裸身基线（无装备·无套装·含出战灵宠）——先独立计算并保存，供面板对比展示
+      const nakedBase = { attack: intrinsic.attack, health: intrinsic.health, defense: intrinsic.defense, speed: intrinsic.speed }
+      const nakedCombat = {}
+      const nakedResist = {}
+      Object.keys(this.combatAttributes).forEach(k => { nakedCombat[k] = 0 })
+      Object.keys(this.combatResistance).forEach(k => { nakedResist[k] = 0 })
+      if (this.activePet && this.activePet.combatAttributes) {
+        const pb = this.activePet.combatAttributes
+        nakedBase.attack += pb.attack || 0
+        nakedBase.defense += pb.defense || 0
+        nakedBase.health += pb.health || 0
+        nakedBase.speed += pb.speed || 0
+        Object.keys(nakedCombat).forEach(k => { nakedCombat[k] += (pb[k] || 0) })
+        Object.keys(nakedResist).forEach(k => { nakedResist[k] += (pb[k] || 0) })
+      }
+      this.nakedBaseAttributes = { ...nakedBase }
+      this.nakedCombatAttributes = { ...nakedCombat }
+      this.nakedCombatResistance = { ...nakedResist }
+
+      // 2) 最终值 = 裸身基线 + 装备 + 套装；先以裸身基线为起点
+      this.baseAttributes = { ...nakedBase }
+      this.combatAttributes = { ...nakedCombat }
+      this.combatResistance = { ...nakedResist }
       Object.keys(this.specialAttributes).forEach(k => { this.specialAttributes[k] = 0 })
       Object.assign(this.artifactBonuses, {
         attack: 0, health: 0, defense: 0, speed: 0,
@@ -1061,7 +1100,7 @@ export const usePlayerStore = defineStore('player', {
         healBoost: 0, critDamageBoost: 0, critDamageReduce: 0, finalDamageBoost: 0, finalDamageReduce: 0,
         combatBoost: 0, resistanceBoost: 0, cultivationRate: 1, spiritRate: 1
       })
-      // 2) 装备：基础属性 + 词条
+      // 3) 装备：基础属性 + 词条
       Object.values(this.equippedArtifacts).forEach(artifact => {
         if (!artifact) return
         if (artifact.stats) {
@@ -1105,7 +1144,7 @@ export const usePlayerStore = defineStore('player', {
           })
         }
       })
-      // 3) 套装加成
+      // 4) 套装加成
       const activeSets = getActiveSetBonuses(this.equippedArtifacts)
       const setList = []
       activeSets.forEach(setInfo => setInfo.bonuses.forEach(b => setList.push(b)))
@@ -1136,17 +1175,7 @@ export const usePlayerStore = defineStore('player', {
           }
         }
       })
-      // 4) 出战灵宠（单一来源：activePet.combatAttributes）
-      if (this.activePet && this.activePet.combatAttributes) {
-        const pb = this.activePet.combatAttributes
-        this.baseAttributes.attack += pb.attack || 0
-        this.baseAttributes.defense += pb.defense || 0
-        this.baseAttributes.health += pb.health || 0
-        this.baseAttributes.speed += pb.speed || 0
-        Object.keys(this.combatAttributes).forEach(k => { this.combatAttributes[k] += (pb[k] || 0) })
-        Object.keys(this.combatResistance).forEach(k => { this.combatResistance[k] += (pb[k] || 0) })
-        Object.keys(this.specialAttributes).forEach(k => { this.specialAttributes[k] += (pb[k] || 0) })
-      }
+      // 5) 出战灵宠已并入裸身基线（步骤1），此处不再重复叠加，避免双重计算
     },
     // 兼容旧调用点：重算套装加成（现由 recomputeAttributes 统一处理）
     recalcSetBonuses() {

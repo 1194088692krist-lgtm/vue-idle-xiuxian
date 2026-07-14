@@ -51,6 +51,7 @@ function store() {
 let idleInterval = null
 let idleTimer = null
 let isRunning = false // 重入锁
+let idleEncounterErrorCount = 0 // 挂机遭遇异常日志去重计数（避免刷屏）
 
 // ============ 生动日志文案库（修仙风） ============
 // 通用场景（无专属描写时回退）
@@ -606,14 +607,29 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
 async function runIdleEncounter() {
-  if (!isIdling.value || !selectedZone.value) return
+  if (!isIdling.value) return
+  // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
+  // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
+  if (!selectedZone.value) {
+    const saved = store().idleExploration
+    if (saved && saved.zoneId) {
+      const z = getZoneById(saved.zoneId)
+      if (z) selectedZone.value = z
+    }
+    if (!selectedZone.value) return
+  }
   if (isRunning) return // 重入锁
-  isRunning = true
   const s = store()
   const zone = selectedZone.value
   const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
-  const effectiveZone = buildEffectiveZone(zone, diff)
+  // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
+  if (!diff) return
+  // 注意：isRunning 必须在 try 内赋值，确保任何异常都能在 finally 中重置，
+  // 否则重入锁会永久卡在 true，导致后续所有遭遇被跳过（表现为「挂机静默死掉」）
+  let effectiveZone
   try {
+    isRunning = true
+    effectiveZone = buildEffectiveZone(zone, diff)
     s.regenerateSpirit()
     if (s.spiritStones < diff.spiritCost) {
       addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
@@ -664,12 +680,20 @@ async function runIdleEncounter() {
     logEncounter(zone, diff, count, result.enemy, result.victory, rewards, loss)
     s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
     s.queueSave()
+    // 一次正常结算后重置异常计数（连续成功则允许再次记录后续异常）
+    idleEncounterErrorCount = 0
     // 气血归零 → 力竭提前失败
     if (idlePlayerHP.value <= 0) {
       idlePlayerDefeated.value = true
       addLog('defeat', `💀 力竭血枯！你的 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
       finishIdle()
       return
+    }
+  } catch (err) {
+    // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
+    if (idleEncounterErrorCount < 3) {
+      addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
+      idleEncounterErrorCount++
     }
   } finally {
     isRunning = false
@@ -713,6 +737,8 @@ function startIdleTimers() {
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = setInterval(() => { runIdleEncounter() }, ENCOUNTER_INTERVAL)
   idleTimer = setInterval(() => {
+    // 守卫：仅当挂机真正进行中且存档状态一致时才推进/结束，避免状态不一致时误触发 finishIdle
+    if (!isIdling.value || !store().idleExploration.isActive) return
     const remaining = store().getIdleRemainingTime()
     const elapsed = store().idleExploration.duration - remaining
     const total = store().idleExploration.duration
@@ -732,6 +758,7 @@ function startIdle(durationMinutes) {
   if (s.spiritStones < diff.spiritCost) return
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
+  idleEncounterErrorCount = 0
   idleEncounterCount.value = 0
   idlePlayerDefeated.value = false
   // 初始化血条：以玩家真实最大生命为基准
