@@ -104,8 +104,8 @@
                   </div>
                   <span>{{ characterSchools[result.item.school]?.name || '' }}</span>
                 </template>
-                <template v-else-if="result.category === 'equipment'">
-                  <span>{{ equipmentTypeNames[result.item.type] || '装备' }}</span>
+                <template v-else-if="result.category === 'weapon' || result.category === 'artifact' || result.category === 'equipment'">
+                  <span>{{ result.category === 'artifact' || result.item.slot === 'artifact' ? '法宝' : '武器' }}</span>
                   <span>{{ result.item.qualityInfo?.name || '' }}</span>
                   <div v-if="result.item.setId" class="result-set" :style="{ color: getSetColor(result.item.setId) }">
                     {{ getSetName(result.item.setId) }}
@@ -385,8 +385,9 @@
 
   const getResultTypeName = (result) => {
     if (result.category === 'character') return `人物`
+    if (result.category === 'weapon') return '武器'
+    if (result.category === 'artifact') return '法宝'
     if (result.category === 'equipment') {
-      // 区分武器和法宝
       if (result.item.slot === 'artifact' || result.item.type === 'artifact') return '法宝'
       return '武器'
     }

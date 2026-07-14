@@ -15,40 +15,111 @@
       <div class="tab-content">
         <!-- 装备 -->
         <div v-if="activeTab === 'equipment'" class="tab-pane">
-          <div class="equip-toolbar">
-            <span class="equip-count">共 {{ playerStore.items.length }} 件装备</span>
+          <div class="pet-actions">
+            <select v-model="equipmentFilterCategory" class="simple-select">
+              <option value="">全部分类</option>
+              <option value="weapon">武器</option>
+              <option value="artifact">法宝</option>
+              <option value="armor">防具</option>
+              <option value="accessory">饰品</option>
+            </select>
+            <select v-model="equipmentFilterQuality" class="simple-select">
+              <option value="">全部品质</option>
+              <option value="mythic">仙品</option>
+              <option value="legendary">极品</option>
+              <option value="epic">上品</option>
+              <option value="rare">中品</option>
+              <option value="uncommon">下品</option>
+              <option value="common">凡品</option>
+            </select>
+            <button
+              class="btn-small btn-success"
+              :disabled="displayEquipmentList.length === 0"
+              @click="sortEquipmentByScore"
+            >
+              🔼 按评分排序
+            </button>
+            <button
+              class="btn-small btn-warning"
+              :disabled="displayEquipmentList.length === 0"
+              @click="batchSellEquipments"
+            >
+              一键出售
+            </button>
           </div>
-          <div class="simple-grid" :class="{ mobile: isMobile }">
+          <div v-if="displayEquipmentList.length > pageSize" class="pagination-info">
+            共 {{ filteredEquipmentList.length }} 件装备，当前第 {{ currentEquipmentPage }} 页
+            <button class="btn-small" :disabled="currentEquipmentPage <= 1" @click="currentEquipmentPage--">上一页</button>
+            <button class="btn-small" :disabled="currentEquipmentPage * pageSize >= filteredEquipmentList.length" @click="currentEquipmentPage++">下一页</button>
+          </div>
+          <div v-if="displayEquipmentList.length" class="simple-grid" :class="{ mobile: isMobile }">
             <div
-              v-for="item in playerStore.items"
+              v-for="item in displayEquipmentList"
               :key="item.id || item.name"
               class="simple-card"
               @click="showEquipmentDetails(item)"
             >
               <div class="card-header">
-                <span :style="{ color: getItemColor(item) }">{{ item.name }}</span>
+                <span :style="{ color: qualityInfoOf(item).color }">{{ item.name }}</span>
+                <button
+                  v-if="!isEquipped(item)"
+                  class="btn-small btn-primary"
+                  @click.stop="equipItem(item)"
+                  :disabled="(item.requiredRealm || 1) > playerStore.level"
+                >装备</button>
+                <button
+                  v-else
+                  class="btn-small btn-danger"
+                  @click.stop="unequipItem(item.slot || item.type)"
+                >卸下</button>
               </div>
               <div class="card-body">
-                <p v-if="item.slot">{{ equipmentTypes[item.slot] || item.slot }}</p>
-                <p v-if="item.qualityInfo" :style="{ color: item.qualityInfo.color }">{{ item.qualityInfo.name }}</p>
+                <div class="equip-meta">
+                  <span class="simple-tag" :style="{ color: qualityInfoOf(item).color }">
+                    {{ qualityInfoOf(item).name }}
+                  </span>
+                  <span class="equip-score-badge">评分 {{ calculateEquipmentScore(item) }}</span>
+                </div>
+                <p>{{ equipmentTypes[item.slot] || item.slot }}</p>
+                <div class="equip-stats">
+                  <span v-if="item.stats?.attack">攻击: {{ item.stats.attack }}</span>
+                  <span v-if="item.stats?.health">生命: {{ item.stats.health }}</span>
+                  <span v-if="item.stats?.defense">防御: {{ item.stats.defense }}</span>
+                </div>
+                <p class="equip-affix-preview">词条：{{ formatAffixNames(item.affixes) }}</p>
               </div>
             </div>
           </div>
-          <div v-if="!playerStore.items.length" class="empty-hint">暂无装备</div>
+          <div v-else class="empty-state">暂无装备</div>
         </div>
-        <!-- 灵草 -->
-        <div v-if="activeTab === 'herbs'" class="tab-pane">
-          <div v-if="groupedHerbs.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="herb in groupedHerbs" :key="herb.id" class="simple-card">
+        <!-- 素材 -->
+        <div v-if="activeTab === 'materials'" class="tab-pane">
+          <div class="material-categories">
+            <button
+              v-for="cat in materialCategories"
+              :key="cat.key"
+              class="btn-small"
+              :class="{ active: selectedMaterialCategory === cat.key }"
+              @click="selectedMaterialCategory = cat.key"
+            >
+              {{ cat.label }}
+            </button>
+          </div>
+          <div v-if="filteredMaterials.length" class="simple-grid" :class="{ mobile: isMobile }">
+            <div v-for="mat in filteredMaterials" :key="mat.id" class="simple-card">
               <div class="card-header">
-                <span>{{ herb.name }}({{ herb.count }})</span>
+                <span>{{ mat.name }}({{ mat.count }})</span>
+                <span class="simple-tag" :style="{ color: getMaterialColor(mat) }">
+                  {{ getMaterialQualityName(mat) }}
+                </span>
               </div>
               <div class="card-body">
-                <p>{{ herb.description }}</p>
+                <p>{{ mat.description }}</p>
+                <span class="material-kind">{{ getMaterialKindName(mat.kind) }}</span>
               </div>
             </div>
           </div>
-          <div v-else class="empty-state">暂无灵草</div>
+          <div v-else class="empty-state">暂无素材</div>
         </div>
         <!-- 丹药 -->
         <div v-if="activeTab === 'pills'" class="tab-pane">
@@ -122,12 +193,9 @@
             <button class="btn-small" :disabled="currentPage * pageSize >= filteredPets.length" @click="currentPage++">下一页</button>
           </div>
           <div v-if="displayPets.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="pet in displayPets" :key="pet.id" class="simple-card">
+            <div v-for="pet in displayPets" :key="pet.id" class="simple-card" @click="showPetDetails(pet)">
               <div class="card-header">
                 <span>{{ pet.name }}</span>
-                <button class="btn-small btn-primary" @click="showPetDetails(pet)">
-                  详情
-                </button>
               </div>
               <div class="card-body">
                 <p>{{ pet.description }}</p>
@@ -138,7 +206,6 @@
                   <span>等级: {{ pet.level || 1 }}</span>
                   <span>星级: {{ pet.star || 0 }}</span>
                   <span class="pet-score">评分: {{ calculatePetScore(pet) }}</span>
-                  <button class="btn-small" @click="showPetDetails(pet)">详情</button>
                 </div>
               </div>
             </div>
@@ -539,6 +606,65 @@
   const playerStore = usePlayerStore()
   const message = useMessage()
 
+  // 素材分类
+  const materialCategories = [
+    { key: 'all', label: '全部' },
+    { key: 'herb', label: '灵草' },
+    { key: 'ore', label: '矿料' },
+    { key: 'liquid', label: '灵液' },
+    { key: 'core', label: '妖核' },
+    { key: 'special', label: '奇遇' }
+  ]
+  const selectedMaterialCategory = ref('all')
+
+  const groupedMaterials = computed(() => {
+    const map = {}
+    const materials = playerStore.materials || []
+    materials.forEach(mat => {
+      const key = mat.id || mat.name + mat.kind
+      if (!map[key]) {
+        map[key] = { ...mat, count: 0 }
+      }
+      map[key].count++
+    })
+    return Object.values(map)
+  })
+
+  const filteredMaterials = computed(() => {
+    if (selectedMaterialCategory.value === 'all') return groupedMaterials.value
+    return groupedMaterials.value.filter(m => m.kind === selectedMaterialCategory.value)
+  })
+
+  const materialQualityNames = {
+    common: '普通',
+    uncommon: '优良',
+    rare: '稀有',
+    epic: '珍贵',
+    legendary: '极品',
+    mythic: '神品'
+  }
+
+  const materialQualityColors = {
+    common: '#9e9e9e',
+    uncommon: '#4caf50',
+    rare: '#2196f3',
+    epic: '#9c27b0',
+    legendary: '#ff9800',
+    mythic: '#f44336'
+  }
+
+  const materialKindNames = {
+    herb: '灵草',
+    ore: '矿料',
+    liquid: '灵液',
+    core: '妖核',
+    special: '奇遇素材'
+  }
+
+  const getMaterialQualityName = (mat) => materialQualityNames[mat.quality] || '普通'
+  const getMaterialColor = (mat) => materialQualityColors[mat.quality] || '#9e9e9e'
+  const getMaterialKindName = (kind) => materialKindNames[kind] || '素材'
+
   // 使用丹药
   const usePill = pill => {
     const result = playerStore.usePill(pill)
@@ -550,12 +676,10 @@
   }
 
   // 标签页
-  const activeTab = ref('equipment')
+  const activeTab = ref('materials')
   const tabs = [
+    { name: 'materials', label: '素材' },
     { name: 'equipment', label: '装备' },
-    { name: 'herbs', label: '灵草' },
-    { name: 'pills', label: '丹药' },
-    { name: 'formulas', label: '丹方' },
     { name: 'pets', label: '灵宠' }
   ]
 
@@ -805,6 +929,10 @@
   const selectedEquipmentType = ref('')
   const selectedQuality = ref('all')
 
+  // 装备标签页筛选变量
+  const equipmentFilterCategory = ref('')
+  const equipmentFilterQuality = ref('')
+
   // 装备列表弹窗标题（含“全部”）
   const equipmentModalTitle = computed(() => {
     if (!selectedEquipmentType.value || selectedEquipmentType.value === 'all') return '全部装备'
@@ -812,6 +940,33 @@
   })
   const currentEquipmentPage = ref(1)
   const equipmentPageSize = ref(8)
+
+  // 装备分类映射
+  const equipmentCategoryMap = {
+    weapon: ['weapon'],
+    artifact: ['artifact'],
+    armor: ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'belt'],
+    accessory: ['necklace', 'ring1', 'ring2']
+  }
+
+  // 装备标签页过滤后的列表
+  const displayEquipmentList = computed(() => {
+    let list = playerStore.items.filter(item => {
+      if (!isEquipmentItem(item)) return false
+      if (equipmentFilterCategory.value) {
+        const slots = equipmentCategoryMap[equipmentFilterCategory.value]
+        if (slots && !slots.includes(item.slot)) return false
+      }
+      if (equipmentFilterQuality.value && item.quality !== equipmentFilterQuality.value) return false
+      return true
+    })
+    if (equipmentSortedByScore.value) {
+      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+    }
+    const start = (currentEquipmentPage.value - 1) * pageSize.value
+    const end = start + pageSize.value
+    return list.slice(start, end)
+  })
 
   // 装备品质选项
   const qualityOptions = computed(() => {

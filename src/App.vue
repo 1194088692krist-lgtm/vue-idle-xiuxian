@@ -249,9 +249,28 @@ import SaveButton from './components/SaveButton.vue'
     }
   }
 
+  const handleEscKey = (e) => {
+    if (e.key === 'Escape') {
+      const modals = document.querySelectorAll('.n-modal, .n-dialog, .modal-overlay, .glass-card')
+      const openModals = Array.from(modals).filter(el => {
+        const style = window.getComputedStyle(el)
+        return style.display !== 'none' && style.visibility !== 'hidden'
+      })
+      if (openModals.length > 0) {
+        const closeBtn = openModals[openModals.length - 1].querySelector('.n-modal__close, .n-dialog__close, .close-btn')
+        if (closeBtn) {
+          closeBtn.click()
+        } else {
+          openModals[openModals.length - 1].dispatchEvent(new Event('close'))
+        }
+      }
+    }
+  }
+
   onMounted(() => {
     startAutoGain()
     window.addEventListener('beforeunload', flushSave)
+    window.addEventListener('keydown', handleEscKey)
     // 启动时从 IndexedDB 载入人物定义（含已上传立绘），保证 Gacha/阵容/战斗等界面无需先打开 GM 工具即可显示立绘
     initCharacterDefs().catch(err => console.error('载入人物立绘定义失败:', err))
   })
@@ -266,6 +285,7 @@ import SaveButton from './components/SaveButton.vue'
     if (stonesRaf.value) cancelAnimationFrame(stonesRaf.value)
     if (cultivationRaf.value) cancelAnimationFrame(cultivationRaf.value)
     window.removeEventListener('beforeunload', flushSave)
+    window.removeEventListener('keydown', handleEscKey)
   })
 
   const getCurrentMenuKey = () => {

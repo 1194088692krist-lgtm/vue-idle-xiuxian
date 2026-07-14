@@ -688,6 +688,14 @@ function grantReward(effectiveZone, isIdleMode = false) {
   const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4)))
   s.phantomCrystals += crystalAmount
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
+  
+  // 升星碎片：难度3以上有概率掉落，难度越高概率越大
+  if (diff >= 3 && Math.random() < (diff - 2) * 0.15) {
+    const fragmentAmount = Math.floor(1 + Math.random() * diff)
+    s.petFragments += fragmentAmount
+    rewards.push({ type: 'pet_fragment', amount: fragmentAmount, name: '升星碎片' })
+  }
+  
   return rewards
 }
 

@@ -133,6 +133,8 @@ export const usePlayerStore = defineStore('player', {
     phantomCrystals: 0, // 幻灵结晶数量
     reinforceStones: 0, // 强化石数量
     refinementStones: 0, // 洗练石数量
+    petEssence: 0, // 灵宠精华
+    petFragments: 0, // 灵宠升星碎片
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     // 丹药沉淀与系统加成
     permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 永久属性加成（洗髓/锻骨丹）
@@ -1623,21 +1625,37 @@ export const usePlayerStore = defineStore('player', {
       if (!member.equippedArtifacts) member.equippedArtifacts = {}
       const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
       let equippedCount = 0
+      const equippedIds = new Set()
+      this.sectMembers.forEach(m => {
+        if (m.equippedArtifacts) {
+          Object.values(m.equippedArtifacts).forEach(eq => {
+            if (eq && eq.id) equippedIds.add(eq.id)
+          })
+        }
+      })
       for (const slot of slots) {
-        // 找到背包中该槽位的可用装备（items 中的装备 = 未被任何角色占用的）
-        const candidates = this.items.filter(i => i.slot === slot && i.type !== 'pet')
+        const candidates = this.items.filter(i => {
+          if (!i.slot || i.type === 'pet') return false
+          if (i.slot !== slot) return false
+          if (equippedIds.has(i.id)) return false
+          if (i.requiredRealm && member.level < i.requiredRealm) return false
+          return true
+        })
         if (candidates.length === 0) continue
-        // 按评分排序取最佳
-        candidates.sort((a, b) => (b.score || 0) - (a.score || 0))
+        candidates.sort((a, b) => {
+          const scoreA = a.score || calculateEquipmentScore(a) || 0
+          const scoreB = b.score || calculateEquipmentScore(b) || 0
+          return scoreB - scoreA
+        })
         const best = candidates[0]
-        // 卸下旧装备（归还到背包）
         if (member.equippedArtifacts[slot]) {
           this.items.push(member.equippedArtifacts[slot])
+          equippedIds.delete(member.equippedArtifacts[slot].id)
         }
-        // 穿上新装备（从背包移除）
         const itemIndex = this.items.findIndex(i => i.id === best.id)
         if (itemIndex !== -1) this.items.splice(itemIndex, 1)
         member.equippedArtifacts[slot] = best
+        equippedIds.add(best.id)
         equippedCount++
       }
       this.queueSave()
@@ -1660,7 +1678,7 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件装备` }
     },
-    // 灵兽放生（报恩返还培养素养 + 素材）
+    // 灵兽放生（报恩返还培养素养 + 素材 + 升星碎片）
     releasePet(petUid) {
       const petIndex = this.items.findIndex(i => (i.uid === petUid || i.id === petUid) && i.type === 'pet')
       if (petIndex === -1) return { success: false, message: '灵宠不存在' }
@@ -1674,6 +1692,9 @@ export const usePlayerStore = defineStore('player', {
       }
       const returnAmount = (rarityReturnMap[pet.rarity] || 5) + (pet.level || 1) * 2 + (pet.star || 0) * 5
       this.petEssence += returnAmount
+      // 返还升星碎片（根据星级返还）
+      const fragmentReturn = (pet.star || 0) * 2 + Math.floor((rarityReturnMap[pet.rarity] || 5) / 10)
+      this.petFragments += fragmentReturn
       // 报恩：额外返还素材
       const materialReturn = Math.floor(returnAmount * 0.3)
       const matTypes = ['herb', 'ore', 'liquid', 'core']
@@ -1684,7 +1705,7 @@ export const usePlayerStore = defineStore('player', {
       }
       this.items.splice(petIndex, 1)
       this.queueSave()
-      return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华和 ${materialReturn} 素材作为报恩`, returnAmount }
+      return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华、${fragmentReturn} 升星碎片和 ${materialReturn} 素材作为报恩`, returnAmount }
     }
   }
 })

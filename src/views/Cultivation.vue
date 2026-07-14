@@ -168,6 +168,11 @@
       </div>
       <h4 class="sub-title">未出战成员</h4>
       <div v-if="benchMembers.length" class="bench-list">
+        <div class="bench-pagination">
+          <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
+          <span class="page-info">{{ benchPage }} / {{ totalBenchPages }}</span>
+          <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
+        </div>
         <div v-for="m in pagedBenchMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
             <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
@@ -179,11 +184,6 @@
           </div>
           <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id)">详情</button>
           <button class="btn btn-success btn-small" @click="toggleTeam(m.id)">加入</button>
-        </div>
-        <div class="bench-pagination">
-          <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
-          <span class="page-info">{{ benchPage }} / {{ totalBenchPages }}</span>
-          <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
         </div>
       </div>
       <div v-else class="bench-empty">所有成员均已出战</div>
@@ -217,11 +217,23 @@
           <div
             v-for="pet in availablePets"
             :key="pet.id || pet.name"
-            class="equip-select-item"
+            class="equip-select-item pet-select-item"
             @click="equipPet(pet)"
           >
-            <span class="item-name" :style="{ color: getPetColor(pet) }">{{ pet.name }}</span>
-            <span class="item-meta">Lv.{{ pet.level }} {{ pet.rarity || '' }}</span>
+            <div class="pet-select-header">
+              <span class="item-name" :style="{ color: getPetColor(pet) }">{{ pet.name }}</span>
+              <span class="pet-score-badge">评分 {{ calculatePetScore(pet) }}</span>
+            </div>
+            <div class="pet-select-info">
+              <span class="simple-tag" :style="{ color: getPetColor(pet) }">{{ getPetRarityName(pet) }}</span>
+              <span>Lv.{{ pet.level || 1 }}</span>
+              <span>⭐{{ pet.star || 0 }}</span>
+            </div>
+            <div class="pet-select-stats" v-if="pet.combatAttributes">
+              <span v-if="pet.combatAttributes.attack">攻击: {{ pet.combatAttributes.attack }}</span>
+              <span v-if="pet.combatAttributes.defense">防御: {{ pet.combatAttributes.defense }}</span>
+              <span v-if="pet.combatAttributes.health">生命: {{ pet.combatAttributes.health }}</span>
+            </div>
           </div>
         </div>
         <div v-else class="equip-select-empty">没有可用的灵宠</div>
@@ -236,6 +248,7 @@ import { usePlayerStore } from '../stores/player'
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar } from '../plugins/characters'
+import { petRarities } from '../plugins/gacha'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
@@ -246,6 +259,22 @@ const selectSlot = ref('')
 const showPetSelect = ref(false)
 const benchPage = ref(1)
 const benchPageSize = 10
+
+const getPetRarityName = (pet) => {
+  return petRarities[pet.rarity]?.name || '未知品质'
+}
+
+const calculatePetScore = (pet) => {
+  if (!pet) return 0
+  const rarityMap = { mortal: 1, spiritual: 1.5, mystic: 2, celestial: 3, divine: 5 }
+  const rarityMult = rarityMap[pet.rarity] || 1
+  const level = pet.level || 1
+  const star = pet.star || 0
+  const baseScore = (pet.combatAttributes?.attack || 0) * 5 +
+                   (pet.combatAttributes?.health || 0) * 0.5 +
+                   (pet.combatAttributes?.defense || 0) * 3
+  return Math.round(baseScore * rarityMult * (1 + (level - 1) * 0.1) * (1 + star * 0.2))
+}
 
 // 计算属性
 const teamMembers = computed(() => playerStore.teamMembers.map(id => playerStore.sectMembers.find(m => m.id === id)).filter(Boolean))
