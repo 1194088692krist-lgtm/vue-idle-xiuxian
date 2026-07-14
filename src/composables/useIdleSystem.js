@@ -20,6 +20,61 @@ const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: fal
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
 const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
+const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
+const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
+
+// 小剧场 buff 系统
+const SKITS = [
+  { text: '${m1}在篝火旁给${m2}讲了个笑话，${m2}笑得差点岔气，修炼效率提升了！', buff: { type: 'cultivation', value: 0.15, duration: 5, name: '心情愉悦' } },
+  { text: '${m1}发现了一株灵草，${m2}却抢先一步摘走，两人争执不下，${m3}出面调停才平息。', buff: { type: 'combat', value: -0.10, duration: 3, name: '内讧' } },
+  { text: '${m1}在山涧中发现了一汪灵泉，大家轮流饮用，感觉精神百倍！', buff: { type: 'combat', value: 0.15, duration: 5, name: '灵泉滋养' } },
+  { text: '${m2}修炼时走火入魔，${m1}及时出手相助，两人配合更加默契了。', buff: { type: 'combat', value: 0.10, duration: 5, name: '默契提升' } },
+  { text: '夜晚扎营时，${m1}讲起了一段往事，众人陷入沉思，心性有所提升。', buff: { type: 'cultivation', value: 0.10, duration: 4, name: '心性感悟' } },
+  { text: '${m3}不慎踩中妖兽陷阱，${m2}奋力救援，虽然脱险但消耗了不少体力。', buff: { type: 'combat', value: -0.12, duration: 3, name: '受惊' } },
+  { text: '${m1}与${m2}切磋武艺，剑光交错间双方都有所领悟，攻击力提升了！', buff: { type: 'attack', value: 0.20, duration: 4, name: '切磋增益' } },
+  { text: '众人在废弃洞府中发现一处古修士留下的阵法残留，${m1}参悟片刻，灵力恢复加快。', buff: { type: 'cultivation', value: 0.20, duration: 5, name: '阵法感悟' } },
+  { text: '${m2}被一只毒虫蛰了，${m3}连忙施药解毒，但大家都有些紧张。', buff: { type: 'combat', value: -0.08, duration: 3, name: '中毒虚惊' } },
+  { text: '${m1}发现了一块古碑，拓印下来后发现是失传的功法残篇，众人轮流参悟。', buff: { type: 'cultivation', value: 0.25, duration: 6, name: '功法感悟' } },
+  { text: '路遇一位游方老道，${m3}与他攀谈数语，老道满意离去，众人获得一缕气运加持。', buff: { type: 'luck', value: 0.30, duration: 5, name: '气运加持' } },
+  { text: '${m1}和${m2}为了争夺一块矿石大打出手，${m3}无奈摇头，士气下降了。', buff: { type: 'combat', value: -0.15, duration: 3, name: '士气低落' } },
+  { text: '${m1}夜观星象，预判明日方位大吉，队伍信心倍增。', buff: { type: 'combat', value: 0.12, duration: 4, name: '星象指引' } },
+  { text: '众人围坐分享干粮，${m2}拿出了珍藏的灵果，大家恢复了不少体力。', buff: { type: 'combat', value: 0.10, duration: 4, name: '灵果滋补' } },
+  { text: '${m3}在溪边洗手时摸到了一枚古丹药，服用后感觉身体轻盈了不少。', buff: { type: 'speed', value: 0.15, duration: 5, name: '身轻如燕' } }
+]
+
+// 队伍角色各自的战斗动作描写
+const MEMBER_ACTIONS = {
+  vanguard: [
+    '${n}挺身而出，以凌厉攻势直取敌人要害，「吃我一记！」',
+    '${n}浑身灵力爆发，一记重击轰得敌人踉跄后退，战意昂扬！',
+    '${n}作为先锋冲入敌阵，剑锋所过之处血光飞溅，气势如虹！',
+    '${n}大喝一声，灵力化形巨掌拍下，将敌人按入地面碎石崩飞！'
+  ],
+  blade: [
+    '${n}身影如鬼魅般闪烁，快剑连斩三道，敌人来不及反应已身中数创！',
+    '${n}从侧翼杀出，一刀割过敌人腰际，干净利落、不拖泥带水！',
+    '${n}抓住敌人攻击间隙，反手一剑封喉，刁钻而致命！',
+    '${n}身形旋转如陀螺，兵刃划出弧月寒光，在敌阵中切割出血路！'
+  ],
+  herb: [
+    '${n}退后一步，指尖凝出碧绿灵光，为${n2}恢复了些许气血！',
+    '${n}抛出一枚丹药，灵力化盾护住全队，低声道：「稳住，有我在」',
+    '${n}以灵力催动药香，弥漫间队友们感到精力恢复、伤痛减轻。',
+    '${n}手法如风，在${n2}背后连点数穴，止住了伤口流血！'
+  ],
+  shield: [
+    '${n}横身挡在队伍前方，护体真气化作金钟罩，硬扛了敌人的狂暴一击！',
+    '${n}以肉身吸引火力，大盾横扫逼退敌人，「休想伤我队友！」',
+    '${n}稳如磐石，承受了敌人致命一击却纹丝不动，为队友争取了反击时机！',
+    '${n}怒目圆睁，浑身护体灵光暴涨，将敌人的攻击尽数弹开！'
+  ],
+  tactician: [
+    '${n}在后方掐指推算，指点道：「左翼包抄，中军压上！」全队攻势大增！',
+    '${n}布下一道简易阵法，灵力流转间限制了敌人行动，「此刻，动手！」',
+    '${n}冷静分析敌人弱点，高声提醒队友攻击方位，全队效率倍增！',
+    '${n}以灵识牵引天地灵气为己用，为队友创造了一个完美的输出窗口！'
+  ]
+}
 
 // ============ 队伍成员挂机状态（每人独立血条和build） ============
 const teamMemberStates = ref([])
@@ -583,6 +638,8 @@ function hideTreasureFlash() {
 
 // ============ 生动日志：单场遭遇 ============
 function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
+  const s = store()
+  const team = s.getTeamMembersDetail()
   addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
   // 探索场景：优先使用对应地图专属描写，让八图各有意境
   const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
@@ -590,11 +647,37 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
   // 敌人现身（按层级差异化描写）
   const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
   addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
-  // 战斗过程：先交手后分胜负，普通怪 2 段、精英/Boss 3 段，描述更详尽
-  const actions = 2 + (enemy.tier !== 'normal' ? 1 : 0)
-  for (let i = 0; i < actions; i++) {
-    const a = pick(COMBAT_ACTIONS); addLog('combat', a.text)
+
+  // 队伍角色各自行动描写
+  if (team.length > 0) {
+    for (const member of team) {
+      const memberState = teamMemberStates.value.find(ms => ms.memberId === member.id)
+      if (memberState && memberState.hp <= 0) {
+        addLog('combat', `${member.name}气血耗尽，无法参战……`)
+        continue
+      }
+      const role = member.role || 'vanguard'
+      const actionPool = MEMBER_ACTIONS[role] || MEMBER_ACTIONS.vanguard
+      let text = pick(actionPool)
+      // 替换占位符
+      text = text.replace(/\$\{n\}/g, member.name)
+      const otherMember = team.find(m => m.id !== member.id)
+      text = text.replace(/\$\{n2\}/g, otherMember?.name || '队友')
+      addLog('combat', text)
+    }
+  } else {
+    // 无队伍时回退到原有通用战斗描写
+    const actions = 2 + (enemy.tier !== 'normal' ? 1 : 0)
+    for (let i = 0; i < actions; i++) {
+      const a = pick(COMBAT_ACTIONS); addLog('combat', a.text)
+    }
   }
+
+  // 小剧场（每5次遭遇有概率触发）
+  if (count % 5 === 0 && team.length >= 2 && Math.random() < 0.6) {
+    triggerSkit(team)
+  }
+
   if (victory) {
     addLog('victory', pick(VICTORY_LINES)(enemy.name))
     rewards.forEach(r => {
@@ -615,6 +698,23 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
   } else {
     addLog('defeat', pick(DEFEAT_LINES)(enemy.name, loss))
   }
+}
+
+// 触发小剧场
+function triggerSkit(team) {
+  const skit = pick(SKITS)
+  const m1 = team[0]?.name || '某人'
+  const m2 = team[1]?.name || '某人'
+  const m3 = team[2]?.name || team[0]?.name || '某人'
+  let text = skit.text
+    .replace(/\$\{m1\}/g, m1)
+    .replace(/\$\{m2\}/g, m2)
+    .replace(/\$\{m3\}/g, m3)
+  addLog('skit', `🎭 ${text}`)
+  // 添加 buff
+  const buff = { ...skit.buff, remaining: skit.buff.duration }
+  idleBuffs.value.push(buff)
+  addLog('skit', `📊 获得「${buff.name}」效果：${buff.value > 0 ? '增益' : '减益'} ${Math.abs(buff.value * 100).toFixed(0)}%，持续 ${buff.duration} 场`)
 }
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
@@ -725,6 +825,20 @@ async function runIdleEncounter() {
     const firstResult = teamResults[0]
     const enemy = firstResult?.result?.enemy || generateZoneEnemy(effectiveZone, count)
     logEncounter(zone, diff, count, enemy, victory, rewards, loss)
+    // 实时更新当前结算画面
+    currentEncounterSummary.value = {
+      count,
+      victory,
+      enemyName: enemy.name,
+      enemyTier: enemy.tier,
+      rewards: rewards.map(r => ({ type: r.type, name: r.name, amount: r.amount, rarity: r.rarity, info: r.info })),
+      loss,
+      teamStates: teamMemberStates.value.map(ms => ({ name: ms.name, hp: ms.hp, maxHP: ms.maxHP })),
+      buffs: [...idleBuffs.value]
+    }
+    // 衰减 buff 剩余场次
+    idleBuffs.value.forEach(b => b.remaining--)
+    idleBuffs.value = idleBuffs.value.filter(b => b.remaining > 0)
     s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
     s.queueSave()
     idleEncounterErrorCount = 0
@@ -861,6 +975,8 @@ function startIdle(durationMinutes) {
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 }
   foundEquipment.value = []
   logs.value = []
+  currentEncounterSummary.value = null
+  idleBuffs.value = []
   
   const team = s.getTeamMembersDetail()
   teamMemberStates.value = team.map(member => ({
@@ -1006,6 +1122,8 @@ export function useIdleSystem() {
     canStartIdle,
     teamMemberStates,
     foundEquipment,
+    currentEncounterSummary,
+    idleBuffs,
     idlePlayerHP,
     idlePlayerMaxHP,
     idlePlayerDefeated,

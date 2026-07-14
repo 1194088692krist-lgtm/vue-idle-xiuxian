@@ -148,10 +148,15 @@
               <div class="char-school">
                 <span class="label">流派：</span>
                 <span class="value">{{ characterSchools[selectedCharacter?.school]?.name }}</span>
-                </div>
-                <div class="char-talent">
-                  <span class="label">天赋：</span>
-                  <span class="value">{{ characterTalents[selectedCharacter?.talent]?.name }}</span>
+              </div>
+              <div class="char-talent">
+                <span class="label">天赋：</span>
+                <span class="value">{{ characterTalents[selectedCharacter?.talent]?.name }}</span>
+              </div>
+              <div class="char-role">
+                <span class="label">定位：</span>
+                <span class="value">{{ characterRoles[selectedCharacter?.role]?.icon }} {{ characterRoles[selectedCharacter?.role]?.name }}</span>
+                <span class="role-desc">{{ characterRoles[selectedCharacter?.role]?.desc }}</span>
               </div>
               <div class="char-stats">
                 <div class="stat-item">
@@ -195,7 +200,7 @@
   } from '../plugins/gacha'
   import { setBonuses } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
-  import { characterSchools, characterTalents } from '../plugins/characters'
+  import { characterSchools, characterTalents, characterRoles } from '../plugins/characters'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -300,6 +305,11 @@
     grantReward(result)
     gachaResults.value = [result]
     showMessage('success', `抽奖获得：${getRewardName(result)}`)
+    // 抽到4星/5星人物自动弹出立绘
+    if (result.category === 'character' && result.item.star >= 4) {
+      selectedCharacter.value = result.item
+      showCharModal.value = true
+    }
     playerStore.queueSave()
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
@@ -330,6 +340,14 @@
     if (summary.refinement_stone) parts.push(`洗练石奖励×${summary.refinement_stone}`)
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
     showMessage('success', `十连抽奖完成：${parts.join('，')}`)
+    // 十连中抽到4星/5星人物自动弹出立绘（取最高星级）
+    const bestChar = results
+      .filter(r => r.category === 'character' && r.item.star >= 4)
+      .sort((a, b) => b.item.star - a.item.star)[0]
+    if (bestChar) {
+      selectedCharacter.value = bestChar.item
+      showCharModal.value = true
+    }
     playerStore.queueSave()
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
@@ -946,6 +964,31 @@
   .char-talent .value {
     color: #F5DEB3;
     font-weight: bold;
+  }
+
+  .char-role {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .char-role .label {
+    color: #888;
+  }
+
+  .char-role .value {
+    color: #F5DEB3;
+    font-weight: bold;
+  }
+
+  .role-desc {
+    font-size: 11px;
+    color: #888;
+    width: 100%;
+    margin-top: 2px;
   }
 
   .char-stats {

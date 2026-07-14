@@ -85,20 +85,20 @@ export const gachaPools = {
   all: {
     name: '综合池',
     cost: 100,
-    characterRate: 0.25,
+    characterRate: 0.15,
     weaponRate: 0.25,
-    artifactRate: 0.25,
+    artifactRate: 0.20,
     petRate: 0.15,
-    resourceRate: 0.10
+    resourceRate: 0.25
   },
   character: {
     name: '人物池',
     cost: 150,
-    characterRate: 0.80,
-    weaponRate: 0.10,
-    artifactRate: 0.05,
-    petRate: 0.03,
-    resourceRate: 0.02
+    characterRate: 0.25,
+    weaponRate: 0.25,
+    artifactRate: 0.20,
+    petRate: 0.10,
+    resourceRate: 0.20
   },
   equipment: {
     name: '装备池',
@@ -140,7 +140,7 @@ export const gachaPools = {
 
 // 资源奖励配置
 const resourceRewards = [
-  { type: 'spirit_stone', amount: [50, 200] },
+  { type: 'spirit_stone', amount: [20, 80] },
   { type: 'reinforce_stone', amount: [1, 5] },
   { type: 'refinement_stone', amount: [1, 3] },
   { type: 'pet_essence', amount: [5, 20] }

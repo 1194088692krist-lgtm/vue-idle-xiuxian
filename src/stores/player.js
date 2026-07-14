@@ -1621,6 +1621,42 @@ export const usePlayerStore = defineStore('player', {
       }
       this.queueSave()
       return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件装备` }
+    },
+    // 灵兽放生（报恩返还培养素养）
+    releasePet(petUid) {
+      const petIndex = this.items.findIndex(i => i.uid === petUid || i.id === petUid)
+      if (petIndex === -1) {
+        // 也在 pets 数组中查找
+        const pIdx = (this.pets || []).findIndex(p => p.uid === petUid || p.id === petUid)
+        if (pIdx === -1) return { success: false, message: '灵宠不存在' }
+        const pet = this.pets[pIdx]
+        const rarityReturnMap = {
+          divine: 100,
+          celestial: 60,
+          mystic: 35,
+          spiritual: 20,
+          mortal: 10
+        }
+        const returnAmount = (rarityReturnMap[pet.rarity] || 5) + (pet.level || 1) * 2 + (pet.star || 0) * 5
+        this.petEssence += returnAmount
+        this.pets.splice(pIdx, 1)
+        this.queueSave()
+        return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华作为报恩`, returnAmount }
+      }
+      const pet = this.items[petIndex]
+      if (pet.type !== 'pet' && !pet.rarity) return { success: false, message: '该物品不是灵宠' }
+      const rarityReturnMap = {
+        divine: 100,
+        celestial: 60,
+        mystic: 35,
+        spiritual: 20,
+        mortal: 10
+      }
+      const returnAmount = (rarityReturnMap[pet.rarity] || 5) + (pet.level || 1) * 2 + (pet.star || 0) * 5
+      this.petEssence += returnAmount
+      this.items.splice(petIndex, 1)
+      this.queueSave()
+      return { success: true, message: `${pet.name}感恩离去，留下了 ${returnAmount} 灵宠精华作为报恩`, returnAmount }
     }
   }
 })
