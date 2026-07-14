@@ -1605,7 +1605,7 @@ const idleDashboard = computed(() => {
       type: b.type,
       typeName: { cultivation: '修炼效率', combat: '战斗能力', attack: '攻击力', speed: '速度', luck: '气运' }[b.type] || b.type,
       value: b.value,
-      valueText: (b.value > 0 ? '+' : '') + (b.value * 100).toFixed(0) + '%',
+      valueText: (b.value > 0 ? '+' : '') + Math.round(b.value * 100) + '%',
       remaining: b.remaining
     })),
     teamHP: teamMemberStates.value.map(ms => ({

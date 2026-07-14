@@ -57,6 +57,10 @@
               v-for="item in displayEquipmentList"
               :key="item.id || item.name"
               class="simple-card"
+              :class="[
+                `equip-border-${item.quality || 'common'}`,
+                `equip-bg-${item.quality || 'common'}`
+              ]"
               @click="showEquipmentDetails(item)"
             >
               <div class="card-header">

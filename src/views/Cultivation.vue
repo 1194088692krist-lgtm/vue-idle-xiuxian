@@ -60,17 +60,11 @@
 
     <!-- 2. 角色选择区 -->
     <div class="member-select glass-card">
-      <div class="member-select-header">
-        <label>选择角色</label>
-        <button v-if="selectedMember" class="btn btn-small btn-outline" @click="viewMemberDetail(selectedMember.id)">详情</button>
-      </div>
+      <label>选择角色</label>
       <select v-model="selectedMemberId" @change="selectMember(selectedMemberId)">
-        <optgroup v-if="teamMembers.length" label="出战队伍">
-          <option v-for="m in teamMembers" :key="m.id" :value="m.id">{{ m.name }}</option>
-        </optgroup>
-        <optgroup label="宗门成员">
-          <option v-for="m in allMembers" :key="m.id" :value="m.id">{{ m.name }}</option>
-        </optgroup>
+        <option v-for="m in sortedMembers" :key="m.id" :value="m.id">
+          {{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }}
+        </option>
       </select>
     </div>
 
@@ -151,7 +145,7 @@
           :class="isInTeam(selectedMember.id) ? 'btn-warning' : 'btn-success'"
           @click="toggleTeam(selectedMember.id)"
         >
-          {{ isInTeam(selectedMember.id) ? '移出队伍' : '加入队伍' }}
+          {{ isInTeam(selectedMember.id) ? '退出' : '加入队伍' }}
         </button>
       </div>
     </div>
@@ -168,7 +162,11 @@
           v-for="slot in slots"
           :key="slot"
           class="equip-slot"
-          :class="{ empty: !selectedMember.equippedArtifacts?.[slot] }"
+          :class="{ 
+            empty: !selectedMember.equippedArtifacts?.[slot],
+            [`equip-border-${selectedMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: selectedMember.equippedArtifacts?.[slot],
+            [`equip-bg-${selectedMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: selectedMember.equippedArtifacts?.[slot]
+          }"
           @click="selectedMember.equippedArtifacts?.[slot] ? unequipSlot(slot) : openEquipSelect(slot)"
         >
           <div class="equip-slot-label">{{ slotNames[slot] }}</div>
@@ -389,7 +387,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig, getCharacterAvatar } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar, characterList } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
@@ -479,6 +477,16 @@ const calculatePetScore = (pet) => {
 // 计算属性
 const teamMembers = computed(() => playerStore.teamMembers.map(id => playerStore.sectMembers.find(m => m.id === id)).filter(Boolean))
 const allMembers = computed(() => playerStore.sectMembers || [])
+const sortedMembers = computed(() => {
+  const members = [...playerStore.sectMembers]
+  return members.sort((a, b) => {
+    const aInTeam = playerStore.teamMembers.includes(a.id)
+    const bInTeam = playerStore.teamMembers.includes(b.id)
+    if (aInTeam && !bInTeam) return -1
+    if (!aInTeam && bInTeam) return 1
+    return 0
+  })
+})
 const selectedMember = computed(() => playerStore.sectMembers.find(m => m.id === selectedMemberId.value))
 const benchMembers = computed(() => playerStore.sectMembers.filter(m => !playerStore.teamMembers.includes(m.id)))
 const totalBenchPages = computed(() => Math.max(1, Math.ceil(benchMembers.value.length / benchPageSize)))
@@ -552,14 +560,21 @@ const getMemberBaseStats = (member) => {
   if (!member) return {}
   const bs = member.baseStats || {}
   const ts = member.talentStats || {}
-  const level = member.level || 1
   const stats = {}
+  
+  const template = characterList.find(c => c.id === member.templateId)
+  const templateBase = template?.baseStats || {}
+  
   for (const k of ['attack','health','defense','speed']) {
-    const base = bs[k] || 0
+    let base = bs[k] || templateBase[k] || 0
+    if (base <= 0) {
+      const defaultBase = { attack: 10, health: 100, defense: 5, speed: 10 }
+      base = defaultBase[k] || 0
+    }
     const talentBonus = ts[k] || 0
-    const levelBonus = (level - 1) * (base * 0.05)
-    stats[k] = Math.floor((base + levelBonus) * (1 + talentBonus))
+    stats[k] = Math.floor(base * (1 + talentBonus))
   }
+  
   for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
     'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
     'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
@@ -1729,11 +1744,11 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: flex-start;
+  align-items: flex-end;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  padding-top: 80px;
+  padding-bottom: 80px;
 }
 .modal-content {
   width: 100%;
