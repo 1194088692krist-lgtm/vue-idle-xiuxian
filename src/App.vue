@@ -9,12 +9,12 @@
             <header class="top-bar">
               <div class="player-info">
                 <div class="player-avatar">
-                  <span>仙</span>
+                  <span>洞</span>
                 </div>
                 <div class="player-meta">
                   <div class="player-name">{{ playerStore.name }}</div>
-                  <div class="player-realm" :style="{ color: getRealmColor(playerStore.level) }">
-                    {{ getRealmName(playerStore.level).name }}
+                  <div class="player-realm" style="color: #9370DB; font-size: 11px;">
+                    洞天字号
                   </div>
                 </div>
               </div>
@@ -647,10 +647,104 @@ import SaveButton from './components/SaveButton.vue'
     height: 100%;
   }
 
-  /* 桌面端优化 */
-  @media (min-width: 769px) {
+  /* 桌面端优化 - 横屏布局 */
+  @media (min-width: 1024px) {
     .game-container {
-      max-width: 520px;
+      max-width: 1400px;
+      margin: 0 auto;
+      display: flex;
+      flex-direction: row;
+      min-height: calc(100vh - 56px);
+      border-left: none;
+      border-right: none;
+      box-shadow: none;
+    }
+
+    .top-bar {
+      position: fixed;
+      top: 0;
+      left: 0;
+      right: 0;
+      z-index: 1000;
+      border-radius: 0;
+      max-width: none;
+    }
+
+    .cultivation-bar {
+      position: fixed;
+      top: 56px;
+      left: 0;
+      right: 0;
+      z-index: 999;
+      border-radius: 0;
+      border-bottom: 1px solid rgba(139, 69, 19, 0.3);
+    }
+
+    .content-area {
+      flex: 1;
+      padding-top: 100px;
+      padding-bottom: 20px;
+      overflow-y: auto;
+    }
+
+    .bottom-nav {
+      position: fixed;
+      top: 100px;
+      left: 0;
+      width: 60px;
+      height: calc(100vh - 100px);
+      flex-direction: column;
+      justify-content: flex-start;
+      border-radius: 0;
+      border-right: 1px solid rgba(139, 69, 19, 0.3);
+      background: rgba(10, 12, 15, 0.95);
+    }
+
+    .bottom-nav-inner {
+      flex-direction: column;
+      height: auto;
+      padding-top: 20px;
+      gap: 4px;
+    }
+
+    .nav-item {
+      max-width: none;
+      width: 50px;
+      height: 50px;
+      border-radius: 8px;
+      margin: 0;
+    }
+
+    .nav-item .nav-label {
+      display: none;
+    }
+
+    .nav-item .nav-icon {
+      font-size: 20px;
+    }
+
+    .nav-item.active {
+      background: rgba(218, 165, 32, 0.2);
+    }
+
+    .player-name {
+      max-width: 200px;
+    }
+
+    .resource-bar {
+      gap: 12px;
+    }
+
+    .resource-item {
+      padding: 6px 14px;
+      font-size: 13px;
+    }
+  }
+
+  /* 中等桌面端 */
+  @media (min-width: 769px) and (max-width: 1023px) {
+    .game-container {
+      max-width: 680px;
       margin: 0 auto;
       border-left: 1px solid rgba(139, 69, 19, 0.2);
       border-right: 1px solid rgba(139, 69, 19, 0.2);

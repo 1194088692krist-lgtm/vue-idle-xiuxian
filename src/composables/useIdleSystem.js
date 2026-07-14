@@ -18,7 +18,7 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
@@ -733,6 +733,7 @@ function grantReward(effectiveZone, isIdleMode = false) {
   const crystalBase = Math.floor(1 + diff * 0.6 + scale * 1.2)
   const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4)))
   s.phantomCrystals += crystalAmount
+  runStats.value.phantomCrystals += crystalAmount
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
   
   // 升星碎片：难度3以上有概率掉落，难度越高概率越大
@@ -1331,7 +1332,7 @@ const idleDashboard = computed(() => {
     totalEquipment: runStats.value.equipment,
     encounterCount: idleEncounterCount.value,
     buildRatio: buildRatio.value,
-    totalPhantomCrystals: s.phantomCrystals,
+    totalPhantomCrystals: runStats.value.phantomCrystals,
     // 角色定位效果统计
     roleEffects: {
       healAmount: runStats.value.healAmount,
@@ -1367,7 +1368,7 @@ const idleDashboard = computed(() => {
       affixes: eq.affixes,
       time: eq._pickedAt || Date.now()
     })),
-    totalPhantomCrystals: s.phantomCrystals
+    totalPhantomCrystals: runStats.value.phantomCrystals
   }
 })
 

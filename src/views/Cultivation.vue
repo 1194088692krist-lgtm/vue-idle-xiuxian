@@ -517,16 +517,18 @@ const getMemberBaseStats = (member) => {
   const bs = member.baseStats || {}
   const ts = member.talentStats || {}
   const stats = {}
-  // Main stats
   for (const k of ['attack','health','defense','speed']) {
-    stats[k] = (bs[k] || 0) + (ts[k] || 0)
+    const base = bs[k] || 0
+    const talentBonus = ts[k] || 0
+    stats[k] = Math.floor(base * (1 + talentBonus))
   }
-  // Combat stats
   for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
     'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
     'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
     'combatBoost','resistanceBoost']) {
-    stats[k] = (bs[k] || 0) + (ts[k] || 0)
+    const base = (bs[k] || 0) + (member.combatAttributes?.[k] || 0) + (member.combatResistance?.[k] || 0) + (member.specialAttributes?.[k] || 0)
+    const talentBonus = ts[k] || 0
+    stats[k] = base + talentBonus
   }
   return stats
 }
@@ -616,7 +618,7 @@ const buildStatRows = (member, keys) => {
 
 const mainStats = computed(() => {
   if (!selectedMember.value) return []
-  return buildStatRows(selectedMember.value, ['attack','health','defense','speed'])
+  return buildStatRows(selectedMember.value, ['attack','health','defense','speed','critRate','comboRate','dodgeRate'])
 })
 
 const combatStats = computed(() => {
@@ -974,8 +976,27 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   gap: 4px;
 }
 .scrollable-table {
-  max-height: 280px;
+  max-height: 200px;
   overflow-y: auto;
+  border-radius: 8px;
+}
+
+.scrollable-table::-webkit-scrollbar {
+  width: 6px;
+}
+
+.scrollable-table::-webkit-scrollbar-track {
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 3px;
+}
+
+.scrollable-table::-webkit-scrollbar-thumb {
+  background: rgba(218, 165, 32, 0.5);
+  border-radius: 3px;
+}
+
+.scrollable-table::-webkit-scrollbar-thumb:hover {
+  background: rgba(218, 165, 32, 0.7);
 }
 .attr-row {
   display: grid;

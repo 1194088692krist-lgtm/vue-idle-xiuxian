@@ -393,8 +393,9 @@
       </div>
       <!-- 宝物高亮弹窗（日志上方） -->
       <transition name="flash">
-        <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }" @click="hideTreasureFlash">
-          <div class="flash-content">
+        <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }">
+          <button class="btn btn-close btn-warning" @click.stop="hideTreasureFlash" style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 12px;">×</button>
+          <div class="flash-content" @click="hideTreasureFlash">
             <div class="flash-icon">{{ treasureFlash.icon }}</div>
             <div class="flash-title">{{ treasureFlash.title }}</div>
             <div class="flash-desc">{{ treasureFlash.desc }}</div>
