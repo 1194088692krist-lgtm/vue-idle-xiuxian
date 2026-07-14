@@ -229,7 +229,12 @@ export const usePlayerStore = defineStore('player', {
         spiritStones: 0,
         itemsFound: 0
       }
-    }
+    },
+    // 宗门系统
+    sectMembers: [], // 宗门成员列表（最多100人）
+    teamMembers: [], // 当前出战队伍（最多5人）
+    maxSectSize: 100,
+    maxTeamSize: 5
   }),
   getters: {
     // 获取灵宠的属性加成
@@ -1353,6 +1358,160 @@ export const usePlayerStore = defineStore('player', {
         return { success: true, message: '升星成功' }
       }
       return { success: false, message: '升星失败' }
+    },
+    // === 宗门系统 ===
+    // 添加宗门成员
+    addSectMember(character) {
+      if (!this.sectMembers) this.sectMembers = []
+      if (this.sectMembers.length >= this.maxSectSize) {
+        return { success: false, message: `宗门已满（上限${this.maxSectSize}人）` }
+      }
+      const existing = this.sectMembers.find(m => m.templateId === character.templateId)
+      if (existing) {
+        return { success: false, message: `${character.name}已在宗门中` }
+      }
+      this.sectMembers.push(character)
+      this.queueSave()
+      return { success: true, message: `成功招募${character.name}加入宗门！` }
+    },
+    // 从宗门移除成员
+    removeSectMember(memberId) {
+      const index = this.sectMembers.findIndex(m => m.id === memberId)
+      if (index === -1) return { success: false, message: '成员不存在' }
+      const member = this.sectMembers[index]
+      this.sectMembers.splice(index, 1)
+      this.teamMembers = this.teamMembers.filter(id => id !== memberId)
+      this.queueSave()
+      return { success: true, message: `已将${member.name}移出宗门` }
+    },
+    // 设置出战队伍
+    setTeamMembers(memberIds) {
+      if (!Array.isArray(memberIds)) return { success: false, message: '无效的队伍配置' }
+      if (memberIds.length > this.maxTeamSize) {
+        return { success: false, message: `队伍人数超出上限（最多${this.maxTeamSize}人）` }
+      }
+      const validIds = memberIds.filter(id => this.sectMembers.some(m => m.id === id))
+      if (validIds.length !== memberIds.length) {
+        return { success: false, message: '存在无效的宗门成员' }
+      }
+      this.teamMembers = [...validIds]
+      this.queueSave()
+      return { success: true, message: '队伍配置成功' }
+    },
+    // 添加成员到队伍
+    addToTeam(memberId) {
+      if (this.teamMembers.length >= this.maxTeamSize) {
+        return { success: false, message: `队伍已满（最多${this.maxTeamSize}人）` }
+      }
+      if (!this.sectMembers.some(m => m.id === memberId)) {
+        return { success: false, message: '成员不在宗门中' }
+      }
+      if (this.teamMembers.includes(memberId)) {
+        return { success: false, message: '成员已在队伍中' }
+      }
+      this.teamMembers.push(memberId)
+      this.queueSave()
+      return { success: true, message: '添加成功' }
+    },
+    // 从队伍移除成员
+    removeFromTeam(memberId) {
+      const index = this.teamMembers.indexOf(memberId)
+      if (index === -1) return { success: false, message: '成员不在队伍中' }
+      this.teamMembers.splice(index, 1)
+      this.queueSave()
+      return { success: true, message: '移除成功' }
+    },
+    // 获取队伍成员详情
+    getTeamMembersDetail() {
+      return this.teamMembers.map(id => this.sectMembers.find(m => m.id === id)).filter(Boolean)
+    },
+    // 获取队伍总Build强度
+    getTeamTotalBuild() {
+      return this.getTeamMembersDetail().reduce((sum, member) => {
+        return sum + this.getCharacterBuildStrength(member)
+      }, 0)
+    },
+    // 获取单个角色的Build强度
+    getCharacterBuildStrength(character) {
+      if (!character) return 0
+      const baseScore = character.baseStats.attack * 5 + character.baseStats.health * 0.5 +
+                        character.baseStats.defense * 3 + character.baseStats.speed * 8
+      const talentScore = Object.values(character.talentStats || {}).reduce((sum, val) => sum + val * 100, 0)
+      const levelMult = 1 + (character.level - 1) * 0.02
+      return Math.round((baseScore + talentScore) * levelMult)
+    },
+    // 角色升级
+    levelUpCharacter(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (member.experience < member.maxExperience) {
+        return { success: false, message: '经验不足' }
+      }
+      member.level++
+      member.experience -= member.maxExperience
+      member.maxExperience = Math.round(member.maxExperience * 1.5)
+      const starConfig = { 3: 1, 4: 1.2, 5: 1.5 }
+      const growth = starConfig[member.star] || 1
+      member.baseStats.attack = Math.round(member.baseStats.attack * (1 + 0.1 * growth))
+      member.baseStats.health = Math.round(member.baseStats.health * (1 + 0.15 * growth))
+      member.baseStats.defense = Math.round(member.baseStats.defense * (1 + 0.1 * growth))
+      member.baseStats.speed = Math.round(member.baseStats.speed * (1 + 0.08 * growth))
+      this.queueSave()
+      return { success: true, message: `${member.name}升级到${member.level}级！` }
+    },
+    // 给角色装备物品
+    equipCharacterArtifact(memberId, artifact, slot) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedArtifacts) member.equippedArtifacts = {}
+      const oldArtifact = member.equippedArtifacts[slot]
+      if (oldArtifact) {
+        this.items.push(oldArtifact)
+      }
+      const itemIndex = this.items.findIndex(i => i.id === artifact.id)
+      if (itemIndex !== -1) {
+        this.items.splice(itemIndex, 1)
+      }
+      member.equippedArtifacts[slot] = artifact
+      this.queueSave()
+      return { success: true, message: '装备成功' }
+    },
+    // 给角色卸下装备
+    unequipCharacterArtifact(memberId, slot) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.equippedArtifacts || !member.equippedArtifacts[slot]) {
+        return { success: false, message: '该槽位没有装备' }
+      }
+      const artifact = member.equippedArtifacts[slot]
+      member.equippedArtifacts[slot] = null
+      this.items.push(artifact)
+      this.queueSave()
+      return { success: true, message: '卸下成功' }
+    },
+    // 角色获得经验
+    addCharacterExperience(memberId, amount) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      member.experience += amount
+      let result = { success: true, message: `获得${amount}经验` }
+      while (member.experience >= member.maxExperience) {
+        const levelResult = this.levelUpCharacter(memberId)
+        if (levelResult.success) {
+          result = levelResult
+        } else {
+          break
+        }
+      }
+      return result
+    },
+    // 更新角色头像
+    updateCharacterAvatar(memberId, avatarData) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      member.avatar = avatarData
+      this.queueSave()
+      return { success: true, message: '头像更新成功' }
     }
   }
 })

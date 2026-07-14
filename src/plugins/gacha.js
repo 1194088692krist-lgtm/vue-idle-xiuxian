@@ -1,6 +1,7 @@
 // 抽奖系统配置
 
 import { getAffixesForSlot, setBonuses, rarityConfig, affixPool } from '../plugins/buildSystem'
+import { generateRandomCharacter } from '../plugins/characters'
 
 // 装备品质配置
 export const equipmentQualities = {
@@ -81,29 +82,50 @@ export const equipmentStatPool = {
 
 // 抽奖池配置
 export const gachaPools = {
-  // 综合池
   all: {
     name: '综合池',
     cost: 100,
-    equipmentRate: 0.6,
-    petRate: 0.25,
-    resourceRate: 0.15
+    characterRate: 0.25,
+    weaponRate: 0.25,
+    artifactRate: 0.25,
+    petRate: 0.15,
+    resourceRate: 0.10
   },
-  // 装备池
-  equipment: {
-    name: '装备池',
+  character: {
+    name: '人物池',
     cost: 150,
-    equipmentRate: 0.9,
-    petRate: 0,
-    resourceRate: 0.1
+    characterRate: 0.80,
+    weaponRate: 0.10,
+    artifactRate: 0.05,
+    petRate: 0.03,
+    resourceRate: 0.02
   },
-  // 灵宠池
+  weapon: {
+    name: '武器池',
+    cost: 120,
+    characterRate: 0,
+    weaponRate: 0.80,
+    artifactRate: 0.15,
+    petRate: 0,
+    resourceRate: 0.05
+  },
+  artifact: {
+    name: '法宝池',
+    cost: 180,
+    characterRate: 0,
+    weaponRate: 0.10,
+    artifactRate: 0.85,
+    petRate: 0,
+    resourceRate: 0.05
+  },
   pet: {
     name: '灵宠池',
     cost: 200,
-    equipmentRate: 0,
-    petRate: 0.9,
-    resourceRate: 0.1
+    characterRate: 0,
+    weaponRate: 0,
+    artifactRate: 0,
+    petRate: 0.95,
+    resourceRate: 0.05
   }
 }
 
@@ -129,8 +151,8 @@ const pickByWeight = (qualityMap) => {
 }
 
 // 生成随机装备
-export const generateEquipment = (playerLevel = 1) => {
-  const type = equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)]
+export const generateEquipment = (playerLevel = 1, specificType = null) => {
+  const type = specificType || equipmentTypes[Math.floor(Math.random() * equipmentTypes.length)]
   const qualityInfo = pickByWeight(equipmentQualities)
   const rarity = qualityInfo.key // 与 buildSystem.rarityConfig 的 key 完全一致
   const nameParts = equipmentNameParts[type] || ['未知']
@@ -270,7 +292,7 @@ export const generateResource = () => {
 }
 
 // 执行一次抽奖
-// 返回 { category: 'equipment'|'pet'|'resource', item: {...} }
+// 返回 { category: 'character'|'weapon'|'artifact'|'pet'|'resource', item: {...} }
 export const doGacha = (poolType, playerLevel = 1) => {
   const pool = gachaPools[poolType]
   if (!pool) return null
@@ -278,17 +300,25 @@ export const doGacha = (poolType, playerLevel = 1) => {
   const rand = Math.random()
   let category
 
-  if (rand < pool.equipmentRate) {
-    category = 'equipment'
-  } else if (rand < pool.equipmentRate + pool.petRate) {
+  if (rand < pool.characterRate) {
+    category = 'character'
+  } else if (rand < pool.characterRate + pool.weaponRate) {
+    category = 'weapon'
+  } else if (rand < pool.characterRate + pool.weaponRate + pool.artifactRate) {
+    category = 'artifact'
+  } else if (rand < pool.characterRate + pool.weaponRate + pool.artifactRate + pool.petRate) {
     category = 'pet'
   } else {
     category = 'resource'
   }
 
   switch (category) {
-    case 'equipment':
-      return { category, item: generateEquipment(playerLevel) }
+    case 'character':
+      return { category, item: generateRandomCharacter() }
+    case 'weapon':
+      return { category, item: generateEquipment(playerLevel, 'weapon') }
+    case 'artifact':
+      return { category, item: generateEquipment(playerLevel, 'artifact') }
     case 'pet':
       return { category, item: generatePet(playerLevel) }
     case 'resource':

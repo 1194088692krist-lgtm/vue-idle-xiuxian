@@ -7,11 +7,10 @@
         </div>
         <div class="header-info">
           <h2 class="card-title gold-gradient-text">天机阁</h2>
-          <p class="card-subtitle">消耗灵石抽取珍稀装备与灵宠</p>
+          <p class="card-subtitle">消耗灵石抽取珍稀人物、武器、法宝与灵宠</p>
         </div>
       </div>
       <div class="card-body">
-        <!-- 新手福利 -->
         <div v-if="!playerStore.beginnerRewardClaimed" class="beginner-reward-box">
           <div class="beginner-reward-info">
             <div class="beginner-reward-icon">🎁</div>
@@ -27,10 +26,9 @@
 
         <div class="tips-box">
           <InfoCircleOutlined />
-          <span>不同奖池产出不同，高品质物品概率更低但属性更强。</span>
+          <span>装备需通过挂机获得，抽卡可获取人物、武器、法宝和灵宠。</span>
         </div>
 
-        <!-- 奖池选择 -->
         <div class="pool-selector">
           <div
             v-for="pool in poolList"
@@ -45,7 +43,6 @@
           </div>
         </div>
 
-        <!-- 抽奖按钮 -->
         <div class="gacha-actions">
           <div class="spirit-stone-display">
             <span class="label">当前灵石：</span>
@@ -69,7 +66,6 @@
           </div>
         </div>
 
-        <!-- 抽奖结果 -->
         <div v-if="gachaResults.length > 0" class="gacha-results">
           <h3 class="section-title">抽奖结果</h3>
           <div class="results-grid">
@@ -78,6 +74,7 @@
               :key="index"
               class="result-card"
               :class="getResultClass(result)"
+              @click="showCharacterDetail(result)"
             >
               <div class="result-type" :style="{ color: getResultColor(result) }">
                 {{ getResultTypeName(result) }}
@@ -86,7 +83,13 @@
                 {{ result.item.name || getResultTypeName(result) }}
               </div>
               <div class="result-detail">
-                <template v-if="result.category === 'equipment'">
+                <template v-if="result.category === 'character'">
+                  <div class="star-rating">
+                    <span v-for="i in result.item.star" :key="i" class="star">★</span>
+                  </div>
+                  <span>{{ characterSchools[result.item.school]?.name || '' }}</span>
+                </template>
+                <template v-else-if="result.category === 'equipment'">
                   <span>{{ equipmentTypeNames[result.item.type] || '装备' }}</span>
                   <span>{{ result.item.qualityInfo?.name || '' }}</span>
                   <div v-if="result.item.setId" class="result-set" :style="{ color: getSetColor(result.item.setId) }">
@@ -113,7 +116,6 @@
           </div>
         </div>
 
-        <!-- 抽奖日志 -->
         <div class="log-section">
           <div class="log-header">
             <h3 class="section-title gold-gradient-text">抽奖日志</h3>
@@ -123,6 +125,57 @@
         </div>
       </div>
     </div>
+
+    <Teleport to="body">
+      <div v-if="showCharModal" class="char-modal-overlay" @click="closeCharModal">
+        <div class="char-modal" @click.stop>
+          <div class="char-modal-close" @click="closeCharModal">✕</div>
+          <div class="char-modal-content">
+            <div class="char-portrait">
+              <div v-if="selectedCharacter?.avatar" class="char-image">
+                <img :src="selectedCharacter.avatar" :alt="selectedCharacter.name" />
+              </div>
+              <div v-else class="char-placeholder">
+                <UserOutlined />
+              </div>
+              <div class="char-star-rating">
+                <span v-for="i in selectedCharacter?.star" :key="i" class="star">★</span>
+              </div>
+            </div>
+            <div class="char-info">
+              <h2 class="char-name">{{ selectedCharacter?.name }}</h2>
+              <p class="char-desc">{{ selectedCharacter?.description }}</p>
+              <div class="char-school">
+                <span class="label">流派：</span>
+                <span class="value">{{ characterSchools[selectedCharacter?.school]?.name }}</span>
+                </div>
+                <div class="char-talent">
+                  <span class="label">天赋：</span>
+                  <span class="value">{{ characterTalents[selectedCharacter?.talent]?.name }}</span>
+              </div>
+              <div class="char-stats">
+                <div class="stat-item">
+                  <span class="stat-label">攻击</span>
+                  <span class="stat-value">{{ selectedCharacter?.baseStats?.attack }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">生命</span>
+                  <span class="stat-value">{{ selectedCharacter?.baseStats?.health }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">防御</span>
+                  <span class="stat-value">{{ selectedCharacter?.baseStats?.defense }}</span>
+                </div>
+                <div class="stat-item">
+                  <span class="stat-label">速度</span>
+                  <span class="stat-value">{{ selectedCharacter?.baseStats?.speed }}</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -130,7 +183,7 @@
   import { usePlayerStore } from '../stores/player'
   import { ref, computed } from 'vue'
   import { useMessage } from 'naive-ui'
-  import { GiftOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
+  import { GiftOutlined, InfoCircleOutlined, UserOutlined } from '@ant-design/icons-vue'
   import { getStatName } from '../plugins/stats'
   import {
     gachaPools,
@@ -142,6 +195,7 @@
   } from '../plugins/gacha'
   import { setBonuses } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
+  import { characterSchools, characterTalents } from '../plugins/characters'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -149,11 +203,14 @@
 
   const currentPool = ref('all')
   const gachaResults = ref([])
+  const showCharModal = ref(false)
+  const selectedCharacter = ref(null)
 
   const poolList = computed(() => [
-    { key: 'all', name: '综合池', cost: gachaPools.all.cost, desc: '装备/灵宠/资源均有' },
-    { key: 'equipment', name: '装备池', cost: gachaPools.equipment.cost, desc: '侧重装备产出' },
-    { key: 'pet', name: '灵宠池', cost: gachaPools.pet.cost, desc: '侧重灵宠产出' }
+    { key: 'all', name: '综合池', cost: gachaPools.all.cost, desc: '人物/武器/法宝/灵宠/资源' },
+    { key: 'equipment', name: '装备池', cost: gachaPools.equipment.cost, desc: '武器/法宝为主' },
+    { key: 'pet', name: '灵宠池', cost: gachaPools.pet.cost, desc: '灵宠为主' },
+    { key: 'character', name: '人物池', cost: gachaPools.character.cost, desc: '人物为主' }
   ])
 
   const currentPoolConfig = computed(() => gachaPools[currentPool.value])
@@ -192,7 +249,14 @@
   // 发放奖励
   const grantReward = (result) => {
     const { category, item } = result
-    if (category === 'equipment') {
+    if (category === 'character') {
+      const addResult = playerStore.addSectMember(item)
+      if (addResult.success) {
+        showMessage('success', addResult.message)
+      } else {
+        showMessage('warning', addResult.message)
+      }
+    } else if (category === 'equipment') {
       playerStore.items.push(item)
     } else if (category === 'pet') {
       playerStore.items.push(item)
@@ -217,6 +281,7 @@
   // 格式化奖励名
   const getRewardName = (result) => {
     const { category, item } = result
+    if (category === 'character') return `${item.star}星人物·${item.name}`
     if (category === 'equipment') return item.name
     if (category === 'pet') return item.name
     return `${resourceNames[item.type] || '资源'}+${item.amount}`
@@ -236,7 +301,6 @@
     gachaResults.value = [result]
     showMessage('success', `抽奖获得：${getRewardName(result)}`)
     playerStore.queueSave()
-    // 抽奖结束后自动存入当前所在存档槽（未指定则默认槽位 1）
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
 
@@ -251,7 +315,6 @@
     const results = doMultiGacha(currentPool.value, 10, playerStore.level)
     results.forEach(r => grantReward(r))
     gachaResults.value = results
-    // 汇总日志
     const summary = {}
     results.forEach(r => {
       const key = r.category === 'resource' ? r.item.type : r.category
@@ -259,6 +322,7 @@
       summary[key]++
     })
     const parts = []
+    if (summary.character) parts.push(`人物×${summary.character}`)
     if (summary.equipment) parts.push(`装备×${summary.equipment}`)
     if (summary.pet) parts.push(`灵宠×${summary.pet}`)
     if (summary.spirit_stone) parts.push(`灵石奖励×${summary.spirit_stone}`)
@@ -267,8 +331,21 @@
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
     showMessage('success', `十连抽奖完成：${parts.join('，')}`)
     playerStore.queueSave()
-    // 抽奖结束后自动存入当前所在存档槽（未指定则默认槽位 1）
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
+  }
+
+  // 显示人物详情弹窗
+  const showCharacterDetail = (result) => {
+    if (result.category === 'character') {
+      selectedCharacter.value = result.item
+      showCharModal.value = true
+    }
+  }
+
+  // 关闭人物详情弹窗
+  const closeCharModal = () => {
+    showCharModal.value = false
+    selectedCharacter.value = null
   }
 
   const clearLogPanel = () => {
@@ -277,7 +354,9 @@
 
   // 结果卡片样式
   const getResultClass = (result) => {
-    if (result.category === 'equipment') {
+    if (result.category === 'character') {
+      return `character-star-${result.item.star}`
+    } else if (result.category === 'equipment') {
       return `quality-${result.item.quality}`
     } else if (result.category === 'pet') {
       return `rarity-${result.item.rarity}`
@@ -286,7 +365,11 @@
   }
 
   const getResultColor = (result) => {
-    if (result.category === 'equipment') {
+    if (result.category === 'character') {
+      if (result.item.star === 5) return '#FFD700'
+      if (result.item.star === 4) return '#9932CC'
+      return '#6fb3ff'
+    } else if (result.category === 'equipment') {
       return result.item.qualityInfo?.color || '#F5DEB3'
     } else if (result.category === 'pet') {
       return petRarities[result.item.rarity]?.color || '#F5DEB3'
@@ -295,6 +378,7 @@
   }
 
   const getResultTypeName = (result) => {
+    if (result.category === 'character') return `人物`
     if (result.category === 'equipment') return '装备'
     if (result.category === 'pet') return '灵宠'
     return resourceNames[result.item.type] || '资源'
@@ -679,5 +763,217 @@
     justify-content: space-between;
     align-items: center;
     margin-bottom: 12px;
+  }
+
+  /* 人物星级 */
+  .star-rating {
+    display: flex;
+    justify-content: center;
+    gap: 2px;
+    margin-bottom: 4px;
+  }
+
+  .star-rating .star {
+    font-size: 14px;
+    color: #DAA520;
+  }
+
+  .result-card.character-star-5 {
+    border-color: #FFD700;
+    box-shadow: 0 0 15px rgba(255, 215, 0, 0.4);
+    background: rgba(255, 215, 0, 0.08);
+  }
+
+  .result-card.character-star-4 {
+    border-color: #9932CC;
+    box-shadow: 0 0 12px rgba(153, 50, 204, 0.3);
+    background: rgba(153, 50, 204, 0.06);
+  }
+
+  .result-card.character-star-3 {
+    border-color: #6fb3ff;
+    box-shadow: 0 0 10px rgba(111, 179, 255, 0.2);
+    background: rgba(111, 179, 255, 0.04);
+  }
+
+  /* 人物弹窗 */
+  .char-modal-overlay {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    backdrop-filter: blur(8px);
+  }
+
+  .char-modal {
+    background: linear-gradient(135deg, rgba(20, 20, 30, 0.95), rgba(40, 30, 20, 0.95));
+    border: 2px solid rgba(218, 165, 32, 0.5);
+    border-radius: 16px;
+    padding: 24px;
+    max-width: 480px;
+    width: 90%;
+    max-height: 80vh;
+    overflow-y: auto;
+    position: relative;
+    animation: modalAppear 0.3s ease-out;
+  }
+
+  @keyframes modalAppear {
+    from {
+      opacity: 0;
+      transform: scale(0.9);
+    }
+    to {
+      opacity: 1;
+      transform: scale(1);
+    }
+  }
+
+  .char-modal-close {
+    position: absolute;
+    top: 12px;
+    right: 12px;
+    font-size: 20px;
+    color: #888;
+    cursor: pointer;
+    padding: 4px 8px;
+    border-radius: 8px;
+    transition: all 0.2s;
+  }
+
+  .char-modal-close:hover {
+    color: #fff;
+    background: rgba(255, 255, 255, 0.1);
+  }
+
+  .char-modal-content {
+    display: flex;
+    gap: 20px;
+    align-items: flex-start;
+  }
+
+  .char-portrait {
+    flex-shrink: 0;
+    width: 140px;
+    height: 180px;
+    position: relative;
+  }
+
+  .char-image {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    overflow: hidden;
+    border: 2px solid rgba(218, 165, 32, 0.5);
+  }
+
+  .char-image img {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+
+  .char-placeholder {
+    width: 100%;
+    height: 100%;
+    border-radius: 12px;
+    border: 2px solid rgba(218, 165, 32, 0.5);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: rgba(0, 0, 0, 0.3);
+    font-size: 48px;
+    color: rgba(218, 165, 32, 0.5);
+  }
+
+  .char-star-rating {
+    position: absolute;
+    bottom: -8px;
+    left: 50%;
+    transform: translateX(-50%);
+    display: flex;
+    gap: 2px;
+    background: rgba(0, 0, 0, 0.8);
+    padding: 4px 12px;
+    border-radius: 12px;
+    border: 1px solid rgba(218, 165, 32, 0.5);
+  }
+
+  .char-star-rating .star {
+    font-size: 16px;
+    color: #FFD700;
+  }
+
+  .char-info {
+    flex: 1;
+  }
+
+  .char-name {
+    margin: 0 0 8px;
+    font-size: 24px;
+    font-weight: bold;
+    color: #FFD700;
+    font-family: var(--font-family-heading);
+  }
+
+  .char-desc {
+    margin: 0 0 12px;
+    font-size: 13px;
+    color: #aaa;
+    line-height: 1.5;
+  }
+
+  .char-school,
+  .char-talent {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 8px;
+    font-size: 13px;
+  }
+
+  .char-school .label,
+  .char-talent .label {
+    color: #888;
+  }
+
+  .char-school .value,
+  .char-talent .value {
+    color: #F5DEB3;
+    font-weight: bold;
+  }
+
+  .char-stats {
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
+    margin-top: 16px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(218, 165, 32, 0.2);
+  }
+
+  .stat-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 6px;
+  }
+
+  .stat-label {
+    font-size: 12px;
+    color: #888;
+  }
+
+  .stat-value {
+    font-size: 14px;
+    font-weight: bold;
+    color: #FFD700;
   }
 </style>

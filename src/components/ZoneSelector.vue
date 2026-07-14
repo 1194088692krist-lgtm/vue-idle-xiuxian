@@ -64,6 +64,48 @@
         </div>
       </div>
 
+      <!-- 队伍选择 -->
+      <div class="team-selector">
+        <div class="team-header">
+          <div class="team-title">
+            <span class="team-icon">🚀</span>
+            <span>出战队伍</span>
+            <span class="team-count">{{ playerStore.teamMembers.length }}/{{ playerStore.maxTeamSize }}</span>
+          </div>
+          <button
+            class="btn btn-small btn-secondary"
+            @click="toggleTeamModal"
+          >
+            {{ showTeamModal ? '关闭' : '选择' }}
+          </button>
+        </div>
+        <div class="team-members">
+          <div v-if="teamMembersDetail.length === 0" class="team-empty">
+            <span>暂无出战成员，请从宗门选择</span>
+          </div>
+          <div
+            v-for="member in teamMembersDetail"
+            :key="member.id"
+            class="team-member-card"
+          >
+            <div class="member-avatar">
+              <span>{{ member.name[0] }}</span>
+              <div class="member-stars">
+                <span v-for="i in member.star" :key="i" class="star">★</span>
+              </div>
+            </div>
+            <div class="member-info">
+              <div class="member-name">{{ member.name }}</div>
+              <div class="member-school">{{ characterSchools[member.school]?.name || member.school }}</div>
+            </div>
+            <div class="member-build">
+              <span class="build-label">Build</span>
+              <span class="build-value">{{ formatBuild(playerStore.getCharacterBuildStrength(member)) }}</span>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 难度档选择 -->
       <div class="difficulty-selector">
         <div class="diff-label">试炼难度</div>
@@ -300,11 +342,85 @@
           <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
         </div>
       </div>
+
+      <!-- 获得装备详情 -->
+      <div v-if="lastSummary && !isIdling && lastSummary.equipmentList && lastSummary.equipmentList.length > 0" class="equipment-detail-section">
+        <div class="equipment-detail-header">
+          <span class="equipment-detail-title">🎁 获得装备详情</span>
+        </div>
+        <div class="equipment-detail-list">
+          <div
+            v-for="(eq, index) in lastSummary.equipmentList"
+            :key="index"
+            class="equipment-detail-item"
+            :style="{ borderColor: eq.qualityInfo?.color || '#888' }"
+          >
+            <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
+              {{ eq.name }}
+              <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
+            </div>
+            <div class="eq-type">{{ eq.typeName || eq.type }}</div>
+            <div class="eq-stats">
+              <span v-for="(value, key) in eq.mainAttributes" :key="key" class="eq-stat">
+                {{ getStatName(key) }} +{{ value }}
+              </span>
+            </div>
+            <div v-if="eq.affixes && eq.affixes.length > 0" class="eq-affixes">
+              <span v-for="(affix, idx) in eq.affixes" :key="idx" class="eq-affix">
+                {{ affix.name }}
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
     </div>
+
+    <!-- 队伍选择弹窗 -->
+    <Teleport to="body">
+      <div v-if="showTeamModal" class="team-modal-overlay" @click="toggleTeamModal">
+        <div class="team-modal" @click.stop>
+          <div class="team-modal-header">
+            <h3>选择出战队伍</h3>
+            <button class="modal-close" @click="toggleTeamModal">✕</button>
+          </div>
+          <div class="team-modal-body">
+            <div class="sect-members-list">
+              <div class="sect-members-title">宗门成员（{{ playerStore.sectMembers.length }}/{{ playerStore.maxSectSize }}）</div>
+              <div class="sect-members-grid">
+                <div
+                  v-for="member in playerStore.sectMembers"
+                  :key="member.id"
+                  class="sect-member-card"
+                  :class="{ selected: isMemberInTeam(member.id) }"
+                  @click="toggleMemberInTeam(member.id)"
+                >
+                  <div class="sect-avatar">
+                    <span>{{ member.name[0] }}</span>
+                  </div>
+                  <div class="sect-member-info">
+                    <div class="sect-member-name">{{ member.name }}</div>
+                    <div class="sect-member-stars">
+                      <span v-for="i in member.star" :key="i" class="star">★</span>
+                    </div>
+                  </div>
+                  <div class="sect-member-build">{{ formatBuild(playerStore.getCharacterBuildStrength(member)) }}</div>
+                  <div class="sect-member-school">{{ characterSchools[member.school]?.name || member.school }}</div>
+                  <div v-if="isMemberInTeam(member.id)" class="sect-member-selected">✓</div>
+                </div>
+              </div>
+            </div>
+          </div>
+          <div class="team-modal-footer">
+            <button class="btn btn-primary" @click="saveTeam">确认队伍</button>
+            <button class="btn btn-secondary" @click="clearTeam">清空队伍</button>
+          </div>
+        </div>
+      </div>
+    </Teleport>
 
     <!-- 宝物高亮弹窗 -->
     <transition name="flash">
-      <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }">
+      <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }" @click="hideTreasureFlash">
         <div class="flash-content">
           <div class="flash-icon">{{ treasureFlash.icon }}</div>
           <div class="flash-title">{{ treasureFlash.title }}</div>
@@ -320,6 +436,8 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
+import { characterSchools } from '../plugins/characters'
+import { getStatName } from '../plugins/stats'
 
 const playerStore = usePlayerStore()
 const {
@@ -334,6 +452,7 @@ const {
   combatState,
   animState,
   treasureFlash,
+  hideTreasureFlash,
   canStartIdle,
   playerBuildStrength,
   currentRecommendedBuild,
@@ -397,7 +516,46 @@ const filteredZones = computed(() => {
 const canEnter = () => true
 const selectZone = (zone) => {
   setSelectedZone(zone)
-  setDifficulty(zone.difficulties[2].key) // 默认选中「凶险」标准档
+  setDifficulty(zone.difficulties[2].key)
+}
+
+// 队伍选择相关
+const showTeamModal = ref(false)
+const tempTeam = ref([])
+
+const toggleTeamModal = () => {
+  if (!showTeamModal.value) {
+    tempTeam.value = [...playerStore.teamMembers]
+  }
+  showTeamModal.value = !showTeamModal.value
+}
+
+const teamMembersDetail = computed(() => {
+  return playerStore.getTeamMembersDetail()
+})
+
+const isMemberInTeam = (memberId) => {
+  return tempTeam.value.includes(memberId)
+}
+
+const toggleMemberInTeam = (memberId) => {
+  const index = tempTeam.value.indexOf(memberId)
+  if (index > -1) {
+    tempTeam.value.splice(index, 1)
+  } else {
+    if (tempTeam.value.length < playerStore.maxTeamSize) {
+      tempTeam.value.push(memberId)
+    }
+  }
+}
+
+const saveTeam = () => {
+  playerStore.setTeamMembers(tempTeam.value)
+  showTeamModal.value = false
+}
+
+const clearTeam = () => {
+  tempTeam.value = []
 }
 
 const getZoneIcon = (id) => {
@@ -1473,5 +1631,402 @@ onUnmounted(() => {
 .flash-leave-to {
   opacity: 0;
   transform: translate(-50%, -50%) scale(1.2);
+}
+
+/* 队伍选择器 */
+.team-selector {
+  padding: 12px;
+  margin-bottom: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(255, 255, 255, 0.06);
+}
+
+.team-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+}
+
+.team-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 14px;
+  font-weight: bold;
+  color: #DAA520;
+}
+
+.team-icon {
+  font-size: 16px;
+}
+
+.team-count {
+  font-size: 12px;
+  color: #888;
+  font-weight: normal;
+  padding: 2px 8px;
+  background: rgba(255, 255, 255, 0.08);
+  border-radius: 10px;
+}
+
+.btn-secondary {
+  background: rgba(255, 255, 255, 0.1);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+}
+
+.btn-secondary:hover {
+  background: rgba(255, 255, 255, 0.15);
+}
+
+.team-members {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.team-empty {
+  width: 100%;
+  text-align: center;
+  padding: 16px;
+  color: #888;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+
+.team-member-card {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  min-width: 140px;
+}
+
+.member-avatar {
+  position: relative;
+  width: 36px;
+  height: 36px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B4513, #DAA520);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.member-stars {
+  position: absolute;
+  bottom: -6px;
+  left: 50%;
+  transform: translateX(-50%);
+  display: flex;
+  gap: 1px;
+  background: rgba(0, 0, 0, 0.8);
+  padding: 1px 4px;
+  border-radius: 6px;
+}
+
+.member-stars .star {
+  font-size: 8px;
+  color: #FFD700;
+}
+
+.member-info {
+  flex: 1;
+}
+
+.member-name {
+  font-size: 13px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.member-school {
+  font-size: 11px;
+  color: #888;
+}
+
+.member-build {
+  text-align: right;
+}
+
+.build-label {
+  display: block;
+  font-size: 10px;
+  color: #888;
+}
+
+.build-value {
+  display: block;
+  font-size: 12px;
+  font-weight: bold;
+  color: #DAA520;
+}
+
+/* 队伍弹窗 */
+.team-modal-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.85);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 1000;
+  backdrop-filter: blur(8px);
+}
+
+.team-modal {
+  background: linear-gradient(135deg, rgba(20, 20, 30, 0.98), rgba(40, 30, 20, 0.98));
+  border: 2px solid rgba(218, 165, 32, 0.5);
+  border-radius: 16px;
+  padding: 20px;
+  max-width: 90vw;
+  width: 500px;
+  max-height: 80vh;
+  display: flex;
+  flex-direction: column;
+  animation: modalAppear 0.3s ease-out;
+}
+
+@keyframes modalAppear {
+  from { opacity: 0; transform: scale(0.9); }
+  to { opacity: 1; transform: scale(1); }
+}
+
+.team-modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+}
+
+.team-modal-header h3 {
+  margin: 0;
+  font-size: 18px;
+  color: #DAA520;
+}
+
+.modal-close {
+  font-size: 20px;
+  color: #888;
+  cursor: pointer;
+  background: none;
+  border: none;
+  padding: 4px 8px;
+  border-radius: 8px;
+  transition: all 0.2s;
+}
+
+.modal-close:hover {
+  color: #fff;
+  background: rgba(255, 255, 255, 0.1);
+}
+
+.team-modal-body {
+  flex: 1;
+  overflow-y: auto;
+}
+
+.sect-members-title {
+  font-size: 14px;
+  color: #DAA520;
+  margin-bottom: 12px;
+  font-weight: bold;
+}
+
+.sect-members-grid {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+}
+
+.sect-member-card {
+  position: relative;
+  padding: 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 10px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+
+.sect-member-card:hover {
+  border-color: rgba(218, 165, 32, 0.4);
+  background: rgba(218, 165, 32, 0.05);
+}
+
+.sect-member-card.selected {
+  border-color: #DAA520;
+  background: rgba(218, 165, 32, 0.15);
+  box-shadow: 0 0 10px rgba(218, 165, 32, 0.2);
+}
+
+.sect-avatar {
+  width: 40px;
+  height: 40px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B4513, #DAA520);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 16px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 8px;
+}
+
+.sect-member-info {
+  margin-bottom: 8px;
+}
+
+.sect-member-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+}
+
+.sect-member-stars {
+  display: flex;
+  gap: 2px;
+  margin-top: 2px;
+}
+
+.sect-member-stars .star {
+  font-size: 11px;
+  color: #DAA520;
+}
+
+.sect-member-build {
+  font-size: 12px;
+  font-weight: bold;
+  color: #DAA520;
+  margin-bottom: 4px;
+}
+
+.sect-member-school {
+  font-size: 11px;
+  color: #888;
+}
+
+.sect-member-selected {
+  position: absolute;
+  top: 8px;
+  right: 8px;
+  width: 20px;
+  height: 20px;
+  border-radius: 50%;
+  background: #DAA520;
+  color: #000;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-weight: bold;
+}
+
+.team-modal-footer {
+  display: flex;
+  gap: 10px;
+  margin-top: 16px;
+  padding-top: 12px;
+  border-top: 1px solid rgba(218, 165, 32, 0.2);
+}
+
+.team-modal-footer .btn {
+  flex: 1;
+}
+
+/* 装备详情区域 */
+.equipment-detail-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(218, 165, 32, 0.2);
+}
+
+.equipment-detail-header {
+  margin-bottom: 10px;
+}
+
+.equipment-detail-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #DAA520;
+}
+
+.equipment-detail-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.equipment-detail-item {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 8px;
+  border-left: 3px solid;
+}
+
+.eq-name {
+  font-size: 14px;
+  font-weight: bold;
+  margin-bottom: 4px;
+}
+
+.eq-quality {
+  font-size: 11px;
+  margin-left: 6px;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.1);
+  border-radius: 4px;
+}
+
+.eq-type {
+  font-size: 11px;
+  color: #888;
+  margin-bottom: 6px;
+}
+
+.eq-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-bottom: 6px;
+}
+
+.eq-stat {
+  font-size: 12px;
+  color: #F5DEB3;
+  padding: 2px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 4px;
+}
+
+.eq-affixes {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.eq-affix {
+  font-size: 11px;
+  color: #FFA500;
+  padding: 2px 6px;
+  background: rgba(255, 165, 0, 0.1);
+  border-radius: 4px;
 }
 </style>

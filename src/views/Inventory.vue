@@ -122,6 +122,13 @@
               <option v-for="opt in options" :key="opt.value" :value="opt.value">{{ opt.label }}</option>
             </select>
             <button
+              class="btn-small btn-success"
+              @click="sortPetsByScore"
+              :disabled="!playerStore.items.filter(item => item.type === 'pet').length"
+            >
+              🔼 按评分排序
+            </button>
+            <button
               class="btn-small"
               @click="showBatchReleaseConfirm = true"
               :disabled="!playerStore.items.filter(item => item.type === 'pet').length"
@@ -150,6 +157,7 @@
                   </span>
                   <span>等级: {{ pet.level || 1 }}</span>
                   <span>星级: {{ pet.star || 0 }}</span>
+                  <span class="pet-score">评分: {{ calculatePetScore(pet) }}</span>
                   <button class="btn-small" @click="showPetDetails(pet)">详情</button>
                 </div>
               </div>
@@ -259,6 +267,9 @@
             {{ opt.label }}
           </option>
         </select>
+        <button class="btn-small btn-success" :disabled="equipmentList.length === 0" @click="sortEquipmentByScore">
+          🔼 按评分排序
+        </button>
         <button class="btn-small btn-warning" :disabled="equipmentList.length === 0" @click="batchSellEquipments">
           一键出售
         </button>
@@ -511,13 +522,18 @@
   const currentPage = ref(1)
   const pageSize = ref(12)
 
+  // 排序标志
+  const petsSortedByScore = ref(false)
+  const equipmentSortedByScore = ref(false)
+
   // 过滤后的灵宠列表
   const filteredPets = computed(() => {
     const pets = playerStore.items.filter(item => item.type === 'pet')
-    if (selectedRarityToRelease.value === 'all') {
-      return pets
+    let result = selectedRarityToRelease.value === 'all' ? pets : pets.filter(pet => pet.rarity === selectedRarityToRelease.value)
+    if (petsSortedByScore.value) {
+      result = [...result].sort((a, b) => calculatePetScore(b) - calculatePetScore(a))
     }
-    return pets.filter(pet => pet.rarity === selectedRarityToRelease.value)
+    return result
   })
 
   // 当前页显示的灵宠
@@ -526,6 +542,17 @@
     const end = start + pageSize.value
     return filteredPets.value.slice(start, end)
   })
+
+  // 灵宠按评分排序
+  const sortPetsByScore = () => {
+    petsSortedByScore.value = !petsSortedByScore.value
+    currentPage.value = 1
+    if (petsSortedByScore.value) {
+      message.success('灵宠已按评分从高到低排序')
+    } else {
+      message.success('灵宠已恢复默认排序')
+    }
+  }
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -656,6 +683,22 @@
       defense: finalBonus,
       health: finalBonus
     }
+  }
+
+  // 计算灵宠评分
+  const calculatePetScore = pet => {
+    if (!pet) return 0
+    const rarityScoreMap = {
+      divine: 1000,
+      celestial: 600,
+      mystic: 350,
+      spiritual: 200,
+      mortal: 100
+    }
+    const baseScore = rarityScoreMap[pet.rarity] || 100
+    const levelScore = (pet.level || 1) * 20
+    const starScore = (pet.star || 0) * 50
+    return baseScore + levelScore + starScore
   }
 
   // 获取升级所需精华数量
@@ -820,6 +863,9 @@
       if (selectedQuality.value !== 'all' && item.quality !== selectedQuality.value) return false
       return true
     })
+    if (equipmentSortedByScore.value) {
+      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+    }
     return list
   })
 
@@ -840,6 +886,17 @@
       message.success(result.message)
     } else {
       message.error(result.message || '批量卖出失败')
+    }
+  }
+
+  // 装备按评分排序
+  const sortEquipmentByScore = () => {
+    equipmentSortedByScore.value = !equipmentSortedByScore.value
+    currentEquipmentPage.value = 1
+    if (equipmentSortedByScore.value) {
+      message.success('装备已按评分从高到低排序')
+    } else {
+      message.success('装备已恢复默认排序')
     }
   }
 
@@ -1381,6 +1438,12 @@
     gap: 8px;
     flex-wrap: wrap;
     margin-top: 6px;
+  }
+
+  .pet-score {
+    color: #DAA520;
+    font-weight: bold;
+    font-size: 13px;
   }
 
   /* 弹窗 */

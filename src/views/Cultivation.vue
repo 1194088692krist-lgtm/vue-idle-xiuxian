@@ -208,14 +208,7 @@
         >
           <span>{{ isAutoCultivating ? '停止自动' : '自动修炼' }}</span>
         </button>
-        <button
-          class="btn btn-info"
-          :class="{ disabled: playerStore.spirit < calculateBreakthroughCost() }"
-          @click="cultivateUntilBreakthrough"
-        >
-          <span>一键突破</span>
-          <span class="btn-cost">消耗 {{ calculateBreakthroughCost() }} 灵力</span>
-        </button>
+        
       </div>
 
       <div class="cultivation-detail">
@@ -381,13 +374,6 @@ const getCurrentCultivationGain = () => Math.floor(baseCultivationGain * Math.po
 const cultivationCost = computed(() => getCurrentCultivationCost())
 const cultivationGain = computed(() => getCurrentCultivationGain())
 
-const calculateBreakthroughCost = () => {
-  const remaining = Math.max(0, playerStore.maxCultivation - playerStore.cultivation)
-  const gain = cultivationGain.value || 1
-  if (gain <= 0) return 0
-  return Math.max(0, Math.ceil(remaining / gain) * getCurrentCultivationCost())
-}
-
 const isAutoCultivating = ref(false)
 const cultivationTimer = ref(null)
 const cultivationWorker = ref(null)
@@ -422,24 +408,6 @@ const initCultivationWorker = () => {
       } else {
         showMessage('success', '修炼成功！')
       }
-    }
-  }
-}
-
-const cultivateUntilBreakthrough = () => {
-  if (!canBreakthrough()) {
-    playerStore.regenerateSpirit() // 先恢复灵力
-    cultivationWorker.value?.postMessage({
-      type: 'cultivateUntilBreakthrough',
-      playerData: {
-        level: playerStore.level, spirit: playerStore.spirit,
-        cultivation: playerStore.cultivation, maxCultivation: playerStore.maxCultivation,
-        luck: playerStore.luck
-      }
-    })
-  } else {
-    if (playerStore.tryBreakthrough()) {
-      showMessage('success', `突破成功！进入${playerStore.realm}！`)
     }
   }
 }

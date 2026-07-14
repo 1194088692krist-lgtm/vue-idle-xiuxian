@@ -18,15 +18,19 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 })
+const foundEquipment = ref([])       // 本次挂机获得的装备列表
 
-// ============ 挂机血条（持久化气血，跨遭遇累积，归零则提前力竭） ============
-const idlePlayerHP = ref(0)
-const idlePlayerMaxHP = ref(0)
-const idlePlayerDefeated = ref(false)
+// ============ 队伍成员挂机状态（每人独立血条和build） ============
+const teamMemberStates = ref([])
 
-// 玩家当前 Build 强度（装备评分总和）
-const playerBuildStrength = computed(() => store().buildStrength)
+// 队伍总 Build 强度（所有出战成员之和）
+const playerBuildStrength = computed(() => {
+  const s = store()
+  const team = s.getTeamMembersDetail()
+  if (team.length === 0) return s.buildStrength
+  return team.reduce((sum, member) => sum + s.getCharacterBuildStrength(member), 0)
+})
 // 当前地图/难度推荐的 Build 强度（挂机能否成功的基础属性）
 const currentRecommendedBuild = computed(() => {
   if (!selectedZone.value) return 0
@@ -543,7 +547,6 @@ function showTreasureFlash(reward) {
   if (flashTimer) clearTimeout(flashTimer)
   const info = reward.info || rarityInfo[reward.rarity] || rarityInfo.common
   const tier = RARITY_TIER[reward.rarity] || 'plain'
-  // 仅 稀有(上品) 及以上品质触发全屏宝物弹窗；良品/灵品等仅保留日志特效，避免频繁打断
   if (tier === 'plain' || tier === 'uncommon') return
   const isPet = reward.type === 'pet'
   const kind = isPet ? '灵宠' : '装备'
@@ -562,10 +565,14 @@ function showTreasureFlash(reward) {
   const title = flashTitles[tier] || '宝物现世！'
   const desc = flashDescs[tier] || `获得${info.name}${kind}！`
   const icon = isPet ? '🐉' : '⚔️'
-  // 越稀有弹窗停留越久
-  const duration = tier === 'mythic' ? 3500 : tier === 'legendary' ? 3000 : tier === 'epic' ? 2500 : 1800
+  const duration = 5000
   treasureFlash.value = { show: true, tier, title, desc, icon, color: info.color }
   flashTimer = setTimeout(() => { treasureFlash.value.show = false }, duration)
+}
+
+function hideTreasureFlash() {
+  if (flashTimer) clearTimeout(flashTimer)
+  treasureFlash.value.show = false
 }
 
 // ============ 生动日志：单场遭遇 ============
@@ -607,7 +614,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
 async function runIdleEncounter() {
   if (!isIdling.value || !selectedZone.value) return
-  if (isRunning) return // 重入锁
+  if (isRunning) return
   isRunning = true
   const s = store()
   const zone = selectedZone.value
@@ -623,57 +630,144 @@ async function runIdleEncounter() {
     s.spiritStones -= diff.spiritCost
     idleEncounterCount.value++
     const count = idleEncounterCount.value
-    const result = await runExploreCombat(effectiveZone, count, true)
+    const ratio = buildRatio.value
+    const underBuilt = Math.max(0, 1 - ratio)
+    
+    let allDead = true
+    let aliveCount = 0
+    const teamResults = []
+    
+    for (const memberState of teamMemberStates.value) {
+      if (memberState.hp <= 0) continue
+      allDead = false
+      aliveCount++
+      
+      const memberRatio = memberState.buildStrength / (currentRecommendedBuild.value / teamMemberStates.value.length)
+      const memberUnderBuilt = Math.max(0, 1 - memberRatio)
+      
+      const result = await runExploreCombatForMember(effectiveZone, count, memberState, true)
+      teamResults.push({ member: memberState, result })
+      
+      if (result.victory) {
+        const maxHP = memberState.maxHP
+        const scrape = Math.round(maxHP * (0.04 + 0.06 * memberUnderBuilt))
+        memberState.hp = Math.min(maxHP, memberState.hp + Math.round(maxHP * 0.12) - scrape)
+      } else {
+        const maxHP = memberState.maxHP
+        const hurt = Math.round(maxHP * (0.25 + 0.35 * memberUnderBuilt))
+        memberState.hp -= hurt
+        memberState.hp = Math.max(0, memberState.hp)
+      }
+    }
+    
+    const victory = teamResults.some(r => r.result.victory)
     let rewards = []
     let loss = 0
-    const maxHP = idlePlayerMaxHP.value || 1
-    const ratio = buildRatio.value
-    const underBuilt = Math.max(0, 1 - ratio) // 0=达标，越大越弱
-    if (result.victory) {
+    
+    if (victory) {
       rewards = grantReward(effectiveZone, true)
       s.dungeonTotalKills++; s.explorationCount++
-      // 保底灵石返还：每场胜利至少回收消耗的 30%~80%（难度越高比例越低但基数大）
       const recoverRatio = Math.max(0.3, 0.8 - effectiveZone.difficulty * 0.06)
       const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
       s.spiritStones += recovered
       runStats.value.spiritStones += recovered
-      // 挂机修为加成：每场胜利额外给修为（与地图等级相关）
       const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5))
       s.cultivate(cultBonus)
       runStats.value.cultivation += cultBonus
-      // 奇遇：每 20 次，50% 触发
       if (count % 20 === 0 && Math.random() < 0.5) {
         const fortunePool = [getRandomHerb({ difficulty: 9 }), getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 }), getRandomSpecial()].filter(Boolean)
         const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
         if (fp) { s.gainMaterial(fp); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + fp.name, material: fp }) }
       }
       runStats.value.victories++
-      // 胜利：小幅擦伤后调息回血，Build 越强损耗越小
-      const scrape = Math.round(maxHP * (0.04 + 0.06 * underBuilt))
-      idlePlayerHP.value = Math.min(maxHP, idlePlayerHP.value + Math.round(maxHP * 0.12) - scrape)
+      const expGain = Math.round(10 * effectiveZone.difficulty)
+      runStats.value.exp += expGain
+      teamMemberStates.value.forEach(ms => {
+        if (ms.hp > 0) {
+          s.addCharacterExperience(ms.memberId, expGain)
+        }
+      })
+      
+      rewards.forEach(r => {
+        if (r.type === 'equipment') {
+          foundEquipment.value.push(r.item)
+        }
+      })
     } else {
       loss = Math.floor(s.cultivation * 0.05)
       s.cultivation = Math.max(0, s.cultivation - loss)
       s.dungeonDeathCount++
       runStats.value.defeats++
-      // 失败：气血重创，Build 越弱受伤越重（25%~60% 最大气血）
-      const hurt = Math.round(maxHP * (0.25 + 0.35 * underBuilt))
-      idlePlayerHP.value -= hurt
     }
-    idlePlayerHP.value = Math.max(0, idlePlayerHP.value)
-    logEncounter(zone, diff, count, result.enemy, result.victory, rewards, loss)
+    
+    const firstResult = teamResults[0]
+    const enemy = firstResult?.result?.enemy || generateZoneEnemy(effectiveZone, count)
+    logEncounter(zone, diff, count, enemy, victory, rewards, loss)
     s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
     s.queueSave()
-    // 气血归零 → 力竭提前失败
-    if (idlePlayerHP.value <= 0) {
-      idlePlayerDefeated.value = true
-      addLog('defeat', `💀 力竭血枯！你的 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
+    
+    if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
+      addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
       finishIdle()
       return
     }
   } finally {
     isRunning = false
   }
+}
+
+async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false) {
+  const s = store()
+  const member = s.sectMembers.find(m => m.id === memberState.memberId)
+  if (!member) {
+    return { victory: false, enemy: null }
+  }
+  
+  const stats = {
+    health: member.baseStats.health,
+    maxHealth: member.baseStats.health,
+    damage: member.baseStats.attack,
+    defense: member.baseStats.defense,
+    speed: member.baseStats.speed,
+    critRate: member.combatAttributes.critRate || 0,
+    comboRate: member.combatAttributes.comboRate || 0,
+    counterRate: member.combatAttributes.counterRate || 0,
+    stunRate: member.combatAttributes.stunRate || 0,
+    dodgeRate: member.combatAttributes.dodgeRate || 0,
+    vampireRate: member.combatAttributes.vampireRate || 0,
+    critResist: member.combatResistance.critResist || 0,
+    comboResist: member.combatResistance.comboResist || 0,
+    counterResist: member.combatResistance.counterResist || 0,
+    stunResist: member.combatResistance.stunResist || 0,
+    dodgeResist: member.combatResistance.dodgeResist || 0,
+    vampireResist: member.combatResistance.vampireResist || 0,
+    healBoost: member.specialAttributes.healBoost || 0,
+    critDamageBoost: member.specialAttributes.critDamageBoost || 0,
+    critDamageReduce: member.specialAttributes.critDamageReduce || 0,
+    finalDamageBoost: member.specialAttributes.finalDamageBoost || 0,
+    finalDamageReduce: member.specialAttributes.finalDamageReduce || 0,
+    combatBoost: member.specialAttributes.combatBoost || 0,
+    resistanceBoost: member.specialAttributes.resistanceBoost || 0
+  }
+  
+  const playerEntity = new CombatEntity(member.name, member.level, stats, member.schoolName)
+  const enemy = generateZoneEnemy(effectiveZone, encounterCount)
+  const manager = new CombatManager(playerEntity, enemy)
+  manager.start()
+  
+  let safetyGuard = 0
+  while (manager.state === 'in_progress' && safetyGuard < 200) {
+    safetyGuard++
+    const result = manager.executeTurn()
+    if (!result) break
+    if (result.state === 'victory') {
+      const drops = grantCombatDrops(enemy)
+      return { victory: true, manager, enemy, drops }
+    } else if (result.state === 'defeat') {
+      return { victory: false, manager, enemy }
+    }
+  }
+  return { victory: false, manager, enemy }
 }
 
 // ============ 离线补算（轻量结算，避免卡顿） ============
@@ -728,28 +822,34 @@ function startIdle(durationMinutes) {
   const s = store()
   if (!selectedZone.value) return
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
-  // 门槛以灵石(spiritStones)为准，与下方扣费一致；regenerateSpirit 只恢复灵力(spirit)，与此门槛无关，故移除
   if (s.spiritStones < diff.spiritCost) return
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterCount.value = 0
-  idlePlayerDefeated.value = false
-  // 初始化血条：以玩家真实最大生命为基准
-  const probe = createPlayerEntity()
-  idlePlayerMaxHP.value = probe.stats.maxHealth
-  idlePlayerHP.value = probe.stats.maxHealth
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0 }
+  foundEquipment.value = []
   logs.value = []
+  
+  const team = s.getTeamMembersDetail()
+  teamMemberStates.value = team.map(member => ({
+    memberId: member.id,
+    name: member.name,
+    hp: member.baseStats.health,
+    maxHP: member.baseStats.health,
+    buildStrength: s.getCharacterBuildStrength(member)
+  }))
+  
   logs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
+  logs.value.push({ type: 'info', text: `🚀 出战阵容：${team.map(m => m.name).join('、') || '无成员'}`, time: new Date().toLocaleTimeString() })
   const match = Math.round(buildRatio.value * 100)
   if (buildRatio.value < 1) {
-    logs.value.push({ type: 'warning', text: `⚠️ 你的 Build 强度（${Math.round(playerBuildStrength.value)}）低于推荐值（${Math.round(currentRecommendedBuild.value)}），匹配度 ${match}%，气血可能不支、挂机或提前力竭。`, time: new Date().toLocaleTimeString() })
+    logs.value.push({ type: 'warning', text: `⚠️ 队伍 Build 强度（${Math.round(playerBuildStrength.value)}）低于推荐值（${Math.round(currentRecommendedBuild.value)}），匹配度 ${match}%，成员气血可能不支、挂机或提前力竭。`, time: new Date().toLocaleTimeString() })
   } else {
-    logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
+    logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，队伍气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
   }
   startIdleTimers()
-  // 挂机开始即触发一次自动存档（落盘挂机状态，防止意外丢失）
   s.queueSave()
+  s.saveToCurrentSlot().catch(err => console.error('挂机开始自动存档失败:', err))
 }
 
 function stopIdle() { finishIdle() }
@@ -760,6 +860,8 @@ function finishIdle() {
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
   const s = store()
+  const allDead = teamMemberStates.value.every(ms => ms.hp <= 0)
+  
   lastSummary.value = {
     zoneName: selectedZone.value?.name || '未知',
     difficulty: selectedDifficultyKey.value,
@@ -770,18 +872,26 @@ function finishIdle() {
     totalStones: runStats.value.spiritStones,
     totalCultivation: runStats.value.cultivation,
     totalEquipment: runStats.value.equipment,
-    defeated: idlePlayerDefeated.value,
-    logs: [...logs.value]
+    totalExp: runStats.value.exp,
+    defeated: allDead,
+    logs: [...logs.value],
+    equipmentList: [...foundEquipment.value],
+    teamStates: [...teamMemberStates.value]
   }
   s.stopIdleExploration()
-  // 挂机结束（正常结束 / 力竭 / 手动停止）立即同步落盘，确保本次收益不丢失
   s.saveData()
+  s.saveToCurrentSlot().catch(err => console.error('挂机结束自动存档失败:', err))
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
+  
+  if (foundEquipment.value.length > 0) {
+    logs.value.push({ type: 'reward-equipment', text: `🎁 获得装备：${foundEquipment.value.map(e => `${e.name}(${e.rarity})`).join('、')}`, time: new Date().toLocaleTimeString() })
+  }
+  
   if (logs.value.length) {
-    const tail = idlePlayerDefeated.value
-      ? `挂机因气血耗尽提前终止！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
+    const tail = allDead
+      ? `挂机因全队力竭提前终止！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
       : `挂机结束！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
     logs.value.push({ type: 'info', text: tail, time: new Date().toLocaleTimeString() })
   }
@@ -862,13 +972,12 @@ export function useIdleSystem() {
     animState,
     treasureFlash,
     canStartIdle,
+    teamMemberStates,
+    foundEquipment,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,
     buildRatio,
-    idlePlayerHP,
-    idlePlayerMaxHP,
-    idlePlayerDefeated,
     // 方法
     setSelectedZone: (z) => { selectedZone.value = z },
     setDifficulty: (k) => { selectedDifficultyKey.value = k },
@@ -878,6 +987,7 @@ export function useIdleSystem() {
     runExploreCombat,
     grantReward,
     showTreasureFlash,
+    hideTreasureFlash,
     buildEffectiveZone,
     getZoneDifficulty
   }
