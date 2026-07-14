@@ -1,11 +1,5 @@
-# 我的放置仙途
+# 凡人修仙
 
-<p align="center">
-    <img src="https://i0.hdslb.com/bfs/article/c5bd547efa79470ccaab206c22b694c48941412.png" width="400">
-</p>
-<p align="center">
-    <a href="https://opensource.org/licenses/MIT"><img src="https://img.shields.io/badge/license-MIT-blue" alt="license MIT"></a>
-    <a href="https://qm.qq.com/q/iifNs5qukg"><img src="https://img.shields.io/badge/QQ%E7%BE%A4-920930589-green" alt="QQ群：920930589"></a>
 </p>
 
 ## 技术栈
@@ -71,7 +65,7 @@ npm run build
 
 ## 版权声明
 
-Copyright © 2025 我的放置仙途
+Copyright © 2025 凡人修仙
 
 本项目采用 MIT 许可证。详情请参阅 LICENSE 文件。
 
