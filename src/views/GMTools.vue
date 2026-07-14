@@ -656,6 +656,131 @@
         </div>
       </div>
 
+      <!-- 人物编辑器 -->
+      <div v-if="activeTab === 'characters'" class="panel">
+        <div class="editor-header">
+          <button class="btn-add" @click="addCharacter">+ 新人物</button>
+          <select v-model="characterFilter" class="filter-select">
+            <option value="all">全部星级</option>
+            <option value="3">3星</option>
+            <option value="4">4星</option>
+            <option value="5">5星</option>
+          </select>
+          <button class="btn-secondary" @click="exportCharacters">📤 导出</button>
+          <button class="btn-secondary" @click="importCharacters">📥 导入</button>
+        </div>
+        <div class="character-list">
+          <div 
+            v-for="(char, index) in filteredCharacters" 
+            :key="char.id"
+            class="character-card"
+            :class="'star-' + char.star"
+            @click="editCharacter(char)"
+          >
+            <div class="char-avatar">
+              <img v-if="char.avatar" :src="char.avatar" class="char-img" />
+              <span v-else class="char-placeholder">{{ char.name[0] }}</span>
+            </div>
+            <div class="char-info">
+              <div class="char-name">{{ char.name }}</div>
+              <div class="char-stars">
+                <span v-for="i in char.star" :key="i" class="star">★</span>
+              </div>
+              <div class="char-school">{{ getSchoolName(char.school) }}</div>
+            </div>
+            <button class="btn-delete" @click.stop="deleteCharacter(index)">×</button>
+          </div>
+        </div>
+
+        <!-- 人物编辑弹窗 -->
+        <div v-if="editingCharacter" class="edit-modal wide">
+          <div class="modal-content">
+            <h3>编辑人物</h3>
+            <div class="form-grid">
+              <div class="form-item">
+                <label>ID</label>
+                <input type="text" v-model="editingCharacter.id" />
+              </div>
+              <div class="form-item">
+                <label>名称</label>
+                <input type="text" v-model="editingCharacter.name" />
+              </div>
+              <div class="form-item">
+                <label>星级</label>
+                <select v-model.number="editingCharacter.star">
+                  <option :value="3">3星</option>
+                  <option :value="4">4星</option>
+                  <option :value="5">5星</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>流派</label>
+                <select v-model="editingCharacter.school">
+                  <option v-for="(school, key) in characterSchools" :key="key" :value="key">{{ school.name }}</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>天赋</label>
+                <select v-model="editingCharacter.talent">
+                  <option v-for="(talent, key) in characterTalents" :key="key" :value="key">{{ talent.name }}</option>
+                </select>
+              </div>
+              <div class="form-item">
+                <label>等级</label>
+                <input type="number" v-model.number="editingCharacter.level" />
+              </div>
+              <div class="form-item full">
+                <label>描述</label>
+                <textarea v-model="editingCharacter.description" rows="2"></textarea>
+              </div>
+              <div class="form-item">
+                <label>攻击</label>
+                <input type="number" v-model.number="editingCharacter.baseStats.attack" />
+              </div>
+              <div class="form-item">
+                <label>生命</label>
+                <input type="number" v-model.number="editingCharacter.baseStats.health" />
+              </div>
+              <div class="form-item">
+                <label>防御</label>
+                <input type="number" v-model.number="editingCharacter.baseStats.defense" />
+              </div>
+              <div class="form-item">
+                <label>速度</label>
+                <input type="number" v-model.number="editingCharacter.baseStats.speed" />
+              </div>
+              <div class="form-item full">
+                <label>立绘上传</label>
+                <div class="avatar-upload-area">
+                  <div class="avatar-preview" v-if="editingCharacter.avatar">
+                    <img :src="editingCharacter.avatar" class="avatar-img" />
+                    <button class="btn-delete" @click="removeAvatar">×</button>
+                  </div>
+                  <div v-else class="avatar-placeholder" @click="triggerAvatarUpload">
+                    <span>点击上传立绘</span>
+                  </div>
+                  <input type="file" ref="avatarInput" @change="handleAvatarUpload" accept="image/*" hidden />
+                </div>
+              </div>
+              <div class="form-item full">
+                <label>立绘URL (可选，优先使用上传图片)</label>
+                <input type="text" v-model="editingCharacter.avatarUrl" placeholder="assets/characters/xxx.png" />
+                <div class="asset-selector">
+                  <select v-model="editingCharacter.avatarUrl">
+                    <option value="">选择已上传图片...</option>
+                    <option v-for="asset in imageAssets" :key="asset.name" :value="asset.name">{{ asset.name }}</option>
+                  </select>
+                </div>
+              </div>
+            </div>
+            <div class="modal-actions">
+              <button class="btn-primary" @click="saveCharacter">保存</button>
+              <button class="btn-secondary" @click="editingCharacter = null">取消</button>
+            </div>
+          </div>
+        </div>
+      </div>
+
       <!-- 灵宠编辑器 -->
       <div v-if="activeTab === 'pets'" class="panel">
         <div class="editor-header">
@@ -869,12 +994,14 @@ import { usePlayerStore } from '../stores/player'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
 import { equipmentQualities, equipmentTypeNames, petRarities, equipmentNameParts, petNameParts, petDescriptions, equipmentStatPool } from '../plugins/gacha'
 import { rarityConfig, affixPool, setBonuses, calculateEquipmentScore, getAffixesForSlot } from '../plugins/buildSystem'
+import { characterList, characterSchools, characterTalents, generateCharacterById } from '../plugins/characters'
 
 const playerStore = usePlayerStore()
 const activeTab = ref('values')
 const tabs = [
   { key: 'values', label: '数值调整' },
   { key: 'theme', label: '主题配置' },
+  { key: 'characters', label: '人物编辑' },
   { key: 'equipment', label: '装备编辑' },
   { key: 'affixes', label: '词条编辑' },
   { key: 'sets', label: '套装编辑' },
@@ -1110,6 +1237,10 @@ const bulkImport = () => {
           localStorage.setItem('gm_gameValues', JSON.stringify(gameValues.value))
           count++
         }
+        if (data.characters) {
+          characterListGM.value = data.characters
+          count++
+        }
         if (data.equipment) {
           equipmentList.value = data.equipment
           count++
@@ -1143,6 +1274,7 @@ const bulkExport = () => {
     version: '1.0.0',
     exportTime: new Date().toISOString(),
     gameValues: gameValues.value,
+    characters: characterListGM.value,
     equipment: equipmentList.value,
     pets: petList.value,
     monsters: monsterList.value,
@@ -1255,6 +1387,128 @@ const saveEquipment = () => {
 const deleteEquipment = (index) => {
   equipmentList.value.splice(index, 1)
   saveToStorage()
+}
+
+// 人物数据
+const characterListGM = ref([])
+const characterFilter = ref('all')
+const editingCharacter = ref(null)
+const avatarInput = ref(null)
+
+const filteredCharacters = computed(() => {
+  if (characterFilter.value === 'all') return characterListGM.value
+  return characterListGM.value.filter(c => c.star === parseInt(characterFilter.value))
+})
+
+const imageAssets = computed(() => {
+  return assetsList.value.filter(a => a.type === 'image')
+})
+
+const getSchoolName = (schoolKey) => {
+  return characterSchools[schoolKey]?.name || schoolKey
+}
+
+const addCharacter = () => {
+  editingCharacter.value = {
+    id: `char_${Date.now()}`,
+    name: '新人物',
+    star: 3,
+    school: 'sword',
+    talent: 'sword_mastery',
+    description: '一位神秘的修士',
+    level: 1,
+    baseStats: { attack: 15, health: 80, defense: 8, speed: 12 },
+    avatar: null,
+    avatarUrl: ''
+  }
+}
+
+const editCharacter = (char) => {
+  editingCharacter.value = {
+    ...char,
+    baseStats: { ...char.baseStats }
+  }
+}
+
+const saveCharacter = () => {
+  const char = { ...editingCharacter.value }
+  if (char.avatarUrl && !char.avatar) {
+    char.avatar = char.avatarUrl
+  }
+  const index = characterListGM.value.findIndex(c => c.id === char.id)
+  if (index >= 0) {
+    characterListGM.value[index] = char
+  } else {
+    characterListGM.value.push(char)
+  }
+  editingCharacter.value = null
+  saveToStorage()
+  alert('人物已保存！')
+}
+
+const deleteCharacter = (index) => {
+  if (confirm('确定删除此人物吗？')) {
+    characterListGM.value.splice(index, 1)
+    saveToStorage()
+  }
+}
+
+const triggerAvatarUpload = () => {
+  avatarInput.value?.click()
+}
+
+const handleAvatarUpload = (e) => {
+  const file = e.target.files[0]
+  if (!file) return
+  const reader = new FileReader()
+  reader.onload = (e) => {
+    if (editingCharacter.value) {
+      editingCharacter.value.avatar = e.target.result
+    }
+  }
+  reader.readAsDataURL(file)
+}
+
+const removeAvatar = () => {
+  if (editingCharacter.value) {
+    editingCharacter.value.avatar = null
+  }
+}
+
+const exportCharacters = () => {
+  const data = JSON.stringify(characterListGM.value, null, 2)
+  const blob = new Blob([data], { type: 'application/json' })
+  const url = URL.createObjectURL(blob)
+  const a = document.createElement('a')
+  a.href = url
+  a.download = 'characters.json'
+  a.click()
+}
+
+const importCharacters = () => {
+  const input = document.createElement('input')
+  input.type = 'file'
+  input.accept = '.json'
+  input.onchange = (e) => {
+    const file = e.target.files[0]
+    const reader = new FileReader()
+    reader.onload = (e) => {
+      try {
+        const data = JSON.parse(e.target.result)
+        if (Array.isArray(data)) {
+          characterListGM.value = data
+          saveToStorage()
+          alert(`成功导入 ${data.length} 个人物！`)
+        } else {
+          alert('导入失败：数据格式不正确')
+        }
+      } catch (err) {
+        alert('导入失败：无效的JSON文件')
+      }
+    }
+    reader.readAsText(file)
+  }
+  input.click()
 }
 
 // 灵宠数据
@@ -1544,6 +1798,7 @@ const resetValues = () => {
 
 // 本地存储
 const saveToStorage = () => {
+  localStorage.setItem('gm_characters', JSON.stringify(characterListGM.value))
   localStorage.setItem('gm_equipment', JSON.stringify(equipmentList.value))
   localStorage.setItem('gm_pets', JSON.stringify(petList.value))
   localStorage.setItem('gm_monsters', JSON.stringify(monsterList.value))
@@ -1554,6 +1809,25 @@ const loadFromStorage = () => {
   try {
     const values = localStorage.getItem('gm_gameValues')
     if (values) gameValues.value = JSON.parse(values)
+
+    const characters = localStorage.getItem('gm_characters')
+    if (characters) {
+      characterListGM.value = JSON.parse(characters)
+    } else {
+      characterListGM.value = characterList.map(c => ({
+        id: c.id,
+        templateId: c.templateId || c.id,
+        name: c.name,
+        star: c.star,
+        school: c.school,
+        talent: c.talent,
+        description: c.description,
+        level: c.level || 1,
+        baseStats: { ...c.baseStats },
+        avatar: c.avatar || null,
+        avatarUrl: ''
+      }))
+    }
 
     const equipment = localStorage.getItem('gm_equipment')
     if (equipment) equipmentList.value = JSON.parse(equipment)
@@ -1733,6 +2007,7 @@ onMounted(() => {
 }
 
 .equipment-list,
+.character-list,
 .pet-list,
 .monster-list {
   display: grid;
@@ -1740,6 +2015,7 @@ onMounted(() => {
   gap: 12px;
 }
 
+.character-card,
 .equipment-card,
 .pet-card,
 .monster-card {
@@ -1752,13 +2028,141 @@ onMounted(() => {
   cursor: pointer;
   transition: all 0.2s;
   border: 1px solid transparent;
+  position: relative;
 }
 
+.character-card:hover,
 .equipment-card:hover,
 .pet-card:hover,
 .monster-card:hover {
   background: rgba(218, 165, 32, 0.1);
   border-color: rgba(218, 165, 32, 0.3);
+}
+
+.character-card.star-5 {
+  border-color: #FFD700;
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.2);
+}
+
+.character-card.star-4 {
+  border-color: #9932CC;
+  box-shadow: 0 0 8px rgba(153, 50, 204, 0.2);
+}
+
+.character-card.star-3 {
+  border-color: #6fb3ff;
+}
+
+.char-avatar {
+  width: 40px;
+  height: 50px;
+  border-radius: 6px;
+  overflow: hidden;
+  background: rgba(139, 69, 19, 0.3);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  flex-shrink: 0;
+}
+
+.char-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.char-placeholder {
+  font-size: 18px;
+  color: #DAA520;
+  font-weight: bold;
+}
+
+.char-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.char-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 2px;
+}
+
+.char-stars {
+  display: flex;
+  gap: 1px;
+  margin-bottom: 2px;
+}
+
+.char-stars .star {
+  font-size: 10px;
+  color: #FFD700;
+}
+
+.char-school {
+  font-size: 11px;
+  color: #888;
+}
+
+.avatar-upload-area {
+  display: flex;
+  gap: 16px;
+  align-items: center;
+}
+
+.avatar-preview {
+  position: relative;
+  width: 100px;
+  height: 130px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 2px solid rgba(218, 165, 32, 0.5);
+}
+
+.avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.avatar-placeholder {
+  width: 100px;
+  height: 130px;
+  border-radius: 8px;
+  border: 2px dashed rgba(218, 165, 32, 0.5);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  background: rgba(0, 0, 0, 0.2);
+  font-size: 12px;
+  color: #888;
+  transition: all 0.2s;
+}
+
+.avatar-placeholder:hover {
+  border-color: #DAA520;
+  color: #DAA520;
+  background: rgba(218, 165, 32, 0.1);
+}
+
+.asset-selector {
+  margin-top: 6px;
+}
+
+.asset-selector select {
+  width: 100%;
+  padding: 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  color: #fff;
+  font-size: 12px;
+}
+
+.edit-modal.wide .modal-content {
+  max-width: 600px;
 }
 
 .eq-icon,
