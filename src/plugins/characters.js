@@ -180,16 +180,26 @@ export function generateCharacterById(charId) {
   }
 }
 
-export function generateRandomCharacter() {
-  const rand = Math.random()
+export function generateRandomCharacter(forceStar = null) {
+  // 概率：5星 3%，4星 20%，3星 77%
+  // forceStar: 保底/锁定星数时使用（如十连保底）
+  const STAR_5_RATE = 0.03
+  const STAR_4_RATE = 0.20
+  const STAR_3_RATE = 0.77
   let star
-  if (rand < 0.5) star = 3
-  else if (rand < 0.85) star = 4
-  else star = 5
-  
+  if (forceStar) {
+    star = forceStar
+  } else {
+    const rand = Math.random()
+    if (rand < STAR_5_RATE) star = 5
+    else if (rand < STAR_5_RATE + STAR_4_RATE) star = 4
+    else star = 3
+  }
   const candidates = characterList.filter(c => c.star === star)
+  if (candidates.length === 0) {
+    return generateCharacterById(characterList[Math.floor(Math.random() * characterList.length)].id)
+  }
   const template = candidates[Math.floor(Math.random() * candidates.length)]
-  
   return generateCharacterById(template.id)
 }
 

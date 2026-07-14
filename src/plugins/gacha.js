@@ -335,12 +335,24 @@ export const doGacha = (poolType, playerLevel = 1) => {
   }
 }
 
-// 批量抽奖
+// 批量抽奖（保底规则：人物池/综合池每 5 次保底一次 4 星或以上）
+// 5星基础概率3%、4星基础概率20%。若 5 次内未出现 4 星或以上人物，则把第 5 次替换为 4 星人物
 export const doMultiGacha = (poolType, count, playerLevel = 1) => {
   const results = []
+  const isCharacterPool = poolType === 'character' || poolType === 'all'
+  const PITY_INTERVAL = 5
   for (let i = 0; i < count; i++) {
     const result = doGacha(poolType, playerLevel)
     if (result) results.push(result)
+    // 每 5 次保底：人物池/综合池 5 次内若没有 4 星或以上人物，则把本次替换为 4 星
+    if (isCharacterPool && (i + 1) % PITY_INTERVAL === 0) {
+      const startIdx = i + 1 - PITY_INTERVAL
+      const window = results.slice(startIdx, i + 1)
+      const hasHighStar = window.some(r => r.category === 'character' && r.item.star >= 4)
+      if (!hasHighStar) {
+        results[i] = { category: 'character', item: generateRandomCharacter(4) }
+      }
+    }
   }
   return results
 }
