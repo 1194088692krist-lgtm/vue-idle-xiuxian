@@ -346,22 +346,8 @@ function createPlayerEntity() {
     spiritDamage: s.spirit * 0.1,
     maxHealth: s.baseAttributes.health
   }
-  const petBonus = s.getPetBonus
-  if (petBonus) {
-    baseStats.damage += petBonus.attack || 0
-    baseStats.health += petBonus.health || 0
-    baseStats.maxHealth = baseStats.health
-    baseStats.defense += petBonus.defense || 0
-    baseStats.speed += petBonus.speed || 0
-  }
-  if (s.artifactBonuses) {
-    const ab = s.artifactBonuses
-    baseStats.damage += ab.attack || 0
-    baseStats.health += ab.health || 0
-    baseStats.maxHealth = baseStats.health
-    baseStats.defense += ab.defense || 0
-    baseStats.speed += ab.speed || 0
-  }
+  // 注意：s.baseAttributes 已由 store.recomputeAttributes 统一烘焙「装备 + 套装 + 出战灵宠」的全部加成，
+  // 此处直接读取即可，切勿再叠加 getPetBonus / artifactBonuses，否则会造成双重计算、属性翻倍。
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
@@ -690,8 +676,9 @@ function runOfflineEncounter(zone, diff, count) {
   s.regenerateSpirit()
   if (s.spiritStones < diff.spiritCost) return false
   s.spiritStones -= diff.spiritCost
-  const pAtk = s.baseAttributes.attack + (s.getPetBonus?.attack || 0) + (s.artifactBonuses?.attack || 0)
-  const pHp = s.baseAttributes.health + (s.getPetBonus?.health || 0) + (s.artifactBonuses?.health || 0)
+  // s.baseAttributes 已含 装备+套装+灵宠 加成（recomputeAttributes 统一烘焙），无需再叠加
+  const pAtk = s.baseAttributes.attack
+  const pHp = s.baseAttributes.health
   // 离线胜率同样以 Build 匹配度为基准（兼容旧数值，做平滑过渡）
   const recBuild = diff.recommendedBuild || 1
   const ratio = (s.buildStrength || 1) / recBuild
@@ -735,8 +722,8 @@ function startIdle(durationMinutes) {
   const s = store()
   if (!selectedZone.value) return
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
-  s.regenerateSpirit()
-  if (s.spirit < diff.spiritCost) return
+  // 门槛以灵石(spiritStones)为准，与下方扣费一致；regenerateSpirit 只恢复灵力(spirit)，与此门槛无关，故移除
+  if (s.spiritStones < diff.spiritCost) return
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterCount.value = 0

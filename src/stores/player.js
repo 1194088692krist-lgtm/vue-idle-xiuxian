@@ -381,6 +381,8 @@ export const usePlayerStore = defineStore('player', {
       if (gmMode !== null) {
         this.isGMMode = gmMode === 'true'
       }
+      // 从干净基线重算派生属性（装备/套装/灵宠），根治「存档重载后加成重复叠加」
+      this.recomputeAttributes()
     },
     // 创建新玩家数据
     initNewPlayer() {
@@ -883,9 +885,9 @@ export const usePlayerStore = defineStore('player', {
       if (!this.activePet) {
         return { success: false, message: '当前没有出战的灵宠' }
       }
-      // 重置所有属性加成
-      this.resetPetBonuses()
+      // 先解除出战，再从干净基线重算（移除灵宠加成）
       this.activePet = null
+      this.resetPetBonuses()
       this.queueSave()
       return { success: true, message: '召回成功' }
     },
@@ -902,58 +904,13 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: '出战成功' }
     },
-    // 重置灵宠属性加成
+    // 重置灵宠属性加成（统一走 recomputeAttributes，单一来源）
     resetPetBonuses() {
-      const petBonus = this.activePet.combatAttributes
-      // 保存原始属性值
-      const originalBaseAttributes = { ...this.baseAttributes }
-      const originalCombatAttributes = { ...this.combatAttributes }
-      const originalCombatResistance = { ...this.combatResistance }
-      const originalSpecialAttributes = { ...this.specialAttributes }
-      // 更新基础属性
-      this.baseAttributes.attack = originalBaseAttributes.attack - petBonus.attack
-      this.baseAttributes.defense = originalBaseAttributes.defense - petBonus.defense
-      this.baseAttributes.health = originalBaseAttributes.health - petBonus.health
-      this.baseAttributes.speed = originalBaseAttributes.speed - petBonus.speed
-      // 更新战斗属性
-      Object.keys(this.combatAttributes).forEach(key => {
-        this.combatAttributes[key] = originalCombatAttributes[key] - (petBonus[key] || 0)
-      })
-      // 更新战斗抗性
-      Object.keys(this.combatResistance).forEach(key => {
-        this.combatResistance[key] = originalCombatResistance[key] - (petBonus[key] || 0)
-      })
-      // 更新特殊属性
-      Object.keys(this.specialAttributes).forEach(key => {
-        this.specialAttributes[key] = originalSpecialAttributes[key] - (petBonus[key] || 0)
-      })
+      this.recomputeAttributes()
     },
-    // 应用灵宠属性加成
+    // 应用灵宠属性加成（统一走 recomputeAttributes，单一来源）
     applyPetBonuses() {
-      if (!this.activePet) return
-      const petBonus = this.activePet.combatAttributes
-      // 保存原始属性值
-      const originalBaseAttributes = { ...this.baseAttributes }
-      const originalCombatAttributes = { ...this.combatAttributes }
-      const originalCombatResistance = { ...this.combatResistance }
-      const originalSpecialAttributes = { ...this.specialAttributes }
-      // 更新基础属性
-      this.baseAttributes.attack = originalBaseAttributes.attack + petBonus.attack
-      this.baseAttributes.defense = originalBaseAttributes.defense + petBonus.defense
-      this.baseAttributes.health = originalBaseAttributes.health + petBonus.health
-      this.baseAttributes.speed = originalBaseAttributes.speed + petBonus.speed
-      // 更新战斗属性
-      Object.keys(this.combatAttributes).forEach(key => {
-        this.combatAttributes[key] = originalCombatAttributes[key] + (petBonus[key] || 0)
-      })
-      // 更新战斗抗性
-      Object.keys(this.combatResistance).forEach(key => {
-        this.combatResistance[key] = originalCombatResistance[key] + (petBonus[key] || 0)
-      })
-      // 更新特殊属性
-      Object.keys(this.specialAttributes).forEach(key => {
-        this.specialAttributes[key] = originalSpecialAttributes[key] + (petBonus[key] || 0)
-      })
+      this.recomputeAttributes()
     },
     // 穿上装备
     equipArtifact(artifact, slot) {
@@ -972,68 +929,8 @@ export const usePlayerStore = defineStore('player', {
       }
       // 穿上新装备
       this.equippedArtifacts[slot] = artifact
-      // 应用装备基础属性
-      if (artifact.stats) {
-        Object.entries(artifact.stats).forEach(([key, value]) => {
-          if (this.artifactBonuses[key] !== undefined) {
-            this.artifactBonuses[key] += value
-            if (key in this.baseAttributes) {
-              this.baseAttributes[key] += value
-            } else if (key in this.combatAttributes) {
-              this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + value)
-            } else if (key in this.combatResistance) {
-              this.combatResistance[key] = Math.min(1, this.combatResistance[key] + value)
-            } else if (key in this.specialAttributes) {
-              this.specialAttributes[key] += value
-            }
-          }
-        })
-      }
-      // 应用装备词条属性
-      if (artifact.affixes && artifact.affixes.length > 0) {
-        artifact.affixes.forEach(affix => {
-          const key = affix.stat
-          let value = affix.value
-          if (affix.valueType === 'percent') {
-            if (key in this.baseAttributes) {
-              const bonus = this.baseAttributes[key] * affix.value
-              this.baseAttributes[key] += bonus
-              if (this.artifactBonuses[key] !== undefined) {
-                this.artifactBonuses[key] += bonus
-              }
-            } else if (key in this.combatAttributes) {
-              this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + affix.value)
-              if (this.artifactBonuses[key] !== undefined) {
-                this.artifactBonuses[key] += affix.value
-              }
-            } else if (key in this.combatResistance) {
-              this.combatResistance[key] = Math.min(1, this.combatResistance[key] + affix.value)
-              if (this.artifactBonuses[key] !== undefined) {
-                this.artifactBonuses[key] += affix.value
-              }
-            } else if (key in this.specialAttributes) {
-              this.specialAttributes[key] += affix.value
-              if (this.artifactBonuses[key] !== undefined) {
-                this.artifactBonuses[key] += affix.value
-              }
-            }
-          } else {
-            if (this.artifactBonuses[key] !== undefined) {
-              this.artifactBonuses[key] += value
-              if (key in this.baseAttributes) {
-                this.baseAttributes[key] += value
-              } else if (key in this.combatAttributes) {
-                this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + value)
-              } else if (key in this.combatResistance) {
-                this.combatResistance[key] = Math.min(1, this.combatResistance[key] + value)
-              } else if (key in this.specialAttributes) {
-                this.specialAttributes[key] += value
-              }
-            }
-          }
-        })
-      }
-      this.recalcSetBonuses()
+      // 统一从干净基线重算（装备+套装+灵宠），避免逐项烘焙导致的叠加/漂移
+      this.recomputeAttributes()
       this.queueSave()
       return { success: true, message: '装备成功' }
     },
@@ -1073,155 +970,130 @@ export const usePlayerStore = defineStore('player', {
     unequipArtifact(slot) {
       const artifact = this.equippedArtifacts[slot]
       if (artifact) {
-        // 移除装备基础属性
-        if (artifact.stats) {
-          Object.entries(artifact.stats).forEach(([key, value]) => {
-            if (this.artifactBonuses[key] !== undefined) {
-              this.artifactBonuses[key] -= value
-              if (key in this.baseAttributes) {
-                this.baseAttributes[key] -= value
-              } else if (key in this.combatAttributes) {
-                this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - value)
-              } else if (key in this.combatResistance) {
-                this.combatResistance[key] = Math.max(0, this.combatResistance[key] - value)
-              } else if (key in this.specialAttributes) {
-                this.specialAttributes[key] -= value
-              }
-            }
-          })
-        }
-        // 移除装备词条属性
-        if (artifact.affixes && artifact.affixes.length > 0) {
-          artifact.affixes.forEach(affix => {
-            const key = affix.stat
-            let value = affix.value
-            if (affix.valueType === 'percent') {
-              if (key in this.baseAttributes) {
-                const totalBase = this.baseAttributes[key] / (1 + affix.value)
-                const bonus = totalBase * affix.value
-                this.baseAttributes[key] -= bonus
-                if (this.artifactBonuses[key] !== undefined) {
-                  this.artifactBonuses[key] -= bonus
-                }
-              } else if (key in this.combatAttributes) {
-                this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - affix.value)
-                if (this.artifactBonuses[key] !== undefined) {
-                  this.artifactBonuses[key] -= affix.value
-                }
-              } else if (key in this.combatResistance) {
-                this.combatResistance[key] = Math.max(0, this.combatResistance[key] - affix.value)
-                if (this.artifactBonuses[key] !== undefined) {
-                  this.artifactBonuses[key] -= affix.value
-                }
-              } else if (key in this.specialAttributes) {
-                this.specialAttributes[key] -= affix.value
-                if (this.artifactBonuses[key] !== undefined) {
-                  this.artifactBonuses[key] -= affix.value
-                }
-              }
-            } else {
-              if (this.artifactBonuses[key] !== undefined) {
-                this.artifactBonuses[key] -= value
-                if (key in this.baseAttributes) {
-                  this.baseAttributes[key] -= value
-                } else if (key in this.combatAttributes) {
-                  this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - value)
-                } else if (key in this.combatResistance) {
-                  this.combatResistance[key] = Math.max(0, this.combatResistance[key] - value)
-                } else if (key in this.specialAttributes) {
-                  this.specialAttributes[key] -= value
-                }
-              }
-            }
-          })
-        }
-        // 将装备返回到背包
+        // 从装备栏移除并放回背包，再从干净基线重算
         this.items.push(artifact)
         this.equippedArtifacts[slot] = null
-        this.recalcSetBonuses()
+        this.recomputeAttributes()
         this.queueSave()
         return true
       }
       return false
     },
-    // 重新计算套装加成
-    recalcSetBonuses() {
-      const activeSets = getActiveSetBonuses(this.equippedArtifacts)
-      const setBonusKey = '__setBonusApplied'
-      if (this[setBonusKey]) {
-        this[setBonusKey].forEach(bonus => {
-          const key = bonus.stat
-          if (bonus.valueType === 'percent') {
-            if (key in this.baseAttributes) {
-              const current = this.baseAttributes[key]
-              const original = current / (1 + bonus.value)
-              this.baseAttributes[key] = original
-              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - (current - original)
-            } else if (key in this.combatAttributes) {
-              this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - bonus.value)
-              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
-            } else if (key in this.combatResistance) {
-              this.combatResistance[key] = Math.max(0, this.combatResistance[key] - bonus.value)
-              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
-            } else if (key in this.specialAttributes) {
-              this.specialAttributes[key] -= bonus.value
-              this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) - bonus.value
-            }
-          } else {
-            if (this.artifactBonuses[key] !== undefined) {
-              this.artifactBonuses[key] -= bonus.value
+    // 从干净基线重算全部派生属性：裸属性 → 装备(基础+词条) → 套装 → 灵宠
+    // 取代逐项烘焙 + __setBonusApplied 非持久化追踪，根治「存档重载后套装加成重复叠加」与浮点漂移
+    recomputeAttributes() {
+      const INTRINSIC = { attack: 10, health: 100, defense: 5, speed: 10 }
+      const intrinsic = {
+        attack: INTRINSIC.attack + (this.rebirthBonus.attack || 0) + (this.permanentBonuses.attack || 0),
+        health: INTRINSIC.health + (this.rebirthBonus.health || 0) + (this.permanentBonuses.health || 0),
+        defense: INTRINSIC.defense + (this.rebirthBonus.defense || 0) + (this.permanentBonuses.defense || 0),
+        speed: INTRINSIC.speed + (this.rebirthBonus.speed || 0) + (this.permanentBonuses.speed || 0)
+      }
+      // 1) 重置为裸属性
+      this.baseAttributes.attack = intrinsic.attack
+      this.baseAttributes.health = intrinsic.health
+      this.baseAttributes.defense = intrinsic.defense
+      this.baseAttributes.speed = intrinsic.speed
+      Object.keys(this.combatAttributes).forEach(k => { this.combatAttributes[k] = 0 })
+      Object.keys(this.combatResistance).forEach(k => { this.combatResistance[k] = 0 })
+      Object.keys(this.specialAttributes).forEach(k => { this.specialAttributes[k] = 0 })
+      Object.assign(this.artifactBonuses, {
+        attack: 0, health: 0, defense: 0, speed: 0,
+        critRate: 0, comboRate: 0, counterRate: 0, stunRate: 0, dodgeRate: 0, vampireRate: 0,
+        critResist: 0, comboResist: 0, counterResist: 0, stunResist: 0, dodgeResist: 0, vampireResist: 0,
+        healBoost: 0, critDamageBoost: 0, critDamageReduce: 0, finalDamageBoost: 0, finalDamageReduce: 0,
+        combatBoost: 0, resistanceBoost: 0, cultivationRate: 1, spiritRate: 1
+      })
+      // 2) 装备：基础属性 + 词条
+      Object.values(this.equippedArtifacts).forEach(artifact => {
+        if (!artifact) return
+        if (artifact.stats) {
+          Object.entries(artifact.stats).forEach(([key, value]) => {
+            if (this.artifactBonuses[key] === undefined) return
+            this.artifactBonuses[key] += value
+            if (key in this.baseAttributes) this.baseAttributes[key] += value
+            else if (key in this.combatAttributes) this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + value)
+            else if (key in this.combatResistance) this.combatResistance[key] = Math.min(1, this.combatResistance[key] + value)
+            else if (key in this.specialAttributes) this.specialAttributes[key] += value
+          })
+        }
+        if (artifact.affixes && artifact.affixes.length) {
+          artifact.affixes.forEach(affix => {
+            const key = affix.stat
+            const value = affix.value
+            if (affix.valueType === 'percent') {
               if (key in this.baseAttributes) {
-                this.baseAttributes[key] -= bonus.value
+                const amt = this.baseAttributes[key] * affix.value
+                this.baseAttributes[key] += amt
+                if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += amt
               } else if (key in this.combatAttributes) {
-                this.combatAttributes[key] = Math.max(0, this.combatAttributes[key] - bonus.value)
+                this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + affix.value)
+                if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += affix.value
               } else if (key in this.combatResistance) {
-                this.combatResistance[key] = Math.max(0, this.combatResistance[key] - bonus.value)
+                this.combatResistance[key] = Math.min(1, this.combatResistance[key] + affix.value)
+                if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += affix.value
               } else if (key in this.specialAttributes) {
-                this.specialAttributes[key] -= bonus.value
+                this.specialAttributes[key] += affix.value
+                if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += affix.value
+              }
+            } else {
+              if (this.artifactBonuses[key] !== undefined) {
+                this.artifactBonuses[key] += value
+                if (key in this.baseAttributes) this.baseAttributes[key] += value
+                else if (key in this.combatAttributes) this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + value)
+                else if (key in this.combatResistance) this.combatResistance[key] = Math.min(1, this.combatResistance[key] + value)
+                else if (key in this.specialAttributes) this.specialAttributes[key] += value
               }
             }
-          }
-        })
-      }
-      const allBonuses = []
-      activeSets.forEach(setInfo => {
-        setInfo.bonuses.forEach(bonus => {
-          allBonuses.push(bonus)
-        })
+          })
+        }
       })
-      allBonuses.forEach(bonus => {
+      // 3) 套装加成
+      const activeSets = getActiveSetBonuses(this.equippedArtifacts)
+      const setList = []
+      activeSets.forEach(setInfo => setInfo.bonuses.forEach(b => setList.push(b)))
+      setList.forEach(bonus => {
         const key = bonus.stat
         if (bonus.valueType === 'percent') {
           if (key in this.baseAttributes) {
-            const bonusAmount = this.baseAttributes[key] * bonus.value
-            this.baseAttributes[key] += bonusAmount
-            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonusAmount
+            const amt = this.baseAttributes[key] * bonus.value
+            this.baseAttributes[key] += amt
+            if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += amt
           } else if (key in this.combatAttributes) {
             this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + bonus.value)
-            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+            if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += bonus.value
           } else if (key in this.combatResistance) {
             this.combatResistance[key] = Math.min(1, this.combatResistance[key] + bonus.value)
-            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+            if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += bonus.value
           } else if (key in this.specialAttributes) {
             this.specialAttributes[key] += bonus.value
-            this.artifactBonuses[key] = (this.artifactBonuses[key] || 0) + bonus.value
+            if (this.artifactBonuses[key] !== undefined) this.artifactBonuses[key] += bonus.value
           }
         } else {
           if (this.artifactBonuses[key] !== undefined) {
             this.artifactBonuses[key] += bonus.value
-            if (key in this.baseAttributes) {
-              this.baseAttributes[key] += bonus.value
-            } else if (key in this.combatAttributes) {
-              this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + bonus.value)
-            } else if (key in this.combatResistance) {
-              this.combatResistance[key] = Math.min(1, this.combatResistance[key] + bonus.value)
-            } else if (key in this.specialAttributes) {
-              this.specialAttributes[key] += bonus.value
-            }
+            if (key in this.baseAttributes) this.baseAttributes[key] += bonus.value
+            else if (key in this.combatAttributes) this.combatAttributes[key] = Math.min(1, this.combatAttributes[key] + bonus.value)
+            else if (key in this.combatResistance) this.combatResistance[key] = Math.min(1, this.combatResistance[key] + bonus.value)
+            else if (key in this.specialAttributes) this.specialAttributes[key] += bonus.value
           }
         }
       })
-      this[setBonusKey] = allBonuses
+      // 4) 出战灵宠（单一来源：activePet.combatAttributes）
+      if (this.activePet && this.activePet.combatAttributes) {
+        const pb = this.activePet.combatAttributes
+        this.baseAttributes.attack += pb.attack || 0
+        this.baseAttributes.defense += pb.defense || 0
+        this.baseAttributes.health += pb.health || 0
+        this.baseAttributes.speed += pb.speed || 0
+        Object.keys(this.combatAttributes).forEach(k => { this.combatAttributes[k] += (pb[k] || 0) })
+        Object.keys(this.combatResistance).forEach(k => { this.combatResistance[k] += (pb[k] || 0) })
+        Object.keys(this.specialAttributes).forEach(k => { this.specialAttributes[k] += (pb[k] || 0) })
+      }
+    },
+    // 兼容旧调用点：重算套装加成（现由 recomputeAttributes 统一处理）
+    recalcSetBonuses() {
+      this.recomputeAttributes()
     },
     // 获取装备总加成
     getArtifactBonus(type) {
