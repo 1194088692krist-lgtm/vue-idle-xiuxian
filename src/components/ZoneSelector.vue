@@ -232,18 +232,7 @@
         </div>
       </div>
 
-      <!-- 探索按钮 -->
-      <div v-if="!combatState.inCombat" class="action-bar">
-        <button
-          class="btn btn-primary"
-          :disabled="isIdling"
-          @click="startExplore"
-        >
-          开始探索
-        </button>
-      </div>
-
-      <!-- 挂机探索区域 -->
+      <!-- 挂机探索区域（开始探索/气血条 已并入挂机面板，简化交互） -->
       <div v-if="!combatState.inCombat" class="idle-section">
         <div class="idle-title">挂机探索</div>
         <div v-if="!isIdling" class="idle-options">
@@ -275,21 +264,6 @@
               <div class="idle-progress-fill" :style="{ width: idleProgress + '%' }"></div>
             </div>
             <div class="idle-count">已完成 {{ idleEncounterCount }} 次探索</div>
-          </div>
-          <!-- 挂机血条 -->
-          <div class="idle-hp">
-            <div class="idle-hp-head">
-              <span class="idle-hp-label">气血</span>
-              <span class="idle-hp-num">{{ Math.ceil(idlePlayerHP) }} / {{ Math.ceil(idlePlayerMaxHP) }}</span>
-            </div>
-            <div class="hp-bar idle-hp-bar">
-              <div
-                class="hp-fill"
-                :class="{ 'hp-low': idleHpPercent <= 30 }"
-                :style="{ width: idleHpPercent + '%' }"
-              ></div>
-            </div>
-            <div v-if="buildRatio < 1" class="idle-hp-warn">⚠ Build 不足，气血可能不支</div>
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
@@ -342,7 +316,56 @@
               <span class="team-hp-text">{{ m.hpPercent }}</span>
             </div>
           </div>
+          <!-- 最近获得的装备（即时显示） -->
+          <div v-if="idleDashboard.recentEquipment && idleDashboard.recentEquipment.length" class="dash-equipment">
+            <div class="dash-equipment-title">⚔️ 最近获得装备（点击查看）</div>
+            <div class="dash-equipment-list">
+              <div
+                v-for="eq in idleDashboard.recentEquipment"
+                :key="eq.id + '_' + eq.time"
+                class="dash-equipment-item"
+                :style="{ borderColor: eq.color, color: eq.color }"
+                @click="showDashEquipment(eq)"
+              >
+                <span class="eq-name">{{ eq.name }}</span>
+                <span class="eq-slot">{{ eq.slotName }}</span>
+                <span class="eq-rarity">{{ eq.rarityName }}</span>
+                <span class="eq-score" v-if="eq.score">评分 {{ eq.score }}</span>
+              </div>
+            </div>
+          </div>
         </div>
+      </div>
+    </div>
+
+    <!-- 仪表盘点击的装备详情弹窗 -->
+    <div v-if="showDashEqModal && dashEqDetail" class="equip-select-modal" @click.self="showDashEqModal = false">
+      <div class="modal-content glass-card">
+        <h3 class="section-title" :style="{ color: dashEqDetail.color }">{{ dashEqDetail.name }}</h3>
+        <div class="char-meta" style="margin-bottom: 12px">
+          <span>{{ dashEqDetail.slotName }}</span>
+          <span>·</span>
+          <span>{{ dashEqDetail.rarityName }}</span>
+          <span>·</span>
+          <span>评分 {{ dashEqDetail.score || 0 }}</span>
+        </div>
+        <div v-if="dashEqDetail.stats" class="attr-block">
+          <h4 class="sub-title">基础数据</h4>
+          <div class="attr-table">
+            <div v-for="(v, k) in dashEqDetail.stats" :key="k" class="attr-row">
+              <span class="attr-col-label">{{ k }}</span>
+              <span class="attr-col-final">{{ v }}</span>
+            </div>
+          </div>
+        </div>
+        <div v-if="dashEqDetail.affixes && dashEqDetail.affixes.length" class="attr-block">
+          <h4 class="sub-title">词条</h4>
+          <div v-for="a in dashEqDetail.affixes" :key="a.id" class="attr-row">
+            <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
+            <span class="attr-col-final">{{ a.value }}</span>
+          </div>
+        </div>
+        <button class="btn btn-warning" style="margin-top: 12px" @click="showDashEqModal = false">关闭</button>
       </div>
     </div>
 
@@ -570,6 +593,14 @@ const canEnter = () => true
 const selectZone = (zone) => {
   setSelectedZone(zone)
   setDifficulty(zone.difficulties[2].key)
+}
+
+// 仪表盘点击查看装备详情
+const showDashEqModal = ref(false)
+const dashEqDetail = ref(null)
+const showDashEquipment = (eq) => {
+  dashEqDetail.value = eq
+  showDashEqModal.value = true
 }
 
 // 队伍选择相关

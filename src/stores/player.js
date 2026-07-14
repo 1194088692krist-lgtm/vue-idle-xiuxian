@@ -19,7 +19,8 @@ const QUALITY_STONE_MAP = {
   common: 1
 }
 // 是否装备类物品（兼容 gacha 生成 type=槽位 与 挂机生成 type='equipment' 两种形态）
-const isEquipmentItem = item => !!item && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
+// 严格排除 pet/material 等非装备类型
+const isEquipmentItem = item => !!item && item.type !== 'pet' && item.type !== 'material' && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
 export const usePlayerStore = defineStore('player', {
   state: () => ({
@@ -423,6 +424,34 @@ export const usePlayerStore = defineStore('player', {
                 })
               }
               delete this.$state.herbs
+            }
+            // 数据清理：移除被错误标记的混合数据
+            // 1. type为'pet'但错误带有slot属性的物品（会被误判为装备）
+            // 2. 名称像灵宠但格式错误的物品
+            if (Array.isArray(this.items)) {
+              const beforeCount = this.items.length
+              this.items = this.items.filter(item => {
+                if (!item) return false
+                // 灵宠必须 type === 'pet' 且不能有 slot 属性
+                if (item.type === 'pet') {
+                  if (item.slot) {
+                    console.warn('清理错误数据：type=pet 但带有 slot 属性的混合物品', item.name)
+                    return false
+                  }
+                  return true
+                }
+                // 装备必须有 slot 或在 EQUIPMENT_SLOTS 中
+                if (item.slot && EQUIPMENT_SLOTS.includes(item.slot)) return true
+                if (item.type === 'equipment') return true
+                // 资源类物品
+                if (['spirit_stone', 'reinforce_stone', 'refinement_stone', 'pet_essence', 'pet_fragment'].includes(item.type)) return true
+                console.warn('清理未知格式物品', item)
+                return false
+              })
+              const removedCount = beforeCount - this.items.length
+              if (removedCount > 0) {
+                console.warn(`数据清理完成：移除了 ${removedCount} 个错误格式物品`)
+              }
             }
           } else {
             console.error('存档数据验证失败，使用初始数据')
@@ -1411,14 +1440,26 @@ export const usePlayerStore = defineStore('player', {
       }
       const existing = this.sectMembers.find(m => m.templateId === character.templateId)
       if (existing) {
-        // 重复人物自动转换为人精华（用于突破境界）
+        // 抽到同名角色：已突破<5次时，自动对已有人物突破一次（基础数值×1.2）
+        if ((existing.breakThrough || 0) < 5) {
+          const r = this.breakThroughCharacter(existing.id)
+          if (r && r.success) {
+            return {
+              success: true,
+              message: `${character.name} 突破成功（${existing.breakThrough}/5）`,
+              duplicate: true,
+              breakThrough: true
+            }
+          }
+        }
+        // 超过突破上限后才会转人精华
         const essenceAmount = character.star * 10 + (character.star >= 4 ? 20 : 0)
         if (!this.characterEssence) this.characterEssence = 0
         this.characterEssence += essenceAmount
         this.queueSave()
         return {
           success: true,
-          message: `${character.name}已是宗门弟子，自动转换为 ${essenceAmount} 人精华`,
+          message: `${character.name} 突破已达上限，自动转换为 ${essenceAmount} 人精华`,
           duplicate: true,
           essence: essenceAmount
         }
@@ -1426,6 +1467,36 @@ export const usePlayerStore = defineStore('player', {
       this.sectMembers.push(character)
       this.queueSave()
       return { success: true, message: `成功招募${character.name}加入宗门！` }
+    },
+    // 人物突破：每次 +1（最多5次），每次大幅提升基础数值（×1.2 复利）
+    breakThroughCharacter(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if ((member.breakThrough || 0) >= 5) {
+        return { success: false, message: '已突破至最高境界（5/5）' }
+      }
+      member.breakThrough = (member.breakThrough || 0) + 1
+      // 基础数值 ×1.2（复利）
+      if (member.baseStats) {
+        member.baseStats.attack = Math.round(member.baseStats.attack * 1.2)
+        member.baseStats.health = Math.round(member.baseStats.health * 1.2)
+        member.baseStats.defense = Math.round(member.baseStats.defense * 1.2)
+        member.baseStats.speed = Math.round(member.baseStats.speed * 1.2)
+      }
+      // 战斗/抗性/特殊属性小幅成长（每次 +20% 效果）
+      const growAttr = (obj) => {
+        if (!obj) return
+        for (const k in obj) {
+          if (typeof obj[k] === 'number' && obj[k] !== 0) {
+            obj[k] = Math.round(obj[k] * 1.2 * 100) / 100
+          }
+        }
+      }
+      growAttr(member.combatAttributes)
+      growAttr(member.combatResistance)
+      growAttr(member.specialAttributes)
+      this.queueSave()
+      return { success: true, message: `${member.name} 突破成功（${member.breakThrough}/5）`, breakThrough: member.breakThrough }
     },
     // 从宗门移除成员
     removeSectMember(memberId) {

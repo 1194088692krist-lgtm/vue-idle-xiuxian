@@ -183,20 +183,54 @@ export function getCharacterAvatar(member) {
   return (t && t.avatar) || null
 }
 
+// 角色定位对应的初始战斗属性（独特数值信息）
+// 每位角色根据其 role 自动获得一组独有的初始战斗/抗性/特殊属性
+const roleInitStats = {
+  // 先锋：核心输出，攻/暴/连/最终增伤
+  vanguard: {
+    combatAttributes: { critRate: 0.08, comboRate: 0.10, counterRate: 0, stunRate: 0, dodgeRate: 0, vampireRate: 0.05 },
+    specialAttributes: { critDamageBoost: 0.20, finalDamageBoost: 0.10, combatBoost: 0.05 }
+  },
+  // 刀锋：副输出，速度/暴击/连击
+  blade: {
+    combatAttributes: { critRate: 0.12, comboRate: 0.15, counterRate: 0.05, stunRate: 0, dodgeRate: 0.05, vampireRate: 0 },
+    specialAttributes: { critDamageBoost: 0.15, combatBoost: 0.08 }
+  },
+  // 药引：治疗/辅助
+  herb: {
+    combatAttributes: { critRate: 0, comboRate: 0, counterRate: 0, stunRate: 0.05, dodgeRate: 0.10, vampireRate: 0 },
+    specialAttributes: { healBoost: 0.30, finalDamageReduce: 0.08, resistanceBoost: 0.10 }
+  },
+  // 护法：坦克/承伤
+  shield: {
+    combatAttributes: { critRate: 0, comboRate: 0, counterRate: 0.15, stunRate: 0.05, dodgeRate: 0, vampireRate: 0 },
+    combatResistance: { critResist: 0.20, comboResist: 0.15, counterResist: 0.10, stunResist: 0.10, dodgeResist: 0.05, vampireResist: 0.10 },
+    specialAttributes: { finalDamageReduce: 0.12, resistanceBoost: 0.15 }
+  },
+  // 掌阵：控场/阵法
+  tactician: {
+    combatAttributes: { critRate: 0.05, comboRate: 0.05, counterRate: 0.05, stunRate: 0.15, dodgeRate: 0.05, vampireRate: 0 },
+    specialAttributes: { combatBoost: 0.10, healBoost: 0.10, finalDamageBoost: 0.05 }
+  }
+}
+
 export function generateCharacterById(charId) {
   const template = characterList.find(c => c.id === charId)
   if (!template) return null
-  
+
   const starMult = starConfig[template.star].multiplier
   const talent = characterTalents[template.talent]
-  
+
   const baseStats = {
     attack: Math.round(template.baseStats.attack * starMult),
     health: Math.round(template.baseStats.health * starMult),
     defense: Math.round(template.baseStats.defense * starMult),
     speed: Math.round(template.baseStats.speed * starMult)
   }
-  
+
+  // 应用定位独有的初始战斗属性
+  const roleStats = roleInitStats[template.role] || roleInitStats.vanguard
+
   return {
     id: `member_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
     templateId: template.id,
@@ -216,6 +250,8 @@ export function generateCharacterById(charId) {
     talentStats: talent.stats,
     description: template.description,
     baseStats: { ...baseStats },
+    // 人物突破次数：0~5，每次抽到同名角色时 +1（最多 5 次）
+    breakThrough: 0,
     level: 1,
     experience: 0,
     maxExperience: 100,
@@ -242,7 +278,8 @@ export function generateCharacterById(charId) {
       counterRate: 0,
       stunRate: 0,
       dodgeRate: 0,
-      vampireRate: 0
+      vampireRate: 0,
+      ...(roleStats.combatAttributes || {})
     },
     combatResistance: {
       critResist: 0,
@@ -250,7 +287,8 @@ export function generateCharacterById(charId) {
       counterResist: 0,
       stunResist: 0,
       dodgeResist: 0,
-      vampireResist: 0
+      vampireResist: 0,
+      ...(roleStats.combatResistance || {})
     },
     specialAttributes: {
       healBoost: 0,
@@ -259,7 +297,8 @@ export function generateCharacterById(charId) {
       finalDamageBoost: 0,
       finalDamageReduce: 0,
       combatBoost: 0,
-      resistanceBoost: 0
+      resistanceBoost: 0,
+      ...(roleStats.specialAttributes || {})
     }
   }
 }

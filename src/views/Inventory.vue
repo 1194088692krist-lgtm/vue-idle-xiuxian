@@ -882,7 +882,7 @@
 
   // 所有装备槽位（用于识别装备类物品，兼容 gacha 与挂机两种生成形态）
   const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
-  const isEquipmentItem = item => !!item && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
+  const isEquipmentItem = item => !!item && item.type !== 'pet' && item.type !== 'material' && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
   // 是否有可装备物品（用于禁用一键按钮）
   const hasEquipableItems = computed(() => {

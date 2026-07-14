@@ -189,6 +189,159 @@
       <div v-else class="bench-empty">所有成员均已出战</div>
     </div>
 
+    <!-- 人物详情弹窗（独立弹窗，不再切换顶部面板） -->
+    <div v-if="showMemberDetailModal && detailMember" class="equip-select-modal character-detail-modal" @click.self="closeMemberDetail">
+      <div class="modal-content glass-card character-detail-content" @click.stop>
+        <div class="char-detail-header">
+          <div class="char-avatar large">
+            <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterAvatar(detailMember)" />
+            <span v-else>{{ detailMember.name?.[0] || '仙' }}</span>
+          </div>
+          <div class="char-info">
+            <div class="char-name-row">
+              <h2 class="char-name">{{ detailMember.name }}</h2>
+              <span class="star-badge">{{ '★'.repeat(detailMember.star || 1) }}</span>
+              <span class="breakthrough-badge" v-if="(detailMember.breakThrough || 0) > 0">
+                突破 {{ detailMember.breakThrough }}/5
+              </span>
+            </div>
+            <div class="char-meta">
+              <span class="char-school" :style="{ color: detailMember.schoolColor }">
+                {{ detailMember.schoolIcon }} {{ detailMember.schoolName }}
+              </span>
+              <span class="char-role" :style="{ color: detailMember.schoolColor }">
+                {{ detailMember.roleIcon }} {{ detailMember.roleName }} · {{ detailMember.roleDesc }}
+              </span>
+            </div>
+            <div class="char-talent-info">天赋: <b>{{ detailMember.talentName }}</b> · {{ detailMember.talentDesc }}</div>
+            <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ playerStore.getCharacterBuildStrength(detailMember) }}</div>
+          </div>
+          <button class="btn btn-warning btn-close" @click="closeMemberDetail">关闭</button>
+        </div>
+
+        <!-- 独特数值信息（基础 / 突破后 / 加成 / 最终） -->
+        <div class="attr-block">
+          <h4 class="sub-title">独特基础数值</h4>
+          <div class="attr-table">
+            <div class="attr-row attr-head">
+              <span class="attr-col-label">属性</span>
+              <span class="attr-col-base">基础</span>
+              <span class="attr-col-delta">突破加成</span>
+              <span class="attr-col-final">最终</span>
+            </div>
+            <div v-for="stat in detailBaseStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 战斗属性（基于定位） -->
+        <div class="attr-block" v-if="detailMember.combatAttributes">
+          <h4 class="sub-title">战斗属性 <span class="role-hint">（根据定位：{{ detailMember.roleName }}）</span></h4>
+          <div class="attr-table">
+            <div class="attr-row attr-head">
+              <span class="attr-col-label">属性</span>
+              <span class="attr-col-base">基础</span>
+              <span class="attr-col-delta">加成</span>
+              <span class="attr-col-final">最终</span>
+            </div>
+            <div v-for="stat in detailCombatStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 抗性 -->
+        <div class="attr-block" v-if="detailMember.combatResistance">
+          <h4 class="sub-title">抗性</h4>
+          <div class="attr-table">
+            <div class="attr-row attr-head">
+              <span class="attr-col-label">属性</span>
+              <span class="attr-col-base">基础</span>
+              <span class="attr-col-delta">加成</span>
+              <span class="attr-col-final">最终</span>
+            </div>
+            <div v-for="stat in detailResistanceStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 特殊属性 -->
+        <div class="attr-block" v-if="detailMember.specialAttributes">
+          <h4 class="sub-title">特殊属性</h4>
+          <div class="attr-table">
+            <div class="attr-row attr-head">
+              <span class="attr-col-label">属性</span>
+              <span class="attr-col-base">基础</span>
+              <span class="attr-col-delta">加成</span>
+              <span class="attr-col-final">最终</span>
+            </div>
+            <div v-for="stat in detailSpecialStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+          </div>
+        </div>
+
+        <!-- 突破按钮 -->
+        <div class="attr-block">
+          <h4 class="sub-title">人物突破</h4>
+          <p class="breakthrough-desc">
+            每突破一次，基础数值 ×1.2（复利），最多 5 次。抽到同名角色时自动突破一次。
+          </p>
+          <div class="breakthrough-bar">
+            <div
+              v-for="i in 5"
+              :key="i"
+              class="breakthrough-dot"
+              :class="{ active: i <= (detailMember.breakThrough || 0) }"
+            >{{ i }}</div>
+          </div>
+          <div class="breakthrough-actions" v-if="(detailMember.breakThrough || 0) < 5">
+            <button class="btn btn-info btn-small" @click="tryManualBreakthrough">
+              使用 1 人精华手动突破（当前：{{ playerStore.characterEssence || 0 }}）
+            </button>
+          </div>
+        </div>
+
+        <!-- 三段式小传 -->
+        <div class="attr-block" v-if="detailBiography">
+          <h4 class="sub-title">人物小传</h4>
+          <div class="bio-section">
+            <p class="bio-text">{{ detailBiography.part1 }}</p>
+          </div>
+          <div class="bio-section" v-if="!detailBiography.isPart2Locked">
+            <h5 class="bio-title">第二段 · 成长经历</h5>
+            <p class="bio-text">{{ detailBiography.part2 }}</p>
+          </div>
+          <div v-else class="bio-locked">
+            <h5 class="bio-title">第二段 · 成长经历</h5>
+            <p>🔒 需要人物突破至 2 次以上解锁</p>
+          </div>
+          <div class="bio-section" v-if="!detailBiography.isPart3Locked">
+            <h5 class="bio-title">第三段 · 终极目标</h5>
+            <p class="bio-text">{{ detailBiography.part3 }}</p>
+          </div>
+          <div v-else class="bio-locked">
+            <h5 class="bio-title">第三段 · 终极目标</h5>
+            <p>🔒 需要人物突破至 4 次以上解锁</p>
+          </div>
+        </div>
+      </div>
+    </div>
+
     <!-- 装备选择弹窗 -->
     <div v-if="showEquipSelect" class="equip-select-modal" @click.self="closeEquipSelect">
       <div class="modal-content glass-card">
@@ -249,6 +402,7 @@ import { ref, computed } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar } from '../plugins/characters'
 import { petRarities } from '../plugins/gacha'
+import { getCharacterBiography } from '../plugins/characterBiographies'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
@@ -467,8 +621,94 @@ const specialStats = computed(() => {
 
 // 方法
 const selectMember = (id) => { selectedMemberId.value = id }
+
+// 详情弹窗状态
+const showMemberDetailModal = ref(false)
+const detailMember = ref(null)
+
 const viewMemberDetail = (id) => {
-  selectedMemberId.value = id
+  // 找到角色（包括宗门成员、候补、未出战等所有数据源）
+  const member = playerStore.sectMembers.find(m => m.id === id)
+    || playerStore.benchMembers?.find(m => m.id === id)
+    || (playerStore.player && playerStore.player.id === id ? playerStore.player : null)
+  detailMember.value = member
+  showMemberDetailModal.value = true
+}
+const closeMemberDetail = () => {
+  showMemberDetailModal.value = false
+  detailMember.value = null
+}
+
+// 详情弹窗中的属性统计
+const detailBaseStats = computed(() => {
+  if (!detailMember.value) return []
+  const b = detailMember.value.baseStats || {}
+  const bt = detailMember.value.breakThrough || 0
+  const mult = Math.pow(1.2, bt)
+  return [
+    { name: '攻击', key: 'attack', base: Math.round((b.attack || 0) / mult), final: b.attack || 0, delta: Math.round((b.attack || 0) - (b.attack || 0) / mult) },
+    { name: '生命', key: 'health', base: Math.round((b.health || 0) / mult), final: b.health || 0, delta: Math.round((b.health || 0) - (b.health || 0) / mult) },
+    { name: '防御', key: 'defense', base: Math.round((b.defense || 0) / mult), final: b.defense || 0, delta: Math.round((b.defense || 0) - (b.defense || 0) / mult) },
+    { name: '速度', key: 'speed', base: Math.round((b.speed || 0) / mult), final: b.speed || 0, delta: Math.round((b.speed || 0) - (b.speed || 0) / mult) }
+  ]
+})
+const detailCombatStats = computed(() => {
+  if (!detailMember.value || !detailMember.value.combatAttributes) return []
+  const c = detailMember.value.combatAttributes
+  return [
+    { name: '暴击率', key: 'critRate', base: c.critRate || 0, delta: 0, final: c.critRate || 0 },
+    { name: '连击率', key: 'comboRate', base: c.comboRate || 0, delta: 0, final: c.comboRate || 0 },
+    { name: '反击率', key: 'counterRate', base: c.counterRate || 0, delta: 0, final: c.counterRate || 0 },
+    { name: '眩晕率', key: 'stunRate', base: c.stunRate || 0, delta: 0, final: c.stunRate || 0 },
+    { name: '闪避率', key: 'dodgeRate', base: c.dodgeRate || 0, delta: 0, final: c.dodgeRate || 0 },
+    { name: '吸血率', key: 'vampireRate', base: c.vampireRate || 0, delta: 0, final: c.vampireRate || 0 }
+  ]
+})
+const detailResistanceStats = computed(() => {
+  if (!detailMember.value || !detailMember.value.combatResistance) return []
+  const c = detailMember.value.combatResistance
+  return [
+    { name: '抗暴', key: 'critResist', base: c.critResist || 0, delta: 0, final: c.critResist || 0 },
+    { name: '抗连', key: 'comboResist', base: c.comboResist || 0, delta: 0, final: c.comboResist || 0 },
+    { name: '抗反击', key: 'counterResist', base: c.counterResist || 0, delta: 0, final: c.counterResist || 0 },
+    { name: '抗眩晕', key: 'stunResist', base: c.stunResist || 0, delta: 0, final: c.stunResist || 0 },
+    { name: '抗闪避', key: 'dodgeResist', base: c.dodgeResist || 0, delta: 0, final: c.dodgeResist || 0 },
+    { name: '抗吸血', key: 'vampireResist', base: c.vampireResist || 0, delta: 0, final: c.vampireResist || 0 }
+  ]
+})
+const detailSpecialStats = computed(() => {
+  if (!detailMember.value || !detailMember.value.specialAttributes) return []
+  const c = detailMember.value.specialAttributes
+  return [
+    { name: '治疗效果', key: 'healBoost', base: c.healBoost || 0, delta: 0, final: c.healBoost || 0 },
+    { name: '暴伤加成', key: 'critDamageBoost', base: c.critDamageBoost || 0, delta: 0, final: c.critDamageBoost || 0 },
+    { name: '暴伤减免', key: 'critDamageReduce', base: c.critDamageReduce || 0, delta: 0, final: c.critDamageReduce || 0 },
+    { name: '最终增伤', key: 'finalDamageBoost', base: c.finalDamageBoost || 0, delta: 0, final: c.finalDamageBoost || 0 },
+    { name: '最终减伤', key: 'finalDamageReduce', base: c.finalDamageReduce || 0, delta: 0, final: c.finalDamageReduce || 0 },
+    { name: '战意', key: 'combatBoost', base: c.combatBoost || 0, delta: 0, final: c.combatBoost || 0 },
+    { name: '抗性', key: 'resistanceBoost', base: c.resistanceBoost || 0, delta: 0, final: c.resistanceBoost || 0 }
+  ]
+})
+const detailBiography = computed(() => {
+  if (!detailMember.value) return null
+  const charId = detailMember.value.templateId || detailMember.value.id
+  return getCharacterBiography(charId, detailMember.value.breakThrough || 0)
+})
+// 手动突破（用 1 个人精华强制突破一次）
+const tryManualBreakthrough = () => {
+  if (!detailMember.value) return
+  if ((detailMember.value.breakThrough || 0) >= 5) {
+    message.warning('已突破至最高境界')
+    return
+  }
+  if ((playerStore.characterEssence || 0) < 1) {
+    message.error('人精华不足（需要 1 个）')
+    return
+  }
+  playerStore.characterEssence -= 1
+  const r = playerStore.breakThroughCharacter(detailMember.value.id)
+  if (r.success) message.success(r.message)
+  else message.error(r.message)
 }
 const isInTeam = (id) => playerStore.teamMembers.includes(id)
 const toggleTeam = (id) => {

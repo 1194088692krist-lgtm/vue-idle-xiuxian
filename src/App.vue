@@ -249,20 +249,38 @@ import SaveButton from './components/SaveButton.vue'
     }
   }
 
+  // 玩家按 ESC 关闭当前最表层弹窗
   const handleEscKey = (e) => {
-    if (e.key === 'Escape') {
-      const modals = document.querySelectorAll('.n-modal, .n-dialog, .modal-overlay, .glass-card')
-      const openModals = Array.from(modals).filter(el => {
-        const style = window.getComputedStyle(el)
-        return style.display !== 'none' && style.visibility !== 'hidden'
-      })
-      if (openModals.length > 0) {
-        const closeBtn = openModals[openModals.length - 1].querySelector('.n-modal__close, .n-dialog__close, .close-btn')
-        if (closeBtn) {
-          closeBtn.click()
-        } else {
-          openModals[openModals.length - 1].dispatchEvent(new Event('close'))
-        }
+    if (e.key !== 'Escape') return
+    // 1) 找到页面上所有可见的弹窗/遮罩/对话框
+    const candidates = document.querySelectorAll(
+      '.n-modal, .n-modal-container, .n-dialog, .modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal, .n-drawer, .n-popselect, .n-base-selection, [class*="-modal"], [class*="overlay"]'
+    )
+    const visibleList = []
+    candidates.forEach(el => {
+      const style = window.getComputedStyle(el)
+      if (style.display === 'none' || style.visibility === 'hidden' || parseFloat(style.opacity) === 0) return
+      const rect = el.getBoundingClientRect()
+      if (rect.width === 0 && rect.height === 0) return
+      visibleList.push({ el, z: parseInt(style.zIndex) || 0, rect })
+    })
+    if (visibleList.length === 0) return
+    // 2) 取 z-index 最大的最表层弹窗
+    visibleList.sort((a, b) => b.z - a.z)
+    const top = visibleList[0].el
+    // 3) 优先点击内部 close 按钮，否则派发 close 事件
+    const closeBtn = top.querySelector(
+      '.n-modal__close, .n-dialog__close, .n-base-close, .close-btn, [aria-label="close"], [data-close]'
+    )
+    if (closeBtn) {
+      closeBtn.click()
+    } else {
+      // 对自定义 modal，直接点击 .modal-overlay 自身即可让外层 click.self 触发关闭
+      const overlay = top.matches('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal') ? top : top.querySelector('.modal-overlay, .equip-select-modal, .character-detail-modal, .pet-detail-modal')
+      if (overlay) {
+        overlay.click()
+      } else {
+        top.dispatchEvent(new Event('close', { bubbles: true }))
       }
     }
   }

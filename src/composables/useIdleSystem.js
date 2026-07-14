@@ -681,10 +681,11 @@ function grantReward(effectiveZone, isIdleMode = false) {
       }
     }
   }
-  // 幻灵结晶：每场遭遇独立产出（青萝林·游历5min≈50，混沌界·灭世30min<3000）
+  // 幻灵结晶：每场遭遇独立产出（青萝林·游历5min≈15，混沌界·灭世30min<1000）。
+  // 此前比例偏高（2+diff*1.5+scale*3），现下调约 60%，让灵石/结晶产出更平衡。
   const diff = effectiveZone.difficulty || 1
   const scale = effectiveZone.enemyScale || 1
-  const crystalBase = Math.floor(2 + diff * 1.5 + scale * 3)
+  const crystalBase = Math.floor(1 + diff * 0.6 + scale * 1.2)
   const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4)))
   s.phantomCrystals += crystalAmount
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
@@ -953,6 +954,7 @@ async function runIdleEncounter() {
       
       rewards.forEach(r => {
         if (r.type === 'equipment') {
+          r.item._pickedAt = Date.now()
           foundEquipment.value.push(r.item)
         }
       })
@@ -1270,6 +1272,20 @@ const idleDashboard = computed(() => {
       hp: ms.hp,
       maxHP: ms.maxHP,
       hpPercent: ms.maxHP > 0 ? ((ms.hp / ms.maxHP) * 100).toFixed(0) + '%' : '0%'
+    })),
+    // 最近获得的装备（按时间倒序，最多展示 6 件），即时反映到仪表盘
+    recentEquipment: (foundEquipment.value || []).slice(-6).reverse().map(eq => ({
+      id: eq.id,
+      name: eq.name,
+      slot: eq.slot || eq.type,
+      slotName: ({weapon:'武器',head:'头部',body:'衣服',legs:'裤子',feet:'鞋子',shoulder:'肩甲',hands:'手套',wrist:'护腕',necklace:'项链',ring1:'戒指1',ring2:'戒指2',belt:'腰带',artifact:'法宝'})[eq.slot || eq.type] || (eq.slot || eq.type),
+      rarity: eq.rarity,
+      rarityName: (eq.qualityInfo && eq.qualityInfo.name) || eq.rarity || '',
+      color: (eq.qualityInfo && eq.qualityInfo.color) || '#9e9e9e',
+      score: eq.score,
+      stats: eq.stats,
+      affixes: eq.affixes,
+      time: eq._pickedAt || Date.now()
     })),
     totalPhantomCrystals: s.phantomCrystals
   }

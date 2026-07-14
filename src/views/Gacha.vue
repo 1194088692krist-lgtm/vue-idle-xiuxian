@@ -16,7 +16,7 @@
             <div class="beginner-reward-icon">🎁</div>
             <div class="beginner-reward-text">
               <div class="beginner-reward-title">新手福利</div>
-              <div class="beginner-reward-desc">新修士专属，领取 20,000 幻灵结晶开启修仙之旅！</div>
+              <div class="beginner-reward-desc">新修士专属，领取 20,000 幻灵结晶 + 10,000 灵石开启修仙之旅！</div>
             </div>
           </div>
           <button class="btn btn-beginner" @click="claimBeginnerReward">
@@ -208,12 +208,13 @@
     pet_essence: '灵宠精华'
   }
 
-  // 新手福利领取
+  // 新手福利领取：20,000 幻灵结晶 + 10,000 灵石
   const claimBeginnerReward = () => {
     if (playerStore.beginnerRewardClaimed) return
     playerStore.phantomCrystals += 20000
+    playerStore.spiritStones += 10000
     playerStore.beginnerRewardClaimed = true
-    showMessage('success', '恭喜领取新手福利！获得 20,000 幻灵结晶！')
+    showMessage('success', '恭喜领取新手福利！获得 20,000 幻灵结晶 + 10,000 灵石！')
     playerStore.queueSave()
   }
 
@@ -242,7 +243,7 @@
       } else {
         showMessage('warning', addResult.message)
       }
-    } else if (category === 'equipment') {
+    } else if (category === 'weapon' || category === 'artifact' || category === 'equipment') {
       playerStore.items.push(item)
     } else if (category === 'pet') {
       playerStore.items.push(item)

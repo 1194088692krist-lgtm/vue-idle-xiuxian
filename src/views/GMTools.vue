@@ -1003,6 +1003,21 @@
               <p>点击或拖拽上传图片/音频</p>
               <p class="upload-hint">支持 PNG, JPG, MP3, WAV</p>
             </div>
+            <div class="upload-actions">
+              <button
+                class="btn btn-success"
+                :disabled="committingRepo || !pendingImageFiles.length"
+                @click="commitImagesToRepo"
+              >
+                {{ committingRepo ? '提交中…' : `提交 ${pendingImageFiles.length || ''} 张立绘到仓库` }}
+              </button>
+              <span class="upload-hint" style="margin-left:8px">
+                （调用 server/ 后端代理，GitHub PAT 不会下发到浏览器）
+              </span>
+            </div>
+            <div v-if="repoCommitResult" class="upload-result" :class="repoCommitResult.ok ? 'ok' : 'err'">
+              {{ repoCommitResult.message }}
+            </div>
           </div>
         </div>
 
@@ -1835,6 +1850,43 @@ const handleDrop = (e) => {
   processFiles(files)
 }
 
+// 提交素材中的图片到 GitHub 仓库（走后端代理）
+const committingRepo = ref(false)
+const repoCommitResult = ref(null)
+const pendingImageFiles = ref([])
+const GMTOOLS_SERVER = 'http://localhost:8787'
+
+const commitImagesToRepo = async () => {
+  if (!pendingImageFiles.value.length) return
+  committingRepo.value = true
+  repoCommitResult.value = null
+  let okCount = 0
+  let errCount = 0
+  const errors = []
+  for (const file of pendingImageFiles.value) {
+    const form = new FormData()
+    form.append('file', file)
+    form.append('path', 'public/portraits')
+    try {
+      const r = await fetch(`${GMTOOLS_SERVER}/api/upload`, { method: 'POST', body: form })
+      const j = await r.json()
+      if (j.ok) okCount++
+      else { errCount++; errors.push(`${file.name}: ${j.error}`) }
+    } catch (e) {
+      errCount++
+      errors.push(`${file.name}: ${e.message}`)
+    }
+  }
+  committingRepo.value = false
+  repoCommitResult.value = {
+    ok: errCount === 0,
+    message: errCount === 0
+      ? `✅ 已成功提交 ${okCount} 张立绘到仓库`
+      : `❌ 成功 ${okCount}，失败 ${errCount}。${errors.slice(0, 3).join('；')}`
+  }
+  if (errCount === 0) pendingImageFiles.value = []
+}
+
 const processFiles = (files) => {
   for (const file of files) {
     const reader = new FileReader()
@@ -1846,6 +1898,10 @@ const processFiles = (files) => {
         url: e.target.result,
         data: e.target.result
       })
+      // 把图片同时加入"待提交到仓库"列表
+      if (type === 'image' && !pendingImageFiles.value.find(f => f.name === file.name)) {
+        pendingImageFiles.value.push(file)
+      }
       saveToStorage()
     }
     reader.readAsDataURL(file)

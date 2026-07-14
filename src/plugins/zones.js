@@ -54,7 +54,7 @@ export const zones = [
         traits: ['速度快', '群体攻击'],
         stats: { attack: 20, health: 200, defense: 5, speed: 15 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [20, 50] },
+          { type: 'spirit_stone', chance: 0.8, amount: [30, 75] },
           { type: 'equipment', chance: 0.3, rarity: ['common', 'uncommon'], slot: 'weapon' },
           { type: 'herb', chance: 0.5, amount: [2, 5] }
         ],
@@ -67,7 +67,7 @@ export const zones = [
         traits: ['高攻击', '暴击率高'],
         stats: { attack: 30, health: 180, defense: 8, speed: 10 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [30, 60] },
+          { type: 'spirit_stone', chance: 0.8, amount: [45, 90] },
           { type: 'equipment', chance: 0.35, rarity: ['common', 'uncommon'], slot: 'hands' },
           { type: 'cultivation', chance: 0.5, amount: [50, 100] }
         ],
@@ -75,7 +75,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.5, amount: [15, 60] },
+      { type: 'spirit_stone', chance: 0.5, amount: [22, 90] },
       { type: 'herb', chance: 0.3, amount: [1, 3], name: '灵草' },
       { type: 'cultivation', chance: 0.3, amount: [25, 75] },
       { type: 'equipment', chance: 0.22, rarity: ['uncommon'], name: '良品装备' }
@@ -102,7 +102,7 @@ export const zones = [
         traits: ['高爆发', '隐蔽攻击'],
         stats: { attack: 50, health: 400, defense: 15, speed: 18 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [50, 120] },
+          { type: 'spirit_stone', chance: 0.8, amount: [75, 180] },
           { type: 'equipment', chance: 0.4, rarity: ['uncommon', 'rare'], slot: 'body' },
           { type: 'pet', chance: 0.1, rarity: ['mortal'] }
         ],
@@ -115,7 +115,7 @@ export const zones = [
         traits: ['高防御', '召唤骷髅'],
         stats: { attack: 35, health: 600, defense: 30, speed: 8 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [60, 150] },
+          { type: 'spirit_stone', chance: 0.8, amount: [90, 225] },
           { type: 'equipment', chance: 0.35, rarity: ['uncommon', 'rare'], slot: 'shoulder' },
           { type: 'herb', chance: 0.6, amount: [4, 10] }
         ],
@@ -123,7 +123,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.4, amount: [60, 180] },
+      { type: 'spirit_stone', chance: 0.4, amount: [90, 270] },
       { type: 'herb', chance: 0.3, amount: [3, 8], name: '灵草' },
       { type: 'cultivation', chance: 0.25, amount: [125, 375] },
       { type: 'equipment', chance: 0.30, rarity: ['uncommon', 'rare'], name: '良品装备' }
@@ -150,7 +150,7 @@ export const zones = [
         traits: ['火焰伤害', '灼烧效果'],
         stats: { attack: 80, health: 800, defense: 25, speed: 12 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [100, 250] },
+          { type: 'spirit_stone', chance: 0.8, amount: [150, 375] },
           { type: 'equipment', chance: 0.45, rarity: ['rare', 'epic'], slot: 'weapon' },
           { type: 'herb', chance: 0.5, amount: [5, 15] }
         ],
@@ -163,7 +163,7 @@ export const zones = [
         traits: ['范围攻击', '复活一次'],
         stats: { attack: 60, health: 600, defense: 20, speed: 25 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [120, 300] },
+          { type: 'spirit_stone', chance: 0.8, amount: [180, 450] },
           { type: 'equipment', chance: 0.5, rarity: ['rare', 'epic'], slot: 'ring1' },
           { type: 'pet', chance: 0.15, rarity: ['spiritual'] }
         ],
@@ -171,7 +171,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.35, amount: [150, 450] },
+      { type: 'spirit_stone', chance: 0.35, amount: [225, 675] },
       { type: 'herb', chance: 0.25, amount: [5, 15], name: '灵草' },
       { type: 'cultivation', chance: 0.25, amount: [375, 1000] },
       { type: 'equipment', chance: 0.36, rarity: ['rare', 'epic'], name: '上品装备' },
@@ -199,7 +199,7 @@ export const zones = [
         traits: ['龙威震慑', '水属性攻击'],
         stats: { attack: 150, health: 1500, defense: 50, speed: 20 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [200, 500] },
+          { type: 'spirit_stone', chance: 0.8, amount: [300, 750] },
           { type: 'equipment', chance: 0.55, rarity: ['epic'], slot: 'necklace' },
           { type: 'pet', chance: 0.2, rarity: ['mystic'] }
         ],
@@ -212,7 +212,7 @@ export const zones = [
         traits: ['吸血', '腐蚀攻击'],
         stats: { attack: 120, health: 2000, defense: 35, speed: 15 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [250, 600] },
+          { type: 'spirit_stone', chance: 0.8, amount: [375, 900] },
           { type: 'equipment', chance: 0.5, rarity: ['rare', 'epic'], slot: 'wrist' },
           { type: 'cultivation', chance: 0.6, amount: [500, 1000] }
         ],
@@ -220,7 +220,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.3, amount: [300, 900] },
+      { type: 'spirit_stone', chance: 0.3, amount: [450, 1350] },
       { type: 'herb', chance: 0.2, amount: [8, 20], name: '灵草' },
       { type: 'cultivation', chance: 0.25, amount: [750, 2000] },
       { type: 'equipment', chance: 0.42, rarity: ['epic', 'legendary'], name: '极品装备' },
@@ -248,7 +248,7 @@ export const zones = [
         traits: ['灵魂攻击', '恐惧效果'],
         stats: { attack: 200, health: 3000, defense: 60, speed: 18 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [400, 1000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [600, 1500] },
           { type: 'equipment', chance: 0.6, rarity: ['legendary'], slot: 'head' },
           { type: 'pet', chance: 0.25, rarity: ['celestial'] }
         ],
@@ -261,7 +261,7 @@ export const zones = [
         traits: ['分身', '再生'],
         stats: { attack: 180, health: 4000, defense: 80, speed: 12 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [500, 1200] },
+          { type: 'spirit_stone', chance: 0.8, amount: [750, 1800] },
           { type: 'equipment', chance: 0.55, rarity: ['legendary'], slot: 'body' },
           { type: 'herb', chance: 0.4, amount: [15, 35] }
         ],
@@ -269,7 +269,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.2, amount: [600, 1500] },
+      { type: 'spirit_stone', chance: 0.2, amount: [900, 2250] },
       { type: 'herb', chance: 0.15, amount: [10, 25], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [1250, 3000] },
       { type: 'equipment', chance: 0.52, rarity: ['legendary', 'mythic'], name: '极品装备' },
@@ -297,7 +297,7 @@ export const zones = [
         traits: ['冰冻', '冰系AOE'],
         stats: { attack: 350, health: 5000, defense: 100, speed: 22 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [800, 2000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [1200, 3000] },
           { type: 'equipment', chance: 0.65, rarity: ['legendary', 'mythic'], slot: 'feet' },
           { type: 'pet', chance: 0.3, rarity: ['celestial'] }
         ],
@@ -310,7 +310,7 @@ export const zones = [
         traits: ['时间减速', '封印技能'],
         stats: { attack: 400, health: 6000, defense: 120, speed: 15 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [1000, 2500] },
+          { type: 'spirit_stone', chance: 0.8, amount: [1500, 3750] },
           { type: 'equipment', chance: 0.6, rarity: ['mythic'], slot: 'belt' },
           { type: 'cultivation', chance: 0.5, amount: [2000, 5000] }
         ],
@@ -318,7 +318,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.15, amount: [1200, 3000] },
+      { type: 'spirit_stone', chance: 0.15, amount: [1800, 4500] },
       { type: 'herb', chance: 0.1, amount: [15, 35], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [2000, 5000] },
       { type: 'equipment', chance: 0.56, rarity: ['mythic'], name: '仙品装备' },
@@ -346,7 +346,7 @@ export const zones = [
         traits: ['仙术攻击', '领域压制'],
         stats: { attack: 600, health: 10000, defense: 180, speed: 25 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [1500, 4000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [2250, 6000] },
           { type: 'equipment', chance: 0.7, rarity: ['mythic'], slot: 'artifact' },
           { type: 'pet', chance: 0.35, rarity: ['divine'] }
         ],
@@ -359,7 +359,7 @@ export const zones = [
         traits: ['魔仙双修', '变身'],
         stats: { attack: 700, health: 12000, defense: 200, speed: 20 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [2000, 5000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [3000, 7500] },
           { type: 'equipment', chance: 0.65, rarity: ['mythic'], slot: 'ring2' },
           { type: 'cultivation', chance: 0.4, amount: [5000, 12000] }
         ],
@@ -367,7 +367,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.1, amount: [2400, 6000] },
+      { type: 'spirit_stone', chance: 0.1, amount: [3600, 9000] },
       { type: 'herb', chance: 0.08, amount: [20, 50], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [3750, 10000] },
       { type: 'equipment', chance: 0.64, rarity: ['mythic'], name: '仙品装备' },
@@ -395,7 +395,7 @@ export const zones = [
         traits: ['法则扭曲', '全属性攻击'],
         stats: { attack: 1200, health: 20000, defense: 300, speed: 30 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [3000, 8000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
           { type: 'equipment', chance: 0.75, rarity: ['mythic'], slot: 'weapon' },
           { type: 'pet', chance: 0.4, rarity: ['divine'] }
         ],
@@ -408,7 +408,7 @@ export const zones = [
         traits: ['因果律', '无法闪避'],
         stats: { attack: 1500, health: 25000, defense: 350, speed: 35 },
         drops: [
-          { type: 'spirit_stone', chance: 0.8, amount: [5000, 15000] },
+          { type: 'spirit_stone', chance: 0.8, amount: [7500, 22500] },
           { type: 'equipment', chance: 0.8, rarity: ['mythic'], slot: 'artifact' },
           { type: 'cultivation', chance: 0.3, amount: [10000, 30000] }
         ],
@@ -416,7 +416,7 @@ export const zones = [
       }
     ],
     rewards: [
-      { type: 'spirit_stone', chance: 0.05, amount: [6000, 15000] },
+      { type: 'spirit_stone', chance: 0.05, amount: [9000, 22500] },
       { type: 'herb', chance: 0.05, amount: [30, 80], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [7500, 20000] },
       { type: 'equipment', chance: 0.70, rarity: ['mythic'], name: '仙品装备' },
