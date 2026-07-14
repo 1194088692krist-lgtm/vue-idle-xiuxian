@@ -1,18 +1,25 @@
 <template>
   <div class="guide-page fade-in-up">
-    <div class="guide-shell glass-card">
-      <aside class="guide-toc" v-if="toc.length">
-        <div class="toc-title">攻略目录</div>
-        <a
-          v-for="(t, i) in toc"
-          :key="i"
-          class="toc-link"
-          :class="'lvl-' + t.level"
-          @click="scrollTo(t.id)"
-        >{{ t.text }}</a>
-      </aside>
-      <article class="guide-body" ref="bodyRef" v-html="guideHtml"></article>
+    <!-- 顶部可折叠目录：默认仅一条窄条，展开为浮层，不占用正文空间 -->
+    <div class="guide-topbar">
+      <button class="toc-toggle" :class="{ active: tocOpen }" @click="tocOpen = !tocOpen">
+        <span class="toc-toggle-icon">📖</span>
+        <span>攻略目录</span>
+        <span class="toc-caret" :class="{ open: tocOpen }">▾</span>
+      </button>
+      <transition name="toc-fade">
+        <div v-if="tocOpen" class="toc-dropdown glass-card">
+          <a
+            v-for="(t, i) in toc"
+            :key="i"
+            class="toc-link"
+            :class="'lvl-' + t.level"
+            @click="scrollTo(t.id); tocOpen = false"
+          >{{ t.text }}</a>
+        </div>
+      </transition>
     </div>
+    <article class="guide-body" ref="bodyRef" v-html="guideHtml"></article>
   </div>
 </template>
 
@@ -22,6 +29,7 @@
 
   const bodyRef = ref(null)
   const toc = ref([])
+  const tocOpen = ref(false)
 
   function buildToc() {
     const el = bodyRef.value
@@ -57,39 +65,51 @@
     box-sizing: border-box;
   }
 
-  .guide-shell {
-    display: flex;
-    gap: 18px;
-    padding: 0;
-    overflow: hidden;
-    border-radius: 16px;
-    background: linear-gradient(160deg, rgba(20, 16, 38, 0.92), rgba(10, 12, 28, 0.92));
-    border: 1px solid rgba(140, 120, 255, 0.18);
+  /* 顶部目录条 */
+  .guide-topbar {
+    position: sticky;
+    top: 0;
+    z-index: 20;
+    margin-bottom: 10px;
   }
-
-  /* 侧边目录 */
-  .guide-toc {
-    flex: 0 0 220px;
-    max-height: calc(100vh - 140px);
-    overflow-y: auto;
-    padding: 18px 14px;
-    border-right: 1px solid rgba(255, 255, 255, 0.08);
-    background: rgba(0, 0, 0, 0.18);
-  }
-  .toc-title {
-    font-size: 13px;
+  .toc-toggle {
+    display: inline-flex;
+    align-items: center;
+    gap: 8px;
+    padding: 8px 16px;
+    border-radius: 10px;
+    cursor: pointer;
+    background: linear-gradient(135deg, rgba(140, 120, 255, 0.25), rgba(20, 16, 38, 0.7));
+    border: 1px solid rgba(140, 120, 255, 0.35);
+    color: #e8e0ff;
+    font-size: 14px;
     font-weight: bold;
-    letter-spacing: 2px;
-    color: #c9b8ff;
-    margin-bottom: 12px;
-    padding-left: 6px;
+    transition: all 0.25s ease;
+  }
+  .toc-toggle:hover { border-color: #8c78ff; }
+  .toc-toggle.active { box-shadow: 0 0 18px rgba(140, 120, 255, 0.5); }
+  .toc-toggle-icon { font-size: 16px; }
+  .toc-caret { transition: transform 0.25s ease; font-size: 12px; }
+  .toc-caret.open { transform: rotate(180deg); }
+
+  /* 展开浮层（覆盖式，不挤压正文） */
+  .toc-dropdown {
+    position: absolute;
+    top: calc(100% + 6px);
+    left: 0;
+    width: 280px;
+    max-height: 62vh;
+    overflow-y: auto;
+    padding: 10px;
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(20, 16, 38, 0.96), rgba(10, 12, 28, 0.96));
+    border: 1px solid rgba(140, 120, 255, 0.3);
+    box-shadow: 0 12px 40px rgba(0, 0, 0, 0.6);
   }
   .toc-link {
     display: block;
-    padding: 5px 8px;
-    margin-bottom: 2px;
-    font-size: 12px;
-    line-height: 1.4;
+    padding: 6px 8px;
+    font-size: 12.5px;
     color: #aab2c8;
     border-radius: 6px;
     cursor: pointer;
@@ -102,18 +122,22 @@
     background: rgba(140, 120, 255, 0.14);
     border-left-color: #8c78ff;
   }
-  .toc-link.lvl-1 { font-weight: bold; color: #e8e0ff; }
+  .toc-link.lvl-1 { font-weight: bold; color: #e8e0ff; font-size: 13px; }
   .toc-link.lvl-3 { font-size: 11px; padding-left: 18px; color: #8b93a8; }
+  .toc-fade-enter-active, .toc-fade-leave-active { transition: opacity 0.2s ease, transform 0.2s ease; }
+  .toc-fade-enter-from, .toc-fade-leave-to { opacity: 0; transform: translateY(-6px); }
 
   /* 正文 */
   .guide-body {
-    flex: 1 1 auto;
-    max-height: calc(100vh - 140px);
+    max-height: calc(100vh - 130px);
     overflow-y: auto;
-    padding: 26px 32px 48px;
+    padding: 22px 26px 48px;
     color: #d7dcea;
     font-size: 14px;
     line-height: 1.85;
+    border-radius: 12px;
+    background: linear-gradient(160deg, rgba(20, 16, 38, 0.92), rgba(10, 12, 28, 0.92));
+    border: 1px solid rgba(140, 120, 255, 0.18);
     font-family: 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', 'Segoe UI', sans-serif;
     scroll-behavior: smooth;
   }
@@ -207,8 +231,7 @@
   .guide-body :deep(tr:nth-child(even) td) { background: rgba(255, 255, 255, 0.04); }
 
   @media (max-width: 720px) {
-    .guide-shell { flex-direction: column; }
-    .guide-toc { flex-basis: auto; max-height: 160px; border-right: none; border-bottom: 1px solid rgba(255, 255, 255, 0.08); }
-    .guide-body { max-height: calc(100vh - 320px); padding: 18px; }
+    .toc-dropdown { width: 240px; }
+    .guide-body { max-height: calc(100vh - 120px); padding: 16px; }
   }
 </style>

@@ -49,6 +49,7 @@
     <!-- 属性面板 -->
     <div class="stats-card glass-card">
       <h3 class="section-title">人物属性</h3>
+      <p class="base-note">基础数值（不含装备 · 含出战灵宠），其增益明细见下方「灵宠增益」</p>
       <div class="stats-grid">
         <div class="stat-item">
           <span class="stat-label">攻击</span>
@@ -133,6 +134,46 @@
           </div>
         </div>
       </div>
+    </div>
+
+    <!-- 灵宠增益 -->
+    <div class="pet-card glass-card" v-if="playerStore.activePet">
+      <h3 class="section-title">
+        灵宠增益
+        <span class="pet-name">{{ activePetInfo.name }}</span>
+        <span class="pet-rarity" :style="{ color: activePetInfo.color }">{{ activePetInfo.rarityName }}</span>
+      </h3>
+      <div class="pet-grid">
+        <div class="pet-item">
+          <span class="pet-label">攻击加成</span>
+          <span class="pet-value">+{{ (petBonus.attack * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="pet-item">
+          <span class="pet-label">生命加成</span>
+          <span class="pet-value">+{{ (petBonus.health * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="pet-item">
+          <span class="pet-label">防御加成</span>
+          <span class="pet-value">+{{ (petBonus.defense * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="pet-item">
+          <span class="pet-label">暴击率</span>
+          <span class="pet-value">+{{ (petBonus.critRate * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="pet-item">
+          <span class="pet-label">连击率</span>
+          <span class="pet-value">+{{ (petBonus.comboRate * 100).toFixed(1) }}%</span>
+        </div>
+        <div class="pet-item">
+          <span class="pet-label">吸血率</span>
+          <span class="pet-value">+{{ (petBonus.vampireRate * 100).toFixed(1) }}%</span>
+        </div>
+      </div>
+      <p class="pet-note">注：灵宠加成已并入上方「基础属性」，此处单独列出其增益占比。</p>
+    </div>
+    <div v-else class="pet-card pet-empty glass-card">
+      <span class="pet-empty-icon">🐾</span>
+      <span>未出战灵宠 · 出战后其加成将并入上方基础属性并计入 Build</span>
     </div>
 
     <!-- 修炼系统 -->
@@ -257,6 +298,21 @@ const logRef = ref(null)
 const showBreakthroughEffect = ref(false)
 const breakthroughRealm = ref('')
 const breakthroughColor = ref('#DAA520')
+
+// 灵宠增益展示：基础属性已含出战灵宠，此处单独列出其加成占比
+const petRarityMap = {
+  mortal: { rarityName: '凡品灵宠', color: '#32CD32' },
+  spiritual: { rarityName: '灵品灵宠', color: '#1E90FF' },
+  mystic: { rarityName: '玄品灵宠', color: '#9932CC' },
+  celestial: { rarityName: '仙品灵宠', color: '#FFD700' },
+  divine: { rarityName: '神品灵宠', color: '#FF0000' }
+}
+const petBonus = computed(() => playerStore.getPetBonus())
+const activePetInfo = computed(() => {
+  const p = playerStore.activePet
+  if (!p) return { name: '', rarityName: '', color: '#aaa' }
+  return { name: p.name, ...(petRarityMap[p.rarity] || { rarityName: p.rarity, color: '#aaa' }) }
+})
 
 const baseGainRate = 1
 const baseCultivationCost = 8
@@ -595,6 +651,76 @@ onUnmounted(() => {
 }
 .resource-label { font-size: 11px; color: #888; }
 .resource-value { font-size: 14px; color: #DAA520; font-weight: bold; }
+
+.base-note {
+  margin: -6px 0 10px;
+  font-size: 11px;
+  color: #8b93a8;
+  line-height: 1.4;
+}
+
+/* 灵宠增益 */
+.pet-card {
+  padding: 16px;
+  border-radius: 12px;
+  border: 1px solid rgba(140, 120, 255, 0.25);
+  background: linear-gradient(135deg, rgba(140, 120, 255, 0.08), rgba(20, 16, 38, 0.6));
+}
+.pet-card .section-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.pet-name {
+  font-size: 15px;
+  color: #fff;
+}
+.pet-rarity {
+  font-size: 12px;
+  font-weight: bold;
+  padding: 1px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.08);
+}
+.pet-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-top: 10px;
+}
+.pet-item {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 8px 6px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 6px;
+  border: 1px solid rgba(140, 120, 255, 0.15);
+}
+.pet-label { font-size: 11px; color: #8b93a8; }
+.pet-value {
+  font-size: 15px;
+  color: #9fe0ff;
+  font-weight: bold;
+  text-shadow: 0 0 8px rgba(159, 224, 255, 0.4);
+}
+.pet-note {
+  margin: 10px 0 0;
+  font-size: 11px;
+  color: #8b93a8;
+  line-height: 1.4;
+}
+.pet-empty {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 14px;
+  font-size: 12px;
+  color: #8b93a8;
+  border-style: dashed;
+}
+.pet-empty-icon { font-size: 18px; }
 
 /* 修炼系统 */
 .cultivation-card {

@@ -3,7 +3,7 @@ import { GameDB } from './db'
 import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
-import { getAffixesForSlot, getActiveSetBonuses, calculateEquipmentScore, calculateBuildStrength } from '../plugins/buildSystem'
+import { getAffixesForSlot, getActiveSetBonuses, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -306,7 +306,8 @@ export const usePlayerStore = defineStore('player', {
       }
     },
     buildStrength() {
-      return calculateBuildStrength(this.equippedArtifacts)
+      // 综合 Build：装备分 + 角色裸战力（含出战灵宠），并按修炼层级成长
+      return calculateTotalBuild(this)
     },
     activeSetBonuses() {
       return getActiveSetBonuses(this.equippedArtifacts)

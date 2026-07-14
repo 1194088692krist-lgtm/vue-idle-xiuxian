@@ -249,6 +249,36 @@ function calculateBuildStrength(equippedArtifacts) {
   return Math.round(totalScore + setBonusScore)
 }
 
+// 修炼层级对 Build 的成长系数（每级 +2%，使层级真实影响 Build 与挂机难度匹配）
+const LEVEL_BUILD_RATE = 0.02
+
+// 角色裸战力（含已出战灵宠：deployPet 已将灵宠加成并入 baseAttributes）
+// 不含装备（由 calculateBuildStrength 计算），也不含神器（避免与 equippedArtifacts 重复计入）
+function calculateCharacterPower(player) {
+  if (!player) return 0
+  let score = 0
+  const ba = player.baseAttributes || {}
+  const ca = player.combatAttributes || {}
+  const cr = player.combatResistance || {}
+  const sa = player.specialAttributes || {}
+  ;['attack', 'health', 'defense', 'speed'].forEach(s => { score += getStatScore(s, ba[s] || 0) })
+  Object.keys(ca).forEach(s => { score += getStatScore(s, ca[s] || 0, true) })
+  Object.keys(cr).forEach(s => { score += getStatScore(s, cr[s] || 0, true) })
+  Object.keys(sa).forEach(s => { score += getStatScore(s, sa[s] || 0, true) })
+  return Math.round(score)
+}
+
+// 综合 Build：装备分 + 角色裸战力，并按修炼层级施加成长系数。
+// 这样人物修炼层级与出战灵宠都会真实体现在 Build 数值与挂机难度匹配上。
+function calculateTotalBuild(player) {
+  if (!player) return 0
+  const equip = calculateBuildStrength(player.equippedArtifacts || {})
+  const charPow = calculateCharacterPower(player)
+  const level = Math.max(1, player.level || 1)
+  const levelMult = 1 + (level - 1) * LEVEL_BUILD_RATE
+  return Math.round((equip + charPow) * levelMult)
+}
+
 function getActiveSetBonuses(equippedArtifacts) {
   const setCount = {}
   const slotMap = {}
@@ -308,6 +338,9 @@ export {
   getAffixValue,
   calculateEquipmentScore,
   calculateBuildStrength,
+  calculateCharacterPower,
+  calculateTotalBuild,
+  LEVEL_BUILD_RATE,
   getActiveSetBonuses,
   applySetBonusStats
 }
