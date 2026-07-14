@@ -5,6 +5,7 @@ import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
+import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
 
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
@@ -588,12 +589,73 @@ function createPlayerEntity() {
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
-function generateZoneEnemy(effectiveZone, encounterCount) {
-  const isBoss = encounterCount > 0 && encounterCount % 10 === 0
-  const isElite = encounterCount > 0 && encounterCount % 5 === 0 && !isBoss
-  const type = isBoss ? CombatType.BOSS : isElite ? CombatType.ELITE : CombatType.NORMAL
+function createBossEnemy(bossData, effectiveZone) {
+  const secretLv = effectiveZone.difficulty
+  const baseStats = {
+    health: bossData.stats.health,
+    maxHealth: bossData.stats.health,
+    damage: bossData.stats.attack,
+    defense: bossData.stats.defense || 0,
+    speed: bossData.stats.speed || 10,
+    critRate: Math.min(0.2, 0.02 + secretLv * 0.01 + 0.1),
+    comboRate: Math.min(0.1, 0.01 + secretLv * 0.005),
+    counterRate: Math.min(0.1, 0.01 + secretLv * 0.005),
+    stunRate: Math.min(0.08, 0.01 + secretLv * 0.003),
+    dodgeRate: Math.min(0.12, 0.02 + secretLv * 0.008),
+    vampireRate: Math.min(0.08, 0.01 + secretLv * 0.003),
+    critResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    comboResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    counterResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    stunResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    dodgeResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    vampireResist: Math.min(0.1, 0.01 + secretLv * 0.003),
+    healBoost: 0,
+    critDamageBoost: 0.3,
+    critDamageReduce: 0,
+    finalDamageBoost: Math.min(0.2, secretLv * 0.01 + 0.1),
+    finalDamageReduce: Math.min(0.1, secretLv * 0.01),
+    combatBoost: 0,
+    resistanceBoost: 0
+  }
+  const enemy = new CombatEntity(bossData.name, effectiveZone.minLevel, baseStats, 'BOSS')
+  enemy.tier = 'boss'
+  enemy.bossId = bossData.id
+  enemy.bossData = bossData
+  return enemy
+}
+
+function generateBossEnemies(effectiveZone, difficultyKey) {
+  const bosses = []
+  if (!effectiveZone.bosses || effectiveZone.bosses.length === 0) return bosses
+  
+  const bossChance = getBossEncounterChance(difficultyKey)
+  if (Math.random() >= bossChance) return bosses
+  
+  let bossCount = 1
+  if (['xiongxian', 'juejing', 'mieshi'].includes(difficultyKey)) {
+    bossCount = Math.random() < 0.5 ? 1 : 2
+  }
+  
+  for (let i = 0; i < bossCount; i++) {
+    const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+    bosses.push(createBossEnemy(bossData, effectiveZone))
+  }
+  
+  return bosses
+}
+
+function generateZoneEnemy(effectiveZone, encounterCount, difficultyKey = 'xiongxian') {
+  const bossEnemies = generateBossEnemies(effectiveZone, difficultyKey)
+  const hasBoss = bossEnemies.length > 0
+  const isElite = !hasBoss && encounterCount > 0 && encounterCount % 5 === 0
+  const type = hasBoss ? CombatType.BOSS : isElite ? CombatType.ELITE : CombatType.NORMAL
   const secretLv = effectiveZone.difficulty
   const scale = effectiveZone.enemyScale
+  
+  if (hasBoss) {
+    return { mainEnemy: bossEnemies[0], allBosses: bossEnemies, hasBoss: true, isElite: false }
+  }
+  
   const baseStats = {
     health: Math.floor(effectiveZone.recommendedStats.health * 0.6 * scale),
     damage: Math.floor(effectiveZone.recommendedStats.attack * 0.4 * scale),
@@ -622,17 +684,7 @@ function generateZoneEnemy(effectiveZone, encounterCount) {
   }
 
   let monsterName
-  if (isBoss && effectiveZone.bosses && effectiveZone.bosses.length > 0) {
-    const boss = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-    monsterName = boss.name
-    baseStats.health = boss.stats.health
-    baseStats.maxHealth = boss.stats.health
-    baseStats.damage = boss.stats.attack
-    baseStats.defense = boss.stats.defense || 0
-    baseStats.speed = boss.stats.speed || 10
-    baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.1)
-    baseStats.finalDamageBoost = Math.min(0.2, baseStats.finalDamageBoost + 0.1)
-  } else if (isElite) {
+  if (isElite) {
     monsterName = effectiveZone.monsters[Math.floor(Math.random() * effectiveZone.monsters.length)]
     baseStats.health = Math.floor(baseStats.health * 1.5)
     baseStats.maxHealth = baseStats.health
@@ -642,12 +694,41 @@ function generateZoneEnemy(effectiveZone, encounterCount) {
     monsterName = effectiveZone.monsters[Math.floor(Math.random() * effectiveZone.monsters.length)]
   }
 
-  const enemy = new CombatEntity(monsterName, effectiveZone.minLevel, baseStats, isBoss ? 'BOSS' : isElite ? '精英' : effectiveZone.difficultyLabel)
-  enemy.tier = isBoss ? 'boss' : isElite ? 'elite' : 'normal'
-  return enemy
+  const enemy = new CombatEntity(monsterName, effectiveZone.minLevel, baseStats, isElite ? '精英' : effectiveZone.difficultyLabel)
+  enemy.tier = isElite ? 'elite' : 'normal'
+  return { mainEnemy: enemy, allBosses: [], hasBoss: false, isElite }
 }
 
-function grantCombatDrops(enemy) {
+function grantBossMaterialDrops(enemy, zoneId) {
+  const s = store()
+  const drops = []
+  const bossMaterials = BOSS_MATERIALS[zoneId]
+  if (!bossMaterials || !enemy.bossData) return drops
+  
+  const zoneBosses = ZONE_BOSSES[zoneId]
+  const bossInfo = zoneBosses?.find(b => b.name === enemy.name)
+  
+  if (bossInfo) {
+    const materialId = bossInfo.dropMaterial
+    const dropChance = bossInfo.dropChance
+    const material = bossMaterials.find(m => m.id === materialId)
+    
+    if (material && Math.random() < dropChance) {
+      const materialItem = {
+        id: materialId,
+        name: material.name,
+        type: 'boss_material',
+        description: material.description
+      }
+      s.items.push(materialItem)
+      drops.push(materialItem)
+    }
+  }
+  
+  return drops
+}
+
+function grantCombatDrops(enemy, zoneId = null) {
   const s = store()
   const drops = []
   const tier = enemy?.tier || 'normal'
@@ -655,6 +736,10 @@ function grantCombatDrops(enemy) {
     if (Math.random() < 0.6) { const c = getRandomCore('boss'); s.gainMaterial(c); drops.push(c) }
     if (Math.random() < 0.08) { const sp = getRandomSpecial(); s.gainMaterial(sp); drops.push(sp) }
     if (Math.random() < 0.25) { const h = getRandomHerb({ difficulty: 9 }); s.gainMaterial(h); drops.push(h) }
+    if (zoneId) {
+      const bossDrops = grantBossMaterialDrops(enemy, zoneId)
+      drops.push(...bossDrops)
+    }
   } else if (tier === 'elite') {
     if (Math.random() < 0.5) { const c = getRandomCore('elite'); s.gainMaterial(c); drops.push(c) }
     const beast = getRandomCore('normal'); s.gainMaterial(beast); drops.push(beast)
@@ -748,15 +833,12 @@ function grantReward(effectiveZone, isIdleMode = false) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
-async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = false) {
-  const playerEntity = createPlayerEntity()
-  const enemy = generateZoneEnemy(effectiveZone, encounterCount)
+async function runSingleCombat(playerEntity, enemy, isIdleMode = false) {
   const manager = new CombatManager(playerEntity, enemy)
   manager.start()
   if (!isIdleMode) {
     combatState.value = { inCombat: true, combatManager: manager }
   }
-  // 安全护栏：即便底层战斗因异常未推进，也强行在有限回合内结束，避免主线程卡死
   let safetyGuard = 0
   while (manager.state === 'in_progress' && safetyGuard < 200) {
     safetyGuard++
@@ -779,13 +861,51 @@ async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = fals
     }
     if (!result) break
     if (result.state === 'victory') {
-      const drops = grantCombatDrops(enemy)
-      return { victory: true, manager, enemy, drops }
+      return { victory: true, manager, enemy }
     } else if (result.state === 'defeat') {
       return { victory: false, manager, enemy }
     }
   }
   return { victory: false, manager, enemy }
+}
+
+async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = false, difficultyKey = 'xiongxian') {
+  const playerEntity = createPlayerEntity()
+  const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
+  const allDrops = []
+  
+  if (enemyData.hasBoss && enemyData.allBosses.length > 1) {
+    let finalVictory = true
+    let lastManager = null
+    let lastEnemy = null
+    
+    for (let i = 0; i < enemyData.allBosses.length; i++) {
+      const boss = enemyData.allBosses[i]
+      const result = await runSingleCombat(playerEntity, boss, isIdleMode)
+      lastManager = result.manager
+      lastEnemy = result.enemy
+      
+      if (!result.victory) {
+        finalVictory = false
+        break
+      }
+      
+      const drops = grantCombatDrops(boss, effectiveZone.id)
+      allDrops.push(...drops)
+    }
+    
+    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses }
+  }
+  
+  const mainEnemy = enemyData.mainEnemy
+  const result = await runSingleCombat(playerEntity, mainEnemy, isIdleMode)
+  
+  if (result.victory) {
+    const drops = grantCombatDrops(mainEnemy, effectiveZone.id)
+    return { ...result, drops, allBosses: enemyData.allBosses }
+  }
+  
+  return { ...result, drops: allDrops, allBosses: enemyData.allBosses }
 }
 
 // ============ 宝物高亮弹窗 ============
@@ -955,7 +1075,7 @@ async function runIdleEncounter() {
       const memberRatio = memberState.buildStrength / (currentRecommendedBuild.value / teamMemberStates.value.length)
       const memberUnderBuilt = Math.max(0, 1 - memberRatio)
       
-      const result = await runExploreCombatForMember(effectiveZone, count, memberState, true)
+      const result = await runExploreCombatForMember(effectiveZone, count, memberState, true, selectedDifficultyKey.value)
       teamResults.push({ member: memberState, result })
       
       if (result.victory) {
@@ -1032,14 +1152,15 @@ async function runIdleEncounter() {
         }
       }
     } else {
-      loss = Math.floor(s.cultivation * 0.05)
-      s.cultivation = Math.max(0, s.cultivation - loss)
+      loss = Math.floor(s.cultivationPool * 0.05)
+      s.cultivationPool = Math.max(0, s.cultivationPool - loss)
       s.dungeonDeathCount++
       runStats.value.defeats++
     }
     
     const firstResult = teamResults[0]
-    const enemy = firstResult?.result?.enemy || generateZoneEnemy(effectiveZone, count)
+    const enemyData = firstResult?.result?.enemy ? { mainEnemy: firstResult.result.enemy, allBosses: firstResult.result.allBosses || [] } : generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
+    const enemy = enemyData.mainEnemy
     logEncounter(zone, diff, count, enemy, victory, rewards, loss)
     // 实时更新当前结算画面
     currentEncounterSummary.value = {
@@ -1075,43 +1196,142 @@ async function runIdleEncounter() {
   }
 }
 
-async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false) {
+async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false, difficultyKey = 'xiongxian') {
   const s = store()
   const member = s.sectMembers.find(m => m.id === memberState.memberId)
   if (!member) {
     return { victory: false, enemy: null }
   }
   
+  const baseStats = member.baseStats || {}
+  const combatAttrs = member.combatAttributes || {}
+  const combatResist = member.combatResistance || {}
+  const specialAttrs = member.specialAttributes || {}
+  const talentStats = member.talentStats || {}
+  
+  const calcFinalStat = (key, baseValue) => {
+    const talentVal = talentStats[key] || 0
+    if (['attack', 'health', 'defense', 'speed'].includes(key)) {
+      return Math.floor(baseValue * (1 + talentVal))
+    }
+    return baseValue + talentVal
+  }
+  
+  let finalHealth = calcFinalStat('health', baseStats.health || 0)
+  let finalDamage = calcFinalStat('attack', baseStats.attack || 0)
+  let finalDefense = calcFinalStat('defense', baseStats.defense || 0)
+  let finalSpeed = calcFinalStat('speed', baseStats.speed || 0)
+  
+  const equipBonus = {}
+  const artifacts = member.equippedArtifacts || {}
+  Object.values(artifacts).forEach(eq => {
+    if (!eq) return
+    if (eq.stats) {
+      Object.entries(eq.stats).forEach(([k, v]) => {
+        equipBonus[k] = (equipBonus[k] || 0) + v
+      })
+    }
+    if (eq.affixes) {
+      eq.affixes.forEach(a => {
+        if (a.valueType === 'percent') {
+          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
+        } else if (a.stat) {
+          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
+        }
+      })
+    }
+  })
+  
+  const applyEquipBonus = (key, baseVal) => {
+    const flat = equipBonus[key] || 0
+    const pct = equipBonus['__pct_' + key] || 0
+    return (baseVal + flat) * (1 + pct)
+  }
+  
+  finalHealth = Math.floor(applyEquipBonus('health', finalHealth))
+  finalDamage = Math.floor(applyEquipBonus('attack', finalDamage))
+  finalDefense = Math.floor(applyEquipBonus('defense', finalDefense))
+  finalSpeed = Math.floor(applyEquipBonus('speed', finalSpeed))
+  
+  const pet = member.equippedPet
+  if (pet && pet.combatAttributes) {
+    const pca = pet.combatAttributes
+    finalHealth += pca.health || 0
+    finalDamage += pca.attack || 0
+    finalDefense += pca.defense || 0
+    finalSpeed += pca.speed || 0
+  }
+  
   const stats = {
-    health: member.baseStats?.health || 0,
-    maxHealth: member.baseStats?.health || 0,
-    damage: member.baseStats?.attack || 0,
-    defense: member.baseStats?.defense || 0,
-    speed: member.baseStats?.speed || 0,
-    critRate: member.combatAttributes?.critRate || 0,
-    comboRate: member.combatAttributes?.comboRate || 0,
-    counterRate: member.combatAttributes?.counterRate || 0,
-    stunRate: member.combatAttributes?.stunRate || 0,
-    dodgeRate: member.combatAttributes?.dodgeRate || 0,
-    vampireRate: member.combatAttributes?.vampireRate || 0,
-    critResist: member.combatResistance?.critResist || 0,
-    comboResist: member.combatResistance?.comboResist || 0,
-    counterResist: member.combatResistance?.counterResist || 0,
-    stunResist: member.combatResistance?.stunResist || 0,
-    dodgeResist: member.combatResistance?.dodgeResist || 0,
-    vampireResist: member.combatResistance?.vampireResist || 0,
-    healBoost: member.specialAttributes?.healBoost || 0,
-    critDamageBoost: member.specialAttributes?.critDamageBoost || 0,
-    critDamageReduce: member.specialAttributes?.critDamageReduce || 0,
-    finalDamageBoost: member.specialAttributes?.finalDamageBoost || 0,
-    finalDamageReduce: member.specialAttributes?.finalDamageReduce || 0,
-    combatBoost: member.specialAttributes?.combatBoost || 0,
-    resistanceBoost: member.specialAttributes?.resistanceBoost || 0
+    health: finalHealth,
+    maxHealth: finalHealth,
+    damage: finalDamage,
+    defense: finalDefense,
+    speed: finalSpeed,
+    critRate: Math.min(1, calcFinalStat('critRate', combatAttrs.critRate || 0) + (equipBonus.critRate || 0) + (pet?.combatAttributes?.critRate || 0)),
+    comboRate: Math.min(1, calcFinalStat('comboRate', combatAttrs.comboRate || 0) + (equipBonus.comboRate || 0) + (pet?.combatAttributes?.comboRate || 0)),
+    counterRate: Math.min(1, calcFinalStat('counterRate', combatAttrs.counterRate || 0) + (equipBonus.counterRate || 0) + (pet?.combatAttributes?.counterRate || 0)),
+    stunRate: Math.min(1, calcFinalStat('stunRate', combatAttrs.stunRate || 0) + (equipBonus.stunRate || 0) + (pet?.combatAttributes?.stunRate || 0)),
+    dodgeRate: Math.min(1, calcFinalStat('dodgeRate', combatAttrs.dodgeRate || 0) + (equipBonus.dodgeRate || 0) + (pet?.combatAttributes?.dodgeRate || 0)),
+    vampireRate: Math.min(1, calcFinalStat('vampireRate', combatAttrs.vampireRate || 0) + (equipBonus.vampireRate || 0) + (pet?.combatAttributes?.vampireRate || 0)),
+    critResist: Math.min(1, calcFinalStat('critResist', combatResist.critResist || 0) + (equipBonus.critResist || 0) + (pet?.combatAttributes?.critResist || 0)),
+    comboResist: Math.min(1, calcFinalStat('comboResist', combatResist.comboResist || 0) + (equipBonus.comboResist || 0) + (pet?.combatAttributes?.comboResist || 0)),
+    counterResist: Math.min(1, calcFinalStat('counterResist', combatResist.counterResist || 0) + (equipBonus.counterResist || 0) + (pet?.combatAttributes?.counterResist || 0)),
+    stunResist: Math.min(1, calcFinalStat('stunResist', combatResist.stunResist || 0) + (equipBonus.stunResist || 0) + (pet?.combatAttributes?.stunResist || 0)),
+    dodgeResist: Math.min(1, calcFinalStat('dodgeResist', combatResist.dodgeResist || 0) + (equipBonus.dodgeResist || 0) + (pet?.combatAttributes?.dodgeResist || 0)),
+    vampireResist: Math.min(1, calcFinalStat('vampireResist', combatResist.vampireResist || 0) + (equipBonus.vampireResist || 0) + (pet?.combatAttributes?.vampireResist || 0)),
+    healBoost: calcFinalStat('healBoost', specialAttrs.healBoost || 0) + (equipBonus.healBoost || 0) + (pet?.combatAttributes?.healBoost || 0),
+    critDamageBoost: calcFinalStat('critDamageBoost', specialAttrs.critDamageBoost || 0) + (equipBonus.critDamageBoost || 0) + (pet?.combatAttributes?.critDamageBoost || 0),
+    critDamageReduce: calcFinalStat('critDamageReduce', specialAttrs.critDamageReduce || 0) + (equipBonus.critDamageReduce || 0) + (pet?.combatAttributes?.critDamageReduce || 0),
+    finalDamageBoost: calcFinalStat('finalDamageBoost', specialAttrs.finalDamageBoost || 0) + (equipBonus.finalDamageBoost || 0) + (pet?.combatAttributes?.finalDamageBoost || 0),
+    finalDamageReduce: calcFinalStat('finalDamageReduce', specialAttrs.finalDamageReduce || 0) + (equipBonus.finalDamageReduce || 0) + (pet?.combatAttributes?.finalDamageReduce || 0),
+    combatBoost: calcFinalStat('combatBoost', specialAttrs.combatBoost || 0) + (equipBonus.combatBoost || 0) + (pet?.combatAttributes?.combatBoost || 0),
+    resistanceBoost: calcFinalStat('resistanceBoost', specialAttrs.resistanceBoost || 0) + (equipBonus.resistanceBoost || 0) + (pet?.combatAttributes?.resistanceBoost || 0)
   }
   
   const playerEntity = new CombatEntity(member.name, member.level, stats, member.schoolName)
-  const enemy = generateZoneEnemy(effectiveZone, encounterCount)
-  const manager = new CombatManager(playerEntity, enemy)
+  const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
+  const allDrops = []
+  
+  if (enemyData.hasBoss && enemyData.allBosses.length > 1) {
+    let finalVictory = true
+    let lastManager = null
+    let lastEnemy = null
+    
+    for (let i = 0; i < enemyData.allBosses.length; i++) {
+      const boss = enemyData.allBosses[i]
+      const manager = new CombatManager(playerEntity, boss)
+      manager.start()
+      
+      let safetyGuard = 0
+      let combatResult = null
+      while (manager.state === 'in_progress' && safetyGuard < 200) {
+        safetyGuard++
+        const result = manager.executeTurn()
+        if (!result) break
+        if (result.state === 'victory' || result.state === 'defeat') {
+          combatResult = result
+          break
+        }
+      }
+      
+      lastManager = manager
+      lastEnemy = boss
+      
+      if (!combatResult || combatResult.state !== 'victory') {
+        finalVictory = false
+        break
+      }
+      
+      const drops = grantCombatDrops(boss, effectiveZone.id)
+      allDrops.push(...drops)
+    }
+    
+    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses }
+  }
+  
+  const mainEnemy = enemyData.mainEnemy
+  const manager = new CombatManager(playerEntity, mainEnemy)
   manager.start()
   
   let safetyGuard = 0
@@ -1120,13 +1340,13 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     const result = manager.executeTurn()
     if (!result) break
     if (result.state === 'victory') {
-      const drops = grantCombatDrops(enemy)
-      return { victory: true, manager, enemy, drops }
+      const drops = grantCombatDrops(mainEnemy, effectiveZone.id)
+      return { victory: true, manager, enemy: mainEnemy, drops, allBosses: enemyData.allBosses }
     } else if (result.state === 'defeat') {
-      return { victory: false, manager, enemy }
+      return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses }
     }
   }
-  return { victory: false, manager, enemy }
+  return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses }
 }
 
 // ============ 离线补算（轻量结算，避免卡顿） ============
@@ -1151,8 +1371,8 @@ function runOfflineEncounter(zone, diff, count) {
     logEncounter(zone, diff, count, { name: zone.monsters[0], tier: 'normal' }, true, rewards, 0)
     runStats.value.victories++
   } else {
-    const loss = Math.floor(s.cultivation * 0.05)
-    s.cultivation = Math.max(0, s.cultivation - loss)
+    const loss = Math.floor(s.cultivationPool * 0.05)
+    s.cultivationPool = Math.max(0, s.cultivationPool - loss)
     s.dungeonDeathCount++
     logEncounter(zone, diff, count, { name: zone.monsters[0], tier: 'normal' }, false, [], loss)
     runStats.value.defeats++
@@ -1195,13 +1415,41 @@ function startIdle(durationMinutes) {
   idleBuffs.value = []
   
   const team = s.getTeamMembersDetail()
-  teamMemberStates.value = team.map(member => ({
-    memberId: member.id,
-    name: member.name,
-    hp: member.baseStats?.health || 0,
-    maxHP: member.baseStats?.health || 0,
-    buildStrength: s.getCharacterBuildStrength(member)
-  }))
+  teamMemberStates.value = team.map(member => {
+    let maxHP = member.baseStats?.health || 0
+    const talentStats = member.talentStats || {}
+    const talentHealthMult = 1 + (talentStats.health || 0)
+    maxHP = Math.floor(maxHP * talentHealthMult)
+    
+    const artifacts = member.equippedArtifacts || {}
+    let equipHealthFlat = 0
+    let equipHealthPct = 0
+    Object.values(artifacts).forEach(eq => {
+      if (!eq) return
+      if (eq.stats?.health) equipHealthFlat += eq.stats.health
+      if (eq.affixes) {
+        eq.affixes.forEach(a => {
+          if (a.stat === 'health') {
+            if (a.valueType === 'percent') equipHealthPct += a.value
+            else equipHealthFlat += a.value
+          }
+        })
+      }
+    })
+    maxHP = Math.floor((maxHP + equipHealthFlat) * (1 + equipHealthPct))
+    
+    if (member.equippedPet?.combatAttributes?.health) {
+      maxHP += member.equippedPet.combatAttributes.health
+    }
+    
+    return {
+      memberId: member.id,
+      name: member.name,
+      hp: maxHP,
+      maxHP: maxHP,
+      buildStrength: s.getCharacterBuildStrength(member)
+    }
+  })
   
   logs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
   logs.value.push({ type: 'info', text: `🚀 出战阵容：${team.map(m => m.name).join('、') || '无成员'}`, time: new Date().toLocaleTimeString() })

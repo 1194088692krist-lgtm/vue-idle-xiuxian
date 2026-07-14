@@ -12,14 +12,14 @@
         </div>
       </div>
       <div class="card-body">
-        <!-- 修改道号 -->
+        <!-- 修改洞天字号 -->
         <div class="setting-row">
-          <label class="setting-label">修改道号</label>
+          <label class="setting-label">修改洞天字号</label>
           <div class="setting-input-group">
             <input
               v-model="newName"
               class="setting-input"
-              placeholder="输入新的道号"
+              placeholder="输入新的洞天字号"
               :maxlength="maxLength"
             />
             <button class="btn btn-primary" :disabled="!newName.trim()" @click="handleChangeName">
@@ -152,6 +152,7 @@
     InfoCircleOutlined,
     GithubOutlined
   } from '@ant-design/icons-vue'
+  import { GAME_VERSION, GAME_VERSION_NAME, GAME_VERSION_DATE } from '../plugins/version'
 
   const clickCount = ref(0)
   const newName = ref('')
@@ -159,7 +160,7 @@
   const maxLength = 6
   const playerStore = usePlayerStore()
   const dialog = useDialog()
-  const version = __APP_VERSION__
+  const version = `${GAME_VERSION} · ${GAME_VERSION_NAME}（${GAME_VERSION_DATE}）`
   const qq = ref(false)
 
   // 存档槽位数据
@@ -319,20 +320,20 @@
     })
   }
 
-  // 修改道号
+  // 修改洞天字号
   const handleChangeName = () => {
     if (!newName.value.trim()) {
-      message.warning('道号不能为空！')
+      message.warning('洞天字号不能为空！')
       return
     }
     if (newName.value.trim().length > maxLength) {
-      message.warning(`道号长度不能超过${maxLength}个字符！`)
+      message.warning(`洞天字号长度不能超过${maxLength}个字符！`)
       return
     }
     const cost = playerStore.nameChangeCount === 0 ? 0 : Math.pow(2, playerStore.nameChangeCount) * 100
     if (playerStore.nameChangeCount > 0) {
       if (playerStore.spiritStones < cost) {
-        message.error(`灵石不足！修改道号需要${cost}颗灵石`)
+        message.error(`灵石不足！修改洞天字号需要${cost}颗灵石`)
         return
       }
       playerStore.spiritStones -= cost
@@ -341,7 +342,7 @@
     playerStore.nameChangeCount++
     playerStore.saveData()
     message.success(
-      playerStore.nameChangeCount === 1 ? '道号修改成功！首次修改免费' : `道号修改成功！消耗${cost}颗灵石`
+      playerStore.nameChangeCount === 1 ? '洞天字号修改成功！首次修改免费' : `洞天字号修改成功！消耗${cost}颗灵石`
     )
     newName.value = ''
   }

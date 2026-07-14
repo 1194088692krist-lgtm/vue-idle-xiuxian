@@ -5,6 +5,28 @@
         <n-spin :show="isLoading" description="正在加载游戏数据...">
           <router-view v-if="isStartScreen" />
           <div v-else class="game-container">
+            <!-- 桌面端左侧导航栏 -->
+            <nav class="desktop-sidebar">
+              <div class="desktop-sidebar-inner">
+                <div class="sidebar-logo">仙</div>
+                <div
+                  v-for="item in allMenuItems"
+                  :key="item.key"
+                  class="nav-item"
+                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  @click="handleMenuClick(item.key)"
+                >
+                  <n-icon class="nav-icon">
+                    <component :is="item.icon" />
+                  </n-icon>
+                </div>
+                <div class="sidebar-save-btn">
+                  <SaveButton />
+                </div>
+              </div>
+            </nav>
+
+            <div class="main-column">
             <!-- 顶部状态栏 -->
             <header class="top-bar">
               <div class="player-info">
@@ -37,20 +59,19 @@
               </div>
             </header>
 
-            <!-- 修为进度条 -->
+            <!-- 修为池 -->
             <div class="cultivation-bar">
               <div class="cultivation-info">
-                <span class="cultivation-label">修为</span>
-                <span class="cultivation-text">{{ animatedCultivation }} / {{ playerStore.maxCultivation }}</span>
+                <span class="cultivation-label">修为池</span>
+                <span class="cultivation-text">{{ animatedCultivation }}</span>
               </div>
               <div class="cultivation-progress">
                 <div class="progress-bar">
-                  <div class="progress-fill" :style="{ width: cultivationPercentage + '%' }">
+                  <div class="progress-fill cultivation-pool-fill" style="width: 100%">
                     <div class="progress-shimmer"></div>
                   </div>
                 </div>
               </div>
-              <div class="cultivation-percent">{{ cultivationPercentage.toFixed(1) }}%</div>
             </div>
 
             <!-- 主内容区 -->
@@ -95,6 +116,7 @@
                 <SaveButton />
               </div>
             </nav>
+            </div>
           </div>
         </n-spin>
       </n-dialog-provider>
@@ -151,7 +173,7 @@ import SaveButton from './components/SaveButton.vue'
     isNewPlayer.value = playerStore.isNewPlayer
     animatedSpirit.value = playerStore.spirit.toFixed(2)
     animatedStones.value = playerStore.spiritStones
-    animatedCultivation.value = playerStore.cultivation
+    animatedCultivation.value = playerStore.cultivationPool || 0
     animatedCrystals.value = playerStore.phantomCrystals
     getMenuItems()
     // 常驻挂机探索：玩家数据就绪后恢复并启动后台推进（离开探索页仍持续）
@@ -174,8 +196,8 @@ import SaveButton from './components/SaveButton.vue'
     animateValue(animatedStones, val, 500, stonesRaf)
   })
 
-  watch(() => playerStore.cultivation, val => {
-    animateValue(animatedCultivation, val, 300, cultivationRaf)
+  watch(() => playerStore.cultivationPool, val => {
+    animateValue(animatedCultivation, val || 0, 300, cultivationRaf)
   })
 
   watch(() => playerStore.phantomCrystals, val => {
@@ -202,6 +224,14 @@ import SaveButton from './components/SaveButton.vue'
       return true
     })
     return items.slice(Math.ceil(items.length / 2))
+  })
+
+  const allMenuItems = computed(() => {
+    return menuItems.value.filter(item => {
+      if (item.key === '') return isNewPlayer.value
+      if (item.key === 'gm') return playerStore.isGMMode
+      return true
+    })
   })
 
   const realmColors = [
@@ -325,10 +355,6 @@ import SaveButton from './components/SaveButton.vue'
 
   const baseGainRate = 1
 
-  const cultivationPercentage = computed(() => {
-    return (playerStore.cultivation / playerStore.maxCultivation) * 100
-  })
-
   const animateValue = (ref, target, duration, rafRef) => {
     if (rafRef.value) {
       cancelAnimationFrame(rafRef.value)
@@ -358,6 +384,14 @@ import SaveButton from './components/SaveButton.vue'
     height: 100dvh;
     overflow: hidden;
     background: linear-gradient(135deg, #0D0D12 0%, #1A1A2E 50%, #0D0D12 100%);
+  }
+
+  .main-column {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    min-width: 0;
+    overflow: hidden;
   }
 
   /* 顶部状态栏 */
@@ -548,13 +582,8 @@ import SaveButton from './components/SaveButton.vue'
     100% { transform: translateX(100%); }
   }
 
-  .cultivation-percent {
-    font-size: 11px;
-    color: #DAA520;
-    font-weight: bold;
-    flex-shrink: 0;
-    min-width: 36px;
-    text-align: right;
+  .cultivation-pool-fill {
+    background: linear-gradient(90deg, #9b59b6, #8e44ad, #9b59b6);
   }
 
   /* 主内容区 */
@@ -714,6 +743,168 @@ import SaveButton from './components/SaveButton.vue'
 
     .content-area {
       padding: 8px;
+    }
+  }
+
+  /* 桌面端左侧导航栏 - 默认隐藏 */
+  .desktop-sidebar {
+    display: none;
+  }
+
+  /* 桌面端布局 (≥1024px) */
+  @media (min-width: 1024px) {
+    body {
+      background: #0D0D12;
+    }
+
+    .game-container {
+      max-width: none;
+      margin: 0;
+      border-left: none;
+      border-right: none;
+      box-shadow: none;
+      position: relative;
+      display: flex;
+      flex-direction: row;
+    }
+
+    .desktop-sidebar {
+      display: flex;
+      position: fixed;
+      left: 0;
+      top: 0;
+      width: 80px;
+      height: 100vh;
+      background: rgba(15, 18, 25, 0.98);
+      backdrop-filter: blur(20px);
+      border-right: 1px solid rgba(139, 69, 19, 0.25);
+      z-index: 100;
+      flex-direction: column;
+    }
+
+    .desktop-sidebar-inner {
+      display: flex;
+      flex-direction: column;
+      align-items: center;
+      justify-content: flex-start;
+      height: 100%;
+      width: 100%;
+      padding: 16px 0 12px;
+      gap: 4px;
+    }
+
+    .sidebar-logo {
+      font-size: 28px;
+      margin-bottom: 16px;
+      color: #DAA520;
+      text-shadow: 0 0 10px rgba(218, 165, 32, 0.4);
+    }
+
+    .desktop-sidebar .nav-item {
+      flex-direction: column;
+      width: 100%;
+      max-width: none;
+      height: 56px;
+      flex: none;
+      border-radius: 0;
+      gap: 2px;
+      padding: 6px 0;
+      transition: all 0.2s;
+      border-left: 3px solid transparent;
+    }
+
+    .desktop-sidebar .nav-item.active {
+      border-left-color: #DAA520;
+      background: rgba(218, 165, 32, 0.08);
+    }
+
+    .desktop-sidebar .nav-item:hover {
+      background: rgba(218, 165, 32, 0.05);
+    }
+
+    .desktop-sidebar .nav-icon {
+      font-size: 22px;
+    }
+
+    .desktop-sidebar .nav-label {
+      font-size: 10px;
+    }
+
+    .sidebar-save-btn {
+      margin-top: auto;
+      padding: 10px 0;
+    }
+
+    .main-column {
+      margin-left: 80px;
+      flex: 1;
+      display: flex;
+      flex-direction: column;
+      min-height: 100vh;
+    }
+
+    .top-bar {
+      position: sticky;
+      top: 0;
+      z-index: 50;
+      padding: 10px 24px;
+      gap: 16px;
+    }
+
+    .player-name {
+      font-size: 16px;
+      max-width: none;
+    }
+
+    .resource-bar {
+      gap: 20px;
+    }
+
+    .resource-item {
+      padding: 4px 12px;
+    }
+
+    .cultivation-bar {
+      padding: 6px 24px;
+    }
+
+    .bottom-nav {
+      display: none;
+    }
+
+    .content-area {
+      max-width: 800px;
+      margin: 0 auto;
+      width: 100%;
+      padding: 20px 24px;
+    }
+  }
+
+  /* 大屏幕优化 (≥1440px) */
+  @media (min-width: 1440px) {
+    .desktop-sidebar {
+      width: 90px;
+    }
+
+    .main-column {
+      margin-left: 90px;
+    }
+
+    .content-area {
+      max-width: 960px;
+      padding: 24px 32px;
+    }
+
+    .desktop-sidebar .nav-item {
+      height: 60px;
+    }
+
+    .desktop-sidebar .nav-icon {
+      font-size: 24px;
+    }
+
+    .desktop-sidebar .nav-label {
+      font-size: 11px;
     }
   }
 </style>

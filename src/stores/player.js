@@ -5,6 +5,7 @@ import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 import { getSkillsForBreakthrough } from '../plugins/skills'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -52,11 +53,12 @@ export const usePlayerStore = defineStore('player', {
     },
     // 基础属性
     name: '无名修士',
-    nameChangeCount: 0, // 道号修改次数
+    nameChangeCount: 0, // 洞天字号修改次数
     level: 1, // 境界等级
     realm: '练气期一层', // 当前境界名称
-    cultivation: 0, // 当前修为值
-    maxCultivation: 100, // 当前境界最大修为值
+    cultivation: 0, // 当前修为值（兼容旧存档）
+    maxCultivation: 100, // 当前境界最大修为值（兼容旧存档）
+    cultivationPool: 0, // 公共修为池
     spirit: 1000, // 灵力值
     maxSpirit: 1000, // 灵力上限
     spiritRate: 1, // 灵力获取倍率
@@ -393,6 +395,9 @@ export const usePlayerStore = defineStore('player', {
       return (this.pillEffects || [])
         .filter(e => e.type === 'dropRate' && e.endTime > now)
         .reduce((s, e) => s + (e.value || 0), 0)
+    },
+    getCultivationPool() {
+      return this.cultivationPool || 0
     }
   },
   actions: {
@@ -690,14 +695,18 @@ export const usePlayerStore = defineStore('player', {
     cultivate(amount) {
       const numAmount = Number(amount)
       if (!Number.isFinite(numAmount)) return
-      this.cultivation = Number(this.cultivation) || 0
       // 悟道丹（expGain）提升修为获取
       const bonus = 1 + (this.expBonus || 0)
-      this.cultivation += numAmount * bonus
+      const gained = numAmount * bonus
+      this.addCultivationToPool(gained)
       this.totalCultivationTime += 1 // 增加修炼时间统计
-      if (this.cultivation >= this.maxCultivation) {
-        this.tryBreakthrough()
-      }
+      this.queueSave()
+    },
+    // 增加公共池修为
+    addCultivationToPool(amount) {
+      const numAmount = Number(amount)
+      if (!Number.isFinite(numAmount) || numAmount <= 0) return
+      this.cultivationPool = (this.cultivationPool || 0) + numAmount
       this.queueSave()
     },
     // 尝试突破
@@ -1689,6 +1698,87 @@ export const usePlayerStore = defineStore('player', {
         }
       }
       return result
+    },
+    // 从公共池分配修为给角色
+    allocateCultivationToMember(memberId, amount) {
+      const numAmount = Number(amount)
+      if (!Number.isFinite(numAmount) || numAmount <= 0) {
+        return { success: false, message: '无效的修为数量' }
+      }
+      if (!this.cultivationPool || this.cultivationPool < numAmount) {
+        return { success: false, message: '公共修为池不足' }
+      }
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) {
+        return { success: false, message: '成员不存在' }
+      }
+      if (!member.level) member.level = 1
+      if (!member.experience) member.experience = 0
+      if (!member.baseStats) {
+        member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+      }
+      this.cultivationPool -= numAmount
+      member.experience += numAmount
+      let levelsGained = 0
+      let breakthroughCount = 0
+      while (true) {
+        const requiredExp = calculateLevelExp(member.level)
+        if (member.experience < requiredExp) break
+        const nextLevel = member.level + 1
+        if (member.level % 9 === 0 && member.level > 0) {
+          const breakthroughCost = calculateBreakthroughCost(member.level)
+          if (this.spiritStones < breakthroughCost.spiritStones) {
+            break
+          }
+          let hasAllMaterials = true
+          if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
+            for (const mat of breakthroughCost.materials) {
+              const matCount = this.materials.filter(m => m.id === mat.id).length
+              if (matCount < mat.amount) {
+                hasAllMaterials = false
+                break
+              }
+            }
+          }
+          if (!hasAllMaterials) break
+          this.spiritStones -= breakthroughCost.spiritStones
+          if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
+            for (const mat of breakthroughCost.materials) {
+              let remaining = mat.amount
+              for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+                if (this.materials[i].id === mat.id) {
+                  this.materials.splice(i, 1)
+                  remaining--
+                }
+              }
+            }
+          }
+          breakthroughCount++
+        }
+        member.experience -= requiredExp
+        member.level = nextLevel
+        const statIncrease = calculateStatIncrease(member.level)
+        member.baseStats.attack += statIncrease.attack
+        member.baseStats.health += statIncrease.health
+        member.baseStats.defense += statIncrease.defense
+        member.baseStats.speed += statIncrease.speed
+        levelsGained++
+      }
+      this.queueSave()
+      let message = `成功分配 ${numAmount} 修为给 ${member.name}`
+      if (levelsGained > 0) {
+        message += `，升级 ${levelsGained} 级`
+        if (breakthroughCount > 0) {
+          message += `（突破 ${breakthroughCount} 次大境界）`
+        }
+      }
+      return {
+        success: true,
+        message,
+        levelsGained,
+        breakthroughCount,
+        newLevel: member.level
+      }
     },
     // 更新角色头像
     updateCharacterAvatar(memberId, avatarData) {

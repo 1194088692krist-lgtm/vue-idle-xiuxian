@@ -8,7 +8,7 @@
           </n-button>
         </template>
         <n-form>
-          <n-form-item label="道号">
+          <n-form-item label="洞天字号">
             <n-input v-model:value="baseAttributes.name" />
           </n-form-item>
           <n-form-item label="境界等级">

@@ -23,6 +23,41 @@
       </div>
     </div>
 
+    <!-- 修为公共池 -->
+    <div class="cultivation-pool glass-card">
+      <h3 class="section-title">修为公共池</h3>
+      <div class="pool-display">
+        <div class="pool-amount">
+          <span class="pool-value">{{ formatNumber(playerStore.getCultivationPool()) }}</span>
+          <span class="pool-label">点修为</span>
+        </div>
+        <div class="pool-hint">修为可自由分配给宗门任意成员</div>
+      </div>
+      <div class="allocate-section" v-if="selectedMember">
+        <div class="allocate-header">
+          <span>分配给：{{ selectedMember.name }}</span>
+          <span class="current-exp">当前：Lv.{{ selectedMember.level }} ({{ selectedMember.experience || 0 }} / {{ getRequiredExp(selectedMember.level) }})</span>
+        </div>
+        <div class="allocate-controls">
+          <input 
+            type="number" 
+            v-model.number="allocateAmount" 
+            min="1" 
+            :max="Math.min(playerStore.getCultivationPool(), 999999)"
+            placeholder="输入修为数量"
+            class="allocate-input"
+          />
+          <button class="btn btn-small btn-primary" @click="allocateQuick(100)">+100</button>
+          <button class="btn btn-small btn-primary" @click="allocateQuick(1000)">+1000</button>
+          <button class="btn btn-small btn-success" @click="doAllocate">分配</button>
+        </div>
+        <div class="allocate-quick">
+          <button class="btn btn-small btn-outline" @click="allocateMax">一键拉满</button>
+          <button class="btn btn-small btn-outline" @click="allocateToNextLevel">升到下一级</button>
+        </div>
+      </div>
+    </div>
+
     <!-- 2. 角色选择区 -->
     <div class="member-select glass-card">
       <label>选择角色</label>
@@ -64,47 +99,36 @@
       </div>
 
       <div class="attr-block">
-        <h4 class="sub-title">属性面板</h4>
-        <div class="attr-table scrollable-table">
-          <div class="attr-row attr-head">
-            <span class="attr-col-label">属性</span>
-            <span class="attr-col-base">基础</span>
-            <span class="attr-col-delta">加成</span>
-            <span class="attr-col-final">最终</span>
-          </div>
-          <div v-for="stat in mainStats.slice(0, 7)" :key="stat.key" class="attr-row">
-            <span class="attr-col-label">{{ stat.name }}</span>
-            <span class="attr-col-base">{{ stat.base }}</span>
-            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-            <span class="attr-col-final">{{ stat.final }}</span>
-          </div>
-        </div>
-        <div class="attr-table" style="margin-top:10px">
-          <div class="attr-row attr-head">
-            <span class="attr-col-label">战斗属性</span>
-            <span class="attr-col-base">基础</span>
-            <span class="attr-col-delta">加成</span>
-            <span class="attr-col-final">最终</span>
-          </div>
-          <div v-for="stat in combatStats" :key="stat.key" class="attr-row">
-            <span class="attr-col-label">{{ stat.name }}</span>
-            <span class="attr-col-base">{{ stat.base }}</span>
-            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-            <span class="attr-col-final">{{ stat.final }}</span>
-          </div>
-        </div>
-        <div class="attr-table" style="margin-top:10px">
-          <div class="attr-row attr-head">
-            <span class="attr-col-label">特殊属性</span>
-            <span class="attr-col-base">基础</span>
-            <span class="attr-col-delta">加成</span>
-            <span class="attr-col-final">最终</span>
-          </div>
-          <div v-for="stat in specialStats" :key="stat.key" class="attr-row">
-            <span class="attr-col-label">{{ stat.name }}</span>
-            <span class="attr-col-base">{{ stat.base }}</span>
-            <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
-            <span class="attr-col-final">{{ stat.final }}</span>
+        <h4 class="sub-title">属性面板 <span class="scroll-hint">（下滑查看更多）</span></h4>
+        <div class="attr-table-wrap">
+          <div class="attr-table scrollable-table">
+            <div class="attr-row attr-head sticky-head">
+              <span class="attr-col-label">属性</span>
+              <span class="attr-col-base">基础</span>
+              <span class="attr-col-delta">加成</span>
+              <span class="attr-col-final">最终</span>
+            </div>
+            <div class="attr-group-title">基础属性</div>
+            <div v-for="stat in mainStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+            <div class="attr-group-title">战斗属性</div>
+            <div v-for="stat in combatStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+            <div class="attr-group-title">特殊属性</div>
+            <div v-for="stat in specialStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">{{ stat.base }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
+              <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
           </div>
         </div>
       </div>
@@ -413,9 +437,54 @@ import { characterSchools, characterTalents, starConfig, getCharacterAvatar } fr
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
+import { calculateLevelExp } from '../plugins/cultivationSystem'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
+
+const allocateAmount = ref(100)
+
+const formatNumber = num => {
+  if (!num) return 0
+  if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
+  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
+  return Math.floor(num).toLocaleString()
+}
+
+const getRequiredExp = (level) => {
+  return calculateLevelExp(level || 1)
+}
+
+const allocateQuick = (amount) => {
+  allocateAmount.value = Math.min(
+    (allocateAmount.value || 0) + amount,
+    playerStore.getCultivationPool()
+  )
+}
+
+const allocateMax = () => {
+  allocateAmount.value = playerStore.getCultivationPool()
+}
+
+const allocateToNextLevel = () => {
+  if (!selectedMember.value) return
+  const required = calculateLevelExp(selectedMember.value.level) - (selectedMember.value.experience || 0)
+  allocateAmount.value = Math.min(required, playerStore.getCultivationPool())
+}
+
+const doAllocate = () => {
+  if (!selectedMember.value || !allocateAmount.value || allocateAmount.value <= 0) {
+    message.warning('请输入有效的修为数量')
+    return
+  }
+  const result = playerStore.allocateCultivationToMember(selectedMember.value.id, allocateAmount.value)
+  if (result.success) {
+    message.success(result.message)
+    allocateAmount.value = 100
+  } else {
+    message.error(result.message)
+  }
+}
 
 const selectedMemberId = ref('')
 const showEquipSelect = ref(false)
@@ -969,15 +1038,25 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   font-weight: bold;
 }
 .attr-block { margin-top: 12px; }
+.attr-table-wrap {
+  border-radius: 8px;
+  overflow: hidden;
+}
 .attr-table {
   display: flex;
   flex-direction: column;
   gap: 2px;
 }
+.scroll-hint {
+  font-size: 11px;
+  color: #888;
+  font-weight: normal;
+  margin-left: 6px;
+}
 .scrollable-table {
-  max-height: 200px;
+  max-height: 260px;
   overflow-y: auto;
-  border-radius: 8px;
+  padding-right: 4px;
 }
 
 .scrollable-table::-webkit-scrollbar {
@@ -997,6 +1076,26 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
 .scrollable-table::-webkit-scrollbar-thumb:hover {
   background: rgba(218, 165, 32, 0.7);
 }
+
+.sticky-head {
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  backdrop-filter: blur(8px);
+  background: rgba(35, 30, 50, 0.95) !important;
+}
+
+.attr-group-title {
+  padding: 6px 8px;
+  font-size: 12px;
+  font-weight: bold;
+  color: #DAA520;
+  background: rgba(218, 165, 32, 0.08);
+  border-radius: 4px;
+  margin-top: 4px;
+  margin-bottom: 2px;
+}
+
 .attr-row {
   display: grid;
   grid-template-columns: 1.1fr 0.9fr 0.9fr 0.9fr;
@@ -1214,6 +1313,92 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
 }
 
 /* ===== 新增样式 ===== */
+
+/* 修为公共池 */
+.cultivation-pool {
+  padding: 16px;
+  border-radius: 12px;
+}
+.pool-display {
+  text-align: center;
+  padding: 16px 0;
+  background: linear-gradient(135deg, rgba(139, 69, 19, 0.1), rgba(218, 165, 32, 0.08));
+  border-radius: 10px;
+  margin-bottom: 16px;
+  border: 1px solid rgba(218, 165, 32, 0.2);
+}
+.pool-amount {
+  display: flex;
+  align-items: baseline;
+  justify-content: center;
+  gap: 8px;
+}
+.pool-value {
+  font-size: 28px;
+  font-weight: bold;
+  color: #DAA520;
+  text-shadow: 0 0 20px rgba(218, 165, 32, 0.5);
+}
+.pool-label {
+  font-size: 14px;
+  color: #888;
+}
+.pool-hint {
+  font-size: 12px;
+  color: #666;
+  margin-top: 6px;
+}
+.allocate-section {
+  border-top: 1px solid rgba(255,255,255,0.1);
+  padding-top: 12px;
+}
+.allocate-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  font-size: 13px;
+  color: #aaa;
+  margin-bottom: 10px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.current-exp {
+  color: #DAA520;
+}
+.allocate-controls {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  margin-bottom: 8px;
+  flex-wrap: wrap;
+}
+.allocate-input {
+  flex: 1;
+  min-width: 100px;
+  padding: 8px 12px;
+  border-radius: 8px;
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  background: rgba(0, 0, 0, 0.3);
+  color: #fff;
+  font-size: 14px;
+  outline: none;
+}
+.allocate-input:focus {
+  border-color: rgba(218, 165, 32, 0.6);
+}
+.allocate-quick {
+  display: flex;
+  gap: 8px;
+  justify-content: flex-end;
+}
+.btn-outline {
+  background: transparent;
+  color: #DAA520;
+  border: 1px solid rgba(218, 165, 32, 0.4);
+}
+.btn-outline:hover {
+  background: rgba(218, 165, 32, 0.1);
+}
 
 /* 宗门概览 */
 .sect-overview {

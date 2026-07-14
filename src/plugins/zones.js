@@ -4,11 +4,11 @@
 // cost  : 每场遭遇的灵力消耗
 // drop  : 掉落率/品质加成
 const DIFFICULTY_TEMPLATES = [
-  { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.6, cost: 8,  drop: 1.0 },
-  { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.9, cost: 15, drop: 1.15 },
-  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 40, drop: 1.3 },
-  { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.8, cost: 80, drop: 1.5 },
-  { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.8, cost: 150, drop: 1.8 }
+  { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.6, cost: 10,  drop: 1.0 },
+  { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.9, cost: 25, drop: 1.15 },
+  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 80, drop: 1.3 },
+  { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.8, cost: 200, drop: 1.5 },
+  { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.8, cost: 500, drop: 1.8 }
 ]
 
 // 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
