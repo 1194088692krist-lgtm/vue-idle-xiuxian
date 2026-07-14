@@ -60,7 +60,7 @@
               @click="showEquipmentDetails(item)"
             >
               <div class="card-header">
-                <span :style="{ color: qualityInfoOf(item).color }">
+                <span :style="{ color: qualityInfoOf(item).color }" :class="'text-glow-' + (item.quality || 'common')">
                   {{ item.name }}
                   <span class="equip-category-tag">{{ getEquipCategoryName(item.slot) }}</span>
                 </span>

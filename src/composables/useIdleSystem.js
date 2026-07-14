@@ -976,12 +976,6 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
       const passiveSkills = (member.skills || []).filter(s => s.type === 'passive')
       passiveSkills.forEach(skill => extras.push(`【${skill.name}】`))
       
-      const artifacts = member.equippedArtifacts || {}
-      for (const [slot, eq] of Object.entries(artifacts)) {
-        if (!eq || !eq.affixes || eq.affixes.length === 0) continue
-        extras.push(eq.name)
-      }
-      
       if (extras.length > 0) {
         text += `（${extras.join('·')}）`
       }

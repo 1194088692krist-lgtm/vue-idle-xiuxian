@@ -525,33 +525,35 @@
     </Teleport>
 
     <!-- 战斗奖励装备详情弹窗 -->
-    <div v-if="showBattleRewardEqDetail && battleRewardEqDetail" class="equip-select-modal" @click.self="closeBattleRewardEquipDetail">
-      <div class="modal-content glass-card" @click.stop>
-        <button class="btn btn-warning btn-close" @click="closeBattleRewardEquipDetail">关闭</button>
-        <div class="modal-header" :style="{ borderColor: battleRewardEqDetail.color }">
-          <span class="modal-title" :style="{ color: battleRewardEqDetail.color }">{{ battleRewardEqDetail.name }}</span>
-          <span>{{ battleRewardEqDetail.rarityName }}</span>
-          <span>·</span>
-          <span>评分 {{ battleRewardEqDetail.score || 0 }}</span>
-        </div>
-        <div v-if="battleRewardEqDetail.stats && Object.keys(battleRewardEqDetail.stats).length" class="attr-block">
-          <h4 class="sub-title">基础数据</h4>
-          <div class="attr-table">
-            <div v-for="(v, k) in battleRewardEqDetail.stats" :key="k" class="attr-row">
-              <span class="attr-col-label">{{ getStatName(k) }}</span>
-              <span class="attr-col-final">{{ formatStatValue(k, v) }}</span>
+    <Teleport to="body">
+      <div v-if="showBattleRewardEqDetail && battleRewardEqDetail" class="equip-select-modal" @click.self="closeBattleRewardEquipDetail">
+        <div class="modal-content glass-card" @click.stop>
+          <button class="btn btn-warning btn-close" @click="closeBattleRewardEquipDetail">关闭</button>
+          <div class="modal-header" :style="{ borderColor: battleRewardEqDetail.color }">
+            <span class="modal-title" :style="{ color: battleRewardEqDetail.color }">{{ battleRewardEqDetail.name }}</span>
+            <span>{{ battleRewardEqDetail.rarityName }}</span>
+            <span>·</span>
+            <span>评分 {{ battleRewardEqDetail.score || 0 }}</span>
+          </div>
+          <div v-if="battleRewardEqDetail.stats && Object.keys(battleRewardEqDetail.stats).length" class="attr-block">
+            <h4 class="sub-title">基础数据</h4>
+            <div class="attr-table">
+              <div v-for="(v, k) in battleRewardEqDetail.stats" :key="k" class="attr-row">
+                <span class="attr-col-label">{{ getStatName(k) }}</span>
+                <span class="attr-col-final">{{ formatStatValue(k, v) }}</span>
+              </div>
+            </div>
+          </div>
+          <div v-if="battleRewardEqDetail.affixes && battleRewardEqDetail.affixes.length" class="attr-block">
+            <h4 class="sub-title">词条</h4>
+            <div v-for="a in battleRewardEqDetail.affixes" :key="a.id" class="attr-row">
+              <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
+              <span class="attr-col-final">{{ a.valueType === 'percent' ? (a.value * 100).toFixed(1) + '%' : a.value }}</span>
             </div>
           </div>
         </div>
-        <div v-if="battleRewardEqDetail.affixes && battleRewardEqDetail.affixes.length" class="attr-block">
-          <h4 class="sub-title">词条</h4>
-          <div v-for="a in battleRewardEqDetail.affixes" :key="a.id" class="attr-row">
-            <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
-            <span class="attr-col-final">{{ a.valueType === 'percent' ? (a.value * 100).toFixed(1) + '%' : a.value }}</span>
-          </div>
-        </div>
       </div>
-    </div>
+    </Teleport>
   </div>
 </template>
 

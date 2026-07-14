@@ -112,6 +112,23 @@ body {
   }
 }
 
+.text-glow-common { text-shadow: 0 0 8px rgba(170, 170, 170, 0.6); }
+.text-glow-uncommon { text-shadow: 0 0 8px rgba(136, 204, 68, 0.6); }
+.text-glow-rare { text-shadow: 0 0 10px rgba(68, 136, 255, 0.7); }
+.text-glow-epic { text-shadow: 0 0 12px rgba(170, 68, 255, 0.8); }
+.text-glow-legendary { text-shadow: 0 0 14px rgba(255, 136, 0, 0.9); animation: legendary-glow 2s ease-in-out infinite alternate; }
+.text-glow-mythic { text-shadow: 0 0 16px rgba(255, 68, 68, 1); animation: mythic-glow 1.5s ease-in-out infinite alternate; }
+
+@keyframes legendary-glow {
+  from { text-shadow: 0 0 10px rgba(255, 136, 0, 0.7); }
+  to { text-shadow: 0 0 20px rgba(255, 136, 0, 1), 0 0 30px rgba(255, 136, 0, 0.5); }
+}
+
+@keyframes mythic-glow {
+  from { text-shadow: 0 0 12px rgba(255, 68, 68, 0.8); }
+  to { text-shadow: 0 0 24px rgba(255, 68, 68, 1), 0 0 40px rgba(255, 68, 68, 0.6); }
+}
+
 @keyframes float {
   0%, 100% {
     transform: translateY(0);

@@ -108,33 +108,36 @@
             <div class="attr-row attr-head sticky-head">
               <span class="attr-col-label">属性</span>
               <span class="attr-col-base">基础</span>
-              <span class="attr-col-equip">装备</span>
-              <span class="attr-col-pet">灵宠</span>
+              <span class="attr-col-delta">加成</span>
               <span class="attr-col-final">最终</span>
             </div>
             <div class="attr-group-title">基础属性</div>
             <div v-for="stat in mainStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
-              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
             </div>
             <div class="attr-group-title">战斗属性</div>
             <div v-for="stat in combatStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
-              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
             </div>
             <div class="attr-group-title">特殊属性</div>
             <div v-for="stat in specialStats" :key="stat.key" class="attr-row">
               <span class="attr-col-label">{{ stat.name }}</span>
               <span class="attr-col-base">{{ stat.base }}</span>
-              <span class="attr-col-equip" :class="{ 'is-zero': stat.equipDelta === 0 }">+{{ stat.equipDelta }}</span>
-              <span class="attr-col-pet" :class="{ 'is-zero': stat.petDelta === 0 }">+{{ stat.petDelta }}</span>
+              <span class="attr-col-delta" :class="{ 'is-zero': stat.delta === 0 }">+{{ stat.delta }}</span>
               <span class="attr-col-final">{{ stat.final }}</span>
+            </div>
+            <div v-if="petBonusStats.length > 0" class="attr-group-title">灵宠加成</div>
+            <div v-for="stat in petBonusStats" :key="stat.key" class="attr-row">
+              <span class="attr-col-label">{{ stat.name }}</span>
+              <span class="attr-col-base">-</span>
+              <span class="attr-col-delta">+{{ stat.value }}</span>
+              <span class="attr-col-final">{{ stat.value }}</span>
             </div>
           </div>
         </div>
@@ -173,6 +176,7 @@
             v-if="selectedMember.equippedArtifacts?.[slot]"
             class="equip-slot-name"
             :style="{ color: getItemColor(selectedMember.equippedArtifacts[slot]) }"
+            :class="'text-glow-' + (selectedMember.equippedArtifacts[slot].quality || 'common')"
           >
             {{ selectedMember.equippedArtifacts[slot].name }}
           </div>
@@ -548,11 +552,13 @@ const getMemberBaseStats = (member) => {
   if (!member) return {}
   const bs = member.baseStats || {}
   const ts = member.talentStats || {}
+  const level = member.level || 1
   const stats = {}
   for (const k of ['attack','health','defense','speed']) {
     const base = bs[k] || 0
     const talentBonus = ts[k] || 0
-    stats[k] = Math.floor(base * (1 + talentBonus))
+    const levelBonus = (level - 1) * (base * 0.05)
+    stats[k] = Math.floor((base + levelBonus) * (1 + talentBonus))
   }
   for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',
     'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
@@ -640,15 +646,11 @@ const buildStatRows = (member, keys) => {
     const eFlat = equipBonus[k] || 0
     const ePct = equipBonus['__pct_' + k] || 0
     const p = petBonus[k] || 0
-    const equipDelta = isPercentStat(k) ? ((b * (1 + ePct) - b) * 100).toFixed(1) : Math.floor(eFlat * (1 + ePct))
-    const petDelta = isPercentStat(k) ? (p * 100).toFixed(1) : Math.floor(p)
     const totalBonus = (b + eFlat + p) * (1 + ePct) - b
     return {
       key: k,
       name: STAT_NAMES[k] || k,
       base: formatStat(k, b),
-      equipDelta: equipDelta,
-      petDelta: petDelta,
       delta: isPercentStat(k) ? (totalBonus * 100).toFixed(1) : Math.floor(Math.abs(totalBonus)),
       final: formatStat(k, final[k] || 0)
     }
@@ -668,6 +670,22 @@ const combatStats = computed(() => {
 const specialStats = computed(() => {
   if (!selectedMember.value) return []
   return buildStatRows(selectedMember.value, ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost'])
+})
+
+const petBonusStats = computed(() => {
+  if (!selectedMember.value) return []
+  const petBonus = getMemberPetBonus(selectedMember.value)
+  const stats = []
+  for (const k of ['attack','health','defense','speed','critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate','critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost']) {
+    if (petBonus[k]) {
+      stats.push({
+        key: k,
+        name: STAT_NAMES[k] || k,
+        value: isPercentStat(k) ? (petBonus[k] * 100).toFixed(1) + '%' : Math.floor(petBonus[k])
+      })
+    }
+  }
+  return stats
 })
 
 // 方法
@@ -1711,11 +1729,11 @@ else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  padding-bottom: 80px;
+  padding-top: 80px;
 }
 .modal-content {
   width: 100%;
