@@ -4,6 +4,7 @@ import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig } from '../plugins/buildSystem'
+import { equipmentNameParts } from '../plugins/gacha'
 
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
@@ -203,15 +204,17 @@ function buildEffectiveZone(zone, diff) {
 // ============ 装备 / 灵宠 / 敌人生成 ============
 const SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
 const RARITY_MULT = { common: 1, uncommon: 1.3, rare: 1.8, epic: 2.5, legendary: 4, mythic: 7 }
-const SLOT_NAMES = { weapon: '剑', head: '冠', body: '袍', legs: '裤', feet: '靴', shoulder: '甲', hands: '套', wrist: '腕', necklace: '链', ring1: '戒', ring2: '戒', belt: '带' }
-const RARITY_PREFIX = { common: '凡品', uncommon: '良品', rare: '上品', epic: '极品', legendary: '仙品', mythic: '神品' }
 
+// 使用真实装备名库（与抽卡系统一致），避免挂机产出「良品戒」这类虚拟命名
 function getEquipName(slot, rarity, setId = null) {
+  const nameParts = equipmentNameParts[slot] || ['未知']
+  const nameBase = nameParts[Math.floor(Math.random() * nameParts.length)]
+  const qualityName = (rarityConfig[rarity] || {}).name || rarity
   if (setId) {
     const setData = setBonuses.find(s => s.id === setId)
-    if (setData) return `${setData.name}·${SLOT_NAMES[slot]}`
+    if (setData) return `${setData.name}·${nameBase}`
   }
-  return (RARITY_PREFIX[rarity] || '凡品') + SLOT_NAMES[slot]
+  return `${nameBase}·${qualityName}`
 }
 
 function generateEquipment(rarity, effectiveZone) {
