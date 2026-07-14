@@ -35,14 +35,14 @@ const ROLE_EFFECTS = {
   blade: {
     name: '刀锋连击',
     effect: (memberState, teamStates) => {
-      const bleed = Math.floor(memberState.baseStats.attack * 0.15)
+      const bleed = Math.floor((memberState.baseStats?.attack || memberState.damage || 0) * 0.15)
       return { type: 'damage_over_time', value: bleed, desc: `${memberState.name}触发刀锋连击，敌人陷入流血状态，每秒受到 ${bleed} 伤害` }
     }
   },
   herb: {
     name: '药引治疗',
     effect: (memberState, teamStates) => {
-      const healAmount = Math.floor(memberState.baseStats.health * 0.15)
+      const healAmount = Math.floor((memberState.baseStats?.health || memberState.maxHealth || 0) * 0.15)
       let healed = 0
       for (const ts of teamStates) {
         if (ts.hp > 0 && ts.hp < ts.maxHP) {
@@ -57,7 +57,7 @@ const ROLE_EFFECTS = {
   shield: {
     name: '护法护盾',
     effect: (memberState, teamStates) => {
-      const absorb = Math.floor(memberState.baseStats.defense * 0.2)
+      const absorb = Math.floor((memberState.baseStats?.defense || memberState.defense || 0) * 0.2)
       return { type: 'shield', value: absorb, desc: `${memberState.name}开启护法护盾，全队获得吸收 ${absorb} 伤害的护盾` }
     }
   },
@@ -1083,30 +1083,30 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
   }
   
   const stats = {
-    health: member.baseStats.health,
-    maxHealth: member.baseStats.health,
-    damage: member.baseStats.attack,
-    defense: member.baseStats.defense,
-    speed: member.baseStats.speed,
-    critRate: member.combatAttributes.critRate || 0,
-    comboRate: member.combatAttributes.comboRate || 0,
-    counterRate: member.combatAttributes.counterRate || 0,
-    stunRate: member.combatAttributes.stunRate || 0,
-    dodgeRate: member.combatAttributes.dodgeRate || 0,
-    vampireRate: member.combatAttributes.vampireRate || 0,
-    critResist: member.combatResistance.critResist || 0,
-    comboResist: member.combatResistance.comboResist || 0,
-    counterResist: member.combatResistance.counterResist || 0,
-    stunResist: member.combatResistance.stunResist || 0,
-    dodgeResist: member.combatResistance.dodgeResist || 0,
-    vampireResist: member.combatResistance.vampireResist || 0,
-    healBoost: member.specialAttributes.healBoost || 0,
-    critDamageBoost: member.specialAttributes.critDamageBoost || 0,
-    critDamageReduce: member.specialAttributes.critDamageReduce || 0,
-    finalDamageBoost: member.specialAttributes.finalDamageBoost || 0,
-    finalDamageReduce: member.specialAttributes.finalDamageReduce || 0,
-    combatBoost: member.specialAttributes.combatBoost || 0,
-    resistanceBoost: member.specialAttributes.resistanceBoost || 0
+    health: member.baseStats?.health || 0,
+    maxHealth: member.baseStats?.health || 0,
+    damage: member.baseStats?.attack || 0,
+    defense: member.baseStats?.defense || 0,
+    speed: member.baseStats?.speed || 0,
+    critRate: member.combatAttributes?.critRate || 0,
+    comboRate: member.combatAttributes?.comboRate || 0,
+    counterRate: member.combatAttributes?.counterRate || 0,
+    stunRate: member.combatAttributes?.stunRate || 0,
+    dodgeRate: member.combatAttributes?.dodgeRate || 0,
+    vampireRate: member.combatAttributes?.vampireRate || 0,
+    critResist: member.combatResistance?.critResist || 0,
+    comboResist: member.combatResistance?.comboResist || 0,
+    counterResist: member.combatResistance?.counterResist || 0,
+    stunResist: member.combatResistance?.stunResist || 0,
+    dodgeResist: member.combatResistance?.dodgeResist || 0,
+    vampireResist: member.combatResistance?.vampireResist || 0,
+    healBoost: member.specialAttributes?.healBoost || 0,
+    critDamageBoost: member.specialAttributes?.critDamageBoost || 0,
+    critDamageReduce: member.specialAttributes?.critDamageReduce || 0,
+    finalDamageBoost: member.specialAttributes?.finalDamageBoost || 0,
+    finalDamageReduce: member.specialAttributes?.finalDamageReduce || 0,
+    combatBoost: member.specialAttributes?.combatBoost || 0,
+    resistanceBoost: member.specialAttributes?.resistanceBoost || 0
   }
   
   const playerEntity = new CombatEntity(member.name, member.level, stats, member.schoolName)
@@ -1198,8 +1198,8 @@ function startIdle(durationMinutes) {
   teamMemberStates.value = team.map(member => ({
     memberId: member.id,
     name: member.name,
-    hp: member.baseStats.health,
-    maxHP: member.baseStats.health,
+    hp: member.baseStats?.health || 0,
+    maxHP: member.baseStats?.health || 0,
     buildStrength: s.getCharacterBuildStrength(member)
   }))
   

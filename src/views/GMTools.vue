@@ -1526,6 +1526,7 @@ const handleAvatarUpload = (e) => {
     }
   }
   reader.readAsDataURL(file)
+  e.target.value = ''
 }
 
 const removeAvatar = () => {
@@ -1571,7 +1572,7 @@ const processPortraitFiles = (fileList) => {
   })
 }
 
-const handleBatchPortraitSelect = (e) => processPortraitFiles(e.target.files)
+const handleBatchPortraitSelect = (e) => { processPortraitFiles(e.target.files); e.target.value = '' }
 const handleBatchPortraitDrop = (e) => processPortraitFiles(e.dataTransfer.files)
 
 const batchMatchedName = (id) => {
@@ -1843,6 +1844,7 @@ const triggerUpload = () => {
 const handleFileSelect = (e) => {
   const files = e.target.files
   processFiles(files)
+  e.target.value = ''
 }
 
 const handleDrop = (e) => {
@@ -1854,7 +1856,11 @@ const handleDrop = (e) => {
 const committingRepo = ref(false)
 const repoCommitResult = ref(null)
 const pendingImageFiles = ref([])
-const GMTOOLS_SERVER = 'http://localhost:8787'
+
+// 自动检测后端代理地址：优先使用同源相对路径（部署同域时），本地开发时用 localhost
+const GMTOOLS_SERVER = import.meta.env.DEV
+  ? (import.meta.env.VITE_GMTOOLS_SERVER || `http://${location.hostname}:8787`)
+  : (import.meta.env.VITE_GMTOOLS_SERVER || '')
 
 const commitImagesToRepo = async () => {
   if (!pendingImageFiles.value.length) return
@@ -1868,13 +1874,23 @@ const commitImagesToRepo = async () => {
     form.append('file', file)
     form.append('path', 'public/portraits')
     try {
-      const r = await fetch(`${GMTOOLS_SERVER}/api/upload`, { method: 'POST', body: form })
+      const uploadUrl = GMTOOLS_SERVER ? `${GMTOOLS_SERVER}/api/upload` : '/api/upload'
+      const r = await fetch(uploadUrl, { method: 'POST', body: form })
+      if (!r.ok) {
+        const txt = await r.text().catch(() => '')
+        errCount++
+        errors.push(`${file.name}: HTTP ${r.status} ${txt.slice(0, 100)}`)
+        continue
+      }
       const j = await r.json()
       if (j.ok) okCount++
       else { errCount++; errors.push(`${file.name}: ${j.error}`) }
     } catch (e) {
       errCount++
-      errors.push(`${file.name}: ${e.message}`)
+      const hint = e.message === 'Failed to fetch'
+        ? '无法连接后端代理，请确认 server/ 已启动（cd server && node index.js）'
+        : e.message
+      errors.push(`${file.name}: ${hint}`)
     }
   }
   committingRepo.value = false

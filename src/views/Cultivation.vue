@@ -526,7 +526,10 @@ const getMemberBaseStats = (member) => {
     'critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist',
     'healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce',
     'combatBoost','resistanceBoost']) {
-    const base = (bs[k] || 0) + (member.combatAttributes?.[k] || 0) + (member.combatResistance?.[k] || 0) + (member.specialAttributes?.[k] || 0)
+    const ca = member.combatAttributes || {}
+    const cr = member.combatResistance || {}
+    const sa = member.specialAttributes || {}
+    const base = (bs[k] || 0) + (ca[k] || 0) + (cr[k] || 0) + (sa[k] || 0)
     const talentBonus = ts[k] || 0
     stats[k] = base + talentBonus
   }

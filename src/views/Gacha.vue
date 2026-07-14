@@ -75,6 +75,7 @@
             <button class="btn btn-info" :disabled="playerStore.spiritStones < 500" @click="exchangeCrystals(10)">兑换10</button>
             <button class="btn btn-info" :disabled="playerStore.spiritStones < 2500" @click="exchangeCrystals(50)">兑换50</button>
             <button class="btn btn-info" :disabled="playerStore.spiritStones < 5000" @click="exchangeCrystals(100)">兑换100</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 50000" @click="exchangeCrystals(1000)">兑换1000</button>
           </div>
         </div>
 
@@ -536,19 +537,19 @@
   /* 奖池选择 */
   .pool-selector {
     display: grid;
-    grid-template-columns: 1fr;
-    gap: 10px;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 8px;
     margin-bottom: 16px;
   }
 
   @media (min-width: 480px) {
     .pool-selector {
-      grid-template-columns: repeat(3, 1fr);
+      grid-template-columns: repeat(4, 1fr);
     }
   }
 
   .pool-card {
-    padding: 14px;
+    padding: 10px 6px;
     background: rgba(0, 0, 0, 0.25);
     border: 2px solid rgba(139, 69, 19, 0.2);
     border-radius: 10px;
@@ -564,16 +565,16 @@
   }
 
   .pool-name {
-    font-size: 16px;
+    font-size: 14px;
     font-weight: bold;
     color: #F5DEB3;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
   .pool-cost {
-    font-size: 13px;
+    font-size: 11px;
     color: #DAA520;
-    margin-bottom: 4px;
+    margin-bottom: 2px;
   }
 
   .pool-desc {
