@@ -397,12 +397,12 @@ export const usePlayerStore = defineStore('player', {
       return (this.pillEffects || [])
         .filter(e => e.type === 'dropRate' && e.endTime > now)
         .reduce((s, e) => s + (e.value || 0), 0)
-    },
-    getCultivationPool() {
-      return this.cultivationPool || 0
     }
   },
   actions: {
+    getCultivationPool() {
+      return this.cultivationPool || 0
+    },
     // 更新HTML暗黑模式类
     updateHtmlDarkMode(isDarkMode) {
       const htmlEl = document.documentElement
