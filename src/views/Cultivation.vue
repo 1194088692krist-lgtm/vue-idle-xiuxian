@@ -49,57 +49,70 @@
     <!-- 属性面板 -->
     <div class="stats-card glass-card">
       <h3 class="section-title">人物属性</h3>
-      <p class="base-note">基础数值（不含装备 · 含出战灵宠），其增益明细见下方「灵宠增益」</p>
-      <div class="stats-grid">
-        <div class="stat-item">
-          <span class="stat-label">攻击</span>
-          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.attack) }}</span>
-          <span v-if="playerStore.rebirthBonus.attack" class="stat-bonus">+{{ playerStore.rebirthBonus.attack }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">生命</span>
-          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.health) }}</span>
-          <span v-if="playerStore.rebirthBonus.health" class="stat-bonus">+{{ playerStore.rebirthBonus.health }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">防御</span>
-          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.defense) }}</span>
-          <span v-if="playerStore.rebirthBonus.defense" class="stat-bonus">+{{ playerStore.rebirthBonus.defense }}</span>
-        </div>
-        <div class="stat-item">
-          <span class="stat-label">速度</span>
-          <span class="stat-value">{{ Math.floor(playerStore.baseAttributes.speed) }}</span>
-          <span v-if="playerStore.rebirthBonus.speed" class="stat-bonus">+{{ playerStore.rebirthBonus.speed }}</span>
+      <p class="base-note">
+        基础数值（含出战灵宠 · 不含装备）；最终数值为叠加装备后；差值为装备提供的加成。
+        灵宠增益见下方「灵宠增益」卡片。
+      </p>
+
+      <!-- 基础属性 -->
+      <div class="attr-group">
+        <h4 class="sub-title">基础属性</h4>
+        <div class="attr-table">
+          <div class="attr-row attr-head">
+            <span class="attr-name">属性</span>
+            <span class="attr-base">基础</span>
+            <span class="attr-final">最终</span>
+            <span class="attr-delta">加成</span>
+          </div>
+          <div class="attr-row" v-for="s in baseStatDefs" :key="s.key">
+            <span class="attr-name">{{ s.label }}</span>
+            <span class="attr-base">{{ fmtFlat(naturalStats[s.key]) }}</span>
+            <span class="attr-final">{{ fmtFlat(finalStats[s.key]) }}</span>
+            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
+              {{ deltaText(finalStats[s.key] - naturalStats[s.key], false) }}
+            </span>
+          </div>
         </div>
       </div>
 
       <!-- 战斗属性 -->
-      <div class="combat-stats">
+      <div class="attr-group">
         <h4 class="sub-title">战斗属性</h4>
-        <div class="combat-grid">
-          <div class="combat-item">
-            <span class="combat-label">暴击率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.critRate * 100).toFixed(1) }}%</span>
+        <div class="attr-table">
+          <div class="attr-row attr-head">
+            <span class="attr-name">属性</span>
+            <span class="attr-base">基础</span>
+            <span class="attr-final">最终</span>
+            <span class="attr-delta">加成</span>
           </div>
-          <div class="combat-item">
-            <span class="combat-label">连击率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.comboRate * 100).toFixed(1) }}%</span>
+          <div class="attr-row" v-for="s in combatStatDefs" :key="s.key">
+            <span class="attr-name">{{ s.label }}</span>
+            <span class="attr-base">{{ fmtRate(naturalStats[s.key]) }}</span>
+            <span class="attr-final">{{ fmtRate(finalStats[s.key]) }}</span>
+            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
+              {{ deltaText(finalStats[s.key] - naturalStats[s.key], true) }}
+            </span>
           </div>
-          <div class="combat-item">
-            <span class="combat-label">闪避率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.dodgeRate * 100).toFixed(1) }}%</span>
+        </div>
+      </div>
+
+      <!-- 抗性属性 -->
+      <div class="attr-group">
+        <h4 class="sub-title">抗性属性</h4>
+        <div class="attr-table">
+          <div class="attr-row attr-head">
+            <span class="attr-name">属性</span>
+            <span class="attr-base">基础</span>
+            <span class="attr-final">最终</span>
+            <span class="attr-delta">加成</span>
           </div>
-          <div class="combat-item">
-            <span class="combat-label">吸血率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.vampireRate * 100).toFixed(1) }}%</span>
-          </div>
-          <div class="combat-item">
-            <span class="combat-label">反击率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.counterRate * 100).toFixed(1) }}%</span>
-          </div>
-          <div class="combat-item">
-            <span class="combat-label">眩晕率</span>
-            <span class="combat-value">{{ (playerStore.combatAttributes.stunRate * 100).toFixed(1) }}%</span>
+          <div class="attr-row" v-for="s in resistanceStatDefs" :key="s.key">
+            <span class="attr-name">{{ s.label }}</span>
+            <span class="attr-base">{{ fmtRate(naturalStats[s.key]) }}</span>
+            <span class="attr-final">{{ fmtRate(finalStats[s.key]) }}</span>
+            <span class="attr-delta" :class="deltaClass(finalStats[s.key] - naturalStats[s.key])">
+              {{ deltaText(finalStats[s.key] - naturalStats[s.key], true) }}
+            </span>
           </div>
         </div>
       </div>
@@ -307,12 +320,53 @@ const petRarityMap = {
   celestial: { rarityName: '仙品灵宠', color: '#FFD700' },
   divine: { rarityName: '神品灵宠', color: '#FF0000' }
 }
-const petBonus = computed(() => playerStore.getPetBonus())
+const petBonus = computed(() => playerStore.getPetBonus)
 const activePetInfo = computed(() => {
   const p = playerStore.activePet
   if (!p) return { name: '', rarityName: '', color: '#aaa' }
   return { name: p.name, ...(petRarityMap[p.rarity] || { rarityName: p.rarity, color: '#aaa' }) }
 })
+
+// 属性定义（用于「基础/最终/加成」对照表）
+const baseStatDefs = [
+  { key: 'attack', label: '攻击' },
+  { key: 'health', label: '生命' },
+  { key: 'defense', label: '防御' },
+  { key: 'speed', label: '速度' }
+]
+const combatStatDefs = [
+  { key: 'critRate', label: '暴击率' },
+  { key: 'comboRate', label: '连击率' },
+  { key: 'counterRate', label: '反击率' },
+  { key: 'stunRate', label: '眩晕率' },
+  { key: 'dodgeRate', label: '闪避率' },
+  { key: 'vampireRate', label: '吸血率' }
+]
+const resistanceStatDefs = [
+  { key: 'critResist', label: '抗暴击' },
+  { key: 'comboResist', label: '抗连击' },
+  { key: 'counterResist', label: '抗反击' },
+  { key: 'stunResist', label: '抗眩晕' },
+  { key: 'dodgeResist', label: '抗闪避' },
+  { key: 'vampireResist', label: '抗吸血' }
+]
+// 自然属性（含灵宠·不含装备）与最终属性（叠加装备+套装）
+const naturalStats = computed(() => playerStore.getNaturalStats)
+const finalStats = computed(() => playerStore.getEffectiveStats)
+// 格式化：基础数值为整数，战斗/抗性为百分比
+const fmtFlat = (v) => Math.floor(Number(v) || 0)
+const fmtRate = (v) => ((Number(v) || 0) * 100).toFixed(1) + '%'
+const deltaText = (d, isRate) => {
+  const v = Number(d) || 0
+  if (Math.abs(v) < 1e-9) return '—'
+  const sign = v > 0 ? '+' : ''
+  return sign + (isRate ? (v * 100).toFixed(1) + '%' : Math.floor(v).toString())
+}
+const deltaClass = (d) => {
+  const v = Number(d) || 0
+  if (Math.abs(v) < 1e-9) return 'delta-zero'
+  return v > 0 ? 'delta-pos' : 'delta-neg'
+}
 
 const baseGainRate = 1
 const baseCultivationCost = 8
@@ -598,42 +652,37 @@ onUnmounted(() => {
   color: #aaa;
   font-weight: bold;
 }
-.stats-grid {
-  display: grid;
-  grid-template-columns: repeat(2, 1fr);
-  gap: 8px;
-}
-.stat-item {
-  display: flex;
-  align-items: center;
-  gap: 6px;
-  padding: 8px 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border-radius: 8px;
-  font-size: 14px;
-}
-.stat-label { color: #888; flex: 1; }
-.stat-value { color: #fff; font-weight: bold; }
-.stat-bonus { color: #66BB6A; font-size: 12px; }
-
-.combat-stats {
-  margin-top: 12px;
-}
-.combat-grid {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-}
-.combat-item {
+/* 属性对照表：基础 / 最终 / 加成 */
+.attr-group { margin-top: 12px; }
+.attr-table {
   display: flex;
   flex-direction: column;
-  align-items: center;
-  padding: 6px;
-  background: rgba(0, 0, 0, 0.15);
-  border-radius: 6px;
+  border-radius: 8px;
+  overflow: hidden;
+  border: 1px solid rgba(218, 165, 32, 0.12);
 }
-.combat-label { font-size: 11px; color: #888; }
-.combat-value { font-size: 14px; color: #fff; font-weight: bold; }
+.attr-row {
+  display: grid;
+  grid-template-columns: 1.4fr 1fr 1fr 1fr;
+  align-items: center;
+  padding: 7px 10px;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.18);
+}
+.attr-row:nth-child(even) { background: rgba(0, 0, 0, 0.1); }
+.attr-head {
+  background: rgba(218, 165, 32, 0.1);
+  color: #DAA520;
+  font-weight: bold;
+  font-size: 12px;
+}
+.attr-name { color: #c9c2b0; }
+.attr-base { color: #9aa0b0; text-align: right; }
+.attr-final { color: #fff; font-weight: bold; text-align: right; }
+.attr-delta { text-align: right; font-weight: bold; }
+.delta-pos { color: #66BB6A; }
+.delta-neg { color: #EF5350; }
+.delta-zero { color: #6b7280; }
 
 .resource-stats { margin-top: 12px; }
 .resource-grid {

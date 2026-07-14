@@ -3,7 +3,7 @@ import { GameDB } from './db'
 import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
-import { getAffixesForSlot, getActiveSetBonuses, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
+import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -37,6 +37,7 @@ export const usePlayerStore = defineStore('player', {
     isDarkMode: localStorage.getItem('darkMode') === 'true',
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
+    _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
     petEssence: 0, // 灵宠精华
     petConfig: {
       rarityMap: {
@@ -311,6 +312,37 @@ export const usePlayerStore = defineStore('player', {
     },
     activeSetBonuses() {
       return getActiveSetBonuses(this.equippedArtifacts)
+    },
+    // 自然属性（含出战灵宠、不含装备）合并为单一映射，供属性面板对照展示
+    getNaturalStats() {
+      const merged = {}
+      const groups = ['baseAttributes', 'combatAttributes', 'combatResistance', 'specialAttributes']
+      groups.forEach(g => {
+        const obj = this[g]
+        if (obj) Object.entries(obj).forEach(([k, v]) => { merged[k] = (merged[k] || 0) + (Number(v) || 0) })
+      })
+      return merged
+    },
+    // 最终生效属性 = 自然属性 + 装备固定/百分比词条 + 套装激活加成
+    getEffectiveStats() {
+      // 务必拷贝！getNaturalStats 是带缓存的 getter，若直接引用并 mutate，会污染“自然属性”缓存，
+      // 导致后续 getNaturalStats 读数被装备数值污染（出现 natAtk 异常偏高）。
+      const merged = { ...this.getNaturalStats }
+      const applyAffix = (stat, value, valueType) => {
+        if (merged[stat] === undefined) return
+        if (valueType === 'percent') merged[stat] = merged[stat] * (1 + value)
+        else merged[stat] = merged[stat] + value
+      }
+      Object.values(this.equippedArtifacts || {}).forEach(eq => {
+        if (!eq) return
+        if (eq.stats) Object.entries(eq.stats).forEach(([st, v]) => applyAffix(st, v, 'flat'))
+      })
+      Object.values(this.equippedArtifacts || {}).forEach(eq => {
+        if (!eq || !eq.affixes) return
+        eq.affixes.forEach(a => applyAffix(a.stat, a.value, a.valueType))
+      })
+      // 套装激活加成（仅作用于已存在的属性键），最终属性 = 自然 + 装备 + 套装
+      return applySetBonusStats(this.equippedArtifacts || {}, { ...merged })
     },
     // 兼容旧 UI：灵草即素材库中 kind==='herb' 的子集
     herbs() {
@@ -913,6 +945,10 @@ export const usePlayerStore = defineStore('player', {
       this.recomputeAttributes()
     },
     // 穿上装备
+    // 重要：装备属性【不再写回】baseAttributes / combatAttributes 等“自然属性”。
+    // 自然属性仅由“角色基础 + 出战灵宠缩放”构成；装备/套装效果统一由
+    // getEffectiveStats 依据 equippedArtifacts 实时聚合（自然 + 装备固定/百分比词条 + 套装激活）。
+    // 这样既能保证「基础/最终/加成」对照面板正确，又彻底杜绝装备/套装数值污染自然属性导致的重复叠加。
     equipArtifact(artifact, slot) {
       // 检查境界要求
       if (artifact.requiredRealm && this.level < artifact.requiredRealm) {
@@ -927,12 +963,33 @@ export const usePlayerStore = defineStore('player', {
       if (index !== -1) {
         this.items.splice(index, 1)
       }
-      // 穿上新装备
+      // 穿上新装备（只登记到槽位，数值在 getEffectiveStats 中聚合）
       this.equippedArtifacts[slot] = artifact
       // 统一从干净基线重算（装备+套装+灵宠），避免逐项烘焙导致的叠加/漂移
       this.recomputeAttributes()
       this.queueSave()
       return { success: true, message: '装备成功' }
+    },
+    // 依据已装备物品，重新汇总“装备固定加成”镜像（attack/health/defense/speed 的平面值）。
+    // 仅保留为兼容字段（个别旧逻辑/外部读取），最终属性一律以 getEffectiveStats 为准。
+    recomputeArtifactBonuses() {
+      const flatKeys = ['attack', 'health', 'defense', 'speed']
+      const bonus = {}
+      flatKeys.forEach(k => { bonus[k] = 0 })
+      Object.values(this.equippedArtifacts || {}).forEach(eq => {
+        if (!eq) return
+        if (eq.stats) {
+          Object.entries(eq.stats).forEach(([st, v]) => {
+            if (st in bonus) bonus[st] += Number(v) || 0
+          })
+        }
+        if (eq.affixes) {
+          eq.affixes.forEach(a => {
+            if (a.valueType !== 'percent' && (a.stat in bonus)) bonus[a.stat] += Number(a.value) || 0
+          })
+        }
+      })
+      this.artifactBonuses = { ...this.artifactBonuses, ...bonus }
     },
     // 一键装备最强装备：遍历所有槽位，自动装备背包中评分最高且满足境界要求的装备
     autoEquipBest() {
@@ -966,7 +1023,7 @@ export const usePlayerStore = defineStore('player', {
     },
     // 装备槽位中文名映射（供 autoEquipBest 使用）
     equipmentSlotNames: { weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子', shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链', ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝' },
-    // 卸下装备
+    // 卸下装备：只把物品退回背包、清空槽位。自然属性本就不含装备数值，无需任何回退。
     unequipArtifact(slot) {
       const artifact = this.equippedArtifacts[slot]
       if (artifact) {
@@ -1267,8 +1324,9 @@ export const usePlayerStore = defineStore('player', {
           combatBoost: currentPet.combatAttributes.combatBoost + 0.01 * qualityMultiplier,
           resistanceBoost: currentPet.combatAttributes.resistanceBoost + 0.01 * qualityMultiplier
         }
-        // 如果是当前出战的灵宠，重新应用属性加成
+        // 如果是当前出战的灵宠，先还原再按新星级/等级重新应用加成（避免重复叠加）
         if (this.activePet && this.activePet.id === pet.id) {
+          this.resetPetBonuses()
           this.applyPetBonuses()
         }
       }

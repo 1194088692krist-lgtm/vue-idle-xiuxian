@@ -319,30 +319,33 @@ function generatePet(rarity, effectiveZone) {
 
 function createPlayerEntity() {
   const s = store()
+  // 战斗单位直接采用「最终属性」（自然属性 + 已装备 + 套装 + 出战灵宠），
+  // 与人物属性对照面板、Build 计算口径完全一致，确保装备/灵宠真实作用于战斗。
+  const eff = s.getEffectiveStats
   const baseStats = {
-    health: s.baseAttributes.health,
-    damage: s.baseAttributes.attack,
-    defense: s.baseAttributes.defense,
-    speed: s.baseAttributes.speed,
-    critRate: s.combatAttributes.critRate,
-    comboRate: s.combatAttributes.comboRate,
-    counterRate: s.combatAttributes.counterRate,
-    stunRate: s.combatAttributes.stunRate,
-    dodgeRate: s.combatAttributes.dodgeRate,
-    vampireRate: s.combatAttributes.vampireRate,
-    critResist: s.combatResistance.critResist,
-    comboResist: s.combatResistance.comboResist,
-    counterResist: s.combatResistance.counterResist,
-    stunResist: s.combatResistance.stunResist,
-    dodgeResist: s.combatResistance.dodgeResist,
-    vampireResist: s.combatResistance.vampireResist,
-    healBoost: s.specialAttributes.healBoost,
-    critDamageBoost: s.specialAttributes.critDamageBoost,
-    critDamageReduce: s.specialAttributes.critDamageReduce,
-    finalDamageBoost: s.specialAttributes.finalDamageBoost,
-    finalDamageReduce: s.specialAttributes.finalDamageReduce,
-    combatBoost: s.specialAttributes.combatBoost,
-    resistanceBoost: s.specialAttributes.resistanceBoost,
+    health: eff.health || 0,
+    damage: eff.attack || 0,
+    defense: eff.defense || 0,
+    speed: eff.speed || 0,
+    critRate: eff.critRate || 0,
+    comboRate: eff.comboRate || 0,
+    counterRate: eff.counterRate || 0,
+    stunRate: eff.stunRate || 0,
+    dodgeRate: eff.dodgeRate || 0,
+    vampireRate: eff.vampireRate || 0,
+    critResist: eff.critResist || 0,
+    comboResist: eff.comboResist || 0,
+    counterResist: eff.counterResist || 0,
+    stunResist: eff.stunResist || 0,
+    dodgeResist: eff.dodgeResist || 0,
+    vampireResist: eff.vampireResist || 0,
+    healBoost: eff.healBoost || 0,
+    critDamageBoost: eff.critDamageBoost || 0,
+    critDamageReduce: eff.critDamageReduce || 0,
+    finalDamageBoost: eff.finalDamageBoost || 0,
+    finalDamageReduce: eff.finalDamageReduce || 0,
+    combatBoost: eff.combatBoost || 0,
+    resistanceBoost: eff.resistanceBoost || 0,
     spiritDamage: s.spirit * 0.1,
     maxHealth: s.baseAttributes.health
   }
@@ -502,7 +505,10 @@ async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = fals
   if (!isIdleMode) {
     combatState.value = { inCombat: true, combatManager: manager }
   }
-  while (manager.state === 'in_progress') {
+  // 安全护栏：即便底层战斗因异常未推进，也强行在有限回合内结束，避免主线程卡死
+  let safetyGuard = 0
+  while (manager.state === 'in_progress' && safetyGuard < 200) {
+    safetyGuard++
     const result = manager.executeTurn()
     if (!isIdleMode && result) {
       if (result.results && result.results.length > 0) {
