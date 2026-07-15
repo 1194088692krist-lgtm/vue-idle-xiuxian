@@ -197,6 +197,64 @@
 
             <!-- 强化子菜单 -->
             <template v-if="forgeTab === 'enhance'">
+              <template v-if="selectedForgeEquip">
+                <div class="section forge-actions-section">
+                  <h3 class="section-title">强化信息</h3>
+                  <div class="enhance-info glass-card">
+                    <div class="enhance-row">
+                      <div class="enhance-label">当前等级</div>
+                      <div class="enhance-value">+{{ selectedForgeEquip.enhanceLevel || 0 }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">目标等级</div>
+                      <div class="enhance-value">+{{ (selectedForgeEquip.enhanceLevel || 0) + 1 }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">成功率</div>
+                      <div class="enhance-value">{{ getEnhanceSuccessRate(selectedForgeEquip) }}%</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">强化效果</div>
+                      <div class="enhance-value">所有属性 × {{ enhanceConfig.enhanceMult }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">锁定等级</div>
+                      <div class="enhance-value">
+                        {{ getLockLevelDisplay(selectedForgeEquip) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section forge-actions-section">
+                  <h3 class="section-title">消耗</h3>
+                  <div class="cost-list">
+                    <div class="cost-item">
+                      <span class="cost-name">灵石</span>
+                      <span class="cost-value" :class="{ insufficient: playerStore.spiritStones < getEnhanceGoldCost(selectedForgeEquip) }">
+                        {{ playerStore.spiritStones }} / {{ getEnhanceGoldCost(selectedForgeEquip) }}
+                      </span>
+                    </div>
+                    <div class="cost-item">
+                      <span class="cost-name">{{ getEnhanceStoneName(selectedForgeEquip) }}</span>
+                      <span class="cost-value" :class="{ insufficient: getEnhanceStoneCount(selectedForgeEquip) < getEnhanceStoneNeed(selectedForgeEquip) }">
+                        {{ getEnhanceStoneCount(selectedForgeEquip) }} / {{ getEnhanceStoneNeed(selectedForgeEquip) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="action-section forge-actions-section">
+                  <button
+                    class="btn-primary enhance-button"
+                    :disabled="!canEnhance(selectedForgeEquip)"
+                    @click="handleEnhance"
+                  >
+                    强化
+                  </button>
+                </div>
+              </template>
+
               <div class="section">
                 <h3 class="section-title">选择装备</h3>
                 <div class="forge-pagination" v-if="forgeFilteredEquipments.length > forgePageSize">
@@ -231,64 +289,6 @@
                 </div>
                 <div v-if="forgeFilteredEquipments.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
-
-              <template v-if="selectedForgeEquip">
-                <div class="section">
-                  <h3 class="section-title">强化信息</h3>
-                  <div class="enhance-info glass-card">
-                    <div class="enhance-row">
-                      <div class="enhance-label">当前等级</div>
-                      <div class="enhance-value">+{{ selectedForgeEquip.enhanceLevel || 0 }}</div>
-                    </div>
-                    <div class="enhance-row">
-                      <div class="enhance-label">目标等级</div>
-                      <div class="enhance-value">+{{ (selectedForgeEquip.enhanceLevel || 0) + 1 }}</div>
-                    </div>
-                    <div class="enhance-row">
-                      <div class="enhance-label">成功率</div>
-                      <div class="enhance-value">{{ getEnhanceSuccessRate(selectedForgeEquip) }}%</div>
-                    </div>
-                    <div class="enhance-row">
-                      <div class="enhance-label">强化效果</div>
-                      <div class="enhance-value">所有属性 × {{ enhanceConfig.enhanceMult }}</div>
-                    </div>
-                    <div class="enhance-row">
-                      <div class="enhance-label">锁定等级</div>
-                      <div class="enhance-value">
-                        {{ getLockLevelDisplay(selectedForgeEquip) }}
-                      </div>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="section">
-                  <h3 class="section-title">消耗</h3>
-                  <div class="cost-list">
-                    <div class="cost-item">
-                      <span class="cost-name">灵石</span>
-                      <span class="cost-value" :class="{ insufficient: playerStore.spiritStones < getEnhanceGoldCost(selectedForgeEquip) }">
-                        {{ playerStore.spiritStones }} / {{ getEnhanceGoldCost(selectedForgeEquip) }}
-                      </span>
-                    </div>
-                    <div class="cost-item">
-                      <span class="cost-name">{{ getEnhanceStoneName(selectedForgeEquip) }}</span>
-                      <span class="cost-value" :class="{ insufficient: getEnhanceStoneCount(selectedForgeEquip) < getEnhanceStoneNeed(selectedForgeEquip) }">
-                        {{ getEnhanceStoneCount(selectedForgeEquip) }} / {{ getEnhanceStoneNeed(selectedForgeEquip) }}
-                      </span>
-                    </div>
-                  </div>
-                </div>
-
-                <div class="action-section">
-                  <button
-                    class="btn-primary enhance-button"
-                    :disabled="!canEnhance(selectedForgeEquip)"
-                    @click="handleEnhance"
-                  >
-                    强化
-                  </button>
-                </div>
-              </template>
             </template>
 
             <!-- 洗练子菜单 -->
@@ -424,10 +424,22 @@
             <template v-if="forgeTab === 'disassemble'">
               <div class="section">
                 <h3 class="section-title">选择装备（可多选）</h3>
-                <div class="forge-pagination" v-if="forgeFilteredInventory.length > forgePageSize">
+                <div class="forge-pagination">
                   <span>共 {{ forgeFilteredInventory.length }} 件，第 {{ forgePage }}/{{ forgeInventoryTotalPages }} 页</span>
-                  <button class="btn-small" :disabled="forgePage <= 1" @click="forgeInvPrevPage">上一页</button>
-                  <button class="btn-small" :disabled="forgePage >= forgeInventoryTotalPages" @click="forgeInvNextPage">下一页</button>
+                  <span style="color: #FFD700;">已选 {{ selectedDisassembleIds.length }} 件</span>
+                  <div class="forge-pagination-actions">
+                    <button class="btn-small" :disabled="forgePage <= 1" @click="forgeInvPrevPage">上一页</button>
+                    <button class="btn-small" :disabled="forgePage >= forgeInventoryTotalPages" @click="forgeInvNextPage">下一页</button>
+                    <button class="btn-small" @click="selectAllCurrentPage">全选当前页</button>
+                    <button class="btn-small btn-danger" @click="selectedDisassembleIds = []">清空选择</button>
+                    <button
+                      class="btn-small btn-primary"
+                      :disabled="selectedDisassembleIds.length === 0"
+                      @click="handleBatchDisassemble"
+                    >
+                      批量分解
+                    </button>
+                  </div>
                 </div>
                 <div class="equipment-grid">
                   <div
@@ -457,23 +469,6 @@
                   </div>
                 </div>
                 <div v-if="forgeFilteredInventory.length === 0" class="empty-state">没有符合条件的装备</div>
-              </div>
-
-              <div class="section">
-                <div class="disassemble-summary">
-                  <span>已选择 {{ selectedDisassembleIds.length }} 件装备</span>
-                  <button class="btn-small btn-danger" @click="selectedDisassembleIds = []">清空选择</button>
-                </div>
-              </div>
-
-              <div class="action-section">
-                <button
-                  class="btn-primary disassemble-button"
-                  :disabled="selectedDisassembleIds.length === 0"
-                  @click="handleBatchDisassemble"
-                >
-                  批量分解
-                </button>
               </div>
             </template>
           </div>
@@ -861,6 +856,17 @@
     }
   }
 
+  const selectAllCurrentPage = () => {
+    const pageIds = forgePagedInventory.value.map(e => e.id)
+    const allSelected = pageIds.every(id => selectedDisassembleIds.value.includes(id))
+    if (allSelected) {
+      selectedDisassembleIds.value = selectedDisassembleIds.value.filter(id => !pageIds.includes(id))
+    } else {
+      const set = new Set([...selectedDisassembleIds.value, ...pageIds])
+      selectedDisassembleIds.value = Array.from(set)
+    }
+  }
+
   const getEnhanceSuccessRate = (equip) => {
     if (!equip) return 0
     const level = equip.enhanceLevel || 0
@@ -964,7 +970,7 @@
     if (selectedDisassembleIds.value.length === 0) return
     const result = await playerStore.batchDisassembleEquipments(selectedDisassembleIds.value)
     if (result.success) {
-      message.success(`成功分解 ${result.count} 件装备`)
+      message.success(result.message)
       selectedDisassembleIds.value = []
     } else {
       message.error(result.message)
@@ -1690,6 +1696,13 @@
     margin-bottom: 10px;
     font-size: 12px;
     color: #888;
+    flex-wrap: wrap;
+  }
+
+  .forge-pagination-actions {
+    display: flex;
+    gap: 6px;
+    margin-left: auto;
     flex-wrap: wrap;
   }
 
