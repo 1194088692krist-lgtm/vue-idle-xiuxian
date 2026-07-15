@@ -322,16 +322,17 @@
       </div>
     </div>
 
-    <!-- 立绘查看器弹窗 -->
-    <div v-if="showAvatarViewer" class="equip-select-modal avatar-viewer-modal" @click.self="closeAvatarViewer">
-      <div class="modal-content glass-card avatar-viewer-content" @click.stop>
-        <button class="btn btn-warning btn-close" @click="closeAvatarViewer">关闭</button>
-        <div class="avatar-viewer-title">{{ avatarViewerMember?.name || '' }} - 立绘</div>
-        <div class="avatar-viewer-image">
-          <img v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)" :src="getCharacterAvatar(avatarViewerMember)" />
-          <div v-else class="avatar-viewer-placeholder">暂无立绘</div>
-        </div>
-      </div>
+    <!-- 立绘查看器：全屏显示，点击任意位置关闭 -->
+    <div v-if="showAvatarViewer" class="avatar-fullscreen" @click="closeAvatarViewer">
+      <img
+        v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)"
+        :src="getCharacterAvatar(avatarViewerMember)"
+        class="avatar-fullscreen-img"
+        @click.stop
+      />
+      <div v-else class="avatar-fullscreen-placeholder">暂无立绘</div>
+      <div class="avatar-fullscreen-name">{{ avatarViewerMember?.name || '' }}</div>
+      <div class="avatar-fullscreen-hint">点击任意位置关闭</div>
     </div>
 
     <!-- 装备选择弹窗 -->
@@ -1840,48 +1841,63 @@ watch([allMembers, teamMembers], () => {
   color: #9e9e9e;
 }
 
-.avatar-viewer-modal {
-  z-index: 100;
-  align-items: flex-start !important;
-  padding-top: 300px !important;
-}
-
-.avatar-viewer-content {
-  max-width: 80%;
-  max-height: 80vh;
-  padding: 20px;
-}
-
-.avatar-viewer-title {
-  text-align: center;
-  font-size: 18px;
-  font-weight: bold;
-  margin-bottom: 16px;
-  color: #fff;
-}
-
-.avatar-viewer-image {
+.avatar-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.96);
+  z-index: 9999;
   display: flex;
+  flex-direction: column;
+  align-items: center;
   justify-content: center;
-  align-items: flex-start;
-  max-height: 70vh;
-  overflow: hidden;
+  cursor: pointer;
+  animation: avatarFadeIn 0.25s ease;
 }
 
-.avatar-viewer-image img {
-  max-width: 320px;
-  max-height: 70vh;
+@keyframes avatarFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.avatar-fullscreen-img {
+  max-width: 100vw;
+  max-height: 100vh;
   width: auto;
   height: auto;
   object-fit: contain;
-  border-radius: 8px;
-  box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
+  cursor: default;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
 }
 
-.avatar-viewer-placeholder {
-  font-size: 24px;
+.avatar-fullscreen-placeholder {
+  font-size: 28px;
   color: #9e9e9e;
-  padding: 40px;
+  padding: 60px;
+}
+
+.avatar-fullscreen-name {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+.avatar-fullscreen-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
 }
 
 .sect-member-modal {

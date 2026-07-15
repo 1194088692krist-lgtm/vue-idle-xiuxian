@@ -402,7 +402,7 @@
           </div>
         </div>
       </transition>
-      <div class="idle-log-body" ref="idleLogRef">
+      <div class="idle-log-body" ref="idleLogRef" @scroll.passive="handleScroll">
         <div
           v-for="(log, idx) in displayLogs"
           :key="idx"
@@ -461,11 +461,11 @@
             <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
               {{ eq.name }}
               <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
-              <span class="eq-score">评分 {{ eq.score || 0 }}</span>
+              <span class="eq-score">评分 {{ getEquipScore(eq) }}</span>
             </div>
-            <div class="eq-type">{{ eq.typeName || eq.type }}</div>
+            <div class="eq-type">{{ getEquipSlotName(eq) }}</div>
             <div class="eq-stats">
-              <span v-for="(value, key) in eq.mainAttributes" :key="key" class="eq-stat">
+              <span v-for="(value, key) in (eq.mainAttributes || eq.stats || {})" :key="key" class="eq-stat">
                 {{ getStatName(key) }} +{{ formatStatValue(key, value) }}
               </span>
             </div>
@@ -558,12 +558,31 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 import { getStatName, formatStatValue } from '../plugins/stats'
+import { calculateEquipmentScore } from '../plugins/buildSystem'
+
+// 装备槽位中文映射（结算栏装备展示用）
+const SLOT_NAME_MAP = {
+  weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子',
+  shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链',
+  ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝'
+}
+const getEquipSlotName = (eq) => {
+  if (!eq) return ''
+  if (eq.typeName) return eq.typeName
+  return SLOT_NAME_MAP[eq.slot || eq.type] || eq.type || ''
+}
+// 装备评分：优先用已缓存的 score，否则实时计算
+const getEquipScore = (eq) => {
+  if (!eq) return 0
+  if (typeof eq.score === 'number' && eq.score > 0) return eq.score
+  try { return calculateEquipmentScore(eq) || 0 } catch (e) { return 0 }
+}
 
 const playerStore = usePlayerStore()
 const {
@@ -767,14 +786,17 @@ const useBattlePill = (pill) => {
 const idleLogRef = ref(null)
 const userScrolling = ref(false)
 let userScrollTimer = null
+let isProgrammaticScroll = false
 
 const isAtBottom = () => {
   if (!idleLogRef.value) return true
   const el = idleLogRef.value
-  return el.scrollTop + el.clientHeight >= el.scrollHeight - 10
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 20
 }
 
 const handleScroll = () => {
+  // 忽略由代码触发的滚动（避免程序滚动到底部时把 userScrolling 误清）
+  if (isProgrammaticScroll) return
   if (!isAtBottom()) {
     userScrolling.value = true
     if (userScrollTimer) clearTimeout(userScrollTimer)
@@ -787,15 +809,20 @@ const handleScroll = () => {
   }
 }
 
+// 日志变化时：仅在用户未回看时自动滚动到底部（flush: 'post' 确保 DOM 已更新）
 watch(
   () => displayLogs.value.length,
   () => {
-    nextTick(() => {
-      if (idleLogRef.value && !userScrolling.value) {
-        idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
-      }
-    })
-  }
+    if (idleLogRef.value && !userScrolling.value) {
+      isProgrammaticScroll = true
+      idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
+      // 程序滚动后立即恢复标志，允许后续用户滚动事件被处理
+      requestAnimationFrame(() => {
+        isProgrammaticScroll = false
+      })
+    }
+  },
+  { flush: 'post' }
 )
 
 // 战斗奖励装备详情弹窗
@@ -807,11 +834,11 @@ const openBattleRewardEquipDetail = (eq) => {
     id: eq.id,
     name: eq.name,
     type: eq.type,
-    typeName: eq.typeName,
+    typeName: getEquipSlotName(eq),
     rarity: eq.rarity,
     rarityName: eq.qualityInfo?.name || '',
     color: eq.qualityInfo?.color || '#9e9e9e',
-    score: eq.score || 0,
+    score: getEquipScore(eq),
     stats: eq.mainAttributes || eq.stats || {},
     affixes: eq.affixes || []
   }
@@ -828,16 +855,8 @@ onMounted(() => {
   if (selectedZone.value && !selectedDifficultyKey.value) {
     setDifficulty(selectedZone.value.difficulties[2].key)
   }
-  nextTick(() => {
-    if (idleLogRef.value) {
-      idleLogRef.value.addEventListener('scroll', handleScroll)
-    }
-  })
 })
 onUnmounted(() => {
-  if (idleLogRef.value) {
-    idleLogRef.value.removeEventListener('scroll', handleScroll)
-  }
   if (userScrollTimer) clearTimeout(userScrollTimer)
 })
 </script>
@@ -1438,7 +1457,6 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   gap: 2px;
-  scroll-behavior: smooth;
 }
 .log-line {
   font-size: 12px;
