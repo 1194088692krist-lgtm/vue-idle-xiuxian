@@ -90,7 +90,7 @@
               @click="showCharacterDetail(result)"
             >
               <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar">
-                <img :src="getCharacterAvatar(result.item)" :alt="result.item.name" />
+                <img :src="getCharacterThumbnail(result.item)" :alt="result.item.name" />
               </div>
               <div class="result-type" :style="{ color: getResultColor(result) }">
                 {{ getResultTypeName(result) }}
@@ -182,7 +182,7 @@
   } from '../plugins/gacha'
   import { setBonuses } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
-  import { characterSchools, characterTalents, characterRoles, getCharacterAvatar } from '../plugins/characters'
+  import { characterSchools, characterTalents, characterRoles, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -220,9 +220,12 @@
   }
 
   const formatNumber = num => {
-    if (num >= 100000000) return (num / 100000000).toFixed(2) + '亿'
-    if (num >= 10000) return (num / 10000).toFixed(1) + '万'
-    return num.toLocaleString()
+    if (num == null) return '0'
+    const n = Number(num) || 0
+    if (n >= 10000) {
+      return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+    }
+    return Math.floor(n).toLocaleString()
   }
 
   const switchPool = key => {

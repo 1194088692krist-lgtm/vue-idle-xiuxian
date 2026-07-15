@@ -73,7 +73,7 @@
       <div class="char-header">
         <div class="char-avatar-container">
           <div class="char-avatar" @click="openAvatarViewer">
-            <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterAvatar(selectedMember)" />
+            <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterThumbnail(selectedMember)" />
             <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
           </div>
           <span class="char-avatar-hint">点击查看立绘</span>
@@ -210,7 +210,7 @@
         </div>
         <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
-            <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
+            <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
@@ -235,7 +235,7 @@
       <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
         <div class="char-detail-header">
           <div class="char-avatar large">
-            <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterAvatar(detailMember)" />
+            <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterThumbnail(detailMember)" />
             <span v-else>{{ detailMember.name?.[0] || '仙' }}</span>
           </div>
           <div class="char-info">
@@ -392,7 +392,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig, getCharacterAvatar, characterList } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'

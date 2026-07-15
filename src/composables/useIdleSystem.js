@@ -38,8 +38,8 @@ const ROLE_EFFECTS = {
   vanguard: {
     name: '先锋冲锋',
     effect: (memberState, teamStates) => {
-      const bonus = Math.floor(memberState.buildStrength * 0.05)
-      return { type: 'damage_boost', value: bonus, desc: `${memberState.name}发动先锋冲锋，全队攻击力提升 ${bonus}` }
+      const bonusPercent = 0.05
+      return { type: 'damage_boost', value: bonusPercent, desc: `${memberState.name}发动先锋冲锋，全队攻击力提升 ${formatBuffPercent(bonusPercent)}` }
     }
   },
   blade: {
@@ -527,10 +527,11 @@ const LOG_CATEGORY_ORDER = {
 
 const pendingLogs = ref([])
 let logDisplayTimer = null
-let lastGenerationTime = 0
+let firstPendingLogTime = 0
 
 const showPendingLog = () => {
   if (pendingLogs.value.length === 0) {
+    firstPendingLogTime = 0
     if (logDisplayTimer) {
       clearInterval(logDisplayTimer)
       logDisplayTimer = null
@@ -539,13 +540,14 @@ const showPendingLog = () => {
   }
 
   const now = Date.now()
-  const timeSinceGeneration = now - lastGenerationTime
+  const timeSinceFirstLog = now - firstPendingLogTime
 
-  if (timeSinceGeneration >= 14000) {
+  if (timeSinceFirstLog >= 14000) {
     while (pendingLogs.value.length > 0) {
       const next = pendingLogs.value.shift()
       logs.value.push(next)
     }
+    firstPendingLogTime = 0
     if (logs.value.length > 400) logs.value = logs.value.slice(-400)
     if (logDisplayTimer) {
       clearInterval(logDisplayTimer)
@@ -568,6 +570,9 @@ function addLog(type, text, detail = null) {
     return
   }
 
+  if (pendingLogs.value.length === 0) {
+    firstPendingLogTime = Date.now()
+  }
   pendingLogs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
 
   if (!logDisplayTimer) {
@@ -1146,7 +1151,6 @@ function hideTreasureFlash() {
 
 // ============ 生动日志：单场遭遇 ============
 function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults = [], roleEffects = []) {
-  lastGenerationTime = Date.now()
   const s = store()
   const team = s.getTeamMembersDetail()
 
@@ -1451,7 +1455,7 @@ async function runIdleEncounter() {
             } else if (effectResult.type === 'shield') {
               runStats.value.shieldAmount += effectResult.value
             } else if (effectResult.type === 'damage_boost' || effectResult.type === 'attack_buff') {
-              runStats.value.damageBoost += effectResult.value
+              runStats.value.damageBoost++
             } else if (effectResult.type === 'damage_over_time') {
               runStats.value.buffCount++
             }
@@ -1938,7 +1942,7 @@ const idleDashboard = computed(() => {
     roleEffects: {
       healAmount: runStats.value.healAmount,
       shieldAmount: runStats.value.shieldAmount,
-      damageBoost: formatBuffPercent(runStats.value.damageBoost),
+      damageBoost: runStats.value.damageBoost + '次',
       buffCount: runStats.value.buffCount
     },
     activeBuffs: idleBuffs.value.map(b => ({

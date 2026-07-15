@@ -89,7 +89,7 @@
             class="team-member-card"
           >
             <div class="member-avatar">
-              <img v-if="getCharacterAvatar(member)" :src="getCharacterAvatar(member)" class="member-avatar-img" :alt="member.name" />
+              <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="member-avatar-img" :alt="member.name" />
               <span v-else>{{ member.name[0] }}</span>
               <div class="member-stars">
                 <span v-for="i in member.star" :key="i" class="star">★</span>
@@ -500,7 +500,7 @@
                   @click="toggleMemberInTeam(member.id)"
                 >
                   <div class="sect-avatar">
-                    <img v-if="getCharacterAvatar(member)" :src="getCharacterAvatar(member)" class="sect-avatar-img" :alt="member.name" />
+                    <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="sect-avatar-img" :alt="member.name" />
                     <span v-else>{{ member.name[0] }}</span>
                   </div>
                   <div class="sect-member-info">
@@ -562,7 +562,7 @@ import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
-import { characterSchools, getCharacterAvatar } from '../plugins/characters'
+import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 import { getStatName, formatStatValue } from '../plugins/stats'
 
 const playerStore = usePlayerStore()

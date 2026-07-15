@@ -157,15 +157,21 @@ export async function loadSharedPortraits() {
     Object.entries(manifest).forEach(([id, data]) => {
       // 兼容新旧两种格式
       if (typeof data === 'object' && data.full) {
-        sharedPortraitMap[id] = `${base}portraits/${data.full}`
+        sharedPortraitMap[id] = {
+          full: `${base}portraits/${data.full}`,
+          thumbnail: data.thumbnail ? `${base}portraits/${data.thumbnail}` : null
+        }
       } else if (typeof data === 'string') {
-        sharedPortraitMap[id] = `${base}portraits/${data}`
+        sharedPortraitMap[id] = {
+          full: `${base}portraits/${data}`,
+          thumbnail: null
+        }
       }
     })
   }
 }
 
-export function getCharacterAvatar(member) {
+export function getCharacterAvatar(member, size = 'full') {
   if (!member) return null
   if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
     return member.avatar
@@ -175,9 +181,19 @@ export function getCharacterAvatar(member) {
   if (characterDefMap[id] && characterDefMap[id].avatar) {
     return characterDefMap[id].avatar
   }
-  if (sharedPortraitMap[id]) return sharedPortraitMap[id]
+  if (sharedPortraitMap[id]) {
+    const portrait = sharedPortraitMap[id]
+    if (typeof portrait === 'object') {
+      return size === 'thumbnail' && portrait.thumbnail ? portrait.thumbnail : portrait.full
+    }
+    return portrait
+  }
   const t = characterList.find(c => c.id === id)
   return (t && t.avatar) || null
+}
+
+export function getCharacterThumbnail(member) {
+  return getCharacterAvatar(member, 'thumbnail')
 }
 
 // 角色定位对应的初始战斗属性（独特数值信息）
