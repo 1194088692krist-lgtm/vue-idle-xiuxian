@@ -143,7 +143,8 @@
     SmileOutlined,
     ArrowUpOutlined,
     DollarOutlined,
-    StarOutlined
+    StarOutlined,
+    FireOutlined
   } from '@ant-design/icons-vue'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
@@ -296,7 +297,7 @@ import SaveButton from './components/SaveButton.vue'
       ...(isNewPlayer.value ? [{ label: '欢迎', key: '', icon: HomeOutlined }] : []),
       { label: '宗门', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
-      { label: '丹药/丹方', key: 'alchemy', icon: MedicineBoxOutlined },
+      { label: '八卦炉', key: 'alchemy', icon: FireOutlined },
       { label: '背包', key: 'inventory', icon: ExperimentOutlined },
       { label: '仙缘祈福', key: 'gacha', icon: GiftOutlined },
       { label: '攻略', key: 'guide', icon: FileTextOutlined },

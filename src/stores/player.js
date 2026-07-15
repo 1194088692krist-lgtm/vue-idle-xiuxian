@@ -1667,12 +1667,16 @@ export const usePlayerStore = defineStore('player', {
     levelUpCharacter(memberId) {
       const member = this.sectMembers.find(m => m.id === memberId)
       if (!member) return { success: false, message: '成员不存在' }
+      const requiredExp = calculateLevelExp(member.level)
+      if (member.maxExperience !== requiredExp) {
+        member.maxExperience = requiredExp
+      }
       if (member.experience < member.maxExperience) {
         return { success: false, message: '经验不足' }
       }
       member.level++
       member.experience -= member.maxExperience
-      member.maxExperience = Math.round(member.maxExperience * 1.5)
+      member.maxExperience = calculateLevelExp(member.level)
       const starConfig = { 3: 1, 4: 1.2, 5: 1.5 }
       const growth = starConfig[member.star] || 1
       member.baseStats.attack = Math.round(member.baseStats.attack * (1 + 0.1 * growth))
@@ -1750,42 +1754,50 @@ export const usePlayerStore = defineStore('player', {
       member.experience += numAmount
       let levelsGained = 0
       let breakthroughCount = 0
-      while (true) {
+      let safetyCounter = 0
+      const MAX_LEVEL = 999
+      while (safetyCounter < 200) {
+        safetyCounter++
         const requiredExp = calculateLevelExp(member.level)
         if (member.experience < requiredExp) break
+        if (member.level >= MAX_LEVEL) break
         const nextLevel = member.level + 1
+        // 突破检查：材料不足时仍然允许升级，但不消耗材料、不计入突破次数
+        let didBreakthrough = false
         if (member.level % 9 === 0 && member.level > 0) {
           const breakthroughCost = calculateBreakthroughCost(member.level)
-          if (this.spiritStones < breakthroughCost.spiritStones) {
-            break
-          }
-          let hasAllMaterials = true
-          if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
-            for (const mat of breakthroughCost.materials) {
-              const matCount = this.materials.filter(m => m.id === mat.id).length
-              if (matCount < mat.amount) {
-                hasAllMaterials = false
-                break
-              }
-            }
-          }
-          if (!hasAllMaterials) break
-          this.spiritStones -= breakthroughCost.spiritStones
-          if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
-            for (const mat of breakthroughCost.materials) {
-              let remaining = mat.amount
-              for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
-                if (this.materials[i].id === mat.id) {
-                  this.materials.splice(i, 1)
-                  remaining--
+          if (this.spiritStones >= breakthroughCost.spiritStones) {
+            let hasAllMaterials = true
+            if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
+              for (const mat of breakthroughCost.materials) {
+                const matCount = this.materials.filter(m => m.id === mat.id).length
+                if (matCount < mat.amount) {
+                  hasAllMaterials = false
+                  break
                 }
               }
             }
+            if (hasAllMaterials) {
+              this.spiritStones -= breakthroughCost.spiritStones
+              if (breakthroughCost.materials && breakthroughCost.materials.length > 0) {
+                for (const mat of breakthroughCost.materials) {
+                  let remaining = mat.amount
+                  for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+                    if (this.materials[i].id === mat.id) {
+                      this.materials.splice(i, 1)
+                      remaining--
+                    }
+                  }
+                }
+              }
+              breakthroughCount++
+              didBreakthrough = true
+            }
           }
-          breakthroughCount++
         }
         member.experience -= requiredExp
         member.level = nextLevel
+        member.maxExperience = calculateLevelExp(member.level)
         const statIncrease = calculateStatIncrease(member.level)
         member.baseStats.attack += statIncrease.attack
         member.baseStats.health += statIncrease.health

@@ -3,101 +3,189 @@
     <div class="main-card glass-card">
       <div class="card-header">
         <div class="header-icon">
-          <MedicineBoxOutlined />
+          <FireOutlined />
         </div>
         <div class="header-info">
-          <h2 class="card-title gold-gradient-text">丹药炼制</h2>
-          <p class="card-subtitle">炼制丹药，提升修为</p>
+          <h2 class="card-title gold-gradient-text">八卦炉</h2>
+          <p class="card-subtitle">炼丹锻器，回炉转生</p>
         </div>
       </div>
-      <div class="card-body">
-        <div class="tips-box">
-          <InfoCircleOutlined />
-          <span>选择丹方，收集材料，炼制各种神奇丹药。</span>
+
+      <!-- 八卦炉子菜单切换 -->
+      <div class="furnace-tabs">
+        <div
+          class="furnace-tab"
+          :class="{ active: activeTab === 'pill' }"
+          @click="activeTab = 'pill'"
+        >
+          <span class="tab-icon">⚗️</span>
+          <span class="tab-label">丹药炼制</span>
         </div>
-        <template v-if="unlockedRecipes.length > 0">
-          <div class="section">
-            <h3 class="section-title">丹方选择</h3>
-            <div class="recipes-grid">
-              <div
-                class="recipe-card glass-card"
-                v-for="recipe in unlockedRecipes"
-                :key="recipe.id"
-                :class="{ selected: selectedRecipe?.id === recipe.id }"
-                @click="selectRecipe(recipe)"
-              >
-                <div class="recipe-header">
-                  <h4 class="recipe-name">{{ recipe.name }}</h4>
-                  <div class="recipe-tags">
-                    <n-tag type="info" size="small">{{ pillGrades[recipe.grade].name }}</n-tag>
-                    <n-tag type="warning" size="small">{{ pillTypes[recipe.type].name }}</n-tag>
+        <div
+          class="furnace-tab"
+          :class="{ active: activeTab === 'forge' }"
+          @click="activeTab = 'forge'"
+        >
+          <span class="tab-icon">🔨</span>
+          <span class="tab-label">装备锻打</span>
+        </div>
+        <div
+          class="furnace-tab"
+          :class="{ active: activeTab === 'rebirth' }"
+          @click="activeTab = 'rebirth'"
+        >
+          <span class="tab-icon">♻️</span>
+          <span class="tab-label">回炉转生</span>
+        </div>
+      </div>
+
+      <div class="card-body">
+        <!-- ==================== 丹药炼制 ==================== -->
+        <template v-if="activeTab === 'pill'">
+          <div class="tips-box">
+            <InfoCircleOutlined />
+            <span>选择丹方，收集材料，炼制各种神奇丹药。</span>
+          </div>
+          <template v-if="unlockedRecipes.length > 0">
+            <div class="section">
+              <h3 class="section-title">丹方选择</h3>
+              <div class="recipes-grid">
+                <div
+                  class="recipe-card glass-card"
+                  v-for="recipe in unlockedRecipes"
+                  :key="recipe.id"
+                  :class="{ selected: selectedRecipe?.id === recipe.id }"
+                  @click="selectRecipe(recipe)"
+                >
+                  <div class="recipe-header">
+                    <h4 class="recipe-name">{{ recipe.name }}</h4>
+                    <div class="recipe-tags">
+                      <n-tag type="info" size="small">{{ pillGrades[recipe.grade].name }}</n-tag>
+                      <n-tag type="warning" size="small">{{ pillTypes[recipe.type].name }}</n-tag>
+                    </div>
+                  </div>
+                  <p class="recipe-desc">{{ recipe.description }}</p>
+                  <div class="recipe-status">
+                    {{ selectedRecipe?.id === recipe.id ? '已选择' : '点击选择' }}
                   </div>
                 </div>
-                <p class="recipe-desc">{{ recipe.description }}</p>
-                <div class="recipe-status">
-                  {{ selectedRecipe?.id === recipe.id ? '已选择' : '点击选择' }}
+              </div>
+            </div>
+          </template>
+          <div v-else class="empty-state">
+            <n-empty description="暂未掌握任何丹方" />
+            <p class="empty-hint">探索秘境可获得丹方残页</p>
+          </div>
+          <template v-if="selectedRecipe">
+            <div class="section">
+              <h3 class="section-title">材料需求</h3>
+              <div class="materials-list">
+                <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.id || material.herb">
+                  <div class="material-info">
+                    <span class="material-name">{{ getMaterialName(material) }}</span>
+                    <span class="material-need">需要: {{ material.count }}</span>
+                  </div>
+                  <div
+                    class="material-status"
+                    :class="getMaterialStatus(material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
+                  >
+                    {{ getMaterialStatus(material) }}
+                  </div>
                 </div>
               </div>
             </div>
+            <div class="section">
+              <h3 class="section-title">效果预览</h3>
+              <div class="effect-grid">
+                <div class="effect-item">
+                  <div class="effect-label">丹药介绍</div>
+                  <div class="effect-value">{{ selectedRecipe.description }}</div>
+                </div>
+                <div class="effect-item">
+                  <div class="effect-label">{{ effectDescription.label }}</div>
+                  <div class="effect-value highlight">{{ effectDescription.value }}</div>
+                </div>
+                <div class="effect-item">
+                  <div class="effect-label">持续时间</div>
+                  <div class="effect-value">{{ Math.floor((currentEffect?.duration || 0) / 60) }}分钟</div>
+                </div>
+                <div class="effect-item">
+                  <div class="effect-label">成功率</div>
+                  <div class="effect-value">{{ (currentEffect?.successRate * 100).toFixed(1) }}%</div>
+                </div>
+              </div>
+            </div>
+            <div class="craft-section">
+              <button
+                class="btn btn-primary craft-button"
+                :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe) }"
+                @click="craftPill"
+              >
+                <span class="btn-icon"><FireOutlined /></span>
+                <span>{{ !checkMaterials(selectedRecipe) ? '材料不足' : '开始炼制' }}</span>
+              </button>
+            </div>
+          </template>
+        </template>
+
+        <!-- ==================== 装备锻打 ==================== -->
+        <template v-if="activeTab === 'forge'">
+          <div class="tips-box">
+            <InfoCircleOutlined />
+            <span>将多余装备投入八卦炉锻打，锤炼出更强属性。</span>
+          </div>
+          <div class="coming-soon">
+            <div class="coming-soon-icon">🔨</div>
+            <h3 class="section-title">装备锻打系统</h3>
+            <p class="coming-soon-desc">投入装备与锻材，以炉火淬炼装备属性。</p>
+            <div class="feature-preview">
+              <div class="feature-item">
+                <span class="feature-icon">⚔️</span>
+                <span>装备强化</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🔄</span>
+                <span>属性洗练</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">✨</span>
+                <span>品质提升</span>
+              </div>
+            </div>
+            <div class="coming-soon-badge">即将开放</div>
           </div>
         </template>
-        <div v-else class="empty-state">
-          <n-empty description="暂未掌握任何丹方" />
-          <p class="empty-hint">探索秘境可获得丹方残页</p>
-        </div>
-        <template v-if="selectedRecipe">
-          <div class="section">
-            <h3 class="section-title">材料需求</h3>
-            <div class="materials-list">
-              <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.id || material.herb">
-                <div class="material-info">
-                  <span class="material-name">{{ getMaterialName(material) }}</span>
-                  <span class="material-need">需要: {{ material.count }}</span>
-                </div>
-                <div
-                  class="material-status"
-                  :class="getMaterialStatus(material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
-                >
-                  {{ getMaterialStatus(material) }}
-                </div>
+
+        <!-- ==================== 回炉转生 ==================== -->
+        <template v-if="activeTab === 'rebirth'">
+          <div class="tips-box">
+            <InfoCircleOutlined />
+            <span>将装备回炉重铸，褪凡入圣，转生重塑。</span>
+          </div>
+          <div class="coming-soon">
+            <div class="coming-soon-icon">♻️</div>
+            <h3 class="section-title">回炉转生系统</h3>
+            <p class="coming-soon-desc">投入高阶装备回炉重炼，突破品质极限，获得新生属性。</p>
+            <div class="feature-preview">
+              <div class="feature-item">
+                <span class="feature-icon">🔮</span>
+                <span>装备回炉</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">🌟</span>
+                <span>品质转生</span>
+              </div>
+              <div class="feature-item">
+                <span class="feature-icon">💎</span>
+                <span>属性继承</span>
               </div>
             </div>
-          </div>
-          <div class="section">
-            <h3 class="section-title">效果预览</h3>
-            <div class="effect-grid">
-              <div class="effect-item">
-                <div class="effect-label">丹药介绍</div>
-                <div class="effect-value">{{ selectedRecipe.description }}</div>
-              </div>
-              <div class="effect-item">
-                <div class="effect-label">{{ effectDescription.label }}</div>
-                <div class="effect-value highlight">{{ effectDescription.value }}</div>
-              </div>
-              <div class="effect-item">
-                <div class="effect-label">持续时间</div>
-                <div class="effect-value">{{ Math.floor((currentEffect?.duration || 0) / 60) }}分钟</div>
-              </div>
-              <div class="effect-item">
-                <div class="effect-label">成功率</div>
-                <div class="effect-value">{{ (currentEffect?.successRate * 100).toFixed(1) }}%</div>
-              </div>
-            </div>
-          </div>
-          <div class="craft-section">
-            <button
-              class="btn btn-primary craft-button"
-              :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe) }"
-              @click="craftPill"
-            >
-              <span class="btn-icon"><FireOutlined /></span>
-              <span>{{ !checkMaterials(selectedRecipe) ? '材料不足' : '开始炼制' }}</span>
-            </button>
+            <div class="coming-soon-badge">即将开放</div>
           </div>
         </template>
       </div>
     </div>
-    <div class="log-section" v-if="selectedRecipe">
+    <div class="log-section" v-if="selectedRecipe && activeTab === 'pill'">
       <div class="log-header">
         <h3 class="section-title gold-gradient-text">炼丹日志</h3>
       </div>
@@ -121,6 +209,7 @@
   const playerStore = usePlayerStore()
   const logRef = ref(null)
 
+  const activeTab = ref('pill')
   const selectedRecipe = ref(null)
 
   const unlockedRecipes = computed(() => {
@@ -246,6 +335,53 @@
     margin: 4px 0 0;
     color: #888;
     font-size: 14px;
+  }
+
+  /* 八卦炉子菜单 */
+  .furnace-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+    padding: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 12px;
+    border: 1px solid rgba(139, 69, 19, 0.15);
+  }
+
+  .furnace-tab {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 4px;
+    padding: 12px 8px;
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #888;
+    font-size: 13px;
+    text-align: center;
+  }
+
+  .furnace-tab:hover {
+    background: rgba(218, 165, 32, 0.08);
+    color: #ccc;
+  }
+
+  .furnace-tab.active {
+    background: linear-gradient(135deg, rgba(139, 69, 19, 0.4), rgba(218, 165, 32, 0.25));
+    color: var(--color-accent-gold);
+    box-shadow: 0 2px 12px rgba(218, 165, 32, 0.2);
+  }
+
+  .tab-icon {
+    font-size: 22px;
+    line-height: 1;
+  }
+
+  .tab-label {
+    font-size: 13px;
+    font-weight: 500;
   }
 
   .tips-box {
@@ -509,5 +645,56 @@
 
   .log-header {
     margin-bottom: 12px;
+  }
+
+  /* 即将开放占位 */
+  .coming-soon {
+    text-align: center;
+    padding: 48px 24px;
+  }
+
+  .coming-soon-icon {
+    font-size: 56px;
+    margin-bottom: 16px;
+    opacity: 0.7;
+  }
+
+  .coming-soon-desc {
+    color: #888;
+    font-size: 14px;
+    line-height: 1.6;
+    margin: 8px 0 24px;
+  }
+
+  .feature-preview {
+    display: flex;
+    justify-content: center;
+    gap: 24px;
+    margin-bottom: 24px;
+    flex-wrap: wrap;
+  }
+
+  .feature-item {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    gap: 6px;
+    color: #aaa;
+    font-size: 13px;
+  }
+
+  .feature-icon {
+    font-size: 28px;
+  }
+
+  .coming-soon-badge {
+    display: inline-block;
+    padding: 6px 20px;
+    background: rgba(218, 165, 32, 0.15);
+    border: 1px solid rgba(218, 165, 32, 0.3);
+    border-radius: 20px;
+    color: var(--color-accent-gold);
+    font-size: 13px;
+    font-weight: 500;
   }
 </style>
