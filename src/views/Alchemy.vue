@@ -163,13 +163,50 @@
           </div>
 
           <div class="forge-content">
+            <!-- 装备筛选工具栏 -->
+            <div class="forge-toolbar">
+              <select v-model="forgeFilterType" class="forge-select" @change="onForgeFilterChange">
+                <option value="">全部种类</option>
+                <option value="weapon">武器</option>
+                <option value="head">头部</option>
+                <option value="body">衣服</option>
+                <option value="legs">裤子</option>
+                <option value="feet">鞋子</option>
+                <option value="shoulder">肩甲</option>
+                <option value="hands">手套</option>
+                <option value="wrist">护腕</option>
+                <option value="necklace">项链</option>
+                <option value="ring1">戒指1</option>
+                <option value="ring2">戒指2</option>
+                <option value="belt">腰带</option>
+                <option value="artifact">法宝</option>
+              </select>
+              <select v-model="forgeFilterRarity" class="forge-select" @change="onForgeFilterChange">
+                <option value="">全部品级</option>
+                <option value="mythic">神品</option>
+                <option value="legendary">仙品</option>
+                <option value="epic">极品</option>
+                <option value="rare">上品</option>
+                <option value="uncommon">良品</option>
+                <option value="common">凡品</option>
+              </select>
+              <button class="btn-small forge-sort-btn" :class="{ active: forgeSortedByScore }" @click="toggleForgeSort">
+                🔼 按评分排序
+              </button>
+            </div>
+
             <!-- 强化子菜单 -->
             <template v-if="forgeTab === 'enhance'">
               <div class="section">
                 <h3 class="section-title">选择装备</h3>
+                <div class="forge-pagination" v-if="forgeFilteredEquipments.length > forgePageSize">
+                  <span>共 {{ forgeFilteredEquipments.length }} 件，第 {{ forgePage }}/{{ forgeTotalPages }} 页</span>
+                  <button class="btn-small" :disabled="forgePage <= 1" @click="forgePrevPage">上一页</button>
+                  <button class="btn-small" :disabled="forgePage >= forgeTotalPages" @click="forgeNextPage">下一页</button>
+                </div>
                 <div class="equipment-grid">
                   <div
-                    v-for="equip in allEquipments"
+                    v-for="equip in forgePagedEquipments"
                     :key="equip.id"
                     class="equipment-card glass-card"
                     :class="{ selected: selectedForgeEquip?.id === equip.id }"
@@ -188,9 +225,11 @@
                     </div>
                     <div class="equip-info">
                       <span>强化: {{ equip.enhanceLevel || 0 }}/{{ enhanceConfig.maxLevel }}</span>
+                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
                     </div>
                   </div>
                 </div>
+                <div v-if="forgeFilteredEquipments.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
 
               <template v-if="selectedForgeEquip">
@@ -256,9 +295,14 @@
             <template v-if="forgeTab === 'reforge'">
               <div class="section">
                 <h3 class="section-title">选择装备</h3>
+                <div class="forge-pagination" v-if="forgeFilteredEquipments.length > forgePageSize">
+                  <span>共 {{ forgeFilteredEquipments.length }} 件，第 {{ forgePage }}/{{ forgeTotalPages }} 页</span>
+                  <button class="btn-small" :disabled="forgePage <= 1" @click="forgePrevPage">上一页</button>
+                  <button class="btn-small" :disabled="forgePage >= forgeTotalPages" @click="forgeNextPage">下一页</button>
+                </div>
                 <div class="equipment-grid">
                   <div
-                    v-for="equip in allEquipments"
+                    v-for="equip in forgePagedEquipments"
                     :key="equip.id"
                     class="equipment-card glass-card"
                     :class="{ selected: selectedForgeEquip?.id === equip.id }"
@@ -277,9 +321,11 @@
                     </div>
                     <div class="equip-info">
                       <span>词条数: {{ Object.keys(equip.stats || {}).length }}/{{ reforgeConfig.affixMaxCount[equip.rarity || 'common'] }}</span>
+                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
                     </div>
                   </div>
                 </div>
+                <div v-if="forgeFilteredEquipments.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
 
               <template v-if="selectedForgeEquip">
@@ -378,9 +424,14 @@
             <template v-if="forgeTab === 'disassemble'">
               <div class="section">
                 <h3 class="section-title">选择装备（可多选）</h3>
+                <div class="forge-pagination" v-if="forgeFilteredInventory.length > forgePageSize">
+                  <span>共 {{ forgeFilteredInventory.length }} 件，第 {{ forgePage }}/{{ forgeInventoryTotalPages }} 页</span>
+                  <button class="btn-small" :disabled="forgePage <= 1" @click="forgeInvPrevPage">上一页</button>
+                  <button class="btn-small" :disabled="forgePage >= forgeInventoryTotalPages" @click="forgeInvNextPage">下一页</button>
+                </div>
                 <div class="equipment-grid">
                   <div
-                    v-for="equip in inventoryEquipments"
+                    v-for="equip in forgePagedInventory"
                     :key="equip.id"
                     class="equipment-card glass-card"
                     :class="{ selected: selectedDisassembleIds.includes(equip.id) }"
@@ -400,8 +451,12 @@
                         {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
                       </div>
                     </div>
+                    <div class="equip-info">
+                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
+                    </div>
                   </div>
                 </div>
+                <div v-if="forgeFilteredInventory.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
 
               <div class="section">
@@ -537,7 +592,7 @@
     InfoCircleOutlined,
     FireOutlined
   } from '@ant-design/icons-vue'
-  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost } from '../plugins/equipment'
+  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, calculateEquipmentScore } from '../plugins/equipment'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -555,6 +610,13 @@
   const reforgeMode = ref('all')
   const selectedReforgeStat = ref(null)
   const reforgeResult = ref(null)
+
+  // 装备锻打 - 筛选与分页
+  const forgeFilterType = ref('')
+  const forgeFilterRarity = ref('')
+  const forgeSortedByScore = ref(false)
+  const forgePage = ref(1)
+  const forgePageSize = 10
 
   const unlockedRecipes = computed(() => {
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
@@ -699,15 +761,90 @@
   }
 
   // ===== 装备锻打相关 =====
+  const EQUIPMENT_SLOTS_FORGE = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+  const isForgeEquipItem = (i) => i && i.type !== 'pet' && i.type !== 'material' && (i.type === 'equipment' || (i.slot && EQUIPMENT_SLOTS_FORGE.includes(i.slot)))
+
   const allEquipments = computed(() => {
     const equipped = Object.values(playerStore.equippedArtifacts).filter(e => e)
-    const inventory = playerStore.items.filter(i => i.type === 'equipment' || (i.slot && ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact'].includes(i.slot)))
+    const inventory = playerStore.items.filter(isForgeEquipItem)
     return [...equipped, ...inventory]
   })
 
   const inventoryEquipments = computed(() => {
-    return playerStore.items.filter(i => i.type === 'equipment' || (i.slot && ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact'].includes(i.slot)))
+    return playerStore.items.filter(isForgeEquipItem)
   })
+
+  // 筛选+排序后的装备列表
+  const forgeFilteredEquipments = computed(() => {
+    let list = allEquipments.value
+    if (forgeFilterType.value) {
+      list = list.filter(e => (e.slot || e.type) === forgeFilterType.value)
+    }
+    if (forgeFilterRarity.value) {
+      list = list.filter(e => (e.rarity || e.quality || 'common') === forgeFilterRarity.value)
+    }
+    if (forgeSortedByScore.value) {
+      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+    }
+    return list
+  })
+
+  // 分页后的装备列表
+  const forgePagedEquipments = computed(() => {
+    const start = (forgePage.value - 1) * forgePageSize
+    return forgeFilteredEquipments.value.slice(start, start + forgePageSize)
+  })
+
+  const forgeTotalPages = computed(() => Math.max(1, Math.ceil(forgeFilteredEquipments.value.length / forgePageSize)))
+
+  // 分解页筛选+排序+分页
+  const forgeFilteredInventory = computed(() => {
+    let list = inventoryEquipments.value
+    if (forgeFilterType.value) {
+      list = list.filter(e => (e.slot || e.type) === forgeFilterType.value)
+    }
+    if (forgeFilterRarity.value) {
+      list = list.filter(e => (e.rarity || e.quality || 'common') === forgeFilterRarity.value)
+    }
+    if (forgeSortedByScore.value) {
+      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+    }
+    return list
+  })
+
+  const forgePagedInventory = computed(() => {
+    const start = (forgePage.value - 1) * forgePageSize
+    return forgeFilteredInventory.value.slice(start, start + forgePageSize)
+  })
+
+  const forgeInventoryTotalPages = computed(() => Math.max(1, Math.ceil(forgeFilteredInventory.value.length / forgePageSize)))
+
+  const toggleForgeSort = () => {
+    forgeSortedByScore.value = !forgeSortedByScore.value
+    forgePage.value = 1
+    if (forgeSortedByScore.value) {
+      message.success('装备已按评分从高到低排序')
+    } else {
+      message.success('装备已恢复默认排序')
+    }
+  }
+
+  const onForgeFilterChange = () => {
+    forgePage.value = 1
+  }
+
+  const forgePrevPage = () => {
+    if (forgePage.value > 1) forgePage.value--
+  }
+  const forgeNextPage = () => {
+    if (forgePage.value < forgeTotalPages.value) forgePage.value++
+  }
+  const forgeInvPrevPage = () => {
+    if (forgePage.value > 1) forgePage.value--
+  }
+  const forgeInvNextPage = () => {
+    if (forgePage.value < forgeInventoryTotalPages.value) forgePage.value++
+  }
 
   const selectForgeEquip = (equip) => {
     selectedForgeEquip.value = equip
@@ -1506,6 +1643,81 @@
     gap: 16px;
   }
 
+  /* 装备筛选工具栏 */
+  .forge-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+    flex-wrap: wrap;
+    align-items: center;
+  }
+
+  .forge-select {
+    padding: 6px 12px;
+    border-radius: 6px;
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    background: rgba(0, 0, 0, 0.3);
+    color: #F5DEB3;
+    font-size: 13px;
+    cursor: pointer;
+  }
+
+  .forge-sort-btn {
+    padding: 6px 14px;
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    border-radius: 6px;
+    background: rgba(0, 0, 0, 0.3);
+    color: #F5DEB3;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+
+  .forge-sort-btn:hover {
+    background: rgba(218, 165, 32, 0.15);
+  }
+
+  .forge-sort-btn.active {
+    background: rgba(218, 165, 32, 0.25);
+    border-color: var(--color-accent-gold);
+    color: #ffd700;
+  }
+
+  .forge-pagination {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #888;
+    flex-wrap: wrap;
+  }
+
+  .equip-score-badge {
+    display: inline-block;
+    padding: 1px 8px;
+    border-radius: 10px;
+    font-size: 11px;
+    font-weight: bold;
+    color: #FFD700;
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+
+  .equip-info {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    font-size: 12px;
+    color: #999;
+  }
+
+  .empty-state {
+    text-align: center;
+    padding: 40px 20px;
+    color: #888;
+  }
+
   .equipment-grid {
     display: grid;
     grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
@@ -1588,11 +1800,6 @@
     color: #ccc;
     display: flex;
     justify-content: space-between;
-  }
-
-  .equip-info {
-    font-size: 12px;
-    color: #999;
   }
 
   .enhance-info {
