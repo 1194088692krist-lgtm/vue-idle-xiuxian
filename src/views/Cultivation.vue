@@ -72,7 +72,7 @@
     <div v-if="selectedMember" class="char-card glass-card">
       <div class="char-header">
         <div class="char-avatar-container">
-          <div class="char-avatar" @click="openAvatarViewer">
+          <div class="char-avatar" @click="openPortrait">
             <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterThumbnail(selectedMember)" />
             <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
           </div>
@@ -322,18 +322,8 @@
       </div>
     </div>
 
-    <!-- 立绘查看器：全屏显示，点击任意位置关闭 -->
-    <div v-if="showAvatarViewer" class="avatar-fullscreen" @click="closeAvatarViewer">
-      <img
-        v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)"
-        :src="getCharacterAvatar(avatarViewerMember)"
-        class="avatar-fullscreen-img"
-        @click.stop
-      />
-      <div v-else class="avatar-fullscreen-placeholder">暂无立绘</div>
-      <div class="avatar-fullscreen-name">{{ avatarViewerMember?.name || '' }}</div>
-      <div class="avatar-fullscreen-hint">点击任意位置关闭</div>
-    </div>
+    <!-- 立绘查看器：复用抽卡时的角色立绘大图弹窗效果 -->
+    <CharacterPortraitModal v-if="showPortrait" :character="portraitCharacter" @close="closePortrait" />
 
     <!-- 装备选择弹窗 -->
     <div v-if="showEquipSelect" class="equip-select-modal" @click.self="closeEquipSelect">
@@ -398,6 +388,7 @@ import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
+import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
@@ -747,17 +738,17 @@ const closeMemberDetail = () => {
   showMemberDetailModal.value = false
 }
 
-// 立绘查看器状态
-const showAvatarViewer = ref(false)
-const avatarViewerMember = ref(null)
+// 立绘查看器：复用抽卡角色立绘大图弹窗
+const showPortrait = ref(false)
+const portraitCharacter = ref(null)
 
-const openAvatarViewer = () => {
-  avatarViewerMember.value = selectedMember.value
-  showAvatarViewer.value = true
+const openPortrait = () => {
+  portraitCharacter.value = selectedMember.value
+  showPortrait.value = true
 }
 
-const closeAvatarViewer = () => {
-  showAvatarViewer.value = false
+const closePortrait = () => {
+  showPortrait.value = false
 }
 
 // 详情弹窗中的属性统计
@@ -1841,64 +1832,6 @@ watch([allMembers, teamMembers], () => {
   color: #9e9e9e;
 }
 
-.avatar-fullscreen {
-  position: fixed;
-  top: 0;
-  left: 0;
-  right: 0;
-  bottom: 0;
-  background: rgba(0, 0, 0, 0.96);
-  z-index: 9999;
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  justify-content: center;
-  cursor: pointer;
-  animation: avatarFadeIn 0.25s ease;
-}
-
-@keyframes avatarFadeIn {
-  from { opacity: 0; }
-  to { opacity: 1; }
-}
-
-.avatar-fullscreen-img {
-  max-width: 100vw;
-  max-height: 100vh;
-  width: auto;
-  height: auto;
-  object-fit: contain;
-  cursor: default;
-  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
-}
-
-.avatar-fullscreen-placeholder {
-  font-size: 28px;
-  color: #9e9e9e;
-  padding: 60px;
-}
-
-.avatar-fullscreen-name {
-  position: absolute;
-  top: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 20px;
-  font-weight: bold;
-  color: #FFD700;
-  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
-  pointer-events: none;
-}
-
-.avatar-fullscreen-hint {
-  position: absolute;
-  bottom: 24px;
-  left: 50%;
-  transform: translateX(-50%);
-  font-size: 13px;
-  color: rgba(255, 255, 255, 0.6);
-  pointer-events: none;
-}
 
 .sect-member-modal {
   z-index: 100;
