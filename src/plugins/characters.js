@@ -146,9 +146,6 @@ export async function initCharacterDefs() {
   return characterDefMap
 }
 
-// 共享立绘（随站点部署，所有玩家同源可见）：id -> 资源 URL。
-// 直接把图片放进 public/portraits/（文件名用角色名或ID），构建前 prebuild 会自动生成
-// public/portraits/manifest.json（scripts/gen-portraits-manifest.mjs），提交推送即对所有玩家生效。
 export const sharedPortraitMap = reactive({})
 
 export async function loadSharedPortraits() {
@@ -157,18 +154,22 @@ export async function loadSharedPortraits() {
   if (!res.ok) return
   const manifest = await res.json()
   if (manifest && typeof manifest === 'object') {
-    Object.entries(manifest).forEach(([id, file]) => {
-      sharedPortraitMap[id] = `${base}portraits/${file}`
+    Object.entries(manifest).forEach(([id, data]) => {
+      if (typeof data === 'object' && data.full) {
+        sharedPortraitMap[id] = {
+          full: `${base}portraits/${data.full}`,
+          thumbnail: `${base}portraits/${data.thumbnail}`
+        }
+      } else if (typeof data === 'string') {
+        sharedPortraitMap[id] = {
+          full: `${base}portraits/${data}`,
+          thumbnail: null
+        }
+      }
     })
   }
 }
 
-// 立绘解析优先级：
-//   1) 成员自带 base64（data URI，运行时/招募后已烘焙）
-//   2) 本地 GMTools 上传的立绘（IndexedDB，个人覆盖，仅自己可见）
-//   3) 共享立绘包（随站点部署，所有玩家可见）
-//   4) 静态表兜底
-// 本地/共享均为同源资源：本地走 data URI（零网络、离线可用），共享走部署站点（大陆可达性取决于部署域名）
 export function getCharacterAvatar(member) {
   if (!member) return null
   if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
@@ -179,9 +180,24 @@ export function getCharacterAvatar(member) {
   if (characterDefMap[id] && characterDefMap[id].avatar) {
     return characterDefMap[id].avatar
   }
-  if (sharedPortraitMap[id]) return sharedPortraitMap[id]
+  if (sharedPortraitMap[id]) {
+    return sharedPortraitMap[id].full
+  }
   const t = characterList.find(c => c.id === id)
   return (t && t.avatar) || null
+}
+
+export function getCharacterThumbnail(member) {
+  if (!member) return null
+  if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
+    return member.avatar
+  }
+  const id = member.templateId || member.id
+  if (!id) return null
+  if (sharedPortraitMap[id] && sharedPortraitMap[id].thumbnail) {
+    return sharedPortraitMap[id].thumbnail
+  }
+  return getCharacterAvatar(member)
 }
 
 // 角色定位对应的初始战斗属性（独特数值信息）
