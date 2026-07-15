@@ -377,24 +377,41 @@ export const allocateExpToCharacter = (player, memberId, amount) => {
   if (!player.cultivationPool || player.cultivationPool < amount) {
     return false
   }
-  
+  if (amount <= 0) return false
+
   const member = player.sectMembers.find(m => m.id === memberId)
   if (!member) return false
-  
+
+  if (typeof member.experience !== 'number' || isNaN(member.experience)) member.experience = 0
+  if (typeof member.level !== 'number' || isNaN(member.level) || member.level < 1) member.level = 1
+  if (typeof member.maxExperience !== 'number' || isNaN(member.maxExperience) || member.maxExperience <= 0) {
+    member.maxExperience = calculateLevelExp(member.level)
+  }
+
   player.cultivationPool -= amount
   member.experience += amount
-  
-  while (member.experience >= member.maxExperience) {
+
+  let safetyCounter = 0
+  const MAX_LEVEL = 999
+  while (member.experience >= member.maxExperience && member.level < MAX_LEVEL && safetyCounter < 100) {
     member.experience -= member.maxExperience
     member.level++
-    member.maxExperience = Math.floor(member.maxExperience * 1.15)
-    
+    const nextLevelExp = calculateLevelExp(member.level)
+    if (!nextLevelExp || isNaN(nextLevelExp) || nextLevelExp <= 0) {
+      member.maxExperience = Math.max(1, Math.floor(member.maxExperience * 1.15))
+    } else {
+      member.maxExperience = nextLevelExp
+    }
+
     const statIncrease = calculateStatIncrease(member.level)
-    member.baseStats.attack += statIncrease.attack
-    member.baseStats.health += statIncrease.health
-    member.baseStats.defense += statIncrease.defense
-    member.baseStats.speed += statIncrease.speed
+    if (statIncrease && member.baseStats) {
+      member.baseStats.attack = (member.baseStats.attack || 0) + (statIncrease.attack || 0)
+      member.baseStats.health = (member.baseStats.health || 0) + (statIncrease.health || 0)
+      member.baseStats.defense = (member.baseStats.defense || 0) + (statIncrease.defense || 0)
+      member.baseStats.speed = (member.baseStats.speed || 0) + (statIncrease.speed || 0)
+    }
+    safetyCounter++
   }
-  
+
   return true
 }

@@ -210,7 +210,7 @@
         </div>
         <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar">
-            <img v-if="getCharacterThumbnail(m)" :src="getCharacterThumbnail(m)" />
+            <img v-if="getCharacterAvatar(m)" :src="getCharacterAvatar(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
@@ -392,7 +392,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar, characterList } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
@@ -1842,6 +1842,8 @@ watch([allMembers, teamMembers], () => {
 
 .avatar-viewer-modal {
   z-index: 100;
+  align-items: flex-start !important;
+  padding-top: 20px !important;
 }
 
 .avatar-viewer-content {

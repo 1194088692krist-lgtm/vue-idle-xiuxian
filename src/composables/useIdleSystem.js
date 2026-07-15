@@ -307,8 +307,8 @@ const buildRatio = computed(() => {
   return rec > 0 ? playerBuildStrength.value / rec : 1
 })
 
-// 在线每场遭遇间隔：2 秒，让日志密集滚动
-const ENCOUNTER_INTERVAL = 2000
+// 在线每场遭遇间隔：15 秒
+const ENCOUNTER_INTERVAL = 15000
 
 let _store = null
 function store() {
