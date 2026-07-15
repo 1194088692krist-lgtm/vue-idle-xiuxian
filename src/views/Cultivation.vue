@@ -17,7 +17,7 @@
           <span class="sect-stat-value">{{ totalStrength }}</span>
         </div>
         <div class="sect-stat-item">
-          <span class="sect-stat-label">人精华</span>
+          <span class="sect-stat-label">灵魂碎片</span>
           <span class="sect-stat-value">{{ playerStore.characterEssence }}</span>
         </div>
       </div>
@@ -917,7 +917,7 @@ const detailBiography = computed(() => {
   const charId = detailMember.value.templateId || detailMember.value.id
   return getCharacterBiography(charId, detailMember.value.breakThrough || 0)
 })
-// 手动突破（用 1 个人精华强制突破一次）
+// 手动突破（用 1 个灵魂碎片强制突破一次）
 const tryManualBreakthrough = () => {
   if (!detailMember.value) return
   if ((detailMember.value.breakThrough || 0) >= 5) {
@@ -925,7 +925,7 @@ const tryManualBreakthrough = () => {
     return
   }
   if ((playerStore.characterEssence || 0) < 1) {
-    message.error('人精华不足（需要 1 个）')
+    message.error('灵魂碎片不足（需要 1 个）')
     return
   }
   playerStore.characterEssence -= 1

@@ -304,7 +304,7 @@
               <span class="dash-label">🛡️ 护盾</span>
               <span class="dash-value" style="color:#2196f3">+{{ idleDashboard.roleEffects.shieldAmount }}</span>
             </div>
-            <div class="dash-item" v-if="idleDashboard.roleEffects.damageBoost > 0">
+            <div class="dash-item" v-if="idleDashboard.roleEffects.damageBoost && idleDashboard.roleEffects.damageBoost !== '0%'">
               <span class="dash-label">⚔️ 攻击加成</span>
               <span class="dash-value" style="color:#ff5722">+{{ idleDashboard.roleEffects.damageBoost }}</span>
             </div>

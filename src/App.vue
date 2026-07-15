@@ -48,11 +48,6 @@
                   </div>
                 </div>
               </div>
-              <div class="top-actions">
-                <n-button quaternary circle @click="playerStore.toggle">
-                  <n-icon><Sunny v-if="playerStore.isDarkMode" /><Moon v-else /></n-icon>
-                </n-button>
-              </div>
             </header>
 
             <!-- 修为池 -->
@@ -139,7 +134,6 @@
     DollarOutlined,
     StarOutlined
   } from '@ant-design/icons-vue'
-  import { Moon, Sunny } from '@vicons/ionicons5'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
 import { initCharacterDefs } from './plugins/characters'

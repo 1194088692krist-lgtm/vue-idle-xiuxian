@@ -158,7 +158,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <ul>
 
-<li><strong>重复角色自动转换</strong>：抽到已有的角色会自动转为「人精华」（3★=30、4★=60、5★=70），用于角色突破境界。</li>
+<li><strong>重复角色自动转换</strong>：抽到已有的角色会自动转为「灵魂碎片」（3★=30、4★=60、5★=70），用于角色突破境界。</li>
 
 </ul>
 
@@ -366,7 +366,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <tr><td><strong>灵宠精华</strong></td><td>分解灵宠、<strong>放生灵宠报恩</strong>、抽卡资源</td><td>灵宠升级</td></tr>
 
-<tr><td><strong>人精华</strong></td><td><strong>抽到重复角色自动转换</strong></td><td>角色突破境界</td></tr>
+<tr><td><strong>灵魂碎片</strong></td><td><strong>抽到重复角色自动转换</strong></td><td>角色突破境界</td></tr>
 
 <tr><td><strong>素材</strong>（灵草/矿料/灵液/妖核/奇遇）</td><td>挂机、抽卡、炼丹</td><td>炼制丹药</td></tr>
 
@@ -1250,13 +1250,13 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <h3>11.7 重复角色处理</h3>
 
-抽到已有的角色会<strong>自动转换为人精华</strong>（用于角色突破境界）：
+抽到已有的角色会<strong>自动转换为灵魂碎片</strong>（用于角色突破境界）：
 
 <pre><code>
 
-人精华 = star × 10 + (star >= 4 ? 20 : 0)
+灵魂碎片 = star × 10 + (star >= 4 ? 20 : 0)
 
-3★ → 30 精华    4★ → 60 精华    5★ → 70 精华
+3★ → 30 碎片    4★ → 60 碎片    5★ → 70 碎片
 
 </code></pre>
 
@@ -1436,7 +1436,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>重复角色转人精华用于突破。</li>
+<li>重复角色转灵魂碎片用于突破。</li>
 
 </ul>
 

@@ -52,6 +52,16 @@
           </div>
         </div>
 
+        <!-- 全屏切换 -->
+        <div class="setting-row">
+          <label class="setting-label">显示模式</label>
+          <div class="setting-input-group">
+            <button class="btn btn-primary" @click="toggleFullscreen">
+              {{ isFullscreen ? '退出全屏' : '进入全屏' }}
+            </button>
+          </div>
+        </div>
+
         <!-- 危险操作 -->
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
@@ -143,7 +153,7 @@
 
 <script setup>
   import { usePlayerStore } from '../stores/player'
-  import { ref, onMounted, computed } from 'vue'
+  import { ref, onMounted, computed, onUnmounted } from 'vue'
   import { useDialog, useMessage } from 'naive-ui'
   import { saveAs } from 'file-saver'
   import {
@@ -162,6 +172,23 @@
   const dialog = useDialog()
   const version = `${GAME_VERSION} · ${GAME_VERSION_NAME}（${GAME_VERSION_DATE}）`
   const qq = ref(false)
+  const isFullscreen = ref(false)
+
+  const handleFullscreenChange = () => {
+    isFullscreen.value = !!document.fullscreenElement
+  }
+
+  const toggleFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {
+        message.error('全屏功能不支持或被浏览器阻止')
+      })
+    } else {
+      document.exitFullscreen().catch(() => {
+        message.error('退出全屏失败')
+      })
+    }
+  }
 
   // 存档槽位数据
   const saveSlots = ref([])
@@ -357,6 +384,12 @@
 
   onMounted(() => {
     loadSaveSlots()
+    document.addEventListener('fullscreenchange', handleFullscreenChange)
+    isFullscreen.value = !!document.fullscreenElement
+  })
+
+  onUnmounted(() => {
+    document.removeEventListener('fullscreenchange', handleFullscreenChange)
   })
 </script>
 

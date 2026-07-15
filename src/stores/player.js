@@ -1503,14 +1503,14 @@ export const usePlayerStore = defineStore('player', {
             }
           }
         }
-        // 超过突破上限后才会转人精华
+        // 超过突破上限后才会转灵魂碎片
         const essenceAmount = character.star * 10 + (character.star >= 4 ? 20 : 0)
         if (!this.characterEssence) this.characterEssence = 0
         this.characterEssence += essenceAmount
         this.queueSave()
         return {
           success: true,
-          message: `${character.name} 突破已达上限，自动转换为 ${essenceAmount} 人精华`,
+          message: `${character.name} 突破已达上限，自动转换为 ${essenceAmount} 灵魂碎片`,
           duplicate: true,
           essence: essenceAmount
         }

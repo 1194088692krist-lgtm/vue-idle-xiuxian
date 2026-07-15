@@ -884,18 +884,34 @@
 
   // 批量放生函数
   const batchReleasePets = () => {
-    playerStore.items = playerStore.items.filter(
+    const toRelease = playerStore.items.filter(
       item =>
-        item.type !== 'pet' ||
-        item.id === playerStore.activePet?.id ||
-        (selectedRarityToRelease.value !== 'all' && item.rarity !== selectedRarityToRelease.value)
+        item.type === 'pet' &&
+        item.id !== playerStore.activePet?.id &&
+        (selectedRarityToRelease.value === 'all' || item.rarity === selectedRarityToRelease.value)
     )
+    let totalEssence = 0
+    let totalFragments = 0
+    let count = 0
+    toRelease.forEach(pet => {
+      const result = playerStore.releasePet(pet.uid || pet.id)
+      if (result.success) {
+        count++
+        totalEssence += result.returnAmount || 0
+        const fragmentReturn = (pet.star || 0) * 2 + Math.floor(({ divine: 100, celestial: 60, mystic: 35, spiritual: 20, mortal: 10 }[pet.rarity] || 5) / 10)
+        totalFragments += fragmentReturn
+      }
+    })
     showBatchReleaseConfirm.value = false
-    message.success(
-      `已放生${
-        selectedRarityToRelease.value === 'all' ? '所有' : petRarities[selectedRarityToRelease.value].name
-      }品阶的未出战灵宠`
-    )
+    if (count > 0) {
+      message.success(
+        `已放生 ${count} 只${
+          selectedRarityToRelease.value === 'all' ? '' : petRarities[selectedRarityToRelease.value].name + '品阶'
+        }未出战灵宠，获得 ${totalEssence} 灵宠精华、${totalFragments} 升星碎片`
+      )
+    } else {
+      message.warning('没有可放生的灵宠')
+    }
   }
 
   // 显示灵宠详情

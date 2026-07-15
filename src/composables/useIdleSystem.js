@@ -389,10 +389,85 @@ const FORTUNE_LINES = [
 const pick = (arr) => arr[Math.floor(Math.random() * arr.length)]
 const rand = (a, b) => Math.floor(Math.random() * (b - a + 1)) + a
 
+// 日志分类优先级（数字越小越先显示）
+// 1=玩家队伍攻击和反应, 2=怪物攻击和反应, 3=战场状态/buff, 4=获得物品/奖励
+const LOG_CATEGORY_ORDER = {
+  // 玩家队伍攻击和反应
+  'combat': 1,
+  // 怪物攻击和反应
+  'enemy-normal': 2,
+  'enemy-elite': 2,
+  'enemy-boss': 2,
+  // 战场状态/buff/场景
+  'header': 3,
+  'scene': 3,
+  'skit': 3,
+  'victory': 3,
+  'defeat': 3,
+  'warning': 3,
+  // 获得物品/奖励
+  'reward-normal': 4,
+  'fortune': 4,
+  'drop-common': 4,
+  'drop-uncommon': 4,
+  'drop-rare': 4,
+  'drop-epic': 4,
+  'drop-legendary': 4,
+  'drop-mythic': 4,
+}
+
+// 待显示日志队列（按分类排序后逐条释放）
+const pendingLogs = ref([])
+let logReleaseTimer = null
+
+// 从待显示队列中按分类优先级取出一条显示
+const releaseOneLog = () => {
+  if (pendingLogs.value.length === 0) return
+  // 按分类优先级排序（同分类内保持原始顺序）
+  pendingLogs.value.sort((a, b) => {
+    const ca = LOG_CATEGORY_ORDER[a.type] ?? 5
+    const cb = LOG_CATEGORY_ORDER[b.type] ?? 5
+    if (ca !== cb) return ca - cb
+    return a._seq - b._seq
+  })
+  const next = pendingLogs.value.shift()
+  if (next) {
+    logs.value.push(next)
+    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+  }
+}
+
+let logSeq = 0
 function addLog(type, text, detail = null) {
-  logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
-  // 控制内存体积：最多保留 400 条
-  if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+  if (!isIdling.value) {
+    logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    return
+  }
+  logSeq++
+  pendingLogs.value.push({ type, text, detail, time: new Date().toLocaleTimeString(), _seq: logSeq })
+  // 如果定时器未启动，立即显示第一条并启动定时器
+  if (!logReleaseTimer) {
+    releaseOneLog()
+    logReleaseTimer = setInterval(() => {
+      if (pendingLogs.value.length === 0) {
+        clearInterval(logReleaseTimer)
+        logReleaseTimer = null
+        return
+      }
+      releaseOneLog()
+    }, 2000)
+  }
+}
+
+const flushAllPendingLogs = () => {
+  if (logReleaseTimer) {
+    clearInterval(logReleaseTimer)
+    logReleaseTimer = null
+  }
+  while (pendingLogs.value.length > 0) {
+    releaseOneLog()
+  }
 }
 
 // 将装备/灵宠的基础数据格式化为日志明细子行
@@ -1431,6 +1506,8 @@ function startIdle(durationMinutes) {
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
   logs.value = []
+  pendingLogs.value = []
+  logSeq = 0
   currentEncounterSummary.value = null
   idleBuffs.value = []
   
@@ -1491,6 +1568,8 @@ function finishIdle() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
+  // 挂机结束时，flush 所有待显示日志
+  flushAllPendingLogs()
   const s = store()
   const allDead = teamMemberStates.value.every(ms => ms.hp <= 0)
   
@@ -1571,6 +1650,8 @@ function initIdle() {
       idlePlayerHP.value = probe.stats.maxHealth
       runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
       logs.value = []
+      pendingLogs.value = []
+      logSeq = 0
       startIdleTimers()
       processOfflineIdle()
     } else {
@@ -1606,7 +1687,7 @@ const idleDashboard = computed(() => {
     roleEffects: {
       healAmount: runStats.value.healAmount,
       shieldAmount: runStats.value.shieldAmount,
-      damageBoost: runStats.value.damageBoost,
+      damageBoost: formatBuffPercent(runStats.value.damageBoost),
       buffCount: runStats.value.buffCount
     },
     activeBuffs: idleBuffs.value.map(b => ({

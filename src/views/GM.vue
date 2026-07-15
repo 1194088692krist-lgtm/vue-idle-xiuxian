@@ -47,7 +47,7 @@
           <n-form-item label="幻灵结晶">
             <n-input-number v-model:value="baseAttributes.phantomCrystals" />
           </n-form-item>
-          <n-form-item label="人精华">
+          <n-form-item label="灵魂碎片">
             <n-input-number v-model:value="baseAttributes.characterEssence" />
           </n-form-item>
           <n-form-item label="强化石">

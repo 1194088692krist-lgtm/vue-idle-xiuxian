@@ -104,7 +104,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [75, 180] },
           { type: 'equipment', chance: 0.4, rarity: ['uncommon', 'rare'], slot: 'body' },
-          { type: 'pet', chance: 0.1, rarity: ['mortal'] }
+          { type: 'pet', chance: 0.03, rarity: ['mortal'] }
         ],
         dropRateBonus: 1.2
       },
@@ -165,7 +165,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [180, 450] },
           { type: 'equipment', chance: 0.5, rarity: ['rare', 'epic'], slot: 'ring1' },
-          { type: 'pet', chance: 0.15, rarity: ['spiritual'] }
+          { type: 'pet', chance: 0.04, rarity: ['spiritual'] }
         ],
         dropRateBonus: 1.4
       }
@@ -175,7 +175,7 @@ export const zones = [
       { type: 'herb', chance: 0.25, amount: [5, 15], name: '灵草' },
       { type: 'cultivation', chance: 0.25, amount: [375, 1000] },
       { type: 'equipment', chance: 0.36, rarity: ['rare', 'epic'], name: '上品装备' },
-      { type: 'pet', chance: 0.22, rarity: ['spiritual', 'mystic'], name: '灵品灵宠' }
+      { type: 'pet', chance: 0.06, rarity: ['spiritual', 'mystic'], name: '灵品灵宠' }
     ],
     recommendedStats: { attack: 50, health: 400 }
   },
@@ -201,7 +201,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [300, 750] },
           { type: 'equipment', chance: 0.55, rarity: ['epic'], slot: 'necklace' },
-          { type: 'pet', chance: 0.2, rarity: ['mystic'] }
+          { type: 'pet', chance: 0.05, rarity: ['mystic'] }
         ],
         dropRateBonus: 1.5
       },
@@ -224,7 +224,7 @@ export const zones = [
       { type: 'herb', chance: 0.2, amount: [8, 20], name: '灵草' },
       { type: 'cultivation', chance: 0.25, amount: [750, 2000] },
       { type: 'equipment', chance: 0.42, rarity: ['epic', 'legendary'], name: '极品装备' },
-      { type: 'pet', chance: 0.30, rarity: ['mystic', 'celestial'], name: '玄品灵宠' }
+      { type: 'pet', chance: 0.08, rarity: ['mystic', 'celestial'], name: '玄品灵宠' }
     ],
     recommendedStats: { attack: 100, health: 800 }
   },
@@ -250,7 +250,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [600, 1500] },
           { type: 'equipment', chance: 0.6, rarity: ['legendary'], slot: 'head' },
-          { type: 'pet', chance: 0.25, rarity: ['celestial'] }
+          { type: 'pet', chance: 0.06, rarity: ['celestial'] }
         ],
         dropRateBonus: 1.6
       },
@@ -273,7 +273,7 @@ export const zones = [
       { type: 'herb', chance: 0.15, amount: [10, 25], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [1250, 3000] },
       { type: 'equipment', chance: 0.52, rarity: ['legendary', 'mythic'], name: '极品装备' },
-      { type: 'pet', chance: 0.40, rarity: ['celestial', 'divine'], name: '玄品灵宠' }
+      { type: 'pet', chance: 0.10, rarity: ['celestial', 'divine'], name: '玄品灵宠' }
     ],
     recommendedStats: { attack: 150, health: 1500 }
   },
@@ -299,7 +299,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1200, 3000] },
           { type: 'equipment', chance: 0.65, rarity: ['legendary', 'mythic'], slot: 'feet' },
-          { type: 'pet', chance: 0.3, rarity: ['celestial'] }
+          { type: 'pet', chance: 0.07, rarity: ['celestial'] }
         ],
         dropRateBonus: 1.7
       },
@@ -322,7 +322,7 @@ export const zones = [
       { type: 'herb', chance: 0.1, amount: [15, 35], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [2000, 5000] },
       { type: 'equipment', chance: 0.56, rarity: ['mythic'], name: '仙品装备' },
-      { type: 'pet', chance: 0.48, rarity: ['divine'], name: '仙品灵宠' }
+      { type: 'pet', chance: 0.12, rarity: ['divine'], name: '仙品灵宠' }
     ],
     recommendedStats: { attack: 300, health: 3000 }
   },
@@ -348,7 +348,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [2250, 6000] },
           { type: 'equipment', chance: 0.7, rarity: ['mythic'], slot: 'artifact' },
-          { type: 'pet', chance: 0.35, rarity: ['divine'] }
+          { type: 'pet', chance: 0.08, rarity: ['divine'] }
         ],
         dropRateBonus: 1.8
       },
@@ -371,7 +371,7 @@ export const zones = [
       { type: 'herb', chance: 0.08, amount: [20, 50], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [3750, 10000] },
       { type: 'equipment', chance: 0.64, rarity: ['mythic'], name: '仙品装备' },
-      { type: 'pet', chance: 0.40, rarity: ['divine'], name: '神品灵宠' }
+      { type: 'pet', chance: 0.10, rarity: ['divine'], name: '神品灵宠' }
     ],
     recommendedStats: { attack: 600, health: 6000 }
   },
@@ -397,7 +397,7 @@ export const zones = [
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
           { type: 'equipment', chance: 0.75, rarity: ['mythic'], slot: 'weapon' },
-          { type: 'pet', chance: 0.4, rarity: ['divine'] }
+          { type: 'pet', chance: 0.10, rarity: ['divine'] }
         ],
         dropRateBonus: 2.0
       },
@@ -420,7 +420,7 @@ export const zones = [
       { type: 'herb', chance: 0.05, amount: [30, 80], name: '灵草' },
       { type: 'cultivation', chance: 0.2, amount: [7500, 20000] },
       { type: 'equipment', chance: 0.70, rarity: ['mythic'], name: '仙品装备' },
-      { type: 'pet', chance: 0.55, rarity: ['divine'], name: '神品灵宠' }
+      { type: 'pet', chance: 0.12, rarity: ['divine'], name: '神品灵宠' }
     ],
     recommendedStats: { attack: 1000, health: 10000 }
   }
