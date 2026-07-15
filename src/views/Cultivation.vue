@@ -254,6 +254,14 @@
             </div>
             <div class="char-talent-info">天赋: <b>{{ detailMember.talentName }}</b> · {{ detailMember.talentDesc }}</div>
             <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ playerStore.getCharacterBuildStrength(detailMember) }}</div>
+            <div class="char-potential">
+              <span>天赋值: {{ detailMember.talentValue || starConfig[detailMember.star]?.talentValue || 100 }}</span>
+              <span class="divider">|</span>
+              <span>努力值: {{ Math.round(detailMember.effortValue || 0) }}
+                <span v-if="getEffortCap(detailMember.star) !== null"> / {{ getEffortCap(detailMember.star) }}</span>
+                <span v-else>（无上限）</span>
+              </span>
+            </div>
           </div>
           <button class="btn btn-warning btn-close" @click="closeMemberDetail">关闭</button>
         </div>
@@ -384,7 +392,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats, getEffortCap } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
@@ -1928,6 +1936,19 @@ watch([allMembers, teamMembers], () => {
 .char-detail-header .char-level {
   font-size: 12px;
   margin-top: 2px;
+}
+
+.char-detail-header .char-potential {
+  font-size: 12px;
+  margin-top: 4px;
+  color: #ffd700;
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+
+.char-detail-header .char-potential .divider {
+  color: #666;
 }
 
 .skill-list {

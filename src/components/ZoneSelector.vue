@@ -176,12 +176,16 @@
           <div v-for="rw in selectedZone.rewards" :key="rw.name" class="reward-row">
             <img :src="getRewardIcon(rw.type)" class="reward-icon" :alt="rw.name" />
             <span class="reward-name">{{ rw.name }}</span>
-            <div class="reward-bar-wrap">
-              <div class="reward-bar" :style="{ width: rw.chance * 100 + '%' }"></div>
-            </div>
             <span class="reward-chance">{{ (rw.chance * 100).toFixed(0) }}%</span>
           </div>
         </div>
+      </div>
+
+      <!-- 丹方解锁提示 -->
+      <div class="pill-unlock-hint">
+        <span class="pill-icon">📜</span>
+        <span class="pill-text">通关 {{ selectedZone.name }} 第5重难度可获得丹方：</span>
+        <span class="pill-names">{{ getZonePillNames(selectedZone.id) }}</span>
       </div>
 
       <!-- 战斗动画区域 -->
@@ -603,6 +607,7 @@ import { useIdleSystem } from '../composables/useIdleSystem'
 import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 import { getStatName, formatStatValue } from '../plugins/stats'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
+import { getPillsByZone } from '../plugins/pills'
 
 // 装备槽位中文映射（结算栏装备展示用）
 const SLOT_NAME_MAP = {
@@ -829,6 +834,12 @@ const getEquipEmoji = (slot) => {
 
 const getRewardIcon = (type) => {
   return REWARD_TYPE_ICON_MAP[type] || '/assets/icons/reward_eq_default.png'
+}
+
+const getZonePillNames = (zoneId) => {
+  const pills = getPillsByZone(zoneId)
+  if (pills.length === 0) return '暂无'
+  return pills.map(p => p.name).join('、')
 }
 
 // 当前选中难度信息
@@ -1277,25 +1288,38 @@ onUnmounted(() => {
   flex-shrink: 0;
 }
 .reward-name {
-  width: 70px;
+  flex: 1;
   color: #ccc;
 }
-.reward-bar-wrap {
-  flex: 1;
-  height: 6px;
-  background: rgba(0, 0, 0, 0.3);
-  border-radius: 3px;
-  overflow: hidden;
-}
-.reward-bar {
-  height: 100%;
-  background: linear-gradient(90deg, #8B4513, #DAA520);
-  border-radius: 3px;
-}
 .reward-chance {
-  width: 36px;
+  width: 40px;
   text-align: right;
-  color: #888;
+  color: #ffd700;
+  font-weight: 600;
+}
+
+.pill-unlock-hint {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(218, 165, 32, 0.08);
+  border: 1px solid rgba(218, 165, 32, 0.2);
+  border-radius: 8px;
+  font-size: 12px;
+  color: #999;
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+  align-items: center;
+}
+.pill-icon {
+  font-size: 14px;
+}
+.pill-text {
+  color: #aaa;
+}
+.pill-names {
+  color: #ffd700;
+  font-weight: 500;
 }
 
 /* 战斗区域 */

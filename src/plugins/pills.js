@@ -435,6 +435,29 @@ export const pillRecipes = [
   }
 ]
 
+export const pillZoneMapping = {
+  forest_edge: ['spirit_gathering', 'wash_marrow_pill', 'heal_pill', 'minor_foundation_pill'],
+  misty_valley: ['cultivation_boost', 'spirit_recovery', 'forge_bone_pill', 'cleanse_pill', 'enlightenment_pill', 'foundation_pill'],
+  phoenix_cave: ['thunder_power', 'essence_condensation', 'mind_clarity', 'treasure_pill', 'quench_spirit_pill', 'calm_spirit_pill', 'great_foundation_pill'],
+  dragon_abyss: ['immortal_essence', 'fire_essence', 'tribulation_pill', 'extreme_foundation_pill'],
+  ghost_wasteland: ['five_elements_pill', 'heaven_foundation_pill'],
+  ice_palace: ['celestial_essence_pill'],
+  immortal_ruins: ['sun_moon_pill'],
+  chaos_realm: ['phoenix_rebirth_pill']
+}
+
+export const getPillsByZone = (zoneId) => {
+  const recipeIds = pillZoneMapping[zoneId] || []
+  return recipeIds.map(id => pillRecipes.find(r => r.id === id)).filter(Boolean)
+}
+
+export const getZoneByPill = (pillId) => {
+  for (const [zoneId, recipeIds] of Object.entries(pillZoneMapping)) {
+    if (recipeIds.includes(pillId)) return zoneId
+  }
+  return null
+}
+
 // 计算丹药实际效果（基于玩家境界）
 export const calculatePillEffect = (recipe, playerLevel) => {
   const grade = pillGrades[recipe.grade]
