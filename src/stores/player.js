@@ -472,8 +472,9 @@ export const usePlayerStore = defineStore('player', {
       this.saveTimer = null
       this.pendingSave = false
       this.lastSaveTime = 0
-      // 初始化主题设置
-      this.isDarkMode = localStorage.getItem('darkMode') === 'true'
+      // 初始化主题设置：默认暗色模式
+      const savedDarkMode = localStorage.getItem('darkMode')
+      this.isDarkMode = savedDarkMode === null ? true : savedDarkMode === 'true'
       // 同步暗黑模式状态到HTML标签
       this.updateHtmlDarkMode(this.isDarkMode)
       // 初始化GM模式设置

@@ -525,12 +525,68 @@ const LOG_CATEGORY_ORDER = {
   'drop-mythic': 4,
 }
 
-function addLog(type, text, detail = null) {
-  logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
-  if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+const pendingLogs = ref([])
+let logDisplayTimer = null
+let lastGenerationTime = 0
+
+const showPendingLog = () => {
+  if (pendingLogs.value.length === 0) {
+    if (logDisplayTimer) {
+      clearInterval(logDisplayTimer)
+      logDisplayTimer = null
+    }
+    return
+  }
+
+  const now = Date.now()
+  const timeSinceGeneration = now - lastGenerationTime
+
+  if (timeSinceGeneration >= 14000) {
+    while (pendingLogs.value.length > 0) {
+      const next = pendingLogs.value.shift()
+      logs.value.push(next)
+    }
+    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    if (logDisplayTimer) {
+      clearInterval(logDisplayTimer)
+      logDisplayTimer = null
+    }
+    return
+  }
+
+  const next = pendingLogs.value.shift()
+  if (next) {
+    logs.value.push(next)
+    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+  }
 }
 
-const flushAllPendingLogs = () => {}
+function addLog(type, text, detail = null) {
+  if (!isIdling.value) {
+    logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    return
+  }
+
+  pendingLogs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+
+  if (!logDisplayTimer) {
+    showPendingLog()
+    logDisplayTimer = setInterval(showPendingLog, 1000)
+  }
+}
+
+const flushAllPendingLogs = () => {
+  if (logDisplayTimer) {
+    clearInterval(logDisplayTimer)
+    logDisplayTimer = null
+  }
+  while (pendingLogs.value.length > 0) {
+    const next = pendingLogs.value.shift()
+    logs.value.push(next)
+  }
+  if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+}
 
 // 将装备/灵宠的基础数据格式化为日志明细子行
 function formatItemDetail(item, type, rarity) {
@@ -1090,6 +1146,7 @@ function hideTreasureFlash() {
 
 // ============ 生动日志：单场遭遇 ============
 function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults = [], roleEffects = []) {
+  lastGenerationTime = Date.now()
   const s = store()
   const team = s.getTeamMembersDetail()
 
