@@ -638,10 +638,10 @@ const RARITY_TIER = {
 
 // 品质权重：低品质权重高，高品质极低，避免高稀有度物品泛滥
 const EQUIP_RARITY_WEIGHTS = {
-  common: 100, uncommon: 45, rare: 10, epic: 2, legendary: 0.1, mythic: 0.025
+  common: 500, uncommon: 45, rare: 10, epic: 10, legendary: 0.3, mythic: 0.075
 }
 const PET_RARITY_WEIGHTS = {
-  mortal: 100, spiritual: 30, mystic: 6, celestial: 0.15, divine: 0.025
+  mortal: 500, spiritual: 30, mystic: 6, celestial: 0.45, divine: 0.075
 }
 
 // 从 rarity 数组中按权重随机选择品质（而非等概率）
