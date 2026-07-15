@@ -384,7 +384,7 @@
 import { usePlayerStore } from '../stores/player'
 import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
-import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList } from '../plugins/characters'
+import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
@@ -576,14 +576,17 @@ const getMemberBaseStats = (member) => {
   const template = characterList.find(c => c.id === member.templateId)
   const templateBase = template?.baseStats || {}
   
+  const effBase = getEffectiveBaseStats(member)
+  
   for (const k of ['attack','health','defense','speed']) {
     let base = bs[k] || templateBase[k] || 0
     if (base <= 0) {
       const defaultBase = { attack: 10, health: 100, defense: 5, speed: 10 }
       base = defaultBase[k] || 0
     }
+    const effVal = effBase[k] || base
     const talentBonus = ts[k] || 0
-    stats[k] = Math.floor(base * (1 + talentBonus))
+    stats[k] = Math.floor(effVal * (1 + talentBonus))
   }
   
   for (const k of ['critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate',

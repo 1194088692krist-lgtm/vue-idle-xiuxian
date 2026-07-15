@@ -160,28 +160,90 @@
         <template v-if="activeTab === 'rebirth'">
           <div class="tips-box">
             <InfoCircleOutlined />
-            <span>将装备回炉重铸，褪凡入圣，转生重塑。</span>
+            <span>角色达到80级后可回炉重造，晋升星级，获得更高天赋。升星后等级重置为1级，但永久继承原努力值的10%。</span>
           </div>
-          <div class="coming-soon">
-            <div class="coming-soon-icon">♻️</div>
-            <h3 class="section-title">回炉转生系统</h3>
-            <p class="coming-soon-desc">投入高阶装备回炉重炼，突破品质极限，获得新生属性。</p>
-            <div class="feature-preview">
-              <div class="feature-item">
-                <span class="feature-icon">🔮</span>
-                <span>装备回炉</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">🌟</span>
-                <span>品质转生</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">💎</span>
-                <span>属性继承</span>
+
+          <div class="section">
+            <h3 class="section-title">选择角色</h3>
+            <div class="rebirth-member-list">
+              <div
+                v-for="member in rebirthCandidates"
+                :key="member.id"
+                class="rebirth-member-card glass-card"
+                :class="{ selected: selectedRebirthMember?.id === member.id, disabled: !canRebirth(member) }"
+                @click="selectRebirthMember(member)"
+              >
+                <div class="member-avatar">{{ member.name.charAt(0) }}</div>
+                <div class="member-info">
+                  <div class="member-name">
+                    {{ member.name }}
+                    <span class="member-star" :style="{ color: starConfig[member.star]?.color }">
+                      {{ '★'.repeat(member.star) }}
+                    </span>
+                  </div>
+                  <div class="member-detail">等级: {{ member.level }} / 80</div>
+                  <div class="member-detail">天赋值: {{ member.talentValue || starConfig[member.star]?.talentValue || 100 }}</div>
+                  <div class="member-detail">
+                    努力值: {{ Math.round(member.effortValue || 0) }}
+                    <span v-if="member.star < 5">/ {{ getMemberEffortCap(member) }}</span>
+                    <span v-else>（无上限）</span>
+                  </div>
+                </div>
+                <div class="member-status">
+                  <span v-if="canRebirth(member)" class="status-ready">可升星</span>
+                  <span v-else class="status-locked">等级不足</span>
+                </div>
               </div>
             </div>
-            <div class="coming-soon-badge">即将开放</div>
           </div>
+
+          <template v-if="selectedRebirthMember">
+            <div class="section">
+              <h3 class="section-title">升星预览</h3>
+              <div class="rebirth-preview glass-card">
+                <div class="preview-row">
+                  <div class="preview-col">
+                    <div class="preview-label">当前</div>
+                    <div class="preview-star" :style="{ color: starConfig[getRebirthPreview(selectedRebirthMember).currentStar]?.color }">
+                      {{ '★'.repeat(getRebirthPreview(selectedRebirthMember).currentStar) }}
+                    </div>
+                    <div class="preview-value">天赋值: {{ getRebirthPreview(selectedRebirthMember).currentTalent }}</div>
+                  </div>
+                  <div class="preview-arrow">→</div>
+                  <div class="preview-col">
+                    <div class="preview-label">升星后</div>
+                    <div class="preview-star" :style="{ color: starConfig[getRebirthPreview(selectedRebirthMember).nextStar]?.color }">
+                      {{ '★'.repeat(getRebirthPreview(selectedRebirthMember).nextStar) }}
+                    </div>
+                    <div class="preview-value highlight">天赋值: {{ getRebirthPreview(selectedRebirthMember).newTalent }}</div>
+                    <div class="preview-bonus">+{{ getRebirthPreview(selectedRebirthMember).inheritedBonus }} 继承加成</div>
+                  </div>
+                </div>
+                <div class="preview-note">
+                  <p>📌 升星后等级重置为1级，需重新修炼</p>
+                  <p>📌 永久继承当前努力值的10%作为额外天赋值</p>
+                  <p>📌 努力值越高，升星后获得的继承加成越多</p>
+                </div>
+              </div>
+            </div>
+
+            <div class="action-section">
+              <button
+                class="btn-primary rebirth-button"
+                :disabled="!canRebirth(selectedRebirthMember)"
+                @click="requestRebirth"
+              >
+                ♻️ 回炉重造
+              </button>
+            </div>
+          </template>
+
+          <n-modal v-model:show="showRebirthConfirm" preset="dialog" title="确认回炉重造"
+            positive-text="确认重造" negative-text="取消" @positive-click="confirmRebirth">
+            <p>确定要将 <strong>{{ selectedRebirthMember?.name }}</strong> 回炉重造吗？</p>
+            <p>角色将晋升 {{ selectedRebirthMember ? selectedRebirthMember.star + 1 : 0 }} 星，但等级重置为 1 级。</p>
+            <p style="color: #d4a017;">当前努力值的 10% 将永久继承为天赋值加成。</p>
+          </n-modal>
         </template>
       </div>
     </div>
@@ -199,7 +261,9 @@
   import { usePlayerStore } from '../stores/player'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { allMaterials } from '../plugins/materials'
+  import { starConfig, getEffortCap } from '../plugins/characters'
   import LogPanel from '../components/LogPanel.vue'
+  import { useMessage } from 'naive-ui'
   import {
     MedicineBoxOutlined,
     InfoCircleOutlined,
@@ -207,10 +271,13 @@
   } from '@ant-design/icons-vue'
 
   const playerStore = usePlayerStore()
+  const message = useMessage()
   const logRef = ref(null)
 
   const activeTab = ref('pill')
   const selectedRecipe = ref(null)
+  const selectedRebirthMember = ref(null)
+  const showRebirthConfirm = ref(false)
 
   const unlockedRecipes = computed(() => {
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
@@ -291,6 +358,66 @@
           btn.classList.remove('fail-animation')
         }, 1000)
       }
+    }
+  }
+
+  // ===== 回炉重造相关 =====
+  const rebirthCandidates = computed(() => {
+    return playerStore.sectMembers.filter(m => m.star < 5)
+  })
+
+  const canRebirth = (member) => {
+    if (!member) return false
+    if (member.star >= 5) return false
+    return member.level >= 80
+  }
+
+  const getMemberEffortCap = (member) => {
+    if (!member) return 0
+    return getEffortCap(member.star)
+  }
+
+  const getRebirthPreview = (member) => {
+    if (!member) return null
+    const currentStar = member.star || 3
+    const nextStar = currentStar + 1
+    if (nextStar > 5) return null
+    const effort = member.effortValue || 0
+    const inheritedBonus = Math.floor(effort * 0.1)
+    const nextCfg = starConfig[nextStar]
+    const newTalent = nextCfg.talentValue + inheritedBonus
+    return {
+      currentStar,
+      nextStar,
+      currentTalent: member.talentValue || starConfig[currentStar]?.talentValue || 100,
+      newTalent,
+      inheritedBonus,
+      currentEffort: effort
+    }
+  }
+
+  const selectRebirthMember = (member) => {
+    selectedRebirthMember.value = member
+  }
+
+  const requestRebirth = () => {
+    if (!selectedRebirthMember.value) return
+    if (!canRebirth(selectedRebirthMember.value)) {
+      message.warning('角色需达到80级才能回炉重造')
+      return
+    }
+    showRebirthConfirm.value = true
+  }
+
+  const confirmRebirth = () => {
+    if (!selectedRebirthMember.value) return
+    const result = playerStore.rebirthCharacter(selectedRebirthMember.value.id)
+    showRebirthConfirm.value = false
+    if (result.success) {
+      message.success(result.message)
+      selectedRebirthMember.value = null
+    } else {
+      message.error(result.message)
     }
   }
 </script>
@@ -696,5 +823,174 @@
     color: var(--color-accent-gold);
     font-size: 13px;
     font-weight: 500;
+  }
+
+  .rebirth-member-list {
+    display: flex;
+    flex-direction: column;
+    gap: 10px;
+  }
+
+  .rebirth-member-card {
+    display: flex;
+    align-items: center;
+    gap: 14px;
+    padding: 14px;
+    cursor: pointer;
+    transition: all 0.2s;
+    border: 1px solid transparent;
+  }
+
+  .rebirth-member-card:hover {
+    border-color: rgba(218, 165, 32, 0.4);
+  }
+
+  .rebirth-member-card.selected {
+    border-color: var(--color-accent-gold);
+    background: rgba(218, 165, 32, 0.08);
+  }
+
+  .rebirth-member-card.disabled {
+    opacity: 0.6;
+    cursor: not-allowed;
+  }
+
+  .member-avatar {
+    width: 50px;
+    height: 50px;
+    border-radius: 50%;
+    background: linear-gradient(135deg, #d4a017, #8b6914);
+    color: #fff;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 20px;
+    font-weight: bold;
+    flex-shrink: 0;
+  }
+
+  .member-info {
+    flex: 1;
+  }
+
+  .member-name {
+    font-size: 16px;
+    font-weight: 600;
+    margin-bottom: 4px;
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+
+  .member-star {
+    font-size: 14px;
+  }
+
+  .member-detail {
+    font-size: 13px;
+    color: #999;
+    margin-top: 2px;
+  }
+
+  .member-status {
+    flex-shrink: 0;
+  }
+
+  .status-ready {
+    padding: 4px 12px;
+    background: rgba(76, 175, 80, 0.15);
+    color: #4caf50;
+    border-radius: 12px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .status-locked {
+    padding: 4px 12px;
+    background: rgba(158, 158, 158, 0.15);
+    color: #999;
+    border-radius: 12px;
+    font-size: 12px;
+  }
+
+  .rebirth-preview {
+    padding: 20px;
+  }
+
+  .preview-row {
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    gap: 20px;
+    margin-bottom: 20px;
+  }
+
+  .preview-col {
+    text-align: center;
+    flex: 1;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 12px;
+  }
+
+  .preview-label {
+    font-size: 13px;
+    color: #888;
+    margin-bottom: 8px;
+  }
+
+  .preview-star {
+    font-size: 24px;
+    margin-bottom: 8px;
+  }
+
+  .preview-value {
+    font-size: 15px;
+    color: #ddd;
+  }
+
+  .preview-value.highlight {
+    color: var(--color-accent-gold);
+    font-weight: 600;
+  }
+
+  .preview-bonus {
+    margin-top: 6px;
+    font-size: 12px;
+    color: #4caf50;
+  }
+
+  .preview-arrow {
+    font-size: 24px;
+    color: var(--color-accent-gold);
+    font-weight: bold;
+  }
+
+  .preview-note {
+    border-top: 1px solid rgba(255, 255, 255, 0.1);
+    padding-top: 16px;
+  }
+
+  .preview-note p {
+    margin: 6px 0;
+    font-size: 13px;
+    color: #aaa;
+    line-height: 1.5;
+  }
+
+  .action-section {
+    text-align: center;
+    margin-top: 20px;
+  }
+
+  .rebirth-button {
+    padding: 12px 36px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .rebirth-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
   }
 </style>

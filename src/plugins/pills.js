@@ -358,6 +358,80 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
     baseEffect: { type: 'breakthroughRate', value: 0.1, duration: 0 }
+  },
+  // ===== 努力值丹药（提升角色潜力/根骨） =====
+  {
+    id: 'minor_foundation_pill',
+    name: '小培元丹',
+    description: '固本培元，少量提升根骨潜力（努力值+5）',
+    grade: 'grade1',
+    type: 'attribute',
+    func: 'effort',
+    materials: [
+      { kind: 'herb', id: 'spirit_grass', count: 3 },
+      { kind: 'ore', id: 'iron_essence', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade1'),
+    baseEffect: { type: 'effortGain', value: 5, duration: 0 }
+  },
+  {
+    id: 'foundation_pill',
+    name: '培元丹',
+    description: '强筋健骨，稳步提升根骨潜力（努力值+12）',
+    grade: 'grade2',
+    type: 'attribute',
+    func: 'effort',
+    materials: [
+      { kind: 'herb', id: 'nine_leaf_lingzhi', count: 2 },
+      { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade2'),
+    baseEffect: { type: 'effortGain', value: 12, duration: 0 }
+  },
+  {
+    id: 'great_foundation_pill',
+    name: '大培元丹',
+    description: '脱胎换骨，大幅提升根骨潜力（努力值+30）',
+    grade: 'grade3',
+    type: 'attribute',
+    func: 'effort',
+    materials: [
+      { kind: 'herb', id: 'purple_ginseng', count: 2 },
+      { kind: 'liquid', id: 'jade_marrow_liquid', count: 1 },
+      { kind: 'core', id: 'elite_core', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade3'),
+    baseEffect: { type: 'effortGain', value: 30, duration: 0 }
+  },
+  {
+    id: 'extreme_foundation_pill',
+    name: '极培元丹',
+    description: '逆天改命，极限提升根骨潜力（努力值+80）',
+    grade: 'grade4',
+    type: 'special',
+    func: 'effort',
+    materials: [
+      { kind: 'herb', id: 'immortal_jade_grass', count: 2 },
+      { kind: 'ore', id: 'tribulation_thunder_stone', count: 1 },
+      { kind: 'core', id: 'demon_king_core', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade4'),
+    baseEffect: { type: 'effortGain', value: 80, duration: 0 }
+  },
+  {
+    id: 'heaven_foundation_pill',
+    name: '天培元丹',
+    description: '夺天地造化，突破潜力极限（努力值+200，无视上限）',
+    grade: 'grade5',
+    type: 'special',
+    func: 'effort',
+    materials: [
+      { kind: 'special', id: 'heaven_fragment', count: 1 },
+      { kind: 'core', id: 'demon_king_core', count: 2 },
+      { kind: 'herb', id: 'sun_essence_flower', count: 2 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade5'),
+    baseEffect: { type: 'effortGain', value: 200, duration: 0, ignoreCap: true }
   }
 ]
 

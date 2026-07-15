@@ -36,7 +36,8 @@ const cores = [
 
 // 至宝（Boss / 奇遇专属）
 const specials = [
-  { id: 'calm_spirit_pearl', name: '定灵珠', description: '凝定神魂之珠，定灵丹必需要件', quality: 'rare', baseValue: 120 }
+  { id: 'calm_spirit_pearl', name: '定灵珠', description: '凝定神魂之珠，定灵丹必需要件', quality: 'rare', baseValue: 120 },
+  { id: 'heaven_fragment', name: '天玄碎片', description: '天降玄石碎片，蕴含造化之力，天培元丹核心材料', quality: 'epic', baseValue: 500 }
 ]
 
 const allMaterials = [

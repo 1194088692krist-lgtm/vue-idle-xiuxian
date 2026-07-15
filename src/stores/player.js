@@ -6,6 +6,7 @@ import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
+import { getEffortCap, rebirthCharacter, getEffectiveBaseStats } from '../plugins/characters'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -961,6 +962,9 @@ export const usePlayerStore = defineStore('player', {
     },
     // 使用丹药
     usePill(pill) {
+      if (pill.effect?.type === 'effortGain') {
+        return { success: false, message: '此丹药需指定角色服用' }
+      }
       const res = this.applyPillEffect(pill.effect)
       // 移除已使用的丹药
       const index = this.items.findIndex(i => i.id === pill.id)
@@ -970,6 +974,43 @@ export const usePlayerStore = defineStore('player', {
       }
       this.queueSave()
       return { success: true, message: res.message || '使用丹药成功' }
+    },
+    // 给指定角色服用丹药（主要用于努力值丹药）
+    usePillOnMember(pill, memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!pill.effect || pill.effect.type !== 'effortGain') {
+        return this.usePill(pill)
+      }
+      if (!member.star) member.star = 3
+      if (typeof member.effortValue !== 'number') member.effortValue = 0
+      if (typeof member.talentValue !== 'number') member.talentValue = 100
+      const gain = pill.effect.value || 0
+      const ignoreCap = pill.effect.ignoreCap
+      const cap = getEffortCap(member.star)
+      if (!ignoreCap && member.effortValue >= cap) {
+        return { success: false, message: `${member.name}的努力值已达上限` }
+      }
+      const oldValue = member.effortValue
+      let newValue = oldValue + gain
+      if (!ignoreCap) {
+        newValue = Math.min(newValue, cap)
+      }
+      const actualGain = Math.round(newValue - oldValue)
+      if (actualGain <= 0) {
+        return { success: false, message: '努力值没有提升' }
+      }
+      member.effortValue = Math.round(newValue)
+      const index = this.items.findIndex(i => i.id === pill.id)
+      if (index > -1) {
+        this.items.splice(index, 1)
+        this.pillsConsumed++
+      }
+      this.queueSave()
+      return {
+        success: true,
+        message: `${member.name}服用${pill.name}，根骨潜力+${actualGain}（${Math.round(oldValue)} → ${Math.round(newValue)}）`
+      }
     },
     // 炼制丹药
     craftPill(recipeId) {
@@ -1614,14 +1655,15 @@ export const usePlayerStore = defineStore('player', {
       }, 0)
     },
     // 获取单个角色的Build强度
+    // 人物强度占40%，装备强度占60%
     getCharacterBuildStrength(character) {
       if (!character) return 0
-      const bs = character.baseStats || {}
+      const effStats = getEffectiveBaseStats(character)
       const ts = character.talentStats || {}
-      const baseScore = ((bs.attack || 0) + (ts.attack || 0)) * 5 +
-                        ((bs.health || 0) + (ts.health || 0)) * 0.5 +
-                        ((bs.defense || 0) + (ts.defense || 0)) * 3 +
-                        ((bs.speed || 0) + (ts.speed || 0)) * 8
+      const charBaseScore = ((effStats.attack || 0) + (ts.attack || 0)) * 5 +
+                        ((effStats.health || 0) + (ts.health || 0)) * 0.5 +
+                        ((effStats.defense || 0) + (ts.defense || 0)) * 3 +
+                        ((effStats.speed || 0) + (ts.speed || 0)) * 8
       let equipScore = 0
       const artifacts = character.equippedArtifacts || {}
       Object.values(artifacts).forEach(eq => {
@@ -1660,8 +1702,11 @@ export const usePlayerStore = defineStore('player', {
           if (effect.stat === 'defense') skillScore += (effect.value || 0) * 300
         }
       }
+      const characterPower = charBaseScore + skillScore + petScore * 0.5
+      const equipmentPower = equipScore + setScore
+      const totalPower = characterPower * 0.4 + equipmentPower * 0.6
       const levelMult = 1 + ((character.level || 1) - 1) * 0.02
-      return Math.round((baseScore + equipScore + petScore + setScore + skillScore) * levelMult)
+      return Math.round(totalPower * levelMult)
     },
     // 角色升级
     levelUpCharacter(memberId) {
@@ -1819,6 +1864,36 @@ export const usePlayerStore = defineStore('player', {
         levelsGained,
         breakthroughCount,
         newLevel: member.level
+      }
+    },
+    // 回炉重造（升星）：80级后可升星到下一级
+    rebirthCharacter(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!member.star) member.star = 3
+      if (member.level < 80) {
+        return { success: false, message: '角色需达到80级才能回炉重造' }
+      }
+      if (member.star >= 5) {
+        return { success: false, message: '五星角色已达最高星级' }
+      }
+      const result = rebirthCharacter(member)
+      if (!result.success) {
+        return { success: false, message: result.message }
+      }
+      Object.assign(member, result.member)
+      member.experience = 0
+      member.level = 1
+      member.maxExperience = calculateLevelExp(1)
+      this.queueSave()
+      return {
+        success: true,
+        message: `${member.name}回炉重造成功！晋升${member.star}星，天赋值 ${result.oldTalent} → ${result.newTalent}`,
+        oldStar: result.oldStar,
+        newStar: result.newStar,
+        oldTalent: result.oldTalent,
+        newTalent: result.newTalent,
+        inheritedBonus: result.inheritedBonus
       }
     },
     // 更新角色头像

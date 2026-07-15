@@ -24,10 +24,35 @@ export const characterRoles = {
 }
 
 export const starConfig = {
-  3: { name: '三星', color: '#999999', multiplier: 1, growthRate: 1 },
-  4: { name: '四星', color: '#4169E1', multiplier: 1.5, growthRate: 1.2 },
-  5: { name: '五星', color: '#FFD700', multiplier: 2.5, growthRate: 1.5 }
+  3: { name: '三星', color: '#999999', multiplier: 1, growthRate: 1, talentValue: 100, effortCapRatio: 0.9, nextStarTalent: 150 },
+  4: { name: '四星', color: '#4169E1', multiplier: 1.5, growthRate: 1.2, talentValue: 150, effortCapRatio: 0.9, nextStarTalent: 225 },
+  5: { name: '五星', color: '#FFD700', multiplier: 2.5, growthRate: 1.5, talentValue: 225, effortCapRatio: null, nextStarTalent: null }
 }
+
+// 根据星级和升星继承的努力值，计算实际初始天赋值（升星时会额外获得原星级最大努力值的10%）
+export function getInitialTalent(star, inheritedEffortBonus = 0) {
+  const base = starConfig[star]?.talentValue || 100
+  return base + inheritedEffortBonus
+}
+
+// 根据星级计算努力值上限（五星无上限）
+export function getEffortCap(star) {
+  const cfg = starConfig[star]
+  if (!cfg) return Infinity
+  if (cfg.effortCapRatio === null || cfg.nextStarTalent === null) return Infinity
+  return Math.floor(cfg.nextStarTalent * cfg.effortCapRatio)
+}
+
+// 天赋值到属性的换算系数（每点天赋值对应多少基础属性）
+export const TALENT_STAT_COEFF = {
+  attack: 0.15,
+  health: 1.0,
+  defense: 0.08,
+  speed: 0.12
+}
+
+// 努力值到属性的换算（与天赋值使用相同系数，但单独计算、单独加成）
+export const EFFORT_STAT_COEFF = TALENT_STAT_COEFF
 
 export const characterTalents = {
   sword_mastery: { name: '剑心通明', desc: '攻击+15%，暴击率+5%', stats: { attack: 0.15, critRate: 0.05 } },
@@ -231,8 +256,11 @@ export function generateCharacterById(charId) {
   const template = characterList.find(c => c.id === charId)
   if (!template) return null
 
-  const starMult = starConfig[template.star].multiplier
+  const starCfg = starConfig[template.star]
+  const starMult = starCfg.multiplier
   const talent = characterTalents[template.talent]
+
+  const baseTalent = starCfg.talentValue
 
   const baseStats = {
     attack: Math.round(template.baseStats.attack * starMult),
@@ -241,7 +269,6 @@ export function generateCharacterById(charId) {
     speed: Math.round(template.baseStats.speed * starMult)
   }
 
-  // 应用定位独有的初始战斗属性
   const roleStats = roleInitStats[template.role] || roleInitStats.vanguard
 
   return {
@@ -263,9 +290,11 @@ export function generateCharacterById(charId) {
     talentStats: talent.stats,
     description: template.description,
     baseStats: { ...baseStats },
-    // 人物突破次数：0~5，每次抽到同名角色时 +1（最多 5 次）
+    talentValue: baseTalent,
+    inheritedTalentBonus: 0,
+    effortValue: 0,
+    rebirthCount: 0,
     breakThrough: 0,
-    // 技能系统
     skillSchool: getSkillSchoolByRole(template.role),
     skillSchoolName: skillSchools[getSkillSchoolByRole(template.role)]?.name || '',
     skillSchoolIcon: skillSchools[getSkillSchoolByRole(template.role)]?.icon || '',
@@ -344,11 +373,64 @@ export function generateRandomCharacter(forceStar = null) {
   return generateCharacterById(template.id)
 }
 
+// 计算角色的有效属性（基础属性 × 努力值加成）
+export function getEffectiveBaseStats(character) {
+  if (!character) return { attack: 0, health: 0, defense: 0, speed: 0 }
+  const base = character.baseStats || { attack: 0, health: 0, defense: 0, speed: 0 }
+  const talent = character.talentValue || 100
+  const effort = character.effortValue || 0
+  const effortMult = 1 + effort / talent
+  return {
+    attack: Math.round(base.attack * effortMult),
+    health: Math.round(base.health * effortMult),
+    defense: Math.round(base.defense * effortMult),
+    speed: Math.round(base.speed * effortMult)
+  }
+}
+
+// 回炉重造：角色升星（3→4, 4→5）
+// 返回新角色（重置为1级，天赋值继承原努力值的10%）
+export function rebirthCharacter(character) {
+  if (!character) return null
+  const currentStar = character.star || 3
+  if (currentStar >= 5) return { success: false, message: '五星角色无法继续升星' }
+
+  const currentCfg = starConfig[currentStar]
+  const nextStar = currentStar + 1
+  const nextCfg = starConfig[nextStar]
+  if (!nextCfg) return { success: false, message: '无法升星' }
+
+  const oldEffort = character.effortValue || 0
+  const inheritedBonus = Math.floor(oldEffort * 0.1)
+  const newTalent = nextCfg.talentValue + inheritedBonus
+
+  const template = characterList.find(c => c.id === character.templateId)
+  if (!template) return { success: false, message: '角色模板不存在' }
+
+  const newMult = newTalent / currentCfg.talentValue
+  const newBaseStats = {
+    attack: Math.round(template.baseStats.attack * newMult),
+    health: Math.round(template.baseStats.health * newMult),
+    defense: Math.round(template.baseStats.defense * newMult),
+    speed: Math.round(template.baseStats.speed * newMult)
+  }
+
+  return {
+    success: true,
+    newStar,
+    newTalent,
+    newBaseStats,
+    inheritedBonus,
+    oldEffort
+  }
+}
+
 export function getCharacterBuildStrength(character) {
   if (!character) return 0
   
-  const baseScore = character.baseStats.attack * 5 + character.baseStats.health * 0.5 +
-                    character.baseStats.defense * 3 + character.baseStats.speed * 8
+  const effStats = getEffectiveBaseStats(character)
+  const baseScore = effStats.attack * 5 + effStats.health * 0.5 +
+                    effStats.defense * 3 + effStats.speed * 8
   
   const talentScore = Object.values(character.talentStats || {}).reduce((sum, val) => sum + val * 100, 0)
   
