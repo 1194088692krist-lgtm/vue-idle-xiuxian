@@ -482,6 +482,7 @@ const calculatePetScore = (pet) => {
 // 计算属性
 const teamMembers = computed(() => playerStore.teamMembers.map(id => playerStore.sectMembers.find(m => m.id === id)).filter(Boolean))
 const allMembers = computed(() => playerStore.sectMembers || [])
+const selectedMember = computed(() => playerStore.sectMembers.find(m => m.id === selectedMemberId.value))
 const sortedMembers = computed(() => {
   const members = [...playerStore.sectMembers]
   return members.sort((a, b) => {
