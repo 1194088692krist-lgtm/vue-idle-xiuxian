@@ -63,6 +63,7 @@
           {{ selectedZone.difficultyLabel }}
         </div>
       </div>
+      <img v-if="selectedZone.image" :src="selectedZone.image" class="zone-image" :alt="selectedZone.name" />
 
       <!-- 队伍选择 -->
       <div class="team-selector">
@@ -245,7 +246,7 @@
           >
             <div class="dur-time">{{ dur.minutes }}分钟</div>
             <div class="dur-info">{{ dur.encounters }}次探索</div>
-            <div class="dur-cost">{{ dur.encounters * 100 }}灵石</div>
+            <div class="dur-cost">{{ currentDifficulty ? currentDifficulty.spiritCost * dur.encounters : 0 }}灵石</div>
           </div>
         </div>
         <button
@@ -396,7 +397,8 @@
         <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }">
           <button class="btn btn-close btn-warning" @click.stop="hideTreasureFlash" style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 12px;">×</button>
           <div class="flash-content" @click="hideTreasureFlash">
-            <div class="flash-icon">{{ treasureFlash.icon }}</div>
+            <img v-if="treasureFlash.iconImage" :src="treasureFlash.iconImage" class="flash-icon-img" :alt="treasureFlash.title" />
+            <div v-else class="flash-icon">{{ treasureFlash.icon }}</div>
             <div class="flash-title">{{ treasureFlash.title }}</div>
             <div class="flash-desc">{{ treasureFlash.desc }}</div>
           </div>
@@ -1047,6 +1049,14 @@ onUnmounted(() => {
   font-size: 13px;
   color: #888;
   max-width: 70%;
+}
+.zone-image {
+  width: 100%;
+  max-height: 160px;
+  object-fit: cover;
+  border-radius: 8px;
+  margin-bottom: 12px;
+  opacity: 0.85;
 }
 .difficulty-badge {
   padding: 4px 12px;
@@ -1789,6 +1799,15 @@ onUnmounted(() => {
   font-size: 48px;
   margin-bottom: 8px;
 }
+.flash-icon-img {
+  width: 64px;
+  height: 64px;
+  object-fit: contain;
+  margin-bottom: 8px;
+  display: block;
+  margin-left: auto;
+  margin-right: auto;
+}
 .flash-title {
   font-size: 24px;
   font-weight: bold;
@@ -2432,7 +2451,8 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   align-items: center;
-  justify-content: center;
+  justify-content: flex-start;
+  padding-top: 300px;
   cursor: pointer;
   animation: avatarFadeIn 0.25s ease;
 }

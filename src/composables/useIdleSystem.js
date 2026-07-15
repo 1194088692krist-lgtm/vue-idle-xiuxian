@@ -1140,6 +1140,32 @@ async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = fals
 
 // ============ 宝物高亮弹窗 ============
 let flashTimer = null
+// 奖励类型对应图标路径
+const REWARD_ICON_MAP = {
+  weapon: '/assets/icons/reward_eq_weapon.png',
+  head: '/assets/icons/reward_eq_head.png',
+  body: '/assets/icons/reward_eq_body.png',
+  legs: '/assets/icons/reward_eq_legs.png',
+  feet: '/assets/icons/reward_eq_feet.png',
+  shoulder: '/assets/icons/reward_eq_shoulder.png',
+  hands: '/assets/icons/reward_eq_weapon.png',
+  wrist: '/assets/icons/reward_eq_wrist.png',
+  necklace: '/assets/icons/reward_eq_necklace.png',
+  ring1: '/assets/icons/reward_eq_ring.png',
+  ring2: '/assets/icons/reward_eq_ring.png',
+  belt: '/assets/icons/reward_eq_belt.png',
+  artifact: '/assets/icons/reward_eq_artifact.png',
+  equipment: '/assets/icons/reward_eq_default.png',
+  pet: '/assets/icons/reward_pet.png',
+  herb: '/assets/icons/reward_mat_herb.png',
+  ore: '/assets/icons/reward_mat_ore.png',
+  liquid: '/assets/icons/reward_mat_liquid.png',
+  core: '/assets/icons/reward_mat_core.png',
+  pet_fragment: '/assets/icons/reward_mat_pet_fragment.png',
+  phantom_crystal: '/assets/icons/reward_mat_phantom_crystal.png',
+  monster: '/assets/icons/reward_monster.png'
+}
+
 function showTreasureFlash(reward) {
   if (flashTimer) clearTimeout(flashTimer)
   const info = reward.info || rarityInfo[reward.rarity] || rarityInfo.common
@@ -1162,8 +1188,9 @@ function showTreasureFlash(reward) {
   const title = flashTitles[tier] || '宝物现世！'
   const desc = flashDescs[tier] || `获得${info.name}${kind}！`
   const icon = isPet ? '🐉' : '⚔️'
+  const iconImage = REWARD_ICON_MAP[reward.type] || REWARD_ICON_MAP[reward.slot] || null
   const duration = 5000
-  treasureFlash.value = { show: true, tier, title, desc, icon, color: info.color }
+  treasureFlash.value = { show: true, tier, title, desc, icon, iconImage, color: info.color }
   flashTimer = setTimeout(() => { treasureFlash.value.show = false }, duration)
 }
 

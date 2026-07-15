@@ -44,7 +44,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 1.0,
-    image: '',
+    image: '/assets/zones/zone_forest_edge.png',
     monsters: ['野猪精', '山匪', '野狼'],
     bosses: [
       {
@@ -92,7 +92,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 1.5,
-    image: '',
+    image: '/assets/zones/zone_misty_valley.png',
     monsters: ['猛虎', '骷髅兵', '毒蛇'],
     bosses: [
       {
@@ -140,7 +140,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 2.0,
-    image: '',
+    image: '/assets/zones/zone_phoenix_cave.png',
     monsters: ['妖狼', '毒蛇', '焰魔'],
     bosses: [
       {
@@ -189,7 +189,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 3.0,
-    image: '',
+    image: '/assets/zones/zone_dragon_abyss.png',
     monsters: ['僵尸王', '血魔', '深渊蛟龙'],
     bosses: [
       {
@@ -238,7 +238,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 4.0,
-    image: '',
+    image: '/assets/zones/zone_ghost_wasteland.png',
     monsters: ['噬魂鬼', '血魔'],
     bosses: [
       {
@@ -287,7 +287,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 5.0,
-    image: '',
+    image: '/assets/zones/zone_ice_palace.png',
     monsters: ['远古妖龙'],
     bosses: [
       {
@@ -336,7 +336,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 7.0,
-    image: '',
+    image: '/assets/zones/zone_immortal_ruins.png',
     monsters: ['远古妖龙'],
     bosses: [
       {
@@ -385,7 +385,7 @@ export const zones = [
     minLevel: 1,
     spiritCost: 50,
     rewardMultiplier: 10.0,
-    image: '',
+    image: '/assets/zones/zone_chaos_realm.png',
     monsters: ['远古妖龙'],
     bosses: [
       {
