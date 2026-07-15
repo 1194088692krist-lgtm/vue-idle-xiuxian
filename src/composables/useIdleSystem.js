@@ -636,6 +636,28 @@ const RARITY_TIER = {
   mortal: 'plain', spiritual: 'uncommon', mystic: 'epic', celestial: 'legendary', divine: 'mythic'
 }
 
+// 品质权重：低品质权重高，高品质极低，避免高稀有度物品泛滥
+const EQUIP_RARITY_WEIGHTS = {
+  common: 100, uncommon: 60, rare: 25, epic: 8, legendary: 2, mythic: 0.5
+}
+const PET_RARITY_WEIGHTS = {
+  mortal: 100, spiritual: 40, mystic: 12, celestial: 3, divine: 0.5
+}
+
+// 从 rarity 数组中按权重随机选择品质（而非等概率）
+function pickRarityByWeight(rarityList, weightMap) {
+  if (!rarityList || rarityList.length === 0) return 'common'
+  if (rarityList.length === 1) return rarityList[0]
+  const weights = rarityList.map(r => weightMap[r] || 1)
+  const total = weights.reduce((a, b) => a + b, 0)
+  let roll = Math.random() * total
+  for (let i = 0; i < rarityList.length; i++) {
+    roll -= weights[i]
+    if (roll <= 0) return rarityList[i]
+  }
+  return rarityList[rarityList.length - 1]
+}
+
 // 各品质掉落的日志文案（越稀有描写越华丽）。plain 单独走普通格式。
 const DROP_TEXT = {
   uncommon:  { icon: '🌿', word: '获得', flair: '，微光初绽' },
@@ -994,7 +1016,7 @@ function grantReward(effectiveZone, isIdleMode = false) {
         runStats.value.cultivation += multiplied
         rewards.push({ type: 'cultivation', amount: multiplied, name: '修为' })
       } else if (rw.type === 'equipment') {
-        let rarity = rw.rarity[Math.floor(Math.random() * rw.rarity.length)]
+        let rarity = pickRarityByWeight(rw.rarity, EQUIP_RARITY_WEIGHTS)
         if (Math.random() < upgradeChance) {
           const idx = rw.rarity.indexOf(rarity)
           if (idx >= 0 && idx < rw.rarity.length - 1) rarity = rw.rarity[idx + 1]
@@ -1005,7 +1027,7 @@ function grantReward(effectiveZone, isIdleMode = false) {
         const info = rarityInfo[rarity] || rarityInfo.common
         rewards.push({ type: 'equipment', name: equip.name, rarity, info, item: equip })
       } else if (rw.type === 'pet') {
-        let rarity = rw.rarity[Math.floor(Math.random() * rw.rarity.length)]
+        let rarity = pickRarityByWeight(rw.rarity, PET_RARITY_WEIGHTS)
         if (Math.random() < upgradeChance) {
           const idx = rw.rarity.indexOf(rarity)
           if (idx >= 0 && idx < rw.rarity.length - 1) rarity = rw.rarity[idx + 1]

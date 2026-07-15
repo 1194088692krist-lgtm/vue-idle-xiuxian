@@ -404,8 +404,8 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   const animateValue = (ref, target, duration, raf_ref) => {
-    if (rafRef.value) {
-      cancelAnimationFrame(rafRef.value)
+    if (raf_ref.value) {
+      cancelAnimationFrame(raf_ref.value)
     }
     const start = Number(ref.value)
     const diff = target - start
@@ -415,12 +415,12 @@ import SaveButton from './components/SaveButton.vue'
       const progress = Math.min(elapsed / duration, 1)
       ref.value = Math.round((start + diff * progress) * 100) / 100
       if (progress < 1) {
-        rafRef.value = requestAnimationFrame(animate)
+        raf_ref.value = requestAnimationFrame(animate)
       } else {
-        rafRef.value = null
+        raf_ref.value = null
       }
     }
-    rafRef.value = requestAnimationFrame(animate)
+    raf_ref.value = requestAnimationFrame(animate)
   }
 </script>
 

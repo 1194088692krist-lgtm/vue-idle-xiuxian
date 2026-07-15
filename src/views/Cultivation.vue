@@ -1863,13 +1863,16 @@ watch([allMembers, teamMembers], () => {
 .avatar-viewer-image {
   display: flex;
   justify-content: center;
-  align-items: center;
-  max-height: 60vh;
+  align-items: flex-start;
+  max-height: 70vh;
+  overflow: hidden;
 }
 
 .avatar-viewer-image img {
-  max-width: 100%;
-  max-height: 60vh;
+  max-width: 320px;
+  max-height: 70vh;
+  width: auto;
+  height: auto;
   object-fit: contain;
   border-radius: 8px;
   box-shadow: 0 4px 20px rgba(0, 0, 0, 0.5);
