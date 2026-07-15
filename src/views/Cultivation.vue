@@ -390,7 +390,7 @@
 
 <script setup>
 import { usePlayerStore } from '../stores/player'
-import { ref, computed } from 'vue'
+import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar, characterList } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
@@ -994,6 +994,14 @@ const autoPickBestTeam = () => {
 // 初始化
 if (teamMembers.value.length > 0) selectedMemberId.value = teamMembers.value[0].id
 else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[0].id
+
+// 当成员列表变化或未选中时，自动选中第一个成员，确保属性面板/装备区域/一键装备始终显示
+watch([allMembers, teamMembers], () => {
+  if (!selectedMemberId.value || !allMembers.value.find(m => m.id === selectedMemberId.value)) {
+    if (teamMembers.value.length > 0) selectedMemberId.value = teamMembers.value[0].id
+    else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[0].id
+  }
+}, { immediate: true })
 </script>
 
 <style scoped>

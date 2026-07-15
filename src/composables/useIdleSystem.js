@@ -7,6 +7,15 @@ import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } 
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
 
+// Buff 百分比格式化：最多保留两位小数，去除多余小数位
+// 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
+const formatBuffPercent = (value) => {
+  const pct = value * 100
+  // 先四舍五入到两位小数，再去除多余的 .00 / .x0
+  const str = pct.toFixed(2).replace(/\.?0+$/, '')
+  return str + '%'
+}
+
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
 const selectedDifficultyKey = ref('xiongxian')
@@ -66,7 +75,7 @@ const ROLE_EFFECTS = {
     name: '掌阵阵法',
     effect: (memberState, teamStates) => {
       const buffAmount = 0.1
-      return { type: 'attack_buff', value: buffAmount, desc: `${memberState.name}布置掌阵阵法，全队攻击力提升 ${Math.round(buffAmount * 100)}%` }
+      return { type: 'attack_buff', value: buffAmount, desc: `${memberState.name}布置掌阵阵法，全队攻击力提升 ${formatBuffPercent(buffAmount)}` }
     }
   }
 }
@@ -1033,7 +1042,7 @@ function triggerSkit(team) {
   idleBuffs.value.push(buff)
   const buffTypeNames = { cultivation: '修炼效率', combat: '战斗能力', attack: '攻击力', speed: '速度', luck: '气运' }
   const buffTypeName = buffTypeNames[buff.type] || buff.type
-  addLog('skit', `📊 获得「${buff.name}」效果：${buffTypeName}${buff.value > 0 ? '+' : ''}${Math.round(buff.value * 100)}%，持续 ${buff.duration} 场`)
+  addLog('skit', `📊 获得「${buff.name}」效果：${buffTypeName}${buff.value > 0 ? '+' : ''}${formatBuffPercent(buff.value)}，持续 ${buff.duration} 场`)
 }
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
@@ -1605,7 +1614,7 @@ const idleDashboard = computed(() => {
       type: b.type,
       typeName: { cultivation: '修炼效率', combat: '战斗能力', attack: '攻击力', speed: '速度', luck: '气运' }[b.type] || b.type,
       value: b.value,
-      valueText: (b.value > 0 ? '+' : '') + Math.round(b.value * 100) + '%',
+      valueText: (b.value > 0 ? '+' : '') + formatBuffPercent(b.value),
       remaining: b.remaining
     })),
     teamHP: teamMemberStates.value.map(ms => ({

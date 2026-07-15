@@ -34,6 +34,16 @@ html {
   min-height: 100vh;
 }
 
+/* 白天模式背景 */
+html:not(.dark) {
+  background: linear-gradient(135deg, #F5EFE0 0%, #E8DCC4 50%, #F0E6D2 100%);
+  color: #3B240F;
+}
+
+html:not(.dark) body {
+  color: #3B240F;
+}
+
 body {
   color: var(--color-text-primary);
   margin: 0;
@@ -67,6 +77,14 @@ body {
     border: 1px solid var(--color-border);
     border-radius: 12px;
     box-shadow: 0 8px 32px rgba(0, 0, 0, 0.3);
+  }
+
+  /* 白天模式 glass-card */
+  html:not(.dark) .glass-card {
+    background: rgba(255, 252, 245, 0.85);
+    border: 1px solid rgba(139, 69, 19, 0.25);
+    box-shadow: 0 8px 32px rgba(139, 69, 19, 0.15);
+    color: #3B240F;
   }
 
   .glass-card-hover:hover {

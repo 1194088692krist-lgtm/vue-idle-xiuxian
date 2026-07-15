@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="darkTheme">
+  <n-config-provider :theme="playerStore.isDarkMode ? darkTheme : null">
     <n-message-provider>
       <n-dialog-provider>
         <n-spin :show="isLoading" description="正在加载游戏数据...">
@@ -30,29 +30,21 @@
             <!-- 顶部状态栏 -->
             <header class="top-bar">
               <div class="player-info">
-                <div class="player-avatar">
-                  <span>洞</span>
-                </div>
-                <div class="player-meta">
-                  <div class="player-name">{{ playerStore.name }}</div>
-                  <div class="player-realm" style="color: #9370DB; font-size: 11px;">
-                    洞天字号
-                  </div>
-                </div>
+                <div class="player-name-only">{{ playerStore.name }}</div>
               </div>
               <div class="resource-bar">
                 <div class="resource-item crystal">
                   <n-icon class="resource-icon"><StarOutlined /></n-icon>
                   <div class="resource-content">
                     <span class="resource-label">幻灵结晶</span>
-                    <span class="resource-value">{{ animatedCrystals }}</span>
+                    <span class="resource-value">{{ formatResource(animatedCrystals) }}</span>
                   </div>
                 </div>
                 <div class="resource-item gold">
                   <n-icon class="resource-icon"><DollarOutlined /></n-icon>
                   <div class="resource-content">
                     <span class="resource-label">灵石</span>
-                    <span class="resource-value">{{ animatedStones }}</span>
+                    <span class="resource-value">{{ formatResource(animatedStones) }}</span>
                   </div>
                 </div>
               </div>
@@ -359,7 +351,17 @@ import SaveButton from './components/SaveButton.vue'
 
   const baseGainRate = 1
 
-  const animateValue = (ref, target, duration, rafRef) => {
+  // 灵石/幻灵结晶格式化：不足1万用数字，超过1万用x万
+  const formatResource = (num) => {
+    if (num == null) return '0'
+    const n = Number(num) || 0
+    if (n >= 10000) {
+      return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+    }
+    return Math.floor(n).toLocaleString()
+  }
+
+  const animateValue = (ref, target, duration, raf_ref) => {
     if (rafRef.value) {
       cancelAnimationFrame(rafRef.value)
     }
@@ -419,48 +421,15 @@ import SaveButton from './components/SaveButton.vue'
     min-width: 0;
   }
 
-  .player-avatar {
-    width: 38px;
-    height: 38px;
-    border-radius: 50%;
-    background: linear-gradient(135deg, #DAA520, #FFD700);
-    display: flex;
-    align-items: center;
-    justify-content: center;
-    font-family: 'Ma Shan Zheng', cursive;
-    font-size: 20px;
-    color: #0D0D12;
-    box-shadow: 0 0 12px rgba(218, 165, 32, 0.4);
-    flex-shrink: 0;
-  }
-
-  .player-meta {
-    display: flex;
-    flex-direction: column;
-    gap: 2px;
-    min-width: 0;
-  }
-
-  .player-name {
+  .player-name-only {
     font-family: 'Ma Shan Zheng', cursive;
     font-size: 16px;
     color: #F5DEB3;
     white-space: nowrap;
     overflow: hidden;
     text-overflow: ellipsis;
-    max-width: 140px;
-  }
-
-  .player-realm {
-    font-size: 10px;
-    padding: 2px 6px;
-    background: rgba(0, 0, 0, 0.3);
-    border-radius: 12px;
-    border: 1px solid rgba(218, 165, 32, 0.3);
-    white-space: nowrap;
-    max-width: 100px;
-    overflow: hidden;
-    text-overflow: ellipsis;
+    max-width: 4em;
+    letter-spacing: 1px;
   }
 
   .resource-bar {
@@ -702,8 +671,8 @@ import SaveButton from './components/SaveButton.vue'
       box-shadow: 0 0 40px rgba(0, 0, 0, 0.5);
     }
 
-    .player-name {
-      max-width: 160px;
+    .player-name-only {
+      max-width: 4em;
     }
 
     .bottom-nav-inner {
@@ -723,18 +692,8 @@ import SaveButton from './components/SaveButton.vue'
       padding: 4px 12px;
     }
 
-    .player-avatar {
-      width: 30px;
-      height: 30px;
-      font-size: 16px;
-    }
-
-    .player-name {
+    .player-name-only {
       font-size: 14px;
-    }
-
-    .player-realm {
-      font-size: 10px;
     }
 
     .resource-item {
@@ -867,9 +826,9 @@ import SaveButton from './components/SaveButton.vue'
       gap: 16px;
     }
 
-    .player-name {
+    .player-name-only {
       font-size: 16px;
-      max-width: none;
+      max-width: 4em;
     }
 
     .resource-bar {
@@ -922,5 +881,97 @@ import SaveButton from './components/SaveButton.vue'
     .desktop-sidebar .nav-label {
       font-size: 11px;
     }
+  }
+
+  /* 白天模式（日间模式）样式 */
+  html:not(.dark) .game-container {
+    background: linear-gradient(135deg, #F5EFE0 0%, #E8DCC4 50%, #F0E6D2 100%);
+  }
+
+  html:not(.dark) .top-bar {
+    background: rgba(245, 239, 224, 0.95);
+    border-bottom: 1px solid rgba(139, 69, 19, 0.4);
+  }
+
+  html:not(.dark) .player-name-only {
+    color: #5B3A1A;
+  }
+
+  html:not(.dark) .resource-label {
+    color: #6B4226;
+  }
+
+  html:not(.dark) .resource-value {
+    color: #4A2C12;
+  }
+
+  html:not(.dark) .resource-item {
+    background: rgba(139, 69, 19, 0.08);
+    border: 1px solid rgba(139, 69, 19, 0.25);
+  }
+
+  html:not(.dark) .resource-item.gold {
+    border-color: rgba(184, 134, 11, 0.5);
+    background: rgba(218, 165, 32, 0.1);
+  }
+
+  html:not(.dark) .resource-item.crystal {
+    border-color: rgba(106, 90, 205, 0.5);
+    background: rgba(147, 112, 219, 0.1);
+  }
+
+  html:not(.dark) .resource-item.crystal .resource-value {
+    color: #4B36A0;
+  }
+
+  html:not(.dark) .resource-item.gold .resource-value {
+    color: #8B6914;
+  }
+
+  html:not(.dark) .resource-item .resource-icon {
+    color: #B8860B;
+  }
+
+  html:not(.dark) .resource-item.crystal .resource-icon {
+    color: #6A5ACD;
+  }
+
+  html:not(.dark) .cultivation-bar {
+    background: rgba(240, 230, 210, 0.9);
+    border-bottom: 1px solid rgba(139, 69, 19, 0.25);
+  }
+
+  html:not(.dark) .cultivation-label {
+    color: #6B4226;
+  }
+
+  html:not(.dark) .cultivation-text {
+    color: #8B6914;
+  }
+
+  html:not(.dark) .bottom-nav {
+    background: rgba(245, 239, 224, 0.98);
+    border-top: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  html:not(.dark) .nav-item {
+    color: #6B4226;
+  }
+
+  html:not(.dark) .nav-item.active {
+    color: #8B6914;
+  }
+
+  html:not(.dark) .desktop-sidebar {
+    background: rgba(240, 230, 210, 0.98);
+    border-right: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  html:not(.dark) .sidebar-logo {
+    color: #8B6914;
+  }
+
+  html:not(.dark) .content-area {
+    color: #3B240F;
   }
 </style>
