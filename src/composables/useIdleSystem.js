@@ -1136,18 +1136,18 @@ function hideTreasureFlash() {
 }
 
 // ============ 生动日志：单场遭遇 ============
-function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
+function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults = [], roleEffects = []) {
   const s = store()
   const team = s.getTeamMembersDetail()
+
   addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
-  // 探索场景：优先使用对应地图专属描写，让八图各有意境
+
   const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
   addLog('scene', pick(scenePool))
-  // 敌人现身（按层级差异化描写）
+
   const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
   addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
 
-  // 队伍角色各自行动描写 - 每个角色只显示一条综合信息
   if (team.length > 0) {
     for (const member of team) {
       const memberState = teamMemberStates.value.find(ms => ms.memberId === member.id)
@@ -1169,21 +1169,26 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
       const passiveSkills = (member.skills || []).filter(s => s.type === 'passive')
       passiveSkills.forEach(skill => extras.push(`【${skill.name}】`))
       
-      if (extras.length > 0) {
-        text += `（${extras.join('·')}）`
+      const combatResult = combatResults.find(cr => cr.memberId === member.id)
+      const damage = combatResult?.combatStats?.playerDamage || 0
+      const tookDamage = combatResult?.combatStats?.playerTookDamage || 0
+      const damageText = damage > 0 ? `\u521B\u6210 ${Math.floor(damage)} 点伤害` : ''
+      const tookDamageText = tookDamage > 0 ? `\u53D7\u5230 ${Math.floor(tookDamage)} 点伤害` : ''
+      const damageInfo = [damageText, tookDamageText].filter(Boolean).join('，')
+      
+      if (extras.length > 0 || damageInfo) {
+        text += '（' + [...extras, damageInfo].filter(Boolean).join('·') + '）'
       }
       
       addLog('combat', text)
     }
   } else {
-    // 无队伍时回退到原有通用战斗描写
     const actions = 2 + (enemy.tier !== 'normal' ? 1 : 0)
     for (let i = 0; i < actions; i++) {
       const a = pick(COMBAT_ACTIONS); addLog('combat', a.text)
     }
   }
 
-  // 怪物攻击日志（2-3条）
   const enemyAttackCount = enemy.tier === 'boss' ? 3 : 2
   const enemyAttackPool = ENEMY_ATTACK_ACTIONS[enemy.tier] || ENEMY_ATTACK_ACTIONS.normal
   const usedEnemyAttacks = new Set()
@@ -1195,12 +1200,18 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
     usedEnemyAttacks.add(idx)
     let attackText = enemyAttackPool[idx]
     attackText = attackText.replace(/\$\{n\}/g, enemy.name)
+    
+    const totalEnemyDamage = combatResults.reduce((sum, cr) => sum + (cr.combatStats?.enemyDamage || 0), 0)
+    const avgDamage = enemyAttackCount > 0 ? Math.floor(totalEnemyDamage / enemyAttackCount) : 0
+    if (avgDamage > 0 && i === 0) {
+      attackText += `\uFF08\u521B\u6210 ${avgDamage} 点伤害\uFF09`
+    }
+    
     addLog('enemy-' + enemy.tier, attackText)
   }
 
-  // 战斗特效日志（随机2-4种）
   const effectTypes = ['crit', 'combo', 'dodge', 'vampire', 'stun', 'counter', 'shield', 'heal']
-  const effectCount = 2 + Math.floor(Math.random() * 3)
+  const effectCount = 2 + Math.floor(Math.random() * 2)
   const shuffledEffects = [...effectTypes].sort(() => Math.random() - 0.5)
   const selectedEffects = shuffledEffects.slice(0, effectCount)
   for (const effectType of selectedEffects) {
@@ -1210,82 +1221,84 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
     }
   }
 
-  // 怪物状态变化日志（随机1-2种）
-  const enemyStatusEffects = ['stun', 'bleed']
-  const enemyStatusCount = victory ? (1 + Math.floor(Math.random() * 2)) : 0
-  const shuffledStatus = [...enemyStatusEffects].sort(() => Math.random() - 0.5)
-  const selectedStatus = shuffledStatus.slice(0, enemyStatusCount)
-  for (const statusType of selectedStatus) {
-    const statusPool = COMBAT_EFFECTS[statusType]
-    if (statusPool && statusPool.length > 0) {
-      addLog('enemy-' + enemy.tier, pick(statusPool))
-    }
-  }
-
-  // 角色定位特殊效果日志（模拟 buff）
-  if (team.length > 0 && victory) {
-    const activeRoles = new Set()
-    for (const member of team) {
-      const memberState = teamMemberStates.value.find(ms => ms.memberId === member.id)
-      if (memberState && memberState.hp > 0) {
-        activeRoles.add(member.role || 'vanguard')
-      }
-    }
-    for (const role of activeRoles) {
-      const roleEffect = ROLE_EFFECTS[role]
-      if (roleEffect) {
-        const member = team.find(m => (m.role || 'vanguard') === role)
-        if (member) {
-          const mockMemberState = { name: member.name, buildStrength: 1000, baseStats: { attack: 500, health: 5000, defense: 200 } }
-          const mockTeamStates = [mockMemberState]
-          const effectResult = roleEffect.effect(mockMemberState, mockTeamStates)
-          if (effectResult) {
-            addLog('combat', effectResult.desc)
-          }
-        }
+  if (victory) {
+    const enemyStatusEffects = ['stun', 'bleed']
+    const enemyStatusCount = 1 + Math.floor(Math.random() * 2)
+    const shuffledStatus = [...enemyStatusEffects].sort(() => Math.random() - 0.5)
+    const selectedStatus = shuffledStatus.slice(0, enemyStatusCount)
+    for (const statusType of selectedStatus) {
+      const statusPool = COMBAT_EFFECTS[statusType]
+      if (statusPool && statusPool.length > 0) {
+        addLog('enemy-' + enemy.tier, pick(statusPool))
       }
     }
   }
 
-  // 小剧场（每5次遭遇有概率触发）
+  if (victory && roleEffects.length > 0) {
+    for (const effect of roleEffects) {
+      addLog('combat', effect.desc)
+    }
+  }
+
   if (count % 5 === 0 && team.length >= 2 && Math.random() < 0.6) {
     triggerSkit(team)
   }
 
   if (victory) {
     addLog('victory', pick(VICTORY_LINES)(enemy.name))
-    rewards.forEach(r => {
-      if (r.type === 'equipment' || r.type === 'pet') {
-        const info = r.info
-        const detail = formatItemDetail(r.item, r.type, r.rarity)
-        const rarity = r.rarity
-        const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
-        addLog(cls, buildDropText(r, info), detail)
-      } else if (r.type === 'fortune') {
-        addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
-      } else if (r.type === 'herb') {
-        addLog('reward-normal', `🌿 获得 ${r.amount} 株灵草，药香扑鼻，正是炼丹炼药的上好材料！`)
-      } else if (r.type === 'ore') {
-        addLog('reward-normal', `⛏️ 获得 ${r.amount} 份矿料，质地精纯，可用于锻造神兵利器！`)
-      } else if (r.type === 'liquid') {
-        addLog('reward-normal', `💧 获得 ${r.amount} 瓶灵液，灵光流转，服之可增进修为！`)
-      } else if (r.type === 'core') {
-        addLog('reward-normal', `💎 获得 ${r.amount} 枚妖兽内丹，灵力充盈，乃是炼器炼丹的珍贵材料！`)
-      } else if (r.type === 'pet_fragment') {
-        addLog('reward-normal', `🌟 获得 ${r.amount} 枚升星碎片，收集足够可用于灵宠升星，大幅提升战力！`)
-      } else if (r.type === 'phantom_crystal') {
-        addLog('reward-normal', `✨ 获得 ${r.amount} 颗幻灵结晶，晶莹剔透，蕴含着神秘的幻灵之力！`)
-      } else if (r.type === 'boss_material') {
-        addLog('drop-rare', `👑 获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！`)
-      } else if (r.type === 'spirit_stone') {
-        addLog('reward-normal', `💰 获得 ${r.amount} 枚灵石，修炼路上不可或缺的硬通货！`)
-      } else if (r.type === 'cultivation') {
-        addLog('reward-normal', `📈 获得 ${r.amount} 点修为，道行精进，境界愈发稳固！`)
-      } else {
-        addLog('reward-normal', `获得 ${r.amount} ${r.name}`)
-      }
+    
+    const equipmentRewards = rewards.filter(r => r.type === 'equipment')
+    const petRewards = rewards.filter(r => r.type === 'pet')
+    const fortuneRewards = rewards.filter(r => r.type === 'fortune')
+    const bossMaterialRewards = rewards.filter(r => r.type === 'boss_material')
+    const materialRewards = rewards.filter(r => ['herb', 'ore', 'liquid', 'core', 'pet_fragment', 'phantom_crystal'].includes(r.type))
+    const currencyRewards = rewards.filter(r => ['spirit_stone', 'cultivation'].includes(r.type))
+
+    for (const r of equipmentRewards) {
+      const info = r.info
+      const detail = formatItemDetail(r.item, r.type, r.rarity)
+      const rarity = r.rarity
+      const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
+      addLog(cls, buildDropText(r, info), detail)
       showTreasureFlash(r)
-    })
+    }
+
+    for (const r of petRewards) {
+      const info = r.info
+      const detail = formatItemDetail(r.item, r.type, r.rarity)
+      const rarity = r.rarity
+      const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
+      addLog(cls, buildDropText(r, info), detail)
+      showTreasureFlash(r)
+    }
+
+    for (const r of bossMaterialRewards) {
+      addLog('drop-rare', `👑 获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！`)
+      showTreasureFlash(r)
+    }
+
+    for (const r of fortuneRewards) {
+      addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
+      showTreasureFlash(r)
+    }
+
+    if (materialRewards.length > 0 || currencyRewards.length > 0) {
+      const materialParts = []
+      for (const r of materialRewards) {
+        const icons = { herb: '🌿', ore: '⛏️', liquid: '💧', core: '💎', pet_fragment: '🌟', phantom_crystal: '✨' }
+        const names = { herb: '灵草', ore: '矿料', liquid: '灵液', core: '妖兽内丹', pet_fragment: '升星碎片', phantom_crystal: '幻灵结晶' }
+        materialParts.push(`${icons[r.type] || '🎁'} ${r.amount} ${names[r.type] || r.name}`)
+      }
+      for (const r of currencyRewards) {
+        if (r.type === 'spirit_stone') {
+          materialParts.push(`💰 ${r.amount} 灵石`)
+        } else if (r.type === 'cultivation') {
+          materialParts.push(`📈 ${r.amount} 修为`)
+        }
+      }
+      addLog('reward-normal', `🎁 获得：${materialParts.join('，')}！`)
+    }
+
   } else {
     addLog('defeat', pick(DEFEAT_LINES)(enemy.name, loss))
   }
@@ -1378,6 +1391,7 @@ async function runIdleEncounter() {
     const victory = teamResults.some(r => r.result.victory)
     let rewards = []
     let loss = 0
+    let roleEffects = []
     
     if (victory) {
       rewards = grantReward(effectiveZone, true)
@@ -1411,7 +1425,6 @@ async function runIdleEncounter() {
       })
       
       // 触发角色定位特殊效果
-      const roleEffects = []
       for (const memberState of teamMemberStates.value) {
         if (memberState.hp <= 0) continue
         const member = s.sectMembers.find(m => m.id === memberState.memberId)
@@ -1421,8 +1434,7 @@ async function runIdleEncounter() {
         if (roleEffect) {
           const effectResult = roleEffect.effect(memberState, teamMemberStates.value)
           if (effectResult) {
-            roleEffects.push(effectResult)
-            addLog('combat', effectResult.desc)
+            roleEffects.push({ ...effectResult, memberName: member.name })
             // 更新统计数据
             if (effectResult.type === 'heal') {
               runStats.value.healAmount += effectResult.value
@@ -1446,7 +1458,17 @@ async function runIdleEncounter() {
     const firstResult = teamResults[0]
     const enemyData = firstResult?.result?.enemy ? { mainEnemy: firstResult.result.enemy, allBosses: firstResult.result.allBosses || [] } : generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
     const enemy = enemyData.mainEnemy
-    logEncounter(zone, diff, count, enemy, victory, rewards, loss)
+    
+    // 收集所有成员的战斗结果数据
+    const combatResults = teamResults.map(tr => ({
+      memberId: tr.member.memberId,
+      memberName: tr.member.name,
+      victory: tr.result.victory,
+      combatStats: tr.result.combatStats || {},
+      enemy: tr.result.enemy
+    }))
+    
+    logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects)
     // 实时更新当前结算画面
     currentEncounterSummary.value = {
       count,
@@ -1578,6 +1600,35 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
   const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
   const allDrops = []
   
+  const combatStats = {
+    playerDamage: 0,
+    playerHeal: 0,
+    playerTookDamage: 0,
+    enemyDamage: 0,
+    rounds: 0,
+    critCount: 0,
+    comboCount: 0,
+    dodgeCount: 0,
+    counterCount: 0,
+    stunCount: 0,
+    vampireCount: 0
+  }
+  
+  const collectTurnResults = (results) => {
+    if (!results) return
+    for (const r of results) {
+      if (r.attacker === playerEntity.name) {
+        combatStats.playerDamage += r.damage
+        if (r.isCrit) combatStats.critCount++
+        if (r.isCombo) combatStats.comboCount++
+      } else {
+        combatStats.enemyDamage += r.damage
+        combatStats.playerTookDamage += r.damage
+      }
+      if (r.isDodged) combatStats.dodgeCount++
+    }
+  }
+  
   if (enemyData.hasBoss && enemyData.allBosses.length > 1) {
     let finalVictory = true
     let lastManager = null
@@ -1593,6 +1644,8 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
       while (manager.state === 'in_progress' && safetyGuard < 200) {
         safetyGuard++
         const result = manager.executeTurn()
+        combatStats.rounds++
+        collectTurnResults(result?.results)
         if (!result) break
         if (result.state === 'victory' || result.state === 'defeat') {
           combatResult = result
@@ -1612,7 +1665,7 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
       allDrops.push(...drops)
     }
     
-    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses }
+    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses, combatStats }
   }
   
   const mainEnemy = enemyData.mainEnemy
@@ -1623,15 +1676,17 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
   while (manager.state === 'in_progress' && safetyGuard < 200) {
     safetyGuard++
     const result = manager.executeTurn()
+    combatStats.rounds++
+    collectTurnResults(result?.results)
     if (!result) break
     if (result.state === 'victory') {
       const drops = grantCombatDrops(mainEnemy, effectiveZone.id)
-      return { victory: true, manager, enemy: mainEnemy, drops, allBosses: enemyData.allBosses }
+      return { victory: true, manager, enemy: mainEnemy, drops, allBosses: enemyData.allBosses, combatStats }
     } else if (result.state === 'defeat') {
-      return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses }
+      return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses, combatStats }
     }
   }
-  return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses }
+  return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses, combatStats }
 }
 
 // ============ 离线补算（轻量结算，避免卡顿） ============

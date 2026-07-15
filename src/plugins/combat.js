@@ -101,7 +101,8 @@ class CombatStats {
     }
     // 应用最终伤害减免
     damage *= 1 - this.finalDamageReduce
-    return Math.abs(damage)
+    // 确保最小伤害为1
+    return Math.max(1, Math.abs(damage))
   }
 }
 
