@@ -23,13 +23,11 @@
     format: {
       type: Function,
       default: (num) => {
-        if (num >= 100000000) {
-          return (num / 100000000).toFixed(2) + '亿'
+        const n = Number(num) || 0
+        if (n >= 100000000) {
+          return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
         }
-        if (num >= 10000) {
-          return (num / 10000).toFixed(1) + '万'
-        }
-        return num.toLocaleString()
+        return Math.floor(n).toLocaleString()
       }
     }
   })

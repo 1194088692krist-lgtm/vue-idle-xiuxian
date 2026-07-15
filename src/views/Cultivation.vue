@@ -14,7 +14,7 @@
         </div>
         <div class="sect-stat-item">
           <span class="sect-stat-label">队伍总战力</span>
-          <span class="sect-stat-value">{{ totalStrength }}</span>
+          <span class="sect-stat-value">{{ formatNumber(totalStrength) }}</span>
         </div>
         <div class="sect-stat-item">
           <span class="sect-stat-label">灵魂碎片</span>
@@ -90,7 +90,7 @@
           <div class="char-level">Lv.{{ selectedMember.level }}</div>
           <div class="build-strength">
             <span class="build-label">战力</span>
-            <span class="build-value">{{ playerStore.getCharacterBuildStrength(selectedMember) }}</span>
+            <span class="build-value">{{ formatNumber(playerStore.getCharacterBuildStrength(selectedMember)) }}</span>
           </div>
         </div>
       </div>
@@ -238,7 +238,7 @@
           </div>
           <div class="bench-info">
             <div class="bench-name">{{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
-            <div class="bench-strength">战力 {{ playerStore.getCharacterBuildStrength(m) }}</div>
+            <div class="bench-strength">战力 {{ formatNumber(playerStore.getCharacterBuildStrength(m)) }}</div>
           </div>
           <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id, $event)">详情</button>
           <button
@@ -276,7 +276,7 @@
               </span>
             </div>
             <div class="char-talent-info">天赋: <b>{{ detailMember.talentName }}</b> · {{ detailMember.talentDesc }}</div>
-            <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ playerStore.getCharacterBuildStrength(detailMember) }}</div>
+            <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ formatNumber(playerStore.getCharacterBuildStrength(detailMember)) }}</div>
             <div class="char-potential">
               <span>天赋值: {{ detailMember.talentValue || starConfig[detailMember.star]?.talentValue || 100 }}</span>
               <span class="divider">|</span>
@@ -443,11 +443,11 @@ const message = useMessage()
 
 const allocateAmount = ref(100)
 
+// 大数据格式化：超过10000万(1亿)按x万显示，否则直接显示数字
 const formatNumber = num => {
-  if (!num) return 0
-  if (num >= 100000000) return (num / 100000000).toFixed(1) + '亿'
-  if (num >= 10000) return (num / 10000).toFixed(1) + '万'
-  return Math.floor(num).toLocaleString()
+  const n = Number(num) || 0
+  if (n >= 100000000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  return Math.floor(n).toLocaleString()
 }
 
 const getRequiredExp = (level) => {

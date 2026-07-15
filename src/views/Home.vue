@@ -100,11 +100,11 @@
   const playerStore = usePlayerStore()
   const message = useMessage()
 
+  // 大数据格式化：超过10000万(1亿)按x万显示，否则直接显示数字
   const formatNumber = num => {
-    if (num >= 10000) {
-      return (num / 10000).toFixed(1) + '万'
-    }
-    return num.toLocaleString()
+    const n = Number(num) || 0
+    if (n >= 100000000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+    return Math.floor(n).toLocaleString()
   }
 
   const receiveNewPlayerGift = () => {

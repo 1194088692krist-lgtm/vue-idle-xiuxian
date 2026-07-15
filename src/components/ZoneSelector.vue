@@ -660,12 +660,12 @@ const {
   getZoneDifficulty
 } = useIdleSystem()
 
-// Build 强度数值格式化（万/亿）
+// Build 强度数值格式化：超过10000万(1亿)按x万显示，否则直接显示数字
 const formatBuild = (v) => {
   if (v == null || v === 0) return '0'
-  if (v >= 100000000) return (v / 100000000).toFixed(2) + '亿'
-  if (v >= 10000) return (v / 10000).toFixed(1) + '万'
-  return Math.round(v).toString()
+  const n = Number(v) || 0
+  if (n >= 100000000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  return Math.floor(n).toLocaleString()
 }
 // 匹配度配色
 const matchColor = computed(() => {

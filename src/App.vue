@@ -66,7 +66,7 @@
             <div class="cultivation-bar">
               <div class="cultivation-info">
                 <span class="cultivation-label">修为池</span>
-                <span class="cultivation-text">{{ animatedCultivation }}</span>
+                <span class="cultivation-text">{{ formatLargeNumber(animatedCultivation) }}</span>
               </div>
               <div class="cultivation-progress">
                 <div class="progress-bar">
@@ -400,6 +400,15 @@ import SaveButton from './components/SaveButton.vue'
     if (num == null) return '0'
     const n = Number(num) || 0
     if (n >= 10000) {
+      return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+    }
+    return Math.floor(n).toLocaleString()
+  }
+
+  // 修为池等大数据格式化：超过10000万(1亿)按x万显示，否则直接显示数字
+  const formatLargeNumber = (num) => {
+    const n = Number(num) || 0
+    if (n >= 100000000) {
       return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
     }
     return Math.floor(n).toLocaleString()
