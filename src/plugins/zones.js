@@ -52,7 +52,7 @@ export const zones = [
         name: '狼王',
         description: '青萝林的霸主，统领狼群横行霸道',
         traits: ['速度快', '群体攻击'],
-        stats: { attack: 20, health: 200, defense: 5, speed: 15 },
+        stats: { attack: 12, health: 124, defense: 4, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [30, 75] },
           { type: 'equipment', chance: 0.3, rarity: ['common', 'uncommon'], slot: 'weapon' },
@@ -65,7 +65,7 @@ export const zones = [
         name: '山匪头目',
         description: '盘踞山林的悍匪首领，刀法凌厉',
         traits: ['高攻击', '暴击率高'],
-        stats: { attack: 30, health: 180, defense: 8, speed: 10 },
+        stats: { attack: 19, health: 112, defense: 6, speed: 10 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [45, 90] },
           { type: 'equipment', chance: 0.35, rarity: ['common', 'uncommon'], slot: 'hands' },
@@ -100,7 +100,7 @@ export const zones = [
         name: '迷雾虎王',
         description: '迷雾中潜伏的兽王，一击致命',
         traits: ['高爆发', '隐蔽攻击'],
-        stats: { attack: 50, health: 400, defense: 15, speed: 18 },
+        stats: { attack: 31, health: 248, defense: 11, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [75, 180] },
           { type: 'equipment', chance: 0.4, rarity: ['uncommon', 'rare'], slot: 'body' },
@@ -113,7 +113,7 @@ export const zones = [
         name: '骷髅将军',
         description: '远古战场遗留的亡灵将军，刀枪不入',
         traits: ['高防御', '召唤骷髅'],
-        stats: { attack: 35, health: 600, defense: 30, speed: 8 },
+        stats: { attack: 22, health: 372, defense: 21, speed: 8 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [90, 225] },
           { type: 'equipment', chance: 0.35, rarity: ['uncommon', 'rare'], slot: 'shoulder' },
@@ -148,7 +148,7 @@ export const zones = [
         name: '焰魔领主',
         description: '凤凰窟的火焰主宰，浑身燃烧着无尽业火',
         traits: ['火焰伤害', '灼烧效果'],
-        stats: { attack: 80, health: 800, defense: 25, speed: 12 },
+        stats: { attack: 50, health: 496, defense: 18, speed: 12 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [150, 375] },
           { type: 'equipment', chance: 0.45, rarity: ['rare', 'epic'], slot: 'weapon' },
@@ -161,7 +161,7 @@ export const zones = [
         name: '火凤凰',
         description: '涅槃重生的神鸟，虽非真凤却也威震一方',
         traits: ['范围攻击', '复活一次'],
-        stats: { attack: 60, health: 600, defense: 20, speed: 25 },
+        stats: { attack: 37, health: 372, defense: 14, speed: 25 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [180, 450] },
           { type: 'equipment', chance: 0.5, rarity: ['rare', 'epic'], slot: 'ring1' },
@@ -197,7 +197,7 @@ export const zones = [
         name: '深渊蛟龙',
         description: '龙渊深处的蛟龙，传承了远古真龙的血脉',
         traits: ['龙威震慑', '水属性攻击'],
-        stats: { attack: 150, health: 1500, defense: 50, speed: 20 },
+        stats: { attack: 93, health: 930, defense: 35, speed: 20 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [300, 750] },
           { type: 'equipment', chance: 0.55, rarity: ['epic'], slot: 'necklace' },
@@ -210,7 +210,7 @@ export const zones = [
         name: '血魔大帝',
         description: '吸食万千生灵精血而成的恐怖存在',
         traits: ['吸血', '腐蚀攻击'],
-        stats: { attack: 120, health: 2000, defense: 35, speed: 15 },
+        stats: { attack: 74, health: 1240, defense: 25, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [375, 900] },
           { type: 'equipment', chance: 0.5, rarity: ['rare', 'epic'], slot: 'wrist' },
@@ -246,7 +246,7 @@ export const zones = [
         name: '噬魂鬼王',
         description: '鬼荒原的统治者，以吞噬生灵魂魄为生',
         traits: ['灵魂攻击', '恐惧效果'],
-        stats: { attack: 200, health: 3000, defense: 60, speed: 18 },
+        stats: { attack: 124, health: 1860, defense: 42, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [600, 1500] },
           { type: 'equipment', chance: 0.6, rarity: ['legendary'], slot: 'head' },
@@ -259,7 +259,7 @@ export const zones = [
         name: '白骨魔尊',
         description: '由无尽白骨堆砌而成的恐怖存在，不死不灭',
         traits: ['分身', '再生'],
-        stats: { attack: 180, health: 4000, defense: 80, speed: 12 },
+        stats: { attack: 112, health: 2480, defense: 56, speed: 12 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [750, 1800] },
           { type: 'equipment', chance: 0.55, rarity: ['legendary'], slot: 'body' },
@@ -295,7 +295,7 @@ export const zones = [
         name: '冰凰',
         description: '镇守冰雪宫的上古神兽，一身冰系神通出神入化',
         traits: ['冰冻', '冰系AOE'],
-        stats: { attack: 350, health: 5000, defense: 100, speed: 22 },
+        stats: { attack: 217, health: 3100, defense: 70, speed: 22 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1200, 3000] },
           { type: 'equipment', chance: 0.65, rarity: ['legendary', 'mythic'], slot: 'feet' },
@@ -308,7 +308,7 @@ export const zones = [
         name: '冰封古魔',
         description: '被封印万年的上古魔修，实力深不可测',
         traits: ['时间减速', '封印技能'],
-        stats: { attack: 400, health: 6000, defense: 120, speed: 15 },
+        stats: { attack: 248, health: 3720, defense: 84, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1500, 3750] },
           { type: 'equipment', chance: 0.6, rarity: ['mythic'], slot: 'belt' },
@@ -344,7 +344,7 @@ export const zones = [
         name: '仙墟守护者',
         description: '上古仙人留下的守护者，拥有仙人之威',
         traits: ['仙术攻击', '领域压制'],
-        stats: { attack: 600, health: 10000, defense: 180, speed: 25 },
+        stats: { attack: 372, health: 6200, defense: 126, speed: 25 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [2250, 6000] },
           { type: 'equipment', chance: 0.7, rarity: ['mythic'], slot: 'artifact' },
@@ -357,7 +357,7 @@ export const zones = [
         name: '堕落仙君',
         description: '曾经的仙人，堕入魔道后更加强大',
         traits: ['魔仙双修', '变身'],
-        stats: { attack: 700, health: 12000, defense: 200, speed: 20 },
+        stats: { attack: 434, health: 7440, defense: 140, speed: 20 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [3000, 7500] },
           { type: 'equipment', chance: 0.65, rarity: ['mythic'], slot: 'ring2' },
@@ -393,7 +393,7 @@ export const zones = [
         name: '混沌主宰',
         description: '混沌界的至高存在，一念可生灭万物',
         traits: ['法则扭曲', '全属性攻击'],
-        stats: { attack: 1200, health: 20000, defense: 300, speed: 30 },
+        stats: { attack: 744, health: 12400, defense: 210, speed: 30 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
           { type: 'equipment', chance: 0.75, rarity: ['mythic'], slot: 'weapon' },
@@ -406,7 +406,7 @@ export const zones = [
         name: '天道化身',
         description: '天道在混沌中的投影，代表着至高法则',
         traits: ['因果律', '无法闪避'],
-        stats: { attack: 1500, health: 25000, defense: 350, speed: 35 },
+        stats: { attack: 930, health: 15500, defense: 245, speed: 35 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [7500, 22500] },
           { type: 'equipment', chance: 0.8, rarity: ['mythic'], slot: 'artifact' },

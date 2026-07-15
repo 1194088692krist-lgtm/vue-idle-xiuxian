@@ -171,6 +171,115 @@ const MEMBER_ACTIONS = {
   ]
 }
 
+// 怪物攻击动作描写
+const ENEMY_ATTACK_ACTIONS = {
+  normal: [
+    '${n}发出低沉咆哮，利爪带着腥风横扫而至，空气被撕裂出刺耳尖啸！',
+    '${n}猛地扑跃而起，血盆大口直咬向队伍前排，獠牙上还滴落着涎水！',
+    '${n}尾巴如钢鞭般抽击过来，所过之处碎石飞溅、草木成齑！',
+    '${n}猛地一跺脚，震得大地微微颤栗，一股冲击波向四周扩散开来！',
+    '${n}张口喷出一团腥臭黑雾，雾气所过之处草木瞬间枯萎发黑！',
+    '${n}身形陡然加速，化作一道黑影直扑而来，速度快得令人咋舌！',
+    '${n}双爪在胸前一划，两道弧形气刃交叉斩出，所过之处寸草不生！',
+    '${n}仰头发出震天嘶吼，声波化作实质冲击，震得众人气血翻涌！',
+    '${n}猛吸一口气，腹部鼓起如球，随即喷出一道灼热的吐息！',
+    '${n}利爪在地面划出深深沟壑，借着反作用力猛冲而至！'
+  ],
+  elite: [
+    '${n}浑身灵光暴涨，气息节节攀升，显然动了真格！一掌拍出灵力凝聚成兽形虚影！',
+    '${n}双目猩红，周身煞气凝成实质，化作数道黑色利箭破空射来！',
+    '${n}身形一晃分出三道残影，从不同方向同时发动攻击，虚实难辨！',
+    '${n}仰天怒吼，天地间灵气竟被牵引而来，在其头顶凝聚成一颗巨大能量球！',
+    '${n}利爪撕裂虚空，一道漆黑空间裂缝骤然出现，吞噬着周遭一切！',
+    '${n}体表鳞甲泛起幽光，防御力骤增的同时发起了狂暴的连续攻击！',
+    '${n}脚踏诡异步法，身形忽左忽右，每一次现身都伴随着致命一击！',
+    '${n}张口吐出一颗内丹，内丹悬浮半空放射出万道光芒，攻势倍增！',
+    '${n}周身浮现出古老符文，符文流转间威力倍增，一拳轰出地动山摇！',
+    '${n}双翼猛地展开，掀起滔天狂风，风中还夹杂着无数风刃！'
+  ],
+  boss: [
+    '${n}威压如山，举手投足间引动天地法则变色，一只遮天巨手凌空拍下！',
+    '${n}冷笑一声，指尖凝聚出毁天灭地的能量光束，所过之处空间都在崩碎！',
+    '${n}身化万千残影，每一道都拥有本尊八成实力，铺天盖地的攻势从四面八方涌来！',
+    '${n}召唤出领域之力，整个战场都被其法则笼罩，众人只觉灵力运转都变得滞涩！',
+    '${n}口中念念有词，古老的咒语回响在天地间，降下一道道毁灭神雷！',
+    '${n}一掌按向地面，大地崩裂，无尽地火岩浆喷涌而出，化作焚天火海！',
+    '${n}双目绽放出慑人神光，两道实质化的目光贯穿虚空，直射众人心神！',
+    '${n}召唤出本命法宝，法宝悬于头顶大放异彩，一道道恐怖术法接连不断！',
+    '${n}身形暴涨百丈，如远古巨兽般俯瞰众生，一脚踩下仿佛天都要塌了！',
+    '${n}施展出禁忌秘术，以自身精血为引，爆发出远超平常的恐怖战力！',
+    '${n}操控空间之力，身形在战场中瞬间挪移，每一次出现都带来致命打击！',
+    '${n}周身浮现出九道法相，法相同步结印，九道不同属性的攻击同时降临！'
+  ]
+}
+
+// 战斗特效描写
+const COMBAT_EFFECTS = {
+  crit: [
+    '⚡ 暴击！这一击精准命中要害，敌人发出痛苦的嘶吼，鲜血喷涌而出！',
+    '💥 致命一击！灵力在敌人体内轰然爆发，造成了难以置信的伤害！',
+    '🎯 完美命中！找到了敌人灵力运转的破绽，这一击的威力提升了数倍！',
+    '🔥 暴击！真火焚尽敌人护体灵气，直接作用在其本体之上，焦糊味弥漫开来！',
+    '⚔️ 暴击！兵刃深深没入敌人身体，鲜血顺着刃尖滴滴答答洒落一地！'
+  ],
+  combo: [
+    '🌀 连击！攻势如行云流水般连绵不绝，敌人根本无从招架！',
+    '⚡ 连击！一快再快，剑光闪烁间敌人已身中数创，毫无还手之力！',
+    '💨 连击！身形化作残影，从各个角度发动猛攻，敌人只能被动挨打！',
+    '✨ 连击！招式衔接得天衣无缝，一波未平一波又起，彻底压制了敌人！',
+    '🗡️ 连击！数道攻击同时命中，每一击都落在相同位置，伤害层层叠加！'
+  ],
+  dodge: [
+    '💨 闪避！身形一侧，堪堪躲过了这记致命攻击，发丝被劲风削断数缕！',
+    '🌀 闪避！脚下踏着玄妙步法，在间不容发之际避开了敌人的锋芒！',
+    '✨ 闪避！身形如柳絮般轻飘飘荡开，敌人的攻击尽数落空，威势大减！',
+    '🌊 闪避！顺着敌人的攻势借力打力，轻巧地从攻击缝隙中穿梭而过！',
+    '⚡ 闪避！电光火石间身形挪移，敌人的攻击擦着衣角掠过，好险！'
+  ],
+  vampire: [
+    '🩸 吸血！攻击中带着奇异力量，敌人的气血顺着兵刃流入体内，伤势有所恢复！',
+    '🌙 吸血！月牙形的灵力刃划过敌人身体，鲜血化作红光被吸入体内！',
+    '💫 吸血！施展出吸血秘术，敌人的生命力正以肉眼可见的速度流失！',
+    '🔴 吸血！每一次攻击都抽取着敌人的精气，转化为自身的灵力！',
+    '✨ 吸血！血光闪烁间，敌人变得萎靡不振，而我方却精神焕发！'
+  ],
+  stun: [
+    '💫 眩晕！这一击正中敌人头部，它晃了晃脑袋，身形踉跄，一时竟无法行动！',
+    '⚡ 眩晕！灵力冲击着敌人的识海，它目光涣散，呆立在原地动弹不得！',
+    '🌟 眩晕！神魂震荡，敌人如同被施了定身术一般，直挺挺地站在那里！',
+    '🌀 眩晕！天旋地转，敌人连站都站不稳，更别说发动攻击了！',
+    '💥 眩晕！一记重击轰在敌人天灵盖上，它眼冒金星，彻底懵了！'
+  ],
+  counter: [
+    '🛡️ 反击！借着敌人攻击的力道顺势反击，这一击来得又快又猛！',
+    '⚔️ 反击！敌人攻击落空的瞬间，我方抓住破绽反手一剑，正中要害！',
+    '💥 反击！以彼之道还施彼身，敌人的攻势越猛，这记反击就越狠！',
+    '🌀 反击！身法一转绕到敌人侧面，趁其旧力已尽新力未生之时发动猛攻！',
+    '✨ 反击！卸力之后顺势反攻，敌人避无可避，只能硬生生吃下这一击！'
+  ],
+  shield: [
+    '🛡️ 护盾！一道灵光护盾骤然展开，硬生生挡下了这记杀招，护盾上泛起阵阵涟漪！',
+    '💎 护盾！罡气凝为实质铠甲，敌人的攻击打在上面只留下浅浅白痕！',
+    '✨ 护盾！护体灵光暴涨，将敌人的攻击尽数弹开，毫发无伤！',
+    '🔮 护盾！阵法光芒亮起，一层半透明的光罩笼罩全身，防御力大增！',
+    '🌀 护盾！灵力激荡形成防护屏障，任凭狂风骤雨般的攻击也岿然不动！'
+  ],
+  heal: [
+    '💚 治疗！一道碧绿灵光笼罩全身，伤口以肉眼可见的速度愈合着！',
+    '🌿 治疗！药力化开，气血翻涌间伤势好转，精神也振奋了不少！',
+    '✨ 治疗！温和的灵力游走于四肢百骸，修补着受损的经脉与肉身！',
+    '💫 治疗！疗伤圣药效果立竿见影，苍白的面色渐渐变得红润起来！',
+    '🌸 治疗！花瓣般的灵光飘落，每一片都带来生机，滋养着受损的躯体！'
+  ],
+  bleed: [
+    '🩸 流血！敌人身上的伤口血流不止，气息渐渐变得虚弱！',
+    '🌙 流血！月牙形的伤痕深可见骨，鲜血如泉涌般喷出，染红了地面！',
+    '💔 流血：每一次动作都牵扯着伤口，鲜血不断渗出，敌人的动作越来越慢！',
+    '🔴 流血：创伤处血液根本无法凝固，敌人的生命力在飞速流逝！',
+    '💧 流血：鲜血顺着身体不断滴落，地上已经积了一小滩，敌人面色惨白！'
+  ]
+}
+
 // ============ 队伍成员挂机状态（每人独立血条和build） ============
 const teamMemberStates = ref([])
 
@@ -198,8 +307,8 @@ const buildRatio = computed(() => {
   return rec > 0 ? playerBuildStrength.value / rec : 1
 })
 
-// 在线每场遭遇间隔：15 秒，让日志密集滚动
-const ENCOUNTER_INTERVAL = 15000
+// 在线每场遭遇间隔：2 秒，让日志密集滚动
+const ENCOUNTER_INTERVAL = 2000
 
 let _store = null
 function store() {
@@ -1074,6 +1183,70 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
     }
   }
 
+  // 怪物攻击日志（2-3条）
+  const enemyAttackCount = enemy.tier === 'boss' ? 3 : 2
+  const enemyAttackPool = ENEMY_ATTACK_ACTIONS[enemy.tier] || ENEMY_ATTACK_ACTIONS.normal
+  const usedEnemyAttacks = new Set()
+  for (let i = 0; i < enemyAttackCount; i++) {
+    let idx
+    do {
+      idx = Math.floor(Math.random() * enemyAttackPool.length)
+    } while (usedEnemyAttacks.has(idx) && usedEnemyAttacks.size < enemyAttackPool.length)
+    usedEnemyAttacks.add(idx)
+    let attackText = enemyAttackPool[idx]
+    attackText = attackText.replace(/\$\{n\}/g, enemy.name)
+    addLog('enemy-' + enemy.tier, attackText)
+  }
+
+  // 战斗特效日志（随机2-4种）
+  const effectTypes = ['crit', 'combo', 'dodge', 'vampire', 'stun', 'counter', 'shield', 'heal']
+  const effectCount = 2 + Math.floor(Math.random() * 3)
+  const shuffledEffects = [...effectTypes].sort(() => Math.random() - 0.5)
+  const selectedEffects = shuffledEffects.slice(0, effectCount)
+  for (const effectType of selectedEffects) {
+    const effectPool = COMBAT_EFFECTS[effectType]
+    if (effectPool && effectPool.length > 0) {
+      addLog('combat', pick(effectPool))
+    }
+  }
+
+  // 怪物状态变化日志（随机1-2种）
+  const enemyStatusEffects = ['stun', 'bleed']
+  const enemyStatusCount = victory ? (1 + Math.floor(Math.random() * 2)) : 0
+  const shuffledStatus = [...enemyStatusEffects].sort(() => Math.random() - 0.5)
+  const selectedStatus = shuffledStatus.slice(0, enemyStatusCount)
+  for (const statusType of selectedStatus) {
+    const statusPool = COMBAT_EFFECTS[statusType]
+    if (statusPool && statusPool.length > 0) {
+      addLog('enemy-' + enemy.tier, pick(statusPool))
+    }
+  }
+
+  // 角色定位特殊效果日志（模拟 buff）
+  if (team.length > 0 && victory) {
+    const activeRoles = new Set()
+    for (const member of team) {
+      const memberState = teamMemberStates.value.find(ms => ms.memberId === member.id)
+      if (memberState && memberState.hp > 0) {
+        activeRoles.add(member.role || 'vanguard')
+      }
+    }
+    for (const role of activeRoles) {
+      const roleEffect = ROLE_EFFECTS[role]
+      if (roleEffect) {
+        const member = team.find(m => (m.role || 'vanguard') === role)
+        if (member) {
+          const mockMemberState = { name: member.name, buildStrength: 1000, baseStats: { attack: 500, health: 5000, defense: 200 } }
+          const mockTeamStates = [mockMemberState]
+          const effectResult = roleEffect.effect(mockMemberState, mockTeamStates)
+          if (effectResult) {
+            addLog('combat', effectResult.desc)
+          }
+        }
+      }
+    }
+  }
+
   // 小剧场（每5次遭遇有概率触发）
   if (count % 5 === 0 && team.length >= 2 && Math.random() < 0.6) {
     triggerSkit(team)
@@ -1086,11 +1259,28 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss) {
         const info = r.info
         const detail = formatItemDetail(r.item, r.type, r.rarity)
         const rarity = r.rarity
-        // 凡品/凡品灵宠保持普通显示（不改显示规则）；其余品质按稀有度套用 drop-{rarity} 分级特效
         const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
         addLog(cls, buildDropText(r, info), detail)
       } else if (r.type === 'fortune') {
         addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
+      } else if (r.type === 'herb') {
+        addLog('reward-normal', `🌿 获得 ${r.amount} 株灵草，药香扑鼻，正是炼丹炼药的上好材料！`)
+      } else if (r.type === 'ore') {
+        addLog('reward-normal', `⛏️ 获得 ${r.amount} 份矿料，质地精纯，可用于锻造神兵利器！`)
+      } else if (r.type === 'liquid') {
+        addLog('reward-normal', `💧 获得 ${r.amount} 瓶灵液，灵光流转，服之可增进修为！`)
+      } else if (r.type === 'core') {
+        addLog('reward-normal', `💎 获得 ${r.amount} 枚妖兽内丹，灵力充盈，乃是炼器炼丹的珍贵材料！`)
+      } else if (r.type === 'pet_fragment') {
+        addLog('reward-normal', `🌟 获得 ${r.amount} 枚升星碎片，收集足够可用于灵宠升星，大幅提升战力！`)
+      } else if (r.type === 'phantom_crystal') {
+        addLog('reward-normal', `✨ 获得 ${r.amount} 颗幻灵结晶，晶莹剔透，蕴含着神秘的幻灵之力！`)
+      } else if (r.type === 'boss_material') {
+        addLog('drop-rare', `👑 获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！`)
+      } else if (r.type === 'spirit_stone') {
+        addLog('reward-normal', `💰 获得 ${r.amount} 枚灵石，修炼路上不可或缺的硬通货！`)
+      } else if (r.type === 'cultivation') {
+        addLog('reward-normal', `📈 获得 ${r.amount} 点修为，道行精进，境界愈发稳固！`)
       } else {
         addLog('reward-normal', `获得 ${r.amount} ${r.name}`)
       }

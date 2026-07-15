@@ -264,9 +264,9 @@ export const usePlayerStore = defineStore('player', {
     },
     // 宗门系统
     sectMembers: [], // 宗门成员列表（最多100人）
-    teamMembers: [], // 当前出战队伍（最多5人）
+    teamMembers: [], // 当前出战队伍（最多3人）
     maxSectSize: 100,
-    maxTeamSize: 5
+    maxTeamSize: 3
   }),
   getters: {
     // 获取灵宠的属性加成
