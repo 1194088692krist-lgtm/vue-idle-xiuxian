@@ -1843,7 +1843,7 @@ watch([allMembers, teamMembers], () => {
 .avatar-viewer-modal {
   z-index: 100;
   align-items: flex-start !important;
-  padding-top: 20px !important;
+  padding-top: 120px !important;
 }
 
 .avatar-viewer-content {

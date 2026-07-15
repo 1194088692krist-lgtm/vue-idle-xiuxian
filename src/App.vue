@@ -2,9 +2,21 @@
   <n-config-provider :theme="playerStore.isDarkMode ? darkTheme : null">
     <n-message-provider>
       <n-dialog-provider>
-        <n-spin :show="isLoading" description="正在加载游戏数据...">
-          <router-view v-if="isStartScreen" />
-          <div v-else class="game-container">
+        <div v-if="isLoading" class="loading-screen">
+          <div class="loading-content">
+            <div class="loading-title">修仙梦途</div>
+            <div class="loading-subtitle">{{ loadingText }}</div>
+            <div class="loading-bar-container">
+              <div class="loading-bar" :style="{ width: loadingProgress + '%' }"></div>
+            </div>
+            <div class="loading-percent">{{ loadingProgress }}%</div>
+            <div v-if="isFirstLoad" class="loading-tip">
+              ⚠️ 首次启动可能需要较长时间加载资源，请耐心等待...
+            </div>
+          </div>
+        </div>
+        <router-view v-if="isStartScreen && !isLoading" />
+        <div v-else-if="!isLoading" class="game-container">
             <!-- 桌面端左侧导航栏 -->
             <nav class="desktop-sidebar">
               <div class="desktop-sidebar-inner">
@@ -109,7 +121,6 @@
             </nav>
             </div>
           </div>
-        </n-spin>
       </n-dialog-provider>
     </n-message-provider>
   </n-config-provider>
@@ -147,6 +158,9 @@ import SaveButton from './components/SaveButton.vue'
   const menuItems = ref([])
   const isNewPlayer = ref(false)
   const isLoading = ref(true)
+  const loadingProgress = ref(0)
+  const loadingText = ref('正在初始化...')
+  const isFirstLoad = ref(false)
   const animatedSpirit = ref(0)
   const animatedStones = ref(0)
   const animatedCultivation = ref(0)
@@ -158,17 +172,44 @@ import SaveButton from './components/SaveButton.vue'
 
   const isStartScreen = computed(() => route.path === '/')
 
-  playerStore.initializePlayer().then(() => {
+  const updateLoading = (text, progress) => {
+    loadingText.value = text
+    if (progress !== undefined) loadingProgress.value = progress
+  }
+
+  async function loadGame() {
+    isFirstLoad.value = !localStorage.getItem('hasLoadedBefore')
+    
+    updateLoading('正在初始化游戏引擎...', 5)
+    await new Promise(r => setTimeout(r, 100))
+    
+    updateLoading('正在加载存档数据...', 20)
+    await playerStore.initializePlayer()
+    
+    updateLoading('正在加载角色定义...', 40)
+    await initCharacterDefs()
+    
+    updateLoading('正在加载立绘资源...', 60)
+    await new Promise(r => setTimeout(r, 200))
+    
+    updateLoading('正在初始化挂机系统...', 80)
+    idleSystem.initIdle()
+    
+    updateLoading('正在进入游戏...', 95)
+    await new Promise(r => setTimeout(r, 100))
+    
     isLoading.value = false
+    localStorage.setItem('hasLoadedBefore', 'true')
+    
     isNewPlayer.value = playerStore.isNewPlayer
     animatedSpirit.value = playerStore.spirit.toFixed(2)
     animatedStones.value = playerStore.spiritStones
     animatedCultivation.value = playerStore.cultivationPool || 0
     animatedCrystals.value = playerStore.phantomCrystals
     getMenuItems()
-    // 常驻挂机探索：玩家数据就绪后恢复并启动后台推进（离开探索页仍持续）
-    idleSystem.initIdle()
-  })
+  }
+
+  loadGame()
 
   watch(
     () => playerStore.isNewPlayer,
@@ -377,6 +418,68 @@ import SaveButton from './components/SaveButton.vue'
 </script>
 
 <style>
+  .loading-screen {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(135deg, #0D0D12 0%, #1A1A2E 50%, #16213E 100%);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 9999;
+  }
+  .loading-content {
+    text-align: center;
+    padding: 40px;
+  }
+  .loading-title {
+    font-size: 36px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 0 0 20px rgba(255, 215, 0, 0.5);
+    margin-bottom: 16px;
+    font-family: '楷体', 'KaiTi', serif;
+  }
+  .loading-subtitle {
+    font-size: 16px;
+    color: #9CA3AF;
+    margin-bottom: 24px;
+  }
+  .loading-bar-container {
+    width: 280px;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.1);
+    border-radius: 4px;
+    overflow: hidden;
+    margin: 0 auto 12px;
+    border: 1px solid rgba(255, 215, 0, 0.3);
+  }
+  .loading-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #FFD700 0%, #FFA500 50%, #FFD700 100%);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+  .loading-percent {
+    font-size: 14px;
+    color: #FFD700;
+    margin-bottom: 20px;
+  }
+  .loading-tip {
+    font-size: 12px;
+    color: #F59E0B;
+    background: rgba(245, 158, 11, 0.1);
+    padding: 12px 20px;
+    border-radius: 8px;
+    border: 1px solid rgba(245, 158, 11, 0.3);
+    max-width: 300px;
+    margin: 0 auto;
+    line-height: 1.6;
+  }
+
   .game-container {
     display: flex;
     flex-direction: column;

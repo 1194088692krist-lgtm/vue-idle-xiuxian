@@ -525,59 +525,12 @@ const LOG_CATEGORY_ORDER = {
   'drop-mythic': 4,
 }
 
-// 待显示日志队列（按分类排序后逐条释放）
-const pendingLogs = ref([])
-let logReleaseTimer = null
-
-// 从待显示队列中按分类优先级取出一条显示
-const releaseOneLog = () => {
-  if (pendingLogs.value.length === 0) return
-  // 按分类优先级排序（同分类内保持原始顺序）
-  pendingLogs.value.sort((a, b) => {
-    const ca = LOG_CATEGORY_ORDER[a.type] ?? 5
-    const cb = LOG_CATEGORY_ORDER[b.type] ?? 5
-    if (ca !== cb) return ca - cb
-    return a._seq - b._seq
-  })
-  const next = pendingLogs.value.shift()
-  if (next) {
-    logs.value.push(next)
-    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
-  }
-}
-
-let logSeq = 0
 function addLog(type, text, detail = null) {
-  if (!isIdling.value) {
-    logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
-    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
-    return
-  }
-  logSeq++
-  pendingLogs.value.push({ type, text, detail, time: new Date().toLocaleTimeString(), _seq: logSeq })
-  // 如果定时器未启动，立即显示第一条并启动定时器
-  if (!logReleaseTimer) {
-    releaseOneLog()
-    logReleaseTimer = setInterval(() => {
-      if (pendingLogs.value.length === 0) {
-        clearInterval(logReleaseTimer)
-        logReleaseTimer = null
-        return
-      }
-      releaseOneLog()
-    }, 2000)
-  }
+  logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+  if (logs.value.length > 400) logs.value = logs.value.slice(-400)
 }
 
-const flushAllPendingLogs = () => {
-  if (logReleaseTimer) {
-    clearInterval(logReleaseTimer)
-    logReleaseTimer = null
-  }
-  while (pendingLogs.value.length > 0) {
-    releaseOneLog()
-  }
-}
+const flushAllPendingLogs = () => {}
 
 // 将装备/灵宠的基础数据格式化为日志明细子行
 function formatItemDetail(item, type, rarity) {
