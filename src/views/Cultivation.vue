@@ -167,6 +167,7 @@
             [`equip-border-${selectedMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: selectedMember.equippedArtifacts?.[slot],
             [`equip-bg-${selectedMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: selectedMember.equippedArtifacts?.[slot]
           }"
+          :style="{ backgroundImage: `url(${slotBgImages[slot]})` }"
           @click="selectedMember.equippedArtifacts?.[slot] ? unequipSlot(slot) : openEquipSelect(slot)"
         >
           <div class="equip-slot-label">{{ slotNames[slot] }}</div>
@@ -500,6 +501,20 @@ const totalStrength = computed(() => teamMembers.value.reduce((sum, m) => sum + 
 // 槽位中文映射
 const slotNames = { weapon:'武器', head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带' }
 const slots = Object.keys(slotNames)
+const slotBgImages = {
+  weapon: '/assets/icons/reward_eq_weapon.png',
+  head: '/assets/icons/reward_eq_head.png',
+  body: '/assets/icons/reward_eq_body.png',
+  legs: '/assets/icons/reward_eq_legs.png',
+  feet: '/assets/icons/reward_eq_feet.png',
+  shoulder: '/assets/icons/reward_eq_shoulder.png',
+  hands: '/assets/icons/reward_eq_wrist.png',
+  wrist: '/assets/icons/reward_eq_wrist.png',
+  necklace: '/assets/icons/reward_eq_necklace.png',
+  ring1: '/assets/icons/reward_eq_ring.png',
+  ring2: '/assets/icons/reward_eq_ring.png',
+  belt: '/assets/icons/reward_eq_belt.png'
+}
 
 const rarityColorMap = {
   mortal: '#32CD32',
@@ -1627,10 +1642,13 @@ watch([allMembers, teamMembers], () => {
   transition: all 0.2s;
   min-height: 64px;
   text-align: center;
+  background-size: 32px 32px;
+  background-repeat: no-repeat;
+  background-position: center center;
 }
 .equip-slot:hover {
   border-color: rgba(218, 165, 32, 0.5);
-  background: rgba(0, 0, 0, 0.3);
+  background-color: rgba(0, 0, 0, 0.3);
 }
 .equip-slot.empty {
   border-style: dashed;

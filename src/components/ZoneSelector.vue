@@ -339,7 +339,7 @@
           <!-- 最近获得的装备（即时显示） -->
           <div v-if="idleDashboard.recentEquipment && idleDashboard.recentEquipment.length" class="dash-equipment">
             <div class="dash-equipment-title">
-              <img src="/assets/icons/reward_eq_weapon.png" class="dash-equip-icon" />
+              <span class="dash-equip-emoji">⚔️</span>
               最近获得装备（点击查看）
             </div>
             <div class="dash-equipment-list">
@@ -350,7 +350,7 @@
                 :style="{ borderColor: eq.color, color: eq.color }"
                 @click="showDashEquipment(eq)"
               >
-                <img :src="getEquipIcon(eq.type || eq.slot)" class="eq-icon" />
+                <span class="eq-emoji">{{ getEquipEmoji(eq.type || eq.slot) }}</span>
                 <span class="eq-name">{{ eq.name }}</span>
                 <span class="eq-slot">{{ eq.slotName }}</span>
                 <span class="eq-rarity">{{ eq.rarityName }}</span>
@@ -790,6 +790,24 @@ const EQUIP_ICON_MAP = {
   pet: '/assets/icons/reward_pet.png'
 }
 
+const EQUIP_EMOJI_MAP = {
+  weapon: '⚔️',
+  head: '👑',
+  body: '🦺',
+  legs: '🩳',
+  feet: '👢',
+  shoulder: '🛡️',
+  hands: '🧤',
+  wrist: '💍',
+  necklace: '📿',
+  ring1: '💍',
+  ring2: '💍',
+  belt: '🎖️',
+  artifact: '🔮',
+  equipment: '📦',
+  pet: '🐾'
+}
+
 const REWARD_TYPE_ICON_MAP = {
   spirit_stone: '/assets/icons/reward_eq_default.png',
   herb: '/assets/icons/reward_mat_herb.png',
@@ -803,6 +821,10 @@ const REWARD_TYPE_ICON_MAP = {
 
 const getEquipIcon = (slot) => {
   return EQUIP_ICON_MAP[slot] || '/assets/icons/reward_eq_default.png'
+}
+
+const getEquipEmoji = (slot) => {
+  return EQUIP_EMOJI_MAP[slot] || '📦'
 }
 
 const getRewardIcon = (type) => {
@@ -2522,6 +2544,60 @@ onUnmounted(() => {
   min-width: 36px;
   text-align: right;
   color: #aaa;
+  font-size: 11px;
+}
+
+.dash-equipment {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.dash-equipment-title {
+  font-size: 13px;
+  color: #FFD700;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: center;
+  gap: 6px;
+}
+.dash-equip-emoji {
+  font-size: 18px;
+}
+.dash-equipment-list {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.dash-equipment-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 4px 8px;
+  border-radius: 4px;
+  font-size: 12px;
+  border: 1px solid;
+  cursor: pointer;
+}
+.dash-equipment-item:hover {
+  opacity: 0.8;
+}
+.eq-emoji {
+  font-size: 16px;
+}
+.eq-name {
+  font-weight: bold;
+}
+.eq-slot {
+  color: #888;
+  font-size: 11px;
+}
+.eq-rarity {
+  color: #aaa;
+  font-size: 11px;
+}
+.eq-score {
+  margin-left: auto;
+  color: #DAA520;
   font-size: 11px;
 }
 
