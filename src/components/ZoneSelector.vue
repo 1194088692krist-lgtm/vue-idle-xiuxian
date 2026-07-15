@@ -88,7 +88,7 @@
             :key="member.id"
             class="team-member-card"
           >
-            <div class="member-avatar">
+            <div class="member-avatar" @click.stop="openAvatarViewer(member)">
               <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="member-avatar-img" :alt="member.name" />
               <span v-else>{{ member.name[0] }}</span>
               <div class="member-stars">
@@ -409,8 +409,11 @@
           class="log-line"
           :class="log.type"
         >
-          <div class="log-text">{{ log.text }}</div>
-          <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
+          <img v-if="log.avatar" :src="log.avatar" class="log-avatar" alt="" />
+          <div class="log-content">
+            <div class="log-text">{{ log.text }}</div>
+            <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
+          </div>
         </div>
       </div>
       <!-- 挂机统计 -->
@@ -499,7 +502,7 @@
                   :class="{ selected: isMemberInTeam(member.id) }"
                   @click="toggleMemberInTeam(member.id)"
                 >
-                  <div class="sect-avatar">
+                  <div class="sect-avatar" @click.stop="openAvatarViewer(member)">
                     <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="sect-avatar-img" :alt="member.name" />
                     <span v-else>{{ member.name[0] }}</span>
                   </div>
@@ -552,6 +555,21 @@
             </div>
           </div>
         </div>
+      </div>
+    </Teleport>
+
+    <!-- 全屏立绘查看器 -->
+    <Teleport to="body">
+      <div v-if="showAvatarViewer" class="avatar-fullscreen" @click="closeAvatarViewer">
+        <img
+          v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)"
+          :src="getCharacterAvatar(avatarViewerMember)"
+          class="avatar-fullscreen-img"
+          @click.stop
+        />
+        <div v-else class="avatar-fullscreen-placeholder">暂无立绘</div>
+        <div class="avatar-fullscreen-name">{{ avatarViewerMember?.name || '' }}</div>
+        <div class="avatar-fullscreen-hint">点击任意位置关闭</div>
       </div>
     </Teleport>
   </div>
@@ -637,6 +655,20 @@ const matchText = computed(() => {
   if (r >= 0.6) return '稍有压力，需注意气血'
   return 'Build 不足，挂机可能提前力竭'
 })
+
+// 全屏立绘查看器
+const showAvatarViewer = ref(false)
+const avatarViewerMember = ref(null)
+const openAvatarViewer = (member) => {
+  if (!member || !getCharacterAvatar(member)) return
+  avatarViewerMember.value = member
+  showAvatarViewer.value = true
+}
+const closeAvatarViewer = () => {
+  showAvatarViewer.value = false
+  avatarViewerMember.value = null
+}
+
 // 血条百分比
 const idleHpPercent = computed(() => {
   if (!idlePlayerMaxHP.value) return 0
@@ -1467,6 +1499,21 @@ onUnmounted(() => {
   border-left: 2px solid transparent;
   animation: logIn 0.35s ease;
   font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', sans-serif, 'Apple Color Emoji', 'Segoe UI Emoji';
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+}
+.log-avatar {
+  width: 24px;
+  height: 24px;
+  border-radius: 4px;
+  object-fit: cover;
+  flex-shrink: 0;
+  margin-top: 1px;
+}
+.log-content {
+  flex: 1;
+  min-width: 0;
 }
 .log-text { display: block; position: relative; z-index: 1; }
 @keyframes logIn {
@@ -2371,5 +2418,70 @@ onUnmounted(() => {
   text-align: right;
   color: #aaa;
   font-size: 11px;
+}
+
+/* 全屏立绘查看器 */
+.avatar-fullscreen {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.96);
+  z-index: 9999;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  animation: avatarFadeIn 0.25s ease;
+}
+
+@keyframes avatarFadeIn {
+  from { opacity: 0; }
+  to { opacity: 1; }
+}
+
+.avatar-fullscreen-img {
+  max-width: 100vw;
+  max-height: 100vh;
+  width: auto;
+  height: auto;
+  object-fit: contain;
+  cursor: default;
+  box-shadow: 0 0 40px rgba(0, 0, 0, 0.8);
+}
+
+.avatar-fullscreen-placeholder {
+  font-size: 28px;
+  color: #9e9e9e;
+  padding: 60px;
+}
+
+.avatar-fullscreen-name {
+  position: absolute;
+  top: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 20px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 2px 12px rgba(0, 0, 0, 0.9);
+  pointer-events: none;
+}
+
+.avatar-fullscreen-hint {
+  position: absolute;
+  bottom: 24px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 13px;
+  color: rgba(255, 255, 255, 0.6);
+  pointer-events: none;
+}
+
+.member-avatar,
+.sect-avatar {
+  cursor: pointer;
 }
 </style>

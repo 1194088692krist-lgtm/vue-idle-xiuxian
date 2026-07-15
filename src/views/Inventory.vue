@@ -155,7 +155,13 @@
               </div>
               <div class="card-body">
                 <p>{{ mat.description }}</p>
-                <span class="material-kind">{{ getMaterialKindName(mat.kind) }}</span>
+                <div class="material-meta">
+                  <span class="material-kind">{{ getMaterialKindName(mat.kind) }}</span>
+                  <span class="material-price">
+                    单价 {{ getMaterialUnitPrice(mat) }} 灵石
+                    <span class="material-total">总价 {{ getMaterialTotalPrice(mat) }} 灵石</span>
+                  </span>
+                </div>
               </div>
             </div>
           </div>
@@ -738,9 +744,20 @@
     special: '奇遇素材'
   }
 
+  const MATERIAL_PRICE_MAP = {
+    common: 5,
+    uncommon: 10,
+    rare: 25,
+    epic: 60,
+    legendary: 150,
+    mythic: 400
+  }
+
   const getMaterialQualityName = (mat) => materialQualityNames[mat.quality] || '普通'
   const getMaterialColor = (mat) => materialQualityColors[mat.quality] || '#9e9e9e'
   const getMaterialKindName = (kind) => materialKindNames[kind] || '素材'
+  const getMaterialUnitPrice = (mat) => MATERIAL_PRICE_MAP[mat.quality] || 5
+  const getMaterialTotalPrice = (mat) => getMaterialUnitPrice(mat) * (mat.count || 1)
 
   // 素材多选模式
   const isMaterialSelectMode = ref(false)
@@ -2046,6 +2063,26 @@
     margin-top: 4px;
     font-size: 11px;
     color: #888;
+  }
+
+  .material-meta {
+    display: flex;
+    flex-wrap: wrap;
+    align-items: center;
+    justify-content: space-between;
+    gap: 4px;
+    margin-top: 4px;
+  }
+
+  .material-price {
+    font-size: 11px;
+    color: #aaa;
+  }
+
+  .material-total {
+    margin-left: 6px;
+    color: #FFD700;
+    font-weight: bold;
   }
 
   /* 素材卖出弹窗 */

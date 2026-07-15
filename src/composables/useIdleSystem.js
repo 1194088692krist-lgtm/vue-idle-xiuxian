@@ -6,6 +6,7 @@ import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomS
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
+import { getCharacterThumbnail } from '../plugins/characters'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
@@ -563,9 +564,9 @@ const showPendingLog = () => {
   }
 }
 
-function addLog(type, text, detail = null) {
+function addLog(type, text, detail = null, avatar = null) {
   if (!isIdling.value) {
-    logs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+    logs.value.push({ type, text, detail, avatar, time: new Date().toLocaleTimeString() })
     if (logs.value.length > 400) logs.value = logs.value.slice(-400)
     return
   }
@@ -573,7 +574,7 @@ function addLog(type, text, detail = null) {
   if (pendingLogs.value.length === 0) {
     firstPendingLogTime = Date.now()
   }
-  pendingLogs.value.push({ type, text, detail, time: new Date().toLocaleTimeString() })
+  pendingLogs.value.push({ type, text, detail, avatar, time: new Date().toLocaleTimeString() })
 
   if (!logDisplayTimer) {
     showPendingLog()
@@ -1215,8 +1216,9 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
       if (extras.length > 0 || damageInfo) {
         text += '（' + [...extras, damageInfo].filter(Boolean).join('·') + '）'
       }
-      
-      addLog('combat', text)
+
+      const avatarUrl = getCharacterThumbnail(member)
+      addLog('combat', text, null, avatarUrl)
     }
   } else {
     const actions = 2 + (enemy.tier !== 'normal' ? 1 : 0)

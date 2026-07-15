@@ -438,17 +438,32 @@ zones.forEach(zone => {
   )
 })
 
+// 各秘境灵石消耗配置（按 游历/试炼/凶险/绝境/灭世 五档）
+// 迷雾谷为基准，其余按比例
+const MISTY_VALLEY_COSTS = [50, 100, 150, 200, 250]
+const ZONE_COST_MULTIPLIER = {
+  forest_edge: 0,        // 青萝林：无消耗
+  misty_valley: 1,       // 迷雾谷：基准
+  phoenix_cave: 1.2,     // 凤凰窟
+  dragon_abyss: 1.5,     // 龙渊
+  ghost_wasteland: 1.8,  // 鬼荒原
+  ice_palace: 2,         // 冰雪宫
+  immortal_ruins: 3,     // 仙墟
+  chaos_realm: 5         // 混沌界
+}
+
 // 为每张秘境生成内置的 5 档难度（八图全开，minLevel 统一为 1）
 zones.forEach(zone => {
   const baseAtk = zone.recommendedStats.attack
   const baseHp = zone.recommendedStats.health
   const baseRM = zone.rewardMultiplier
   const baseBuild = ZONE_BUILD_BASE[zone.id] || 0
-  zone.difficulties = DIFFICULTY_TEMPLATES.map(t => ({
+  const costMult = ZONE_COST_MULTIPLIER[zone.id] ?? 1
+  zone.difficulties = DIFFICULTY_TEMPLATES.map((t, idx) => ({
     key: t.key,
     label: t.label,
     color: t.color,
-    spiritCost: t.cost,
+    spiritCost: costMult === 0 ? 0 : Math.round(MISTY_VALLEY_COSTS[idx] * costMult),
     rewardMultiplier: Math.round(baseRM * t.rmMul * 100) / 100,
     enemyScale: t.scale,
     dropBonus: t.drop,
