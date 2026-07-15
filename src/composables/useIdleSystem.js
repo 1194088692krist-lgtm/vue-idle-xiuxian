@@ -564,9 +564,9 @@ const showPendingLog = () => {
   }
 }
 
-function addLog(type, text, detail = null, avatar = null) {
+function addLog(type, text, detail = null, avatar = null, parts = null) {
   if (!isIdling.value) {
-    logs.value.push({ type, text, detail, avatar, time: new Date().toLocaleTimeString() })
+    logs.value.push({ type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
     if (logs.value.length > 400) logs.value = logs.value.slice(-400)
     return
   }
@@ -574,7 +574,7 @@ function addLog(type, text, detail = null, avatar = null) {
   if (pendingLogs.value.length === 0) {
     firstPendingLogTime = Date.now()
   }
-  pendingLogs.value.push({ type, text, detail, avatar, time: new Date().toLocaleTimeString() })
+  pendingLogs.value.push({ type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
 
   if (!logDisplayTimer) {
     showPendingLog()
@@ -661,24 +661,32 @@ function pickRarityByWeight(rarityList, weightMap) {
 
 // 各品质掉落的日志文案（越稀有描写越华丽）。plain 单独走普通格式。
 const DROP_TEXT = {
-  uncommon:  { icon: '🌿', word: '获得', flair: '，微光初绽' },
-  rare:      { icon: '💎', word: '获得', flair: '，蓝光流转' },
-  spiritual: { icon: '🌿', word: '收服', flair: '，灵光乍现' },
-  epic:      { icon: '🌟', word: '获得', flair: '，紫气东来' },
-  mystic:    { icon: '✨', word: '收服', flair: '，玄光环绕' },
-  legendary: { icon: '🔥', word: '获得', flair: '，金光万丈，天地同贺' },
-  celestial: { icon: '🌟', word: '收服', flair: '，仙光普照' },
-  mythic:    { icon: '⚡', word: '获得', flair: '，神辉冲霄，异象惊世' },
-  divine:    { icon: '🔆', word: '收服', flair: '，神兽降世，瑞彩千条' }
+  uncommon:  { word: '获得', flair: '，微光初绽' },
+  rare:      { word: '获得', flair: '，蓝光流转' },
+  spiritual: { word: '收服', flair: '，灵光乍现' },
+  epic:      { word: '获得', flair: '，紫气东来' },
+  mystic:    { word: '收服', flair: '，玄光环绕' },
+  legendary: { word: '获得', flair: '，金光万丈，天地同贺' },
+  celestial: { word: '收服', flair: '，仙光普照' },
+  mythic:    { word: '获得', flair: '，神辉冲霄，异象惊世' },
+  divine:    { word: '收服', flair: '，神兽降世，瑞彩千条' }
 }
 
-function buildDropText(reward, info) {
+function buildDropParts(reward, info) {
   const rarity = reward.rarity
+  const iconUrl = REWARD_ICON_MAP[reward.slot] || REWARD_ICON_MAP[reward.type] || null
   if (rarity === 'common' || rarity === 'mortal') {
-    return `⚔️ ${reward.type === 'pet' ? '收服' : '获得'}【${reward.name}】（${info.name}）`
+    const word = reward.type === 'pet' ? '收服' : '获得'
+    return [
+      { icon: iconUrl, text: '' },
+      { icon: null, text: `${word}【${reward.name}】（${info.name}）` }
+    ]
   }
   const t = DROP_TEXT[rarity] || DROP_TEXT.uncommon
-  return `${t.icon} ${t.word}【${reward.name}】${t.flair}！`
+  return [
+    { icon: iconUrl, text: '' },
+    { icon: null, text: `${t.word}【${reward.name}】${t.flair}！` }
+  ]
 }
 
 // 合并难度参数，生成一个「有效区域」供战斗/奖励逻辑使用
@@ -1148,7 +1156,7 @@ const REWARD_ICON_MAP = {
   legs: '/assets/icons/reward_eq_legs.png',
   feet: '/assets/icons/reward_eq_feet.png',
   shoulder: '/assets/icons/reward_eq_shoulder.png',
-  hands: '/assets/icons/reward_eq_weapon.png',
+  hands: '/assets/icons/reward_eq_wrist.png',
   wrist: '/assets/icons/reward_eq_wrist.png',
   necklace: '/assets/icons/reward_eq_necklace.png',
   ring1: '/assets/icons/reward_eq_ring.png',
@@ -1163,7 +1171,10 @@ const REWARD_ICON_MAP = {
   core: '/assets/icons/reward_mat_core.png',
   pet_fragment: '/assets/icons/reward_mat_pet_fragment.png',
   phantom_crystal: '/assets/icons/reward_mat_phantom_crystal.png',
-  monster: '/assets/icons/reward_monster.png'
+  monster: '/assets/icons/reward_monster.png',
+  spirit_stone: '/assets/icons/reward_eq_default.png',
+  cultivation: '/assets/icons/reward_eq_default.png',
+  fortune: '/assets/icons/reward_eq_default.png'
 }
 
 function showTreasureFlash(reward) {
@@ -1188,7 +1199,7 @@ function showTreasureFlash(reward) {
   const title = flashTitles[tier] || '宝物现世！'
   const desc = flashDescs[tier] || `获得${info.name}${kind}！`
   const icon = isPet ? '🐉' : '⚔️'
-  const iconImage = REWARD_ICON_MAP[reward.type] || REWARD_ICON_MAP[reward.slot] || null
+  const iconImage = REWARD_ICON_MAP[reward.slot] || REWARD_ICON_MAP[reward.type] || null
   const duration = 5000
   treasureFlash.value = { show: true, tier, title, desc, icon, iconImage, color: info.color }
   flashTimer = setTimeout(() => { treasureFlash.value.show = false }, duration)
@@ -1324,7 +1335,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
       const detail = formatItemDetail(r.item, r.type, r.rarity)
       const rarity = r.rarity
       const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
-      addLog(cls, buildDropText(r, info), detail)
+      addLog(cls, '', detail, null, buildDropParts(r, info))
       showTreasureFlash(r)
     }
 
@@ -1333,35 +1344,41 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
       const detail = formatItemDetail(r.item, r.type, r.rarity)
       const rarity = r.rarity
       const cls = (rarity === 'common' || rarity === 'mortal') ? 'reward-normal' : 'drop-' + rarity
-      addLog(cls, buildDropText(r, info), detail)
+      addLog(cls, '', detail, null, buildDropParts(r, info))
       showTreasureFlash(r)
     }
 
     for (const r of bossMaterialRewards) {
-      addLog('drop-rare', `👑 获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！`)
+      addLog('drop-rare', '', null, null, [
+        { icon: '/assets/icons/reward_mat_core.png', text: '' },
+        { icon: null, text: `获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！` }
+      ])
       showTreasureFlash(r)
     }
 
     for (const r of fortuneRewards) {
-      addLog('fortune', pick(FORTUNE_LINES)(r.material?.name || r.name))
+      addLog('fortune', '', null, null, [
+        { icon: '/assets/icons/reward_mat_core.png', text: '' },
+        { icon: null, text: pick(FORTUNE_LINES)(r.material?.name || r.name) }
+      ])
       showTreasureFlash(r)
     }
 
     if (materialRewards.length > 0 || currencyRewards.length > 0) {
       const materialParts = []
       for (const r of materialRewards) {
-        const icons = { herb: '🌿', ore: '⛏️', liquid: '💧', core: '💎', pet_fragment: '🌟', phantom_crystal: '✨' }
+        const iconUrls = { herb: '/assets/icons/reward_mat_herb.png', ore: '/assets/icons/reward_mat_ore.png', liquid: '/assets/icons/reward_mat_liquid.png', core: '/assets/icons/reward_mat_core.png', pet_fragment: '/assets/icons/reward_mat_pet_fragment.png', phantom_crystal: '/assets/icons/reward_mat_phantom_crystal.png' }
         const names = { herb: '灵草', ore: '矿料', liquid: '灵液', core: '妖兽内丹', pet_fragment: '升星碎片', phantom_crystal: '幻灵结晶' }
-        materialParts.push(`${icons[r.type] || '🎁'} ${r.amount} ${names[r.type] || r.name}`)
+        materialParts.push({ icon: iconUrls[r.type], text: `${r.amount} ${names[r.type] || r.name}` })
       }
       for (const r of currencyRewards) {
         if (r.type === 'spirit_stone') {
-          materialParts.push(`💰 ${r.amount} 灵石`)
+          materialParts.push({ icon: null, text: `${r.amount} 灵石` })
         } else if (r.type === 'cultivation') {
-          materialParts.push(`📈 ${r.amount} 修为`)
+          materialParts.push({ icon: null, text: `${r.amount} 修为` })
         }
       }
-      addLog('reward-normal', `🎁 获得：${materialParts.join('，')}！`)
+      addLog('reward-normal', '获得：', null, null, materialParts)
     }
 
   } else {

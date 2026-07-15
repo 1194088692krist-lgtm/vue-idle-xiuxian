@@ -33,7 +33,8 @@
       >
         <div class="zone-banner" :style="{ borderTopColor: zone.difficultyColor }">
           <div class="zone-icon-area">
-            <span class="zone-icon">{{ getZoneIcon(zone.id) }}</span>
+            <img v-if="zone.image" :src="zone.image" class="zone-icon-img" :alt="zone.name" />
+            <span v-else class="zone-icon">{{ getZoneIcon(zone.id) }}</span>
           </div>
           <div class="zone-difficulty-badge" :style="{ backgroundColor: zone.difficultyColor }">
             {{ zone.difficultyLabel }}
@@ -56,7 +57,11 @@
     <div v-if="selectedZone" class="zone-detail glass-card">
       <div class="detail-header">
         <div>
-          <h3 class="detail-title">{{ getZoneIcon(selectedZone.id) }} {{ selectedZone.name }}</h3>
+          <h3 class="detail-title">
+            <img v-if="selectedZone.image" :src="selectedZone.image" class="detail-zone-icon" :alt="selectedZone.name" />
+            <span v-else>{{ getZoneIcon(selectedZone.id) }}</span>
+            {{ selectedZone.name }}
+          </h3>
           <p class="detail-desc">{{ selectedZone.description }}</p>
         </div>
         <div class="difficulty-badge" :style="{ backgroundColor: selectedZone.difficultyColor }">
@@ -169,6 +174,7 @@
         <div class="rewards-title">可能获得的报酬</div>
         <div class="rewards-list">
           <div v-for="rw in selectedZone.rewards" :key="rw.name" class="reward-row">
+            <img :src="getRewardIcon(rw.type)" class="reward-icon" :alt="rw.name" />
             <span class="reward-name">{{ rw.name }}</span>
             <div class="reward-bar-wrap">
               <div class="reward-bar" :style="{ width: rw.chance * 100 + '%' }"></div>
@@ -332,7 +338,10 @@
           </div>
           <!-- 最近获得的装备（即时显示） -->
           <div v-if="idleDashboard.recentEquipment && idleDashboard.recentEquipment.length" class="dash-equipment">
-            <div class="dash-equipment-title">⚔️ 最近获得装备（点击查看）</div>
+            <div class="dash-equipment-title">
+              <img src="/assets/icons/reward_eq_weapon.png" class="dash-equip-icon" />
+              最近获得装备（点击查看）
+            </div>
             <div class="dash-equipment-list">
               <div
                 v-for="eq in idleDashboard.recentEquipment"
@@ -341,6 +350,7 @@
                 :style="{ borderColor: eq.color, color: eq.color }"
                 @click="showDashEquipment(eq)"
               >
+                <img :src="getEquipIcon(eq.type || eq.slot)" class="eq-icon" />
                 <span class="eq-name">{{ eq.name }}</span>
                 <span class="eq-slot">{{ eq.slotName }}</span>
                 <span class="eq-rarity">{{ eq.rarityName }}</span>
@@ -413,7 +423,15 @@
         >
           <img v-if="log.avatar" :src="log.avatar" class="log-avatar" alt="" />
           <div class="log-content">
-            <div class="log-text">{{ log.text }}</div>
+            <div class="log-text">
+              <template v-if="log.parts">
+                <span v-for="(part, idx) in log.parts" :key="idx">
+                  <img v-if="part.icon" :src="part.icon" class="log-inline-icon" :alt="part.text" />
+                  {{ part.text || '' }}
+                </span>
+              </template>
+              <template v-else>{{ log.text }}</template>
+            </div>
             <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
           </div>
         </div>
@@ -754,6 +772,43 @@ const getZoneIcon = (id) => {
   return icons[id] || '⛰️'
 }
 
+const EQUIP_ICON_MAP = {
+  weapon: '/assets/icons/reward_eq_weapon.png',
+  head: '/assets/icons/reward_eq_head.png',
+  body: '/assets/icons/reward_eq_body.png',
+  legs: '/assets/icons/reward_eq_legs.png',
+  feet: '/assets/icons/reward_eq_feet.png',
+  shoulder: '/assets/icons/reward_eq_shoulder.png',
+  hands: '/assets/icons/reward_eq_wrist.png',
+  wrist: '/assets/icons/reward_eq_wrist.png',
+  necklace: '/assets/icons/reward_eq_necklace.png',
+  ring1: '/assets/icons/reward_eq_ring.png',
+  ring2: '/assets/icons/reward_eq_ring.png',
+  belt: '/assets/icons/reward_eq_belt.png',
+  artifact: '/assets/icons/reward_eq_artifact.png',
+  equipment: '/assets/icons/reward_eq_default.png',
+  pet: '/assets/icons/reward_pet.png'
+}
+
+const REWARD_TYPE_ICON_MAP = {
+  spirit_stone: '/assets/icons/reward_eq_default.png',
+  herb: '/assets/icons/reward_mat_herb.png',
+  ore: '/assets/icons/reward_mat_ore.png',
+  liquid: '/assets/icons/reward_mat_liquid.png',
+  fortune: '/assets/icons/reward_mat_core.png',
+  cultivation: '/assets/icons/reward_eq_default.png',
+  equipment: '/assets/icons/reward_eq_default.png',
+  pet: '/assets/icons/reward_pet.png'
+}
+
+const getEquipIcon = (slot) => {
+  return EQUIP_ICON_MAP[slot] || '/assets/icons/reward_eq_default.png'
+}
+
+const getRewardIcon = (type) => {
+  return REWARD_TYPE_ICON_MAP[type] || '/assets/icons/reward_eq_default.png'
+}
+
 // 当前选中难度信息
 const currentDifficulty = computed(() =>
   selectedZone.value ? getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value) : null
@@ -984,6 +1039,23 @@ onUnmounted(() => {
 }
 .zone-icon-area {
   font-size: 28px;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+}
+.zone-icon-img {
+  width: 48px;
+  height: 48px;
+  object-fit: cover;
+  border-radius: 4px;
+}
+.detail-zone-icon {
+  width: 28px;
+  height: 28px;
+  object-fit: cover;
+  border-radius: 4px;
+  vertical-align: middle;
+  margin-right: 8px;
 }
 .zone-difficulty-badge {
   position: absolute;
@@ -1176,8 +1248,14 @@ onUnmounted(() => {
   gap: 8px;
   font-size: 12px;
 }
+.reward-icon {
+  width: 18px;
+  height: 18px;
+  object-fit: contain;
+  flex-shrink: 0;
+}
 .reward-name {
-  width: 80px;
+  width: 70px;
   color: #ccc;
 }
 .reward-bar-wrap {
@@ -1520,6 +1598,14 @@ onUnmounted(() => {
   object-fit: cover;
   flex-shrink: 0;
   margin-top: 1px;
+}
+.log-inline-icon {
+  width: 16px;
+  height: 16px;
+  object-fit: contain;
+  vertical-align: middle;
+  margin-right: 4px;
+  margin-left: 4px;
 }
 .log-content {
   flex: 1;
