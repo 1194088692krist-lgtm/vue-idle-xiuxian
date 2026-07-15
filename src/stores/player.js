@@ -36,8 +36,8 @@ export const usePlayerStore = defineStore('player', {
     isNewPlayer: true,
     // GM模式开关
     isGMMode: false,
-    // 主题设置
-    isDarkMode: localStorage.getItem('darkMode') === null ? true : localStorage.getItem('darkMode') === 'true',
+    // 主题设置：默认暗色模式
+    isDarkMode: localStorage.getItem('darkMode') !== 'false',
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）

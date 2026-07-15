@@ -179,28 +179,35 @@ import SaveButton from './components/SaveButton.vue'
 
   async function loadGame() {
     isFirstLoad.value = !localStorage.getItem('hasLoadedBefore')
-    
+
+    // 默认暗色模式：未设置时强制应用
+    if (localStorage.getItem('darkMode') === null) {
+      localStorage.setItem('darkMode', 'true')
+      playerStore.isDarkMode = true
+    }
+    document.documentElement.classList.toggle('dark', playerStore.isDarkMode)
+
     updateLoading('正在初始化游戏引擎...', 5)
     await new Promise(r => setTimeout(r, 100))
-    
+
     updateLoading('正在加载存档数据...', 20)
     await playerStore.initializePlayer()
-    
+
     updateLoading('正在加载角色定义...', 40)
     await initCharacterDefs()
-    
+
     updateLoading('正在加载立绘资源...', 60)
     await new Promise(r => setTimeout(r, 200))
-    
+
     updateLoading('正在初始化挂机系统...', 80)
     idleSystem.initIdle()
-    
+
     updateLoading('正在进入游戏...', 95)
     await new Promise(r => setTimeout(r, 100))
-    
+
     isLoading.value = false
     localStorage.setItem('hasLoadedBefore', 'true')
-    
+
     isNewPlayer.value = playerStore.isNewPlayer
     animatedSpirit.value = playerStore.spirit.toFixed(2)
     animatedStones.value = playerStore.spiritStones

@@ -1704,11 +1704,9 @@ function startIdle(durationMinutes) {
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
   logs.value = []
-  pendingLogs.value = []
-  logSeq = 0
   currentEncounterSummary.value = null
   idleBuffs.value = []
-  
+
   const team = s.getTeamMembersDetail()
   teamMemberStates.value = team.map(member => {
     let maxHP = member.baseStats?.health || 0
@@ -1848,8 +1846,6 @@ function initIdle() {
       idlePlayerHP.value = probe.stats.maxHealth
       runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
       logs.value = []
-      pendingLogs.value = []
-      logSeq = 0
       startIdleTimers()
       processOfflineIdle()
     } else {
