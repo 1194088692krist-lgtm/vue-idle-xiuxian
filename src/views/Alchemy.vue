@@ -700,11 +700,13 @@
 
   // ===== 装备锻打相关 =====
   const allEquipments = computed(() => {
-    return [...playerStore.equipment, ...playerStore.inventory]
+    const equipped = Object.values(playerStore.equippedArtifacts).filter(e => e)
+    const inventory = playerStore.items.filter(i => i.type === 'equipment' || (i.slot && ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact'].includes(i.slot)))
+    return [...equipped, ...inventory]
   })
 
   const inventoryEquipments = computed(() => {
-    return playerStore.inventory
+    return playerStore.items.filter(i => i.type === 'equipment' || (i.slot && ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact'].includes(i.slot)))
   })
 
   const selectForgeEquip = (equip) => {

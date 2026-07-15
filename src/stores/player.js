@@ -1082,6 +1082,62 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: '洗练成功' }
     },
+    reforgeEquipmentPreview(equipment, mode = 'all', targetStat = null) {
+      let targetEquip = equipment
+      if (!this.items.find(i => i.id === equipment.id)) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipment.id) {
+            targetEquip = this.equippedArtifacts[slot]
+            break
+          }
+        }
+      }
+      if (!targetEquip) {
+        return { success: false, message: '装备不存在' }
+      }
+      if (this.refinementStones < enhanceConfig.costPerAttempt) {
+        return { success: false, message: '洗练石不足' }
+      }
+      if (mode === 'single' && !targetStat) {
+        return { success: false, message: '请选择要洗练的词条' }
+      }
+      const usedSafe = this.reforgeSafeCharges > 0
+      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat)
+      if (!result.success) {
+        return result
+      }
+      return {
+        success: true,
+        newStats: result.newStats,
+        wasSafe: usedSafe,
+        oldStats: result.oldStats
+      }
+    },
+    reforgeEquipmentConfirm(equipment, newStats) {
+      let targetEquip = equipment
+      if (!this.items.find(i => i.id === equipment.id)) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipment.id) {
+            targetEquip = this.equippedArtifacts[slot]
+            break
+          }
+        }
+      }
+      if (!targetEquip) {
+        return { success: false, message: '装备不存在' }
+      }
+      if (this.refinementStones < enhanceConfig.costPerAttempt) {
+        return { success: false, message: '洗练石不足' }
+      }
+      targetEquip.stats = { ...newStats }
+      this.refinementStones -= enhanceConfig.costPerAttempt
+      const usedSafe = this.reforgeSafeCharges > 0
+      if (usedSafe) {
+        this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
+      }
+      this.queueSave()
+      return { success: true, message: '洗练成功' }
+    },
     // 批量出售装备（按当前筛选，统一折算为灵石）
     async batchSellEquipments(quality = null, equipmentType = null) {
       const toSell = this.items.filter(item => {
