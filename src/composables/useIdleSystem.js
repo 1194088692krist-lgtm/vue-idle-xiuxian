@@ -1227,8 +1227,8 @@ function showTreasureFlash(reward) {
   }
   const title = flashTitles[tier] || '宝物现世！'
   const desc = flashDescs[tier] || `获得${info.name}${kind}！`
-  const icon = REWARD_EMOJI_MAP[reward.slot] || REWARD_EMOJI_MAP[reward.type] || (isPet ? '🐉' : '⚔️')
-  const iconImage = null
+  const icon = isPet ? '🐉' : '⚔️'
+  const iconImage = REWARD_ICON_MAP[reward.slot] || REWARD_ICON_MAP[reward.type] || null
   const duration = 5000
   treasureFlash.value = { show: true, tier, title, desc, icon, iconImage, color: info.color }
   flashTimer = setTimeout(() => { treasureFlash.value.show = false }, duration)
