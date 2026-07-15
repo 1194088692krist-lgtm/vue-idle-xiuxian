@@ -10,8 +10,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <h2>🆕 近期（最近 2 天）海量更新摘要</h2>
 
+<table>
 <tr><td>模块</td><td>关键改动</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th></tr>
@@ -114,7 +114,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
    挂机队伍协同战斗 + 小剧场增益 → 挑战更高秘境更高难度 → 更优掉落 → 反哺成长
 
-</code></pre>
+</pre>
 
 <strong>最重要的一条认知</strong>：等级（修炼层数）本身<strong>不直接增加</strong>攻击/生命等战斗数值。真正让你变强的是 <strong>角色阵容、装备 Build、灵宠、套装、丹药永久加成、转生</strong>。等级的作用是：
 
@@ -152,7 +152,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <ul>
 
-<li>出战队伍最多 <strong>5 人</strong>，从宗门成员中编队；挂机时按队伍总 Build 强度结算战斗；</li>
+<li>出战队伍最多 <strong>3 人</strong>，从宗门成员中编队；挂机时按队伍总 Build 强度结算战斗；</li>
 
 </ul>
 
@@ -222,7 +222,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 角色Build = (基础属性分 + Σ装备评分 + 灵宠分 + 套装激活分) × (1 + (等级-1)×0.02)
 
-</code></pre>
+</pre>
 
 <ul>
 
@@ -278,8 +278,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 每个角色拥有一个<strong>定位（role）</strong>，影响挂机战斗中的行动描写与小剧场表现。定位名称采用修仙风命名，但可直观对应传统 RPG 角色：
 
+<table>
 <tr><td>定位</td><td>修仙名</td><td>图标</td><td>对应传统定位</td><td>说明</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -336,7 +336,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 掌阵：在后方掐指推算，指点道：「左翼包抄，中军压上！」……
 
-</code></pre>
+</pre>
 
 <blockquote>气血耗尽的角色会显示「气血耗尽，无法参战……」并跳过行动。</blockquote>
 
@@ -344,8 +344,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <h2>4. 资源体系一览</h2>
 
+<table>
 <tr><td>资源</td><td>来源</td><td>用途</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th></tr>
@@ -376,8 +376,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <strong>装备分解产出</strong>（</code>QUALITY_STONE_MAP<code>）：
 
+<table>
 <tr><td>品质</td><td>强化石</td><td>洗练石</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th></tr>
@@ -430,8 +430,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 人物修为分为四个阶段，共 <strong>126 级</strong>：
 
+<table>
 <tr><td>阶段</td><td>境界范围</td><td>等级范围</td><td>特点</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -458,12 +458,12 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 升级经验 = floor(100 × 1.15^(等级-1))
 
-</code></pre>
+</pre>
 
 代表等级的升级经验：
 
+<table>
 <tr><td>等级</td><td>境界</td><td>升级经验</td></tr>
-
 <thead>
 
 <tr><th>---:</th><th>---</th><th>---:</th></tr>
@@ -524,7 +524,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 阶段倍率 = { 前期:1, 中期:3, 后期:10, 终局:30 }
 
-</code></pre>
+</pre>
 
 <h3>5.5 每级基础数值提升</h3>
 
@@ -540,14 +540,14 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 速度 += floor(0.5 × 1.08^(等级-1))
 
-</code></pre>
+</pre>
 
 <h3>5.6 BOSS专属素材</h3>
 
 每个地图有两个专属BOSS，击败后有10%~20%概率掉落突破素材。需要选择<strong>凶险及以上难度</strong>才有概率遇到：
 
+<table>
 <tr><td>遇到概率</td><td>凶险</td><td>绝境</td><td>灭世</td></tr>
-
 <thead>
 
 <tr><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
@@ -560,8 +560,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 各地图BOSS素材：
 
+<table>
 <tr><td>等级</td><td>地图</td><td>素材1</td><td>素材2</td></tr>
-
 <thead>
 
 <tr><th>---:</th><th>---</th><th>---</th><th>---</th></tr>
@@ -600,7 +600,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
   修炼效率 +10%N    灵力效率 +10%N
 
-</code></pre>
+</pre>
 
 <ul>
 
@@ -626,8 +626,8 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <h3>7.1 装备品质（rarity）</h3>
 
+<table>
 <tr><td>品质</td><td>名称</td><td>颜色</td><td>评分倍率</td><td>词条数</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -660,7 +660,7 @@ ring1 戒指 / ring2 戒指 / belt 腰带    ← 共 12 槽，宗门成员可装
 
 artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
-</code></pre>
+</pre>
 
 <h3>7.3 词缀（affix）与品质倍率</h3>
 
@@ -686,14 +686,14 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 装备评分 = round( (基础分 + 词条分 + 套装分) × 品质倍率 × (1 + 强化等级×0.1) )
 
-</code></pre>
+</pre>
 
 <h3>7.4 套装（setBonuses）</h3>
 
 集齐同套装多件触发百分比加成：
 
+<table>
 <tr><td>套装件数</td><td>Build 加成分</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th></tr>
@@ -714,8 +714,8 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <h3>7.5 套装详细数据</h3>
 
+<table>
 <tr><td>套装</td><td>部位</td><td>2件效果</td><td>3件效果</td><td>4件效果</td><td>5件效果</td><td>特点</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -752,7 +752,7 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 Build强度 = Σ(每件已装备评分) + Σ(套装激活分)
 
-</code></pre>
+</pre>
 
 <ul>
 
@@ -768,8 +768,8 @@ Build强度 = Σ(每件已装备评分) + Σ(套装激活分)
 
 <h3>7.6 Build 强度参考阶梯（BUILD_TIERS）</h3>
 
+<table>
 <tr><td>档位</td><td>名称</td><td>参考 Build</td><td>含义</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -830,7 +830,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 最终加成 = 基础 + 星 + 等级 + 阶位（战斗属性取一半）
 
-</code></pre>
+</pre>
 
 <h3>8.1 灵宠操作</h3>
 
@@ -878,10 +878,10 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 返还精华 = 稀有度基础 + 等级×2 + 星级×5
 
-</code></pre>
+</pre>
 
+<table>
 <tr><td>灵宠品质</td><td>基础返还精华</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---:</th></tr>
@@ -964,8 +964,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <strong>小剧场示例</strong>：
 
+<table>
 <tr><td>小剧场</td><td>buff 类型</td><td>效果</td><td>持续</td><td>性质</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -1034,8 +1034,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 各秘境「凶险(标准)档」的掉落配置：
 
+<table>
 <tr><td>秘境</td><td>难度</td><td>奖励倍率</td><td>装备掉率</td><td>装备品质</td><td>灵宠掉率</td><td>灵宠品质</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---:</th><th>---:</th><th>---</th><th>---:</th><th>---</th></tr>
@@ -1068,7 +1068,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 匹配度 = 队伍总Build强度 ÷ 推荐Build
 
-</code></pre>
+</pre>
 
 <ul>
 
@@ -1090,8 +1090,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <h3>9.6 五档难度系数</h3>
 
+<table>
 <tr><td>难度</td><td>名称</td><td>缩放</td><td>奖励倍率</td><td>每场耗灵石</td><td>掉落加成系数</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
@@ -1116,8 +1116,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </code>ZONE_BUILD_BASE<code>（凶险档推荐 Build）与分区推荐属性：
 
+<table>
 <tr><td>秘境</td><td>难度</td><td>推荐攻击</td><td>推荐生命</td><td>凶险推荐Build</td><td>游历</td><td>试炼</td><td>绝境</td><td>灭世</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
@@ -1178,8 +1178,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 抽卡<strong>不一定 100% 抽到人物</strong>。人物概率 10%~25%，其余为灵石、装备、素材等。
 
+<table>
 <tr><td>奖池</td><td>单次消耗幻灵结晶</td><td>人物概率</td><td>装备概率</td><td>灵宠概率</td><td>资源概率</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
@@ -1208,7 +1208,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 5星 = 3%    4星 = 20%    3星 = 77%
 
-</code></pre>
+</pre>
 
 <h3>11.3 保底机制</h3>
 
@@ -1258,7 +1258,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 3★ → 30 碎片    4★ → 60 碎片    5★ → 70 碎片
 
-</code></pre>
+</pre>
 
 <hr>
 
@@ -1266,8 +1266,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 丹药按「品阶 grade (1~9)」决定<strong>基础成功率</strong>（一品 90% → 九品 10%）与材料需求。按功能分四类，效果随等级放大：
 
+<table>
 <tr><td>类型</td><td>倍率</td><td>代表丹药</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th></tr>
@@ -1286,8 +1286,8 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <strong>关键丹药</strong>：
 
+<table>
 <tr><td>丹药</td><td>功能</td><td>效果</td></tr>
-
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th></tr>
@@ -1344,7 +1344,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 9) 最终减伤：伤害 ×= (1 − 最终减伤)
 
-</code></pre>
+</pre>
 
 <ul>
 
@@ -1386,7 +1386,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>宗门：用综合池/人物池抽角色组队，5 人满编；新手福利 20,000 幻灵结晶开局抽卡；</li>
+<li>宗门：用综合池/人物池抽角色组队，3 人满编；新手福利 20,000 幻灵结晶开局抽卡；</li>
 
 </ul>
 
@@ -1658,7 +1658,7 @@ buff持续 = duration 场遭遇，每场 -1，归零失效
 
 闪避 = 守方闪避 − 攻方抗闪避；  反击 = 守方反击 − 攻方抗反击
 
-</code></pre>
+</pre>
 
 <hr>
 

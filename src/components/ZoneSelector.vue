@@ -763,13 +763,37 @@ const useBattlePill = (pill) => {
   }
 }
 
-// 修复：挂机日志自动滚动到底部
+// 智能滚动：用户手动滚动时不强制回到底部
 const idleLogRef = ref(null)
+const userScrolling = ref(false)
+let userScrollTimer = null
+
+const isAtBottom = () => {
+  if (!idleLogRef.value) return true
+  const el = idleLogRef.value
+  return el.scrollTop + el.clientHeight >= el.scrollHeight - 10
+}
+
+const handleScroll = () => {
+  if (!isAtBottom()) {
+    userScrolling.value = true
+    if (userScrollTimer) clearTimeout(userScrollTimer)
+    userScrollTimer = setTimeout(() => {
+      userScrolling.value = false
+    }, 5000)
+  } else {
+    userScrolling.value = false
+    if (userScrollTimer) clearTimeout(userScrollTimer)
+  }
+}
+
 watch(
   () => displayLogs.value.length,
   () => {
     nextTick(() => {
-      if (idleLogRef.value) idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
+      if (idleLogRef.value && !userScrolling.value) {
+        idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
+      }
     })
   }
 )
@@ -804,9 +828,17 @@ onMounted(() => {
   if (selectedZone.value && !selectedDifficultyKey.value) {
     setDifficulty(selectedZone.value.difficulties[2].key)
   }
+  nextTick(() => {
+    if (idleLogRef.value) {
+      idleLogRef.value.addEventListener('scroll', handleScroll)
+    }
+  })
 })
 onUnmounted(() => {
-  // 挂机计时器由 useIdleSystem 单例常驻管理，组件卸载不清理（实现离开页面仍后台挂机）
+  if (idleLogRef.value) {
+    idleLogRef.value.removeEventListener('scroll', handleScroll)
+  }
+  if (userScrollTimer) clearTimeout(userScrollTimer)
 })
 </script>
 
