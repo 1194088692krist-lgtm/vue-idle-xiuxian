@@ -17,7 +17,10 @@ const ores = [
   { id: 'dark_iron_marrow', name: '玄铁髓', description: '玄铁精髓，锻骨丹核心辅材', quality: 'uncommon', baseValue: 28, zoneMin: 2, chance: 0.2 },
   { id: 'spirit_quench_sand', name: '淬灵砂', description: '淬炼灵气的神砂，强化丹主料', quality: 'uncommon', baseValue: 30, zoneMin: 2, chance: 0.18 },
   { id: 'tribulation_thunder_stone', name: '雷劫石', description: '雷劫淬炼之石，渡厄丹必需要件', quality: 'rare', baseValue: 60, zoneMin: 5, chance: 0.5 },
-  { id: 'dao_essence_stone', name: '道蕴石', description: '蕴含大道纹路的奇石，悟道丹辅料', quality: 'rare', baseValue: 65, zoneMin: 5, chance: 0.4 }
+  { id: 'dao_essence_stone', name: '道蕴石', description: '蕴含大道纹路的奇石，悟道丹辅料', quality: 'rare', baseValue: 65, zoneMin: 5, chance: 0.4 },
+  { id: 'common_enhance_stone', name: '普通强化石', description: '蕴含微弱灵力的灵石，可用于装备强化+1~+4', quality: 'common', baseValue: 50, zoneMin: 1, chance: 0.2 },
+  { id: 'advanced_enhance_stone', name: '高级强化石', description: '蕴含精纯灵力的灵石，可用于装备强化+5~+8，需龙渊以上地图获取', quality: 'rare', baseValue: 200, zoneMin: 5, chance: 0.3 },
+  { id: 'supreme_enhance_stone', name: '至尊强化石', description: '蕴含至强灵力的神石，可用于装备强化+9~+12，仅分解仙品以上装备概率获得', quality: 'legendary', baseValue: 1000, zoneMin: null, chance: 0 }
 ]
 
 // 灵液（zoneMin 同上）

@@ -475,20 +475,6 @@
         </div>
         <div class="modal-actions four-grid">
           <button
-            class="btn-small btn-primary"
-            @click="showEnhanceConfirm = true"
-            :disabled="(selectedEquipment?.enhanceLevel || 0) >= 100"
-          >
-            强化
-          </button>
-          <button
-            class="btn-small btn-info"
-            :disabled="playerStore.refinementStones === 0"
-            @click="showReforgePreConfirm = true"
-          >
-            洗练
-          </button>
-          <button
             v-if="selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot || selectedEquipment?.type]?.id"
             class="btn-small"
             @click="equipItem(selectedEquipment)"
@@ -511,67 +497,6 @@
             出售/分解
           </button>
         </div>
-      </div>
-    </div>
-  </div>
-
-  <!-- 强化确认弹窗 -->
-  <div v-if="showEnhanceConfirm" class="simple-modal" @click.self="showEnhanceConfirm = false">
-    <div class="simple-modal-content">
-      <div class="modal-header"><h3>装备强化</h3></div>
-      <p>是否消耗 {{ ((selectedEquipment?.enhanceLevel || 0) + 1) * 10 }} 强化石强化装备？</p>
-      <p>当前强化石数量：{{ playerStore.reinforceStones }}</p>
-      <div class="modal-actions">
-        <button class="btn-small" @click="showEnhanceConfirm = false">取消</button>
-        <button
-          class="btn-small btn-primary"
-          @click="handleEnhanceEquipment"
-          :disabled="playerStore.reinforceStones < ((selectedEquipment?.enhanceLevel || 0) + 1) * 10"
-        >
-          确认强化
-        </button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 洗练确认弹窗 -->
-  <div v-if="showReforgeConfirm" class="simple-modal" @click.self="showReforgeConfirm = false">
-    <div class="simple-modal-content">
-      <div class="modal-header"><h3>洗练结果确认</h3></div>
-      <div v-if="reforgeResult" class="reforge-compare">
-        <div class="old-stats">
-          <h4>原始属性</h4>
-          <div v-for="(value, key) in reforgeResult.oldStats" :key="key">
-            {{ getStatName(key) }}: {{ formatStatValue(key, value) }}
-          </div>
-        </div>
-        <div class="new-stats">
-          <h4>新属性</h4>
-          <div v-for="(value, key) in reforgeResult.newStats" :key="key">
-            {{ getStatName(key) }}: {{ formatStatValue(key, value) }}
-          </div>
-        </div>
-      </div>
-      <div class="modal-actions">
-        <button class="btn-small btn-primary" @click="confirmReforgeResult(true)">确认新属性</button>
-        <button class="btn-small" @click="confirmReforgeResult(false)">保留原属性</button>
-      </div>
-    </div>
-  </div>
-
-  <!-- 洗练前置确认弹窗 -->
-  <div v-if="showReforgePreConfirm" class="simple-modal" @click.self="showReforgePreConfirm = false">
-    <div class="simple-modal-content">
-      <div class="modal-header"><h3>洗练确认</h3></div>
-      <p>洗练将消耗 {{ reforgeCost }} 洗练石，并可能改变装备的词条属性，是否继续？</p>
-      <p>当前洗练石数量：{{ playerStore.refinementStones }}</p>
-      <div class="modal-actions">
-        <button class="btn-small" @click="showReforgePreConfirm = false">取消</button>
-        <button
-          class="btn-small btn-info"
-          @click="confirmReforgeStart"
-          :disabled="playerStore.refinementStones < reforgeCost"
-        >确认洗练</button>
       </div>
     </div>
   </div>
@@ -1247,77 +1172,8 @@
     return Math.max(1, Math.round((calculateEquipmentScore(selectedEquipment.value) || 0) * 0.1))
   })
 
-  // 强化确认弹窗
-  const showEnhanceConfirm = ref(false)
-
-  // 强化装备
-  const handleEnhanceEquipment = () => {
-    if (!selectedEquipment.value) return
-    const usedBonus = playerStore.enhanceBonus || 0 // 淬灵丹加成
-    const result = enhanceEquipment(selectedEquipment.value, playerStore.reinforceStones, usedBonus)
-    if (result.success) {
-      playerStore.reinforceStones -= result.cost
-      selectedEquipment.value.stats = { ...result.newStats }
-      selectedEquipment.value.enhanceLevel = result.newLevel
-      if (usedBonus > 0) playerStore.enhanceBonus = 0 // 消耗淬灵丹加成（下次强化）
-      message.success('强化成功')
-      playerStore.saveData()
-    } else {
-      message.error(result.message || '强化失败')
-    }
-  }
-
-  // 洗练前置确认弹窗
-  const showReforgePreConfirm = ref(false)
-  // 洗练消耗（与 plugins/equipment reforgeConfig.costPerAttempt 保持一致）
-  const reforgeCost = 10
   // 出售 / 分解选择弹窗
   const showSellDisassemble = ref(false)
-
-  // 洗练确认弹窗
-  const showReforgeConfirm = ref(false)
-  const reforgeResult = ref(null)
-
-  // 洗练前置确认后，执行洗练
-  const confirmReforgeStart = () => {
-    showReforgePreConfirm.value = false
-    handleReforgeEquipment()
-  }
-
-  // 洗练装备
-  const handleReforgeEquipment = () => {
-    if (!selectedEquipment.value) return
-    const usedSafe = playerStore.reforgeSafeCharges > 0 // 定灵丹保底
-    const result = reforgeEquipment(selectedEquipment.value, playerStore.refinementStones, false, usedSafe)
-    if (result.success) {
-      playerStore.refinementStones -= result.cost
-      result.usedSafe = usedSafe
-      reforgeResult.value = result
-      showReforgeConfirm.value = true
-    } else {
-      message.error(result.message || '洗练失败')
-    }
-  }
-
-  // 确认洗练结果
-  const confirmReforgeResult = confirm => {
-    if (!reforgeResult.value) return
-    if (confirm) {
-      // 用户确认后，应用新属性
-      selectedEquipment.value.stats = reforgeResult.value.newStats
-      message.success('已确认新属性')
-      if (reforgeResult.value.usedSafe) {
-        // 消耗一次定灵丹保底
-        playerStore.reforgeSafeCharges = Math.max(0, playerStore.reforgeSafeCharges - 1)
-      }
-    } else {
-      // 用户取消，保留原属性
-      message.info('已保留原有属性')
-    }
-    showReforgeConfirm.value = false
-    reforgeResult.value = null
-    playerStore.saveData()
-  }
 
   // 使用装备（兼容 gacha 的 type=槽位 与 挂机生成的 type='equipment'，统一取 slot）
   const equipItem = equipment => {

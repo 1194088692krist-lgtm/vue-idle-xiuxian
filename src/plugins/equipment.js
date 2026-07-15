@@ -2,39 +2,82 @@
 
 // 强化等级配置
 const enhanceConfig = {
-  maxLevel: 100, // 最大强化等级
-  baseSuccessRate: 1, // 基础成功率
-  costPerLevel: 10, // 每级消耗的强化石数量
-  statIncrease: 0.1 // 每级属性提升比例（10%）
+  maxLevel: 12,
+  baseSuccessRate: 0.9,
+  lockLevels: [4, 8],
+  spiritStoneBaseCost: 100,
+  spiritStoneGrowth: 1.5,
+  stoneCosts: {
+    1: { type: 'common_enhance_stone', count: 5 },
+    2: { type: 'common_enhance_stone', count: 10 },
+    3: { type: 'common_enhance_stone', count: 20 },
+    4: { type: 'common_enhance_stone', count: 40 },
+    5: { type: 'advanced_enhance_stone', count: 5 },
+    6: { type: 'advanced_enhance_stone', count: 10 },
+    7: { type: 'advanced_enhance_stone', count: 20 },
+    8: { type: 'advanced_enhance_stone', count: 40 },
+    9: { type: 'supreme_enhance_stone', count: 1 },
+    10: { type: 'supreme_enhance_stone', count: 2 },
+    11: { type: 'supreme_enhance_stone', count: 4 },
+    12: { type: 'supreme_enhance_stone', count: 8 }
+  },
+  enhanceMult: 1.5
 }
 
 // 洗练配置
 const reforgeConfig = {
-  costPerAttempt: 10, // 每次洗练消耗的洗练石数量
-  minVariation: -0.3, // 最小属性变化（-30%）
-  maxVariation: 0.3, // 最大属性变化（+30%）
-  newStatChance: 0.3 // 更换属性的概率（30%）
+  costPerAttempt: 10,
+  minVariation: -0.3,
+  maxVariation: 0.3,
+  newStatChance: 0.3,
+  affixMaxCount: {
+    common: 1,
+    uncommon: 2,
+    rare: 3,
+    epic: 4,
+    legendary: 5,
+    mythic: 6
+  }
 }
 
-// 可洗练的属性池
 const reforgeableStats = {
-  weapon: ['attack', 'critRate', 'critDamageBoost'],
-  head: ['defense', 'health', 'stunResist'],
-  body: ['defense', 'health', 'finalDamageReduce'],
-  legs: ['defense', 'speed', 'dodgeRate'],
-  feet: ['defense', 'speed', 'dodgeRate'],
-  shoulder: ['defense', 'health', 'counterRate'],
-  hands: ['attack', 'critRate', 'comboRate'],
-  wrist: ['defense', 'counterRate', 'vampireRate'],
-  necklace: ['health', 'healBoost', 'spiritRate'],
-  ring1: ['attack', 'critDamageBoost', 'finalDamageBoost'],
-  ring2: ['defense', 'critDamageReduce', 'resistanceBoost'],
-  belt: ['health', 'defense', 'combatBoost'],
-  artifact: ['attack', 'critRate', 'comboRate']
+  weapon: ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost'],
+  head: ['defense', 'health', 'stunResist', 'critResist', 'healBoost'],
+  body: ['defense', 'health', 'finalDamageReduce', 'counterResist', 'comboResist'],
+  legs: ['defense', 'speed', 'dodgeRate', 'dodgeResist', 'counterRate'],
+  feet: ['defense', 'speed', 'dodgeRate', 'dodgeResist', 'haste'],
+  shoulder: ['defense', 'health', 'counterRate', 'stunResist', 'resistanceBoost'],
+  hands: ['attack', 'critRate', 'comboRate', 'vampireRate', 'speed'],
+  wrist: ['defense', 'counterRate', 'vampireRate', 'healBoost', 'critDamageReduce'],
+  necklace: ['health', 'healBoost', 'spiritRate', 'critRate', 'cultivationRate'],
+  ring1: ['attack', 'critDamageBoost', 'finalDamageBoost', 'comboRate', 'vampireRate'],
+  ring2: ['defense', 'critDamageReduce', 'resistanceBoost', 'dodgeRate', 'finalDamageReduce'],
+  belt: ['health', 'defense', 'combatBoost', 'healBoost', 'counterRate'],
+  artifact: ['attack', 'critRate', 'comboRate', 'finalDamageBoost', 'vampireRate']
 }
 
-// 强化装备
-function enhanceEquipment(equipment, playerReinforceStones, enhanceBonus = 0) {
+// 强化石类型配置
+export const enhanceStoneTypes = {
+  common_enhance_stone: { name: '普通强化石', color: '#808080', rarity: 'common', dropZoneMin: 1 },
+  advanced_enhance_stone: { name: '高级强化石', color: '#1E90FF', rarity: 'rare', dropZoneMin: 5 },
+  supreme_enhance_stone: { name: '至尊强化石', color: '#FFD700', rarity: 'legendary', dropZoneMin: null }
+}
+
+function getEnhanceSpiritStoneCost(currentLevel) {
+  return Math.round(enhanceConfig.spiritStoneBaseCost * Math.pow(enhanceConfig.spiritStoneGrowth, currentLevel))
+}
+
+function getEnhanceStoneCost(currentLevel) {
+  return enhanceConfig.stoneCosts[currentLevel + 1] || { type: 'common_enhance_stone', count: 0 }
+}
+
+function getLockLevel(currentLevel) {
+  if (currentLevel >= enhanceConfig.lockLevels[1]) return enhanceConfig.lockLevels[1]
+  if (currentLevel >= enhanceConfig.lockLevels[0]) return enhanceConfig.lockLevels[0]
+  return 0
+}
+
+function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus = 0) {
   if (!equipment || !equipment.stats) {
     return { success: false, message: '无效的装备' }
   }
@@ -42,93 +85,89 @@ function enhanceEquipment(equipment, playerReinforceStones, enhanceBonus = 0) {
   if (currentLevel >= enhanceConfig.maxLevel) {
     return { success: false, message: '装备已达到最大强化等级' }
   }
-  const cost = enhanceConfig.costPerLevel * (currentLevel + 1)
-  if (playerReinforceStones < cost) {
-    return { success: false, message: '强化石不足' }
+  const goldCost = getEnhanceSpiritStoneCost(currentLevel)
+  if (playerGold < goldCost) {
+    return { success: false, message: '灵石不足' }
   }
-  // 计算成功率（淬灵丹 enhanceBonus 提升）
-  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - currentLevel * 0.05 + (enhanceBonus || 0))
+  const stoneCost = getEnhanceStoneCost(currentLevel)
+  const stoneCount = (playerMaterials || []).filter(m => m.kind === 'ore' && m.id === stoneCost.type).length
+  if (stoneCount < stoneCost.count) {
+    return { success: false, message: `${enhanceStoneTypes[stoneCost.type]?.name || '强化石'}不足` }
+  }
+  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - currentLevel * 0.03 + (enhanceBonus || 0))
   const isSuccess = Math.random() < successRate
   if (!isSuccess) {
+    const lockLevel = getLockLevel(currentLevel)
+    const oldLevel = currentLevel
+    equipment.enhanceLevel = lockLevel
     return {
       success: false,
-      message: '强化失败',
-      cost,
-      oldStats: { ...equipment.stats },
-      newStats: { ...equipment.stats }
+      message: `强化失败，强化等级从+${oldLevel}回退到+${lockLevel}`,
+      goldCost,
+      stoneCost,
+      oldLevel,
+      newLevel: lockLevel,
+      isFailure: true
     }
   }
-  // 保存旧属性用于对比
   const oldStats = { ...equipment.stats }
-  // 提升装备属性
+  const oldLevel = currentLevel
   Object.keys(equipment.stats).forEach(stat => {
     if (typeof equipment.stats[stat] === 'number') {
-      equipment.stats[stat] *= 1 + enhanceConfig.statIncrease
-      // 对百分比属性进行特殊处理
-      if (
-        ['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce'].includes(
-          stat
-        )
-      ) {
-        equipment.stats[stat] = Math.round(equipment.stats[stat] * 100) / 100
-      } else {
-        equipment.stats[stat] = Math.round(equipment.stats[stat])
-      }
+      equipment.stats[stat] = Math.round(equipment.stats[stat] * enhanceConfig.enhanceMult)
     }
   })
-  // 更新强化等级
-  equipment.enhanceLevel = (equipment.enhanceLevel || 0) + 1
+  equipment.enhanceLevel = currentLevel + 1
   return {
     success: true,
-    message: '强化成功',
-    cost,
+    message: `强化成功，强化等级+${equipment.enhanceLevel}`,
+    goldCost,
+    stoneCost,
     oldStats,
     newStats: equipment.stats,
-    newLevel: equipment.enhanceLevel
+    oldLevel,
+    newLevel: equipment.enhanceLevel,
+    successRate: Math.round(successRate * 100)
   }
 }
 
-function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true, reforgeSafe = false) {
+function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true, reforgeSafe = false, targetStat = null) {
   if (!equipment || !equipment.stats || !equipment.type) {
     return { success: false, message: '无效的装备' }
   }
-  if (playerSpiritStones < reforgeConfig.costPerAttempt) {
+  if (playerReforgeStones < reforgeConfig.costPerAttempt) {
     return { success: false, message: '洗练石不足' }
   }
   const oldStats = { ...equipment.stats }
-  const availableStats = reforgeableStats[equipment.type]
+  const availableStats = reforgeableStats[equipment.type] || reforgeableStats.weapon
   const tempStats = { ...equipment.stats }
   const originStats = Object.keys(tempStats)
-  // 生成要处理的属性索引（1-3个随机）
-  const modifyIndexes = [
-    ...new Set(
-      Array.from({ length: Math.floor(Math.random() * 3) + 1 }, () => Math.floor(Math.random() * originStats.length))
-    )
-  ].slice(0, 3) // 确保最多处理3个属性
+  const modifyIndexes = targetStat !== null
+    ? originStats.map((s, i) => s === targetStat ? i : -1).filter(i => i >= 0)
+    : [
+      ...new Set(
+        Array.from({ length: Math.floor(Math.random() * 3) + 1 }, () => Math.floor(Math.random() * originStats.length))
+      )
+    ].slice(0, 3)
+  if (modifyIndexes.length === 0 && originStats.length > 0) {
+    modifyIndexes.push(0)
+  }
   modifyIndexes.forEach(index => {
     const originStat = originStats[index]
     let currentStat = originStat
-    const baseValue = tempStats[originStat]
-    // Step 1: 尝试替换属性
+    const baseValue = tempStats[originStat] || 1
     if (Math.random() < reforgeConfig.newStatChance) {
-      // 过滤可用属性（不包含现有属性）
-      const availableNew = availableStats.filter(s => !originStats.includes(s) && s !== originStat)
+      const availableNew = availableStats.filter(s => !originStats.includes(s) || s !== originStat)
       if (availableNew.length > 0) {
         const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
-        // 替换属性名但保留当前数值（会在步骤2中调整）
         delete tempStats[originStat]
         currentStat = newStat
+        originStats[index] = newStat
       }
     }
-    // Step 2：强制数值调整（基于原始值±30%；定灵丹保底时只增不减）
-    const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3 // [-0.3, 0.3] 或 [0, 0.3]
+    const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
     const newValue = baseValue * (1 + delta)
-    // 根据属性类型处理数值精度
-    if (
-      ['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce'].includes(
-        currentStat
-      )
-    ) {
+    if (['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce'].includes(currentStat)) {
       tempStats[currentStat] = Math.min(Math.max(Number(newValue.toFixed(2)), baseValue * 0.7), baseValue * 1.3)
     } else {
       tempStats[currentStat] = Math.min(
@@ -137,16 +176,26 @@ function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true,
       )
     }
   })
-  // 强制属性数量校验
-  if (Object.keys(tempStats).length !== originStats.length) {
-    console.error('属性数量异常', { old: originStats, new: tempStats })
-    return {
-      success: false,
-      message: '洗练过程出现异常',
-      cost: 0,
-      oldStats,
-      newStats: oldStats
+  if (Object.keys(tempStats).length === 0) {
+    const randomStat = availableStats[Math.floor(Math.random() * availableStats.length)]
+    const rarity = equipment.rarity || 'common'
+    const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
+    if (maxAffixes >= 1) {
+      tempStats[randomStat] = Math.round((Math.random() * 10 + 5))
     }
+  }
+  const rarity = equipment.rarity || 'common'
+  const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
+  while (Object.keys(tempStats).length < maxAffixes) {
+    const availableNew = availableStats.filter(s => !Object.keys(tempStats).includes(s))
+    if (availableNew.length === 0) break
+    const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
+    tempStats[newStat] = Math.round((Math.random() * 10 + 5))
+  }
+  while (Object.keys(tempStats).length > maxAffixes) {
+    const keys = Object.keys(tempStats)
+    const removeKey = keys[Math.floor(Math.random() * keys.length)]
+    delete tempStats[removeKey]
   }
   if (confirmNewStats) {
     equipment.stats = { ...tempStats }
@@ -157,10 +206,55 @@ function reforgeEquipment(equipment, playerSpiritStones, confirmNewStats = true,
     cost: reforgeConfig.costPerAttempt,
     oldStats,
     newStats: tempStats,
-    confirmed: confirmNewStats
+    confirmed: confirmNewStats,
+    targetStat
+  }
+}
+
+function disassembleEquipment(equipment) {
+  if (!equipment) return { success: false, message: '无效的装备' }
+  const rarity = equipment.rarity || 'common'
+  let commonStones = 0
+  let advancedStones = 0
+  let supremeStones = 0
+  let reforgeStones = 0
+  const rarityRewards = {
+    common: { common: 1, reforge: 0 },
+    uncommon: { common: 2, reforge: 1 },
+    rare: { common: 4, advanced: 1, reforge: 2 },
+    epic: { common: 6, advanced: 2, reforge: 3 },
+    legendary: { common: 8, advanced: 4, reforge: 5 },
+    mythic: { common: 10, advanced: 6, reforge: 8 }
+  }
+  const rewards = rarityRewards[rarity] || rarityRewards.common
+  commonStones += rewards.common || 0
+  advancedStones += rewards.advanced || 0
+  reforgeStones += rewards.reforge || 0
+  if (rarity === 'legendary') {
+    if (Math.random() < 0.3) {
+      supremeStones += Math.floor(Math.random() * 2) + 1
+    }
+  }
+  if (rarity === 'mythic') {
+    supremeStones += Math.floor(Math.random() * 3) + 1
+  }
+  return {
+    success: true,
+    message: `分解成功`,
+    rewards: {
+      common_enhance_stone: commonStones,
+      advanced_enhance_stone: advancedStones,
+      supreme_enhance_stone: supremeStones,
+      reforge_stone: reforgeStones
+    }
   }
 }
 
 import { calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
 
-export { enhanceConfig, reforgeConfig, reforgeableStats, enhanceEquipment, reforgeEquipment, calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses }
+export { 
+  enhanceConfig, reforgeConfig, reforgeableStats, 
+  enhanceEquipment, reforgeEquipment, disassembleEquipment,
+  getEnhanceSpiritStoneCost, getEnhanceStoneCost, getLockLevel,
+  calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses 
+}

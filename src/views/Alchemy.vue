@@ -132,27 +132,295 @@
         <template v-if="activeTab === 'forge'">
           <div class="tips-box">
             <InfoCircleOutlined />
-            <span>将多余装备投入八卦炉锻打，锤炼出更强属性。</span>
+            <span>投入装备与锻材，以炉火淬炼装备属性。</span>
           </div>
-          <div class="coming-soon">
-            <div class="coming-soon-icon">🔨</div>
-            <h3 class="section-title">装备锻打系统</h3>
-            <p class="coming-soon-desc">投入装备与锻材，以炉火淬炼装备属性。</p>
-            <div class="feature-preview">
-              <div class="feature-item">
-                <span class="feature-icon">⚔️</span>
-                <span>装备强化</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">🔄</span>
-                <span>属性洗练</span>
-              </div>
-              <div class="feature-item">
-                <span class="feature-icon">✨</span>
-                <span>品质提升</span>
-              </div>
+
+          <div class="forge-sub-tabs">
+            <div
+              class="forge-sub-tab"
+              :class="{ active: forgeTab === 'enhance' }"
+              @click="forgeTab = 'enhance'"
+            >
+              <span class="tab-icon">⚔️</span>
+              <span class="tab-label">强化</span>
             </div>
-            <div class="coming-soon-badge">即将开放</div>
+            <div
+              class="forge-sub-tab"
+              :class="{ active: forgeTab === 'reforge' }"
+              @click="forgeTab = 'reforge'"
+            >
+              <span class="tab-icon">🔄</span>
+              <span class="tab-label">洗练</span>
+            </div>
+            <div
+              class="forge-sub-tab"
+              :class="{ active: forgeTab === 'disassemble' }"
+              @click="forgeTab = 'disassemble'"
+            >
+              <span class="tab-icon">🗑️</span>
+              <span class="tab-label">分解</span>
+            </div>
+          </div>
+
+          <div class="forge-content">
+            <!-- 强化子菜单 -->
+            <template v-if="forgeTab === 'enhance'">
+              <div class="section">
+                <h3 class="section-title">选择装备</h3>
+                <div class="equipment-grid">
+                  <div
+                    v-for="equip in allEquipments"
+                    :key="equip.id"
+                    class="equipment-card glass-card"
+                    :class="{ selected: selectedForgeEquip?.id === equip.id }"
+                    @click="selectForgeEquip(equip)"
+                  >
+                    <div class="equip-header">
+                      <span class="equip-name">{{ equip.name }}<span v-if="equip.enhanceLevel && equip.enhanceLevel > 0" class="equip-enhance">+{{ equip.enhanceLevel }}</span></span>
+                      <span class="equip-rarity" :style="{ color: rarityConfig[equip.rarity || 'common']?.color }">
+                        {{ rarityConfig[equip.rarity || 'common']?.name }}
+                      </span>
+                    </div>
+                    <div class="equip-stats">
+                      <div v-for="(val, key) in equip.stats" :key="key" class="equip-stat">
+                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                      </div>
+                    </div>
+                    <div class="equip-info">
+                      <span>强化: {{ equip.enhanceLevel || 0 }}/{{ enhanceConfig.maxLevel }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <template v-if="selectedForgeEquip">
+                <div class="section">
+                  <h3 class="section-title">强化信息</h3>
+                  <div class="enhance-info glass-card">
+                    <div class="enhance-row">
+                      <div class="enhance-label">当前等级</div>
+                      <div class="enhance-value">+{{ selectedForgeEquip.enhanceLevel || 0 }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">目标等级</div>
+                      <div class="enhance-value">+{{ (selectedForgeEquip.enhanceLevel || 0) + 1 }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">成功率</div>
+                      <div class="enhance-value">{{ getEnhanceSuccessRate(selectedForgeEquip) }}%</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">强化效果</div>
+                      <div class="enhance-value">所有属性 × {{ enhanceConfig.enhanceMult }}</div>
+                    </div>
+                    <div class="enhance-row">
+                      <div class="enhance-label">锁定等级</div>
+                      <div class="enhance-value">
+                        {{ getLockLevelDisplay(selectedForgeEquip) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="section">
+                  <h3 class="section-title">消耗</h3>
+                  <div class="cost-list">
+                    <div class="cost-item">
+                      <span class="cost-name">灵石</span>
+                      <span class="cost-value" :class="{ insufficient: playerStore.spiritStones < getEnhanceGoldCost(selectedForgeEquip) }">
+                        {{ playerStore.spiritStones }} / {{ getEnhanceGoldCost(selectedForgeEquip) }}
+                      </span>
+                    </div>
+                    <div class="cost-item">
+                      <span class="cost-name">{{ getEnhanceStoneName(selectedForgeEquip) }}</span>
+                      <span class="cost-value" :class="{ insufficient: getEnhanceStoneCount(selectedForgeEquip) < getEnhanceStoneNeed(selectedForgeEquip) }">
+                        {{ getEnhanceStoneCount(selectedForgeEquip) }} / {{ getEnhanceStoneNeed(selectedForgeEquip) }}
+                      </span>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="action-section">
+                  <button
+                    class="btn-primary enhance-button"
+                    :disabled="!canEnhance(selectedForgeEquip)"
+                    @click="handleEnhance"
+                  >
+                    强化
+                  </button>
+                </div>
+              </template>
+            </template>
+
+            <!-- 洗练子菜单 -->
+            <template v-if="forgeTab === 'reforge'">
+              <div class="section">
+                <h3 class="section-title">选择装备</h3>
+                <div class="equipment-grid">
+                  <div
+                    v-for="equip in allEquipments"
+                    :key="equip.id"
+                    class="equipment-card glass-card"
+                    :class="{ selected: selectedForgeEquip?.id === equip.id }"
+                    @click="selectForgeEquip(equip)"
+                  >
+                    <div class="equip-header">
+                      <span class="equip-name">{{ equip.name }}<span v-if="equip.enhanceLevel && equip.enhanceLevel > 0" class="equip-enhance">+{{ equip.enhanceLevel }}</span></span>
+                      <span class="equip-rarity" :style="{ color: rarityConfig[equip.rarity || 'common']?.color }">
+                        {{ rarityConfig[equip.rarity || 'common']?.name }}
+                      </span>
+                    </div>
+                    <div class="equip-stats">
+                      <div v-for="(val, key) in equip.stats" :key="key" class="equip-stat">
+                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                      </div>
+                    </div>
+                    <div class="equip-info">
+                      <span>词条数: {{ Object.keys(equip.stats || {}).length }}/{{ reforgeConfig.affixMaxCount[equip.rarity || 'common'] }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <template v-if="selectedForgeEquip">
+                <div class="section">
+                  <h3 class="section-title">洗练方式</h3>
+                  <div class="reforge-mode">
+                    <button
+                      class="btn-primary"
+                      :class="{ active: reforgeMode === 'all' }"
+                      @click="reforgeMode = 'all'"
+                    >
+                      全部洗练
+                    </button>
+                    <button
+                      class="btn-info"
+                      :class="{ active: reforgeMode === 'single' }"
+                      @click="reforgeMode = 'single'"
+                    >
+                      单条洗练
+                    </button>
+                  </div>
+                </div>
+
+                <template v-if="reforgeMode === 'single'">
+                  <div class="section">
+                    <h3 class="section-title">选择词条</h3>
+                    <div class="stat-select">
+                      <button
+                        v-for="(val, key) in selectedForgeEquip.stats"
+                        :key="key"
+                        class="stat-btn"
+                        :class="{ active: selectedReforgeStat === key }"
+                        @click="selectedReforgeStat = key"
+                      >
+                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                      </button>
+                    </div>
+                  </div>
+                </template>
+
+                <div class="section">
+                  <h3 class="section-title">洗练消耗</h3>
+                  <div class="cost-list">
+                    <div class="cost-item">
+                      <span class="cost-name">洗练石</span>
+                      <span class="cost-value" :class="{ insufficient: playerStore.refinementStones < reforgeConfig.costPerAttempt }">
+                        {{ playerStore.refinementStones }} / {{ reforgeConfig.costPerAttempt }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="reforge-safe">
+                    <span>定灵丹保底: {{ playerStore.reforgeSafeCharges }} 次</span>
+                  </div>
+                </div>
+
+                <div class="action-section">
+                  <button
+                    class="btn-primary reforge-button"
+                    :disabled="!canReforge(selectedForgeEquip)"
+                    @click="handleReforge"
+                  >
+                    洗练
+                  </button>
+                </div>
+
+                <template v-if="reforgeResult">
+                  <div class="section">
+                    <h3 class="section-title">洗练结果</h3>
+                    <div class="reforge-result glass-card">
+                      <div class="reforge-compare">
+                        <div class="reforge-old">
+                          <h4>原属性</h4>
+                          <div v-for="(val, key) in reforgeResult.oldStats" :key="key" class="reforge-stat">
+                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                          </div>
+                        </div>
+                        <div class="reforge-arrow">→</div>
+                        <div class="reforge-new">
+                          <h4>新属性</h4>
+                          <div v-for="(val, key) in reforgeResult.newStats" :key="key" class="reforge-stat">
+                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="reforge-actions">
+                        <button class="btn-small" @click="reforgeResult = null">保留原属性</button>
+                        <button class="btn-small btn-primary" @click="confirmReforgeResult">确认替换</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+            </template>
+
+            <!-- 分解子菜单 -->
+            <template v-if="forgeTab === 'disassemble'">
+              <div class="section">
+                <h3 class="section-title">选择装备（可多选）</h3>
+                <div class="equipment-grid">
+                  <div
+                    v-for="equip in inventoryEquipments"
+                    :key="equip.id"
+                    class="equipment-card glass-card"
+                    :class="{ selected: selectedDisassembleIds.includes(equip.id) }"
+                    @click="toggleDisassembleSelect(equip.id)"
+                  >
+                    <div class="equip-checkbox">
+                      <span v-if="selectedDisassembleIds.includes(equip.id)">✓</span>
+                    </div>
+                    <div class="equip-header">
+                      <span class="equip-name">{{ equip.name }}<span v-if="equip.enhanceLevel && equip.enhanceLevel > 0" class="equip-enhance">+{{ equip.enhanceLevel }}</span></span>
+                      <span class="equip-rarity" :style="{ color: rarityConfig[equip.rarity || 'common']?.color }">
+                        {{ rarityConfig[equip.rarity || 'common']?.name }}
+                      </span>
+                    </div>
+                    <div class="equip-stats">
+                      <div v-for="(val, key) in equip.stats" :key="key" class="equip-stat">
+                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                      </div>
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <div class="section">
+                <div class="disassemble-summary">
+                  <span>已选择 {{ selectedDisassembleIds.length }} 件装备</span>
+                  <button class="btn-small btn-danger" @click="selectedDisassembleIds = []">清空选择</button>
+                </div>
+              </div>
+
+              <div class="action-section">
+                <button
+                  class="btn-primary disassemble-button"
+                  :disabled="selectedDisassembleIds.length === 0"
+                  @click="handleBatchDisassemble"
+                >
+                  批量分解
+                </button>
+              </div>
+            </template>
           </div>
         </template>
 
@@ -269,6 +537,7 @@
     InfoCircleOutlined,
     FireOutlined
   } from '@ant-design/icons-vue'
+  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost } from '../plugins/equipment'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -278,6 +547,14 @@
   const selectedRecipe = ref(null)
   const selectedRebirthMember = ref(null)
   const showRebirthConfirm = ref(false)
+
+  // 装备锻打相关
+  const forgeTab = ref('enhance')
+  const selectedForgeEquip = ref(null)
+  const selectedDisassembleIds = ref([])
+  const reforgeMode = ref('all')
+  const selectedReforgeStat = ref(null)
+  const reforgeResult = ref(null)
 
   const unlockedRecipes = computed(() => {
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
@@ -419,6 +696,193 @@
     } else {
       message.error(result.message)
     }
+  }
+
+  // ===== 装备锻打相关 =====
+  const allEquipments = computed(() => {
+    return [...playerStore.equipment, ...playerStore.inventory]
+  })
+
+  const inventoryEquipments = computed(() => {
+    return playerStore.inventory
+  })
+
+  const selectForgeEquip = (equip) => {
+    selectedForgeEquip.value = equip
+    selectedReforgeStat.value = null
+    reforgeResult.value = null
+  }
+
+  const toggleDisassembleSelect = (equipId) => {
+    const idx = selectedDisassembleIds.value.indexOf(equipId)
+    if (idx > -1) {
+      selectedDisassembleIds.value.splice(idx, 1)
+    } else {
+      selectedDisassembleIds.value.push(equipId)
+    }
+  }
+
+  const getEnhanceSuccessRate = (equip) => {
+    if (!equip) return 0
+    const level = equip.enhanceLevel || 0
+    let rate = enhanceConfig.baseSuccessRate
+    if (level >= 4) rate -= 0.05
+    if (level >= 8) rate -= 0.05
+    return Math.round(rate * 100)
+  }
+
+  const getLockLevelDisplay = (equip) => {
+    if (!equip) return ''
+    const level = equip.enhanceLevel || 0
+    if (level < 4) return '失败归零'
+    if (level < 8) return '+4 保护'
+    return '+8 保护'
+  }
+
+  const getEnhanceGoldCost = (equip) => {
+    if (!equip) return 0
+    return getEnhanceSpiritStoneCost(equip.enhanceLevel || 0)
+  }
+
+  const getEnhanceStoneNeed = (equip) => {
+    if (!equip) return 0
+    const cost = getEnhanceStoneCost(equip.enhanceLevel || 0)
+    return cost ? cost.count : 0
+  }
+
+  const enhanceStoneTypes = {
+    common_enhance_stone: { name: '普通强化石' },
+    advanced_enhance_stone: { name: '高级强化石' },
+    supreme_enhance_stone: { name: '至尊强化石' }
+  }
+
+  const getEnhanceStoneName = (equip) => {
+    if (!equip) return ''
+    const cost = getEnhanceStoneCost(equip.enhanceLevel || 0)
+    return cost && enhanceStoneTypes[cost.type] ? enhanceStoneTypes[cost.type].name : ''
+  }
+
+  const getEnhanceStoneCount = (equip) => {
+    if (!equip) return 0
+    const cost = getEnhanceStoneCost(equip.enhanceLevel || 0)
+    if (!cost) return 0
+    return playerStore.materials.filter(m => m.id === cost.type).length
+  }
+
+  const canEnhance = (equip) => {
+    if (!equip) return false
+    const level = equip.enhanceLevel || 0
+    if (level >= enhanceConfig.maxLevel) return false
+    if (playerStore.spiritStones < getEnhanceGoldCost(equip)) return false
+    if (getEnhanceStoneCount(equip) < getEnhanceStoneNeed(equip)) return false
+    return true
+  }
+
+  const handleEnhance = () => {
+    if (!selectedForgeEquip.value) return
+    const result = playerStore.enhanceEquipmentItem(selectedForgeEquip.value)
+    if (result.success) {
+      message.success(`强化成功！${selectedForgeEquip.value.name} +${selectedForgeEquip.value.enhanceLevel}`)
+    } else {
+      message.error(`强化失败：${result.message}`)
+    }
+  }
+
+  const canReforge = (equip) => {
+    if (!equip) return false
+    if (playerStore.refinementStones < reforgeConfig.costPerAttempt) return false
+    if (reforgeMode.value === 'single' && !selectedReforgeStat.value) return false
+    return true
+  }
+
+  const handleReforge = () => {
+    if (!selectedForgeEquip.value) return
+    const result = playerStore.reforgeEquipmentPreview(selectedForgeEquip.value, reforgeMode.value, selectedReforgeStat.value)
+    if (result.success) {
+      reforgeResult.value = {
+        oldStats: { ...selectedForgeEquip.value.stats },
+        newStats: result.newStats,
+        wasSafe: result.wasSafe
+      }
+    } else {
+      message.error(result.message)
+    }
+  }
+
+  const confirmReforgeResult = () => {
+    if (!selectedForgeEquip.value || !reforgeResult.value) return
+    const result = playerStore.reforgeEquipmentConfirm(selectedForgeEquip.value, reforgeResult.value.newStats)
+    if (result.success) {
+      message.success('洗练完成！')
+      reforgeResult.value = null
+      selectedReforgeStat.value = null
+    } else {
+      message.error(result.message)
+    }
+  }
+
+  const handleBatchDisassemble = async () => {
+    if (selectedDisassembleIds.value.length === 0) return
+    const result = await playerStore.batchDisassembleEquipments(selectedDisassembleIds.value)
+    if (result.success) {
+      message.success(`成功分解 ${result.count} 件装备`)
+      selectedDisassembleIds.value = []
+    } else {
+      message.error(result.message)
+    }
+  }
+
+  const getStatName = (statKey) => {
+    const statNames = {
+      attack: '攻击',
+      defense: '防御',
+      health: '生命',
+      speed: '速度',
+      critRate: '暴击率',
+      critDamage: '暴击伤害',
+      dodgeRate: '闪避率',
+      blockRate: '格挡率',
+      hpRegen: '生命恢复',
+      mpRegen: '法力恢复',
+      goldFind: '金币获取',
+      expGain: '经验获取',
+      dropRate: '掉落率',
+      spiritStonesFind: '灵石获取',
+      damageReflection: '伤害反弹',
+      damageReduction: '伤害减免',
+      skillDamage: '技能伤害',
+      healingEffect: '治疗效果',
+      elementalDamage: '元素伤害',
+      elementalResist: '元素抗性',
+      petAttack: '宠物攻击',
+      petDefense: '宠物防御',
+      petHealth: '宠物生命',
+      allStats: '全属性',
+      finalDamage: '最终伤害',
+      finalDefense: '最终防御',
+      damagePerSecond: '每秒伤害',
+      damagePerHit: '每次伤害',
+      armorPenetration: '破甲',
+      ignoreDefense: '忽视防御',
+      lifesteal: '吸血',
+      spellDamage: '法术伤害',
+      physicalDamage: '物理伤害',
+      maxMana: '最大法力',
+      energyRegen: '能量恢复',
+      skillCooldown: '技能冷却'
+    }
+    return statNames[statKey] || statKey
+  }
+
+  const formatStatValue = (statKey, value) => {
+    const percentStats = ['critRate', 'critDamage', 'dodgeRate', 'blockRate', 'goldFind', 'expGain', 'dropRate', 'spiritStonesFind', 'damageReflection', 'damageReduction', 'skillDamage', 'healingEffect', 'elementalResist']
+    if (percentStats.includes(statKey)) {
+      return `${(value * 100).toFixed(1)}%`
+    }
+    if (value >= 10000) {
+      return `${(value / 10000).toFixed(1)}万`
+    }
+    return Math.round(value).toString()
   }
 </script>
 
@@ -992,5 +1456,337 @@
   .rebirth-button:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+
+  /* ===== 装备锻打样式 ===== */
+  .forge-sub-tabs {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 16px;
+  }
+
+  .forge-sub-tab {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    padding: 10px 20px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    color: #999;
+    border: 1px solid transparent;
+  }
+
+  .forge-sub-tab:hover {
+    background: rgba(0, 0, 0, 0.5);
+    color: #fff;
+  }
+
+  .forge-sub-tab.active {
+    background: rgba(218, 165, 32, 0.15);
+    border-color: var(--color-accent-gold);
+    color: #ffd700;
+  }
+
+  .tab-icon {
+    font-size: 18px;
+  }
+
+  .tab-label {
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .forge-content {
+    display: flex;
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .equipment-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(280px, 1fr));
+    gap: 12px;
+  }
+
+  .equipment-card {
+    padding: 16px;
+    cursor: pointer;
+    transition: all 0.3s ease;
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    position: relative;
+  }
+
+  .equipment-card:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 25px rgba(139, 69, 19, 0.2);
+  }
+
+  .equipment-card.selected {
+    border-color: var(--color-accent-gold);
+    background: rgba(218, 165, 32, 0.1);
+  }
+
+  .equip-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 20px;
+    height: 20px;
+    border: 2px solid #666;
+    border-radius: 4px;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 12px;
+    color: #4caf50;
+    background: rgba(0, 0, 0, 0.5);
+  }
+
+  .equipment-card.selected .equip-checkbox {
+    background: #4caf50;
+    border-color: #4caf50;
+    color: #fff;
+  }
+
+  .equip-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 8px;
+  }
+
+  .equip-name {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .equip-enhance {
+    color: #ffd700;
+    margin-left: 4px;
+    font-weight: 700;
+  }
+
+  .equip-rarity {
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .equip-stats {
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    margin-bottom: 8px;
+  }
+
+  .equip-stat {
+    font-size: 13px;
+    color: #ccc;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .equip-info {
+    font-size: 12px;
+    color: #999;
+  }
+
+  .enhance-info {
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+  }
+
+  .enhance-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+  }
+
+  .enhance-label {
+    font-size: 14px;
+    color: #999;
+  }
+
+  .enhance-value {
+    font-size: 16px;
+    font-weight: 600;
+    color: #fff;
+  }
+
+  .cost-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .cost-item {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+  }
+
+  .cost-name {
+    font-size: 14px;
+    color: #999;
+  }
+
+  .cost-value {
+    font-size: 14px;
+    font-weight: 600;
+    color: #4caf50;
+  }
+
+  .cost-value.insufficient {
+    color: #f44336;
+  }
+
+  .action-section {
+    display: flex;
+    justify-content: center;
+    padding: 16px 0;
+  }
+
+  .enhance-button,
+  .reforge-button,
+  .disassemble-button {
+    padding: 12px 40px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .enhance-button:disabled,
+  .reforge-button:disabled,
+  .disassemble-button:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+
+  .reforge-mode {
+    display: flex;
+    gap: 12px;
+    flex-wrap: wrap;
+  }
+
+  .reforge-mode button {
+    padding: 10px 24px;
+    font-size: 14px;
+    font-weight: 500;
+  }
+
+  .reforge-mode button.active {
+    background: var(--color-accent-gold);
+    color: #000;
+    border-color: var(--color-accent-gold);
+  }
+
+  .stat-select {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+
+  .stat-btn {
+    padding: 8px 16px;
+    font-size: 13px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(255, 255, 255, 0.1);
+    border-radius: 6px;
+    color: #ccc;
+    cursor: pointer;
+    transition: all 0.3s ease;
+  }
+
+  .stat-btn:hover {
+    background: rgba(0, 0, 0, 0.5);
+    border-color: rgba(255, 255, 255, 0.3);
+  }
+
+  .stat-btn.active {
+    background: rgba(218, 165, 32, 0.15);
+    border-color: var(--color-accent-gold);
+    color: #ffd700;
+  }
+
+  .reforge-safe {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #999;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border-radius: 6px;
+  }
+
+  .reforge-result {
+    padding: 20px;
+  }
+
+  .reforge-compare {
+    display: flex;
+    justify-content: space-around;
+    gap: 20px;
+    margin-bottom: 16px;
+  }
+
+  .reforge-old,
+  .reforge-new {
+    flex: 1;
+    padding: 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+  }
+
+  .reforge-old h4,
+  .reforge-new h4 {
+    margin: 0 0 12px;
+    font-size: 16px;
+    font-weight: 600;
+  }
+
+  .reforge-old h4 {
+    color: #999;
+  }
+
+  .reforge-new h4 {
+    color: #4caf50;
+  }
+
+  .reforge-stat {
+    font-size: 14px;
+    color: #ccc;
+    padding: 4px 0;
+    display: flex;
+    justify-content: space-between;
+  }
+
+  .reforge-arrow {
+    display: flex;
+    align-items: center;
+    font-size: 32px;
+    color: #ffd700;
+    font-weight: bold;
+  }
+
+  .reforge-actions {
+    display: flex;
+    justify-content: center;
+    gap: 16px;
+  }
+
+  .disassemble-summary {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 12px 16px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    font-size: 14px;
+    color: #ccc;
   }
 </style>

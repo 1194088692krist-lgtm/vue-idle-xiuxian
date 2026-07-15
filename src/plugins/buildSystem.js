@@ -202,7 +202,7 @@ function calculateEquipmentScore(equipment) {
     })
   }
   const enhanceLevel = equipment.enhanceLevel || 0
-  const enhanceMult = 1 + enhanceLevel * 0.1
+  const enhanceMult = Math.pow(1.5, enhanceLevel)
   let setBonusScore = 0
   if (equipment.setId) {
     setBonusScore += 50

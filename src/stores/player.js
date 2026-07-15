@@ -7,6 +7,7 @@ import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEq
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats } from '../plugins/characters'
+import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig } from '../plugins/equipment'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -921,20 +922,165 @@ export const usePlayerStore = defineStore('player', {
     },
     // 分解装备（获得强化石 / 洗练石）
     async disassembleEquipment(equipment) {
-      const index = this.items.findIndex(i => i.id === equipment.id)
+      let index = this.items.findIndex(i => i.id === equipment.id)
       if (index === -1) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipment.id) {
+            return { success: false, message: '请先卸下装备再分解' }
+          }
+        }
         return { success: false, message: '装备不存在' }
       }
-      const q = equipment.quality || 'common'
-      const reinforce = QUALITY_STONE_MAP[q] || 1
-      const refine = q === 'common' ? 0 : Math.max(1, (QUALITY_STONE_MAP[q] || 1) - 1)
-      this.reinforceStones += reinforce
-      this.refinementStones += refine
+      const result = disassembleEquipment(equipment)
+      if (!result.success) {
+        return result
+      }
+      const rewards = result.rewards
+      if (rewards.common_enhance_stone) {
+        for (let i = 0; i < rewards.common_enhance_stone; i++) {
+          this.materials.push({ kind: 'ore', id: 'common_enhance_stone', name: '普通强化石' })
+        }
+      }
+      if (rewards.advanced_enhance_stone) {
+        for (let i = 0; i < rewards.advanced_enhance_stone; i++) {
+          this.materials.push({ kind: 'ore', id: 'advanced_enhance_stone', name: '高级强化石' })
+        }
+      }
+      if (rewards.supreme_enhance_stone) {
+        for (let i = 0; i < rewards.supreme_enhance_stone; i++) {
+          this.materials.push({ kind: 'ore', id: 'supreme_enhance_stone', name: '至尊强化石' })
+        }
+      }
+      if (rewards.reforge_stone) {
+        this.refinementStones += rewards.reforge_stone
+      }
       this.items.splice(index, 1)
       this.queueSave()
-      const parts = [`强化石×${reinforce}`]
-      if (refine > 0) parts.push(`洗练石×${refine}`)
+      const parts = []
+      if (rewards.common_enhance_stone) parts.push(`普通强化石×${rewards.common_enhance_stone}`)
+      if (rewards.advanced_enhance_stone) parts.push(`高级强化石×${rewards.advanced_enhance_stone}`)
+      if (rewards.supreme_enhance_stone) parts.push(`至尊强化石×${rewards.supreme_enhance_stone}`)
+      if (rewards.reforge_stone) parts.push(`洗练石×${rewards.reforge_stone}`)
       return { success: true, message: `分解成功，获得 ${parts.join('、')}` }
+    },
+    // 批量分解装备
+    async batchDisassembleEquipments(equipmentIds) {
+      if (!equipmentIds || equipmentIds.length === 0) {
+        return { success: false, message: '请选择要分解的装备' }
+      }
+      let totalCommon = 0, totalAdvanced = 0, totalSupreme = 0, totalReforge = 0
+      const ids = new Set(equipmentIds)
+      const toDisassemble = this.items.filter(item => ids.has(item.id))
+      for (const equip of toDisassemble) {
+        const result = disassembleEquipment(equip)
+        if (result.success) {
+          totalCommon += result.rewards.common_enhance_stone || 0
+          totalAdvanced += result.rewards.advanced_enhance_stone || 0
+          totalSupreme += result.rewards.supreme_enhance_stone || 0
+          totalReforge += result.rewards.reforge_stone || 0
+        }
+      }
+      for (let i = 0; i < totalCommon; i++) {
+        this.materials.push({ kind: 'ore', id: 'common_enhance_stone', name: '普通强化石' })
+      }
+      for (let i = 0; i < totalAdvanced; i++) {
+        this.materials.push({ kind: 'ore', id: 'advanced_enhance_stone', name: '高级强化石' })
+      }
+      for (let i = 0; i < totalSupreme; i++) {
+        this.materials.push({ kind: 'ore', id: 'supreme_enhance_stone', name: '至尊强化石' })
+      }
+      this.refinementStones += totalReforge
+      this.items = this.items.filter(i => !ids.has(i.id))
+      this.queueSave()
+      const parts = []
+      if (totalCommon) parts.push(`普通强化石×${totalCommon}`)
+      if (totalAdvanced) parts.push(`高级强化石×${totalAdvanced}`)
+      if (totalSupreme) parts.push(`至尊强化石×${totalSupreme}`)
+      if (totalReforge) parts.push(`洗练石×${totalReforge}`)
+      return { success: true, message: `成功分解 ${toDisassemble.length} 件装备，获得 ${parts.join('、')}` }
+    },
+    // 强化装备
+    enhanceEquipmentItem(equipment) {
+      let targetEquip = equipment
+      let isEquipped = false
+      if (!this.items.find(i => i.id === equipment.id)) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipment.id) {
+            targetEquip = this.equippedArtifacts[slot]
+            isEquipped = true
+            break
+          }
+        }
+      }
+      if (!targetEquip) {
+        return { success: false, message: '装备不存在' }
+      }
+      const usedBonus = this.enhanceBonus || 0
+      const result = enhanceEquipment(targetEquip, this.spiritStones, this.materials, usedBonus)
+      if (!result.success) {
+        if (result.isFailure) {
+          this.queueSave()
+        }
+        return result
+      }
+      this.spiritStones -= result.goldCost
+      const stoneType = result.stoneCost.type
+      let remaining = result.stoneCost.count
+      for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+        if (this.materials[i].kind === 'ore' && this.materials[i].id === stoneType) {
+          this.materials.splice(i, 1)
+          remaining--
+        }
+      }
+      if (usedBonus > 0) {
+        this.enhanceBonus = 0
+      }
+      this.queueSave()
+      return result
+    },
+    // 洗练装备
+    reforgeEquipmentItem(equipment, targetStat = null) {
+      let targetEquip = equipment
+      let isEquipped = false
+      if (!this.items.find(i => i.id === equipment.id)) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipment.id) {
+            targetEquip = this.equippedArtifacts[slot]
+            isEquipped = true
+            break
+          }
+        }
+      }
+      if (!targetEquip) {
+        return { success: false, message: '装备不存在' }
+      }
+      const usedSafe = this.reforgeSafeCharges > 0
+      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat)
+      if (!result.success) {
+        return result
+      }
+      return result
+    },
+    // 确认洗练结果
+    confirmReforge(equipment, newStats) {
+      let targetEquip = equipment
+      for (const slot of EQUIPMENT_SLOTS) {
+        if (this.equippedArtifacts[slot]?.id === equipment.id) {
+          targetEquip = this.equippedArtifacts[slot]
+          break
+        }
+      }
+      if (!targetEquip) {
+        return { success: false, message: '装备不存在' }
+      }
+      targetEquip.stats = { ...newStats }
+      this.refinementStones -= enhanceConfig.costPerAttempt
+      const usedSafe = this.reforgeSafeCharges > 0
+      if (usedSafe) {
+        this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
+      }
+      this.queueSave()
+      return { success: true, message: '洗练成功' }
     },
     // 批量出售装备（按当前筛选，统一折算为灵石）
     async batchSellEquipments(quality = null, equipmentType = null) {
