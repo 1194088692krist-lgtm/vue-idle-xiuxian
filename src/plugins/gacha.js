@@ -15,11 +15,11 @@ export const equipmentQualities = {
 
 // 灵宠品质配置
 export const petRarities = {
-  divine: { name: '神品', color: '#FF0000', weight: 2 },
-  celestial: { name: '仙品', color: '#FFD700', weight: 8 },
-  mystic: { name: '玄品', color: '#9932CC', weight: 15 },
+  divine: { name: '神品', color: '#FF0000', weight: 1 },
+  celestial: { name: '仙品', color: '#FFD700', weight: 4 },
+  mystic: { name: '玄品', color: '#9932CC', weight: 10 },
   spiritual: { name: '灵品', color: '#1E90FF', weight: 25 },
-  mortal: { name: '凡品', color: '#32CD32', weight: 50 }
+  mortal: { name: '凡品', color: '#32CD32', weight: 60 }
 }
 
 // 装备类型配置
@@ -340,15 +340,18 @@ export const doGacha = (poolType, playerLevel = 1) => {
   }
 }
 
-// 批量抽奖（保底规则：人物池/综合池每 5 次保底一次 4 星或以上）
+// 批量抽奖（保底规则：人物池/综合池每 5 次保底一次 4 星或以上；每 50 抽保底一次 5 星）
 // 5星基础概率1%、4星基础概率19%。若 5 次内未出现 4 星或以上人物，则把第 5 次替换为 4 星人物
+// 若 50 次内未出现 5 星人物，则把第 50 次替换为 5 星人物
 // 每轮最多获得 2 个人物
 export const doMultiGacha = (poolType, count, playerLevel = 1) => {
   const results = []
   const isCharacterPool = poolType === 'character' || poolType === 'all'
-  const PITY_INTERVAL = 5
+  const PITY_INTERVAL_4STAR = 5
+  const PITY_INTERVAL_5STAR = 50
   let characterCount = 0
   const MAX_CHARACTERS = 2
+  let fiveStarPityCounter = 0
   
   for (let i = 0; i < count; i++) {
     const result = doGacha(poolType, playerLevel)
@@ -360,13 +363,35 @@ export const doMultiGacha = (poolType, count, playerLevel = 1) => {
     } else {
       if (result && result.category === 'character') {
         characterCount++
+        if (result.item.star === 5) {
+          fiveStarPityCounter = 0
+        } else {
+          fiveStarPityCounter++
+        }
+      } else {
+        fiveStarPityCounter++
       }
       if (result) results.push(result)
     }
     
-    // 每 5 次保底：人物池/综合池 5 次内若没有 4 星或以上人物，则把本次替换为 4 星
-    if (isCharacterPool && (i + 1) % PITY_INTERVAL === 0) {
-      const startIdx = i + 1 - PITY_INTERVAL
+    // 每 50 次五星保底：人物池/综合池 50 次内若没有 5 星人物，则把本次替换为 5 星
+    if (isCharacterPool && fiveStarPityCounter >= PITY_INTERVAL_5STAR) {
+      const startIdx = Math.max(0, i + 1 - PITY_INTERVAL_5STAR)
+      const window = results.slice(startIdx, i + 1)
+      const hasFiveStar = window.some(r => r.category === 'character' && r.item.star === 5)
+      if (!hasFiveStar) {
+        // 五星保底时，如果人物数量未超限，则替换为5星人物
+        if (characterCount < MAX_CHARACTERS) {
+          results[i] = { category: 'character', item: generateRandomCharacter(5) }
+          characterCount++
+          fiveStarPityCounter = 0
+        }
+      }
+    }
+    
+    // 每 5 次四星保底：人物池/综合池 5 次内若没有 4 星或以上人物，则把本次替换为 4 星
+    if (isCharacterPool && (i + 1) % PITY_INTERVAL_4STAR === 0) {
+      const startIdx = i + 1 - PITY_INTERVAL_4STAR
       const window = results.slice(startIdx, i + 1)
       const hasHighStar = window.some(r => r.category === 'character' && r.item.star >= 4)
       if (!hasHighStar) {

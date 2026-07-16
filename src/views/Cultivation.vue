@@ -1057,6 +1057,7 @@ watch([allMembers, teamMembers], () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
 .char-info {
   flex: 1;
@@ -1736,6 +1737,7 @@ watch([allMembers, teamMembers], () => {
   width: 100%;
   height: 100%;
   object-fit: cover;
+  object-position: top center;
 }
 .bench-info {
   flex: 1;

@@ -1172,11 +1172,12 @@ onUnmounted(() => {
 }
 .zone-image {
   width: 100%;
-  max-height: 160px;
-  object-fit: cover;
+  max-height: 240px;
+  object-fit: contain;
   border-radius: 8px;
   margin-bottom: 12px;
   opacity: 0.85;
+  background-color: rgba(0, 0, 0, 0.2);
 }
 .difficulty-badge {
   padding: 4px 12px;
