@@ -349,6 +349,31 @@
               <span class="team-hp-text">{{ m.hpPercent }}</span>
             </div>
           </div>
+          <!-- 秘境怪物状态（位于队伍信息下方） -->
+          <div v-if="idleDashboard.enemy" class="dash-enemy">
+            <div class="dash-enemy-title">
+              <span class="dash-enemy-emoji">👹</span>
+              <span>秘境怪物状态</span>
+              <span class="enemy-tier-badge" :class="'tier-' + idleDashboard.enemy.tier">{{ { boss: 'BOSS', elite: '精英', normal: '普通' }[idleDashboard.enemy.tier] || '普通' }}</span>
+            </div>
+            <div class="dash-enemy-name">
+              {{ idleDashboard.enemy.name }}
+              <span v-if="idleDashboard.enemy.realm" class="enemy-realm">{{ idleDashboard.enemy.realm }}</span>
+            </div>
+            <div class="enemy-hp-bar">
+              <div class="enemy-hp-fill" :style="{ width: idleDashboard.enemy.hpPercent }"></div>
+              <span class="enemy-hp-text">{{ idleDashboard.enemy.currentHealth }} / {{ idleDashboard.enemy.maxHealth }}（{{ idleDashboard.enemy.hpPercent }}）</span>
+            </div>
+            <div class="enemy-stats-grid">
+              <div class="enemy-stat"><span class="es-label">攻击</span><span class="es-value">{{ idleDashboard.enemy.damage }}</span></div>
+              <div class="enemy-stat"><span class="es-label">防御</span><span class="es-value">{{ idleDashboard.enemy.defense }}</span></div>
+              <div class="enemy-stat"><span class="es-label">速度</span><span class="es-value">{{ idleDashboard.enemy.speed }}</span></div>
+              <div class="enemy-stat"><span class="es-label">暴击</span><span class="es-value">{{ idleDashboard.enemy.critRate }}</span></div>
+            </div>
+            <div v-if="idleDashboard.enemy.effects && idleDashboard.enemy.effects.length" class="enemy-effects">
+              <span v-for="(fx, i) in idleDashboard.enemy.effects" :key="i" class="enemy-effect" :class="fx.type">{{ fx.name }}</span>
+            </div>
+          </div>
           <!-- 最近获得的装备（即时显示） -->
           <div v-if="idleDashboard.recentEquipment && idleDashboard.recentEquipment.length" class="dash-equipment">
             <div class="dash-equipment-title">
@@ -2743,6 +2768,113 @@ onUnmounted(() => {
   font-size: 11px;
 }
 
+/* 秘境怪物状态面板（挂机仪表盘内，队伍信息下方） */
+.dash-enemy {
+  margin-top: 10px;
+  padding: 10px;
+  border-top: 1px solid rgba(255, 255, 255, 0.08);
+  background: rgba(0, 0, 0, 0.22);
+  border-radius: 8px;
+}
+.dash-enemy-title {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  font-size: 13px;
+  font-weight: bold;
+  color: #FF6B6B;
+  margin-bottom: 6px;
+}
+.dash-enemy-emoji {
+  font-size: 15px;
+}
+.enemy-tier-badge {
+  margin-left: auto;
+  font-size: 10px;
+  font-weight: bold;
+  padding: 1px 7px;
+  border-radius: 10px;
+  letter-spacing: 1px;
+}
+.enemy-tier-badge.tier-boss { background: rgba(196, 77, 77, 0.25); color: #FF8A8A; border: 1px solid rgba(196, 77, 77, 0.5); }
+.enemy-tier-badge.tier-elite { background: rgba(122, 90, 160, 0.25); color: #C9A0E8; border: 1px solid rgba(122, 90, 160, 0.5); }
+.enemy-tier-badge.tier-normal { background: rgba(122, 158, 126, 0.25); color: #B6D4B8; border: 1px solid rgba(122, 158, 126, 0.5); }
+.dash-enemy-name {
+  font-size: 14px;
+  font-weight: bold;
+  color: #fff;
+  margin-bottom: 6px;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+}
+.enemy-realm {
+  font-size: 11px;
+  font-weight: normal;
+  color: #b0a89c;
+}
+.enemy-hp-bar {
+  position: relative;
+  height: 16px;
+  background: rgba(0, 0, 0, 0.35);
+  border-radius: 8px;
+  overflow: hidden;
+  margin-bottom: 4px;
+}
+.enemy-hp-fill {
+  height: 100%;
+  background: linear-gradient(90deg, #ff5252, #ff8a50);
+  border-radius: 8px;
+  transition: width 0.3s;
+}
+.enemy-hp-text {
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  text-align: center;
+  font-size: 11px;
+  line-height: 16px;
+  color: #fff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
+}
+.enemy-stats-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 6px;
+  margin-top: 6px;
+}
+.enemy-stat {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  padding: 4px 2px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 6px;
+}
+.es-label {
+  font-size: 10px;
+  color: #9e968a;
+}
+.es-value {
+  font-size: 14px;
+  font-weight: bold;
+  color: #ffd9b0;
+}
+.enemy-effects {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-top: 6px;
+}
+.enemy-effect {
+  font-size: 10px;
+  padding: 1px 7px;
+  border-radius: 10px;
+}
+.enemy-effect.buff { background: rgba(76, 175, 80, 0.2); color: #7ed47f; border: 1px solid rgba(76, 175, 80, 0.4); }
+.enemy-effect.debuff { background: rgba(255, 82, 82, 0.2); color: #ff8a8a; border: 1px solid rgba(255, 82, 82, 0.4); }
+
 /* 全屏立绘查看器 */
 .avatar-fullscreen {
   position: fixed;
@@ -2897,5 +3029,82 @@ html:not(.dark) .material-name {
 }
 html:not(.dark) .material-amount {
   color: #8B6914;
+}
+
+/* 日间模式：挂机仪表盘深色底衬（适度、不厚重），文字清晰可读 */
+html:not(.dark) .idle-dashboard {
+  background: rgba(33, 29, 24, 0.35);
+  border-color: rgba(255, 215, 0, 0.28);
+}
+html:not(.dark) .dashboard-title {
+  color: #FFD86B;
+}
+html:not(.dark) .dash-value {
+  color: #FBF7EF;
+}
+html:not(.dark) .dash-label {
+  color: #D9D2C5;
+}
+html:not(.dark) .dash-buffs-title,
+html:not(.dark) .dash-team-title,
+html:not(.dark) .dash-equipment-title {
+  color: #FFD86B;
+}
+html:not(.dark) .dash-buff-item.positive {
+  background: rgba(76, 175, 80, 0.22);
+  color: #B6E6B8;
+}
+html:not(.dark) .dash-buff-item.negative {
+  background: rgba(255, 82, 82, 0.22);
+  color: #FFB3B3;
+}
+html:not(.dark) .buff-remaining {
+  color: #C9C2B6;
+}
+html:not(.dark) .team-name {
+  color: #EFE9DD;
+}
+html:not(.dark) .team-hp-text {
+  color: #D9D2C5;
+}
+html:not(.dark) .eq-slot,
+html:not(.dark) .eq-rarity {
+  color: #CFC8BC;
+}
+
+/* 日间模式：秘境怪物状态面板深色底衬（略浅于仪表盘主底衬） */
+html:not(.dark) .dash-enemy {
+  background: rgba(40, 35, 28, 0.3);
+}
+html:not(.dark) .dash-enemy-title {
+  color: #FF8585;
+}
+html:not(.dark) .dash-enemy-name {
+  color: #FBF7EF;
+}
+html:not(.dark) .enemy-realm {
+  color: #C9C2B6;
+}
+html:not(.dark) .enemy-hp-bar {
+  background: rgba(0, 0, 0, 0.4);
+}
+html:not(.dark) .enemy-hp-text {
+  color: #FBF7EF;
+}
+html:not(.dark) .es-label {
+  color: #C9C2B6;
+}
+html:not(.dark) .es-value {
+  color: #FFD9B0;
+}
+html:not(.dark) .enemy-effect.buff {
+  background: rgba(76, 175, 80, 0.25);
+  color: #B6E6B8;
+  border-color: rgba(76, 175, 80, 0.45);
+}
+html:not(.dark) .enemy-effect.debuff {
+  background: rgba(255, 82, 82, 0.25);
+  color: #FFB3B3;
+  border-color: rgba(255, 82, 82, 0.45);
 }
 </style>

@@ -34,6 +34,7 @@ const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: ''
 const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
+const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
 
@@ -1729,6 +1730,7 @@ async function runIdleEncounter() {
     const firstResult = teamResults[0]
     const enemyData = firstResult?.result?.enemy ? { mainEnemy: firstResult.result.enemy, allBosses: firstResult.result.allBosses || [] } : generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
     const enemy = enemyData.mainEnemy
+    currentIdleEnemy.value = enemy // 暴露给挂机仪表盘怪物状态面板
     
     // 收集所有成员的战斗结果数据
     const combatResults = teamResults.map(tr => ({
@@ -2181,6 +2183,7 @@ function finishIdle() {
   s.saveData()
   s.saveToCurrentSlot().catch(err => console.error('挂机结束自动存档失败:', err))
   isIdling.value = false
+  currentIdleEnemy.value = null
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
   
@@ -2303,7 +2306,31 @@ const idleDashboard = computed(() => {
       affixes: eq.affixes,
       time: eq._pickedAt || Date.now()
     })),
-    totalPhantomCrystals: runStats.value.phantomCrystals
+    totalPhantomCrystals: runStats.value.phantomCrystals,
+    // 当前挂机遭遇的怪物状态（挂机仪表盘怪物状态面板）
+    enemy: currentIdleEnemy.value ? (() => {
+      const en = currentIdleEnemy.value
+      const maxHP = Math.round(en.stats?.maxHealth || en.currentHealth || en.maxHealth || 0)
+      const curHP = Math.round(en.currentHealth ?? maxHP)
+      const effects = Array.isArray(en.effects) ? en.effects.map(e => ({
+        name: e?.name || '未知状态',
+        type: e?.type || 'debuff',
+        duration: e?.duration ?? null
+      })) : []
+      return {
+        name: en.name,
+        tier: en.tier || 'normal',
+        realm: en.realm || '',
+        currentHealth: curHP,
+        maxHealth: maxHP,
+        hpPercent: maxHP > 0 ? Math.max(0, Math.min(100, (curHP / maxHP) * 100)).toFixed(0) + '%' : '0%',
+        damage: Math.round(en.stats?.damage || 0),
+        defense: Math.round(en.stats?.defense || 0),
+        speed: Math.round(en.stats?.speed || 0),
+        critRate: en.stats?.critRate != null ? (en.stats.critRate * 100).toFixed(0) + '%' : '—',
+        effects
+      }
+    })() : null
   }
 })
 
@@ -2331,6 +2358,7 @@ export function useIdleSystem() {
     idlePlayerHP,
     idlePlayerMaxHP,
     idlePlayerDefeated,
+    currentIdleEnemy,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,
