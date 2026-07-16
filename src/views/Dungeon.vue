@@ -99,6 +99,56 @@
                 </div>
               </div>
             </div>
+            <!-- 当前遭遇怪物状态面板 -->
+            <n-card class="enemy-status-card" :bordered="false" v-if="dungeonState.combatManager?.enemy">
+              <template #header>
+                <span class="enemy-status-title">👹 当前遭遇：{{ dungeonState.combatManager.enemy.name }}</span>
+              </template>
+              <!-- 血条 -->
+              <div class="es-hp-row">
+                <span class="es-hp-label">生命</span>
+                <div class="es-hp-bar">
+                  <div
+                    class="es-hp-fill"
+                    :style="{
+                      width: `${
+                        (dungeonState.combatManager.enemy.currentHealth /
+                          dungeonState.combatManager.enemy.stats.maxHealth) *
+                        100
+                      }%`
+                    }"
+                  ></div>
+                </div>
+                <span class="es-hp-text">
+                  {{ dungeonState.combatManager.enemy.currentHealth.toFixed(1) }} /
+                  {{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}
+                </span>
+              </div>
+              <!-- 数值信息 -->
+              <div class="es-stats-grid">
+                <div class="es-stat"><span>攻击力</span><b>{{ dungeonState.combatManager.enemy.stats.damage.toFixed(1) }}</b></div>
+                <div class="es-stat"><span>防御力</span><b>{{ dungeonState.combatManager.enemy.stats.defense.toFixed(1) }}</b></div>
+                <div class="es-stat"><span>速度</span><b>{{ dungeonState.combatManager.enemy.stats.speed.toFixed(1) }}</b></div>
+                <div class="es-stat"><span>生命上限</span><b>{{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}</b></div>
+              </div>
+              <!-- 正面/负面状态 -->
+              <div class="es-status-group">
+                <div class="es-status-col">
+                  <div class="es-status-title positive">正面状态</div>
+                  <div v-for="s in enemyPositiveStatuses" :key="s.name" class="es-status-chip positive">
+                    {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
+                  </div>
+                  <div v-if="enemyPositiveStatuses.length === 0" class="es-status-empty">无</div>
+                </div>
+                <div class="es-status-col">
+                  <div class="es-status-title negative">负面状态</div>
+                  <div v-for="s in enemyNegativeStatuses" :key="s.name" class="es-status-chip negative">
+                    {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
+                  </div>
+                  <div v-if="enemyNegativeStatuses.length === 0" class="es-status-empty">无</div>
+                </div>
+              </div>
+            </n-card>
             <n-modal
               v-model:show="infoShow"
               preset="dialog"
@@ -355,6 +405,34 @@
     showingOptions: false,
     currentOptions: [],
     combatManager: null
+  })
+
+  // 当前遭遇怪物的正面状态（抗性类等对怪物有利的战斗状态）
+  const enemyPositiveStatuses = computed(() => {
+    const e = dungeonState.value.combatManager?.enemy
+    if (!e || !e.stats) return []
+    const s = e.stats
+    return [
+      { name: '抗眩晕', value: s.stunResist || 0 },
+      { name: '抗吸血', value: s.vampireResist || 0 },
+      { name: '抗暴击', value: s.critResist || 0 },
+      { name: '抗反击', value: s.counterResist || 0 },
+      { name: '抗闪避', value: s.dodgeResist || 0 }
+    ].filter(x => x.value > 0)
+  })
+
+  // 当前遭遇怪物的负面状态（眩晕/吸血等异常类、对玩家不利的战斗状态）
+  const enemyNegativeStatuses = computed(() => {
+    const e = dungeonState.value.combatManager?.enemy
+    if (!e || !e.stats) return []
+    const s = e.stats
+    return [
+      { name: '眩晕', value: s.stunRate || 0 },
+      { name: '吸血', value: s.vampireRate || 0 },
+      { name: '反击', value: s.counterRate || 0 },
+      { name: '暴击', value: s.critRate || 0 },
+      { name: '连击', value: s.comboRate || 0 }
+    ].filter(x => x.value > 0)
   })
 
   // 当前战斗日志
@@ -752,6 +830,147 @@
     height: 100%;
     background: #ff0000;
     transition: width 0.3s ease;
+  }
+
+  /* 当前遭遇怪物状态面板 */
+  .enemy-status-card {
+    margin-bottom: 16px;
+    background: linear-gradient(135deg, rgba(60, 10, 20, 0.55), rgba(20, 10, 30, 0.55));
+    border: 1px solid rgba(233, 30, 99, 0.4);
+    border-radius: 12px;
+    box-shadow: 0 4px 18px rgba(233, 30, 99, 0.15);
+  }
+
+  .enemy-status-title {
+    font-weight: 700;
+    font-size: 15px;
+    color: #ff8aa8;
+    letter-spacing: 0.5px;
+  }
+
+  .es-hp-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    margin-bottom: 12px;
+  }
+
+  .es-hp-label {
+    font-size: 12px;
+    color: #ffb3c6;
+    white-space: nowrap;
+  }
+
+  .es-hp-bar {
+    flex: 1;
+    height: 16px;
+    background: rgba(0, 0, 0, 0.45);
+    border-radius: 8px;
+    overflow: hidden;
+    border: 1px solid rgba(255, 255, 255, 0.12);
+  }
+
+  .es-hp-fill {
+    height: 100%;
+    background: linear-gradient(90deg, #ff4d4f, #ff7875);
+    transition: width 0.4s ease;
+    box-shadow: 0 0 8px rgba(255, 77, 79, 0.6);
+  }
+
+  .es-hp-text {
+    font-size: 12px;
+    font-weight: 600;
+    color: #fff;
+    white-space: nowrap;
+  }
+
+  .es-stats-grid {
+    display: grid;
+    grid-template-columns: repeat(4, 1fr);
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .es-stat {
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+    padding: 8px 4px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 8px;
+    border: 1px solid rgba(255, 255, 255, 0.08);
+  }
+
+  .es-stat span {
+    font-size: 11px;
+    color: #c9c9c9;
+    margin-bottom: 4px;
+  }
+
+  .es-stat b {
+    font-size: 15px;
+    color: #ffd666;
+    font-weight: 700;
+  }
+
+  .es-status-group {
+    display: flex;
+    gap: 12px;
+  }
+
+  .es-status-col {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+  }
+
+  .es-status-title {
+    font-size: 12px;
+    font-weight: 700;
+    padding: 4px 8px;
+    border-radius: 6px;
+    text-align: center;
+  }
+
+  .es-status-title.positive {
+    color: #95de64;
+    background: rgba(82, 196, 26, 0.12);
+    border: 1px solid rgba(82, 196, 26, 0.4);
+  }
+
+  .es-status-title.negative {
+    color: #ff7875;
+    background: rgba(255, 77, 79, 0.12);
+    border: 1px solid rgba(255, 77, 79, 0.4);
+  }
+
+  .es-status-chip {
+    font-size: 12px;
+    padding: 5px 8px;
+    border-radius: 6px;
+    text-align: center;
+    font-weight: 600;
+  }
+
+  .es-status-chip.positive {
+    color: #b7eb8f;
+    background: rgba(82, 196, 26, 0.18);
+    border: 1px solid rgba(82, 196, 26, 0.5);
+  }
+
+  .es-status-chip.negative {
+    color: #ffccc7;
+    background: rgba(255, 77, 79, 0.18);
+    border: 1px solid rgba(255, 77, 79, 0.5);
+  }
+
+  .es-status-empty {
+    font-size: 12px;
+    color: #888;
+    padding: 4px 8px;
+    text-align: center;
+    font-style: italic;
   }
 
   .character.attack {
