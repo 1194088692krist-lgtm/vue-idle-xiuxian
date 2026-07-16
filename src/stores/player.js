@@ -1074,7 +1074,7 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '装备不存在' }
       }
       targetEquip.stats = { ...newStats }
-      this.refinementStones -= enhanceConfig.costPerAttempt
+      this.refinementStones -= reforgeConfig.costPerAttempt
       const usedSafe = this.reforgeSafeCharges > 0
       if (usedSafe) {
         this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
@@ -1130,7 +1130,7 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '洗练石不足' }
       }
       targetEquip.stats = { ...newStats }
-      this.refinementStones -= enhanceConfig.costPerAttempt
+      this.refinementStones -= reforgeConfig.costPerAttempt
       const usedSafe = this.reforgeSafeCharges > 0
       if (usedSafe) {
         this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)

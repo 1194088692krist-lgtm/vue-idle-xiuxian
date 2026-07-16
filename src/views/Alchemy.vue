@@ -293,6 +293,97 @@
 
             <!-- 洗练子菜单 -->
             <template v-if="forgeTab === 'reforge'">
+              <template v-if="selectedForgeEquip">
+                <div class="section forge-actions-section">
+                  <h3 class="section-title">洗练方式</h3>
+                  <div class="reforge-mode">
+                    <button
+                      class="btn-primary"
+                      :class="{ active: reforgeMode === 'all' }"
+                      @click="reforgeMode = 'all'"
+                    >
+                      全部洗练
+                    </button>
+                    <button
+                      class="btn-info"
+                      :class="{ active: reforgeMode === 'single' }"
+                      @click="reforgeMode = 'single'"
+                    >
+                      单条洗练
+                    </button>
+                  </div>
+                </div>
+
+                <template v-if="reforgeMode === 'single'">
+                  <div class="section forge-actions-section">
+                    <h3 class="section-title">选择词条</h3>
+                    <div class="stat-select">
+                      <button
+                        v-for="(val, key) in selectedForgeEquip.stats"
+                        :key="key"
+                        class="stat-btn"
+                        :class="{ active: selectedReforgeStat === key }"
+                        @click="selectedReforgeStat = key"
+                      >
+                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                      </button>
+                    </div>
+                  </div>
+                </template>
+
+                <div class="section forge-actions-section">
+                  <h3 class="section-title">洗练消耗</h3>
+                  <div class="cost-list">
+                    <div class="cost-item">
+                      <span class="cost-name">洗练石</span>
+                      <span class="cost-value" :class="{ insufficient: playerStore.refinementStones < reforgeConfig.costPerAttempt }">
+                        {{ playerStore.refinementStones || 0 }} / {{ reforgeConfig.costPerAttempt }}
+                      </span>
+                    </div>
+                  </div>
+                  <div class="reforge-safe">
+                    <span>定灵丹保底: {{ playerStore.reforgeSafeCharges }} 次</span>
+                  </div>
+                </div>
+
+                <div class="action-section forge-actions-section">
+                  <button
+                    class="btn-primary reforge-button"
+                    :disabled="!canReforge(selectedForgeEquip)"
+                    @click="handleReforge"
+                  >
+                    洗练
+                  </button>
+                </div>
+
+                <template v-if="reforgeResult">
+                  <div class="section forge-actions-section">
+                    <h3 class="section-title">洗练结果</h3>
+                    <div class="reforge-result glass-card">
+                      <div class="reforge-compare">
+                        <div class="reforge-old">
+                          <h4>原属性</h4>
+                          <div v-for="(val, key) in reforgeResult.oldStats" :key="key" class="reforge-stat">
+                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                          </div>
+                        </div>
+                        <div class="reforge-arrow">→</div>
+                        <div class="reforge-new">
+                          <h4>新属性</h4>
+                          <div v-for="(val, key) in reforgeResult.newStats" :key="key" class="reforge-stat">
+                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                          </div>
+                        </div>
+                      </div>
+                      <div class="reforge-actions">
+                        <button class="btn-small" @click="reforgeResult = null">保留原属性</button>
+                        <button class="btn-small btn-primary" @click="confirmReforgeResult">确认替换</button>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+
               <div class="section">
                 <h3 class="section-title">选择装备</h3>
                 <div class="forge-pagination" v-if="forgeFilteredEquipments.length > forgePageSize">
@@ -327,97 +418,6 @@
                 </div>
                 <div v-if="forgeFilteredEquipments.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
-
-              <template v-if="selectedForgeEquip">
-                <div class="section">
-                  <h3 class="section-title">洗练方式</h3>
-                  <div class="reforge-mode">
-                    <button
-                      class="btn-primary"
-                      :class="{ active: reforgeMode === 'all' }"
-                      @click="reforgeMode = 'all'"
-                    >
-                      全部洗练
-                    </button>
-                    <button
-                      class="btn-info"
-                      :class="{ active: reforgeMode === 'single' }"
-                      @click="reforgeMode = 'single'"
-                    >
-                      单条洗练
-                    </button>
-                  </div>
-                </div>
-
-                <template v-if="reforgeMode === 'single'">
-                  <div class="section">
-                    <h3 class="section-title">选择词条</h3>
-                    <div class="stat-select">
-                      <button
-                        v-for="(val, key) in selectedForgeEquip.stats"
-                        :key="key"
-                        class="stat-btn"
-                        :class="{ active: selectedReforgeStat === key }"
-                        @click="selectedReforgeStat = key"
-                      >
-                        {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
-                      </button>
-                    </div>
-                  </div>
-                </template>
-
-                <div class="section">
-                  <h3 class="section-title">洗练消耗</h3>
-                  <div class="cost-list">
-                    <div class="cost-item">
-                      <span class="cost-name">洗练石</span>
-                      <span class="cost-value" :class="{ insufficient: playerStore.refinementStones < reforgeConfig.costPerAttempt }">
-                        {{ playerStore.refinementStones }} / {{ reforgeConfig.costPerAttempt }}
-                      </span>
-                    </div>
-                  </div>
-                  <div class="reforge-safe">
-                    <span>定灵丹保底: {{ playerStore.reforgeSafeCharges }} 次</span>
-                  </div>
-                </div>
-
-                <div class="action-section">
-                  <button
-                    class="btn-primary reforge-button"
-                    :disabled="!canReforge(selectedForgeEquip)"
-                    @click="handleReforge"
-                  >
-                    洗练
-                  </button>
-                </div>
-
-                <template v-if="reforgeResult">
-                  <div class="section">
-                    <h3 class="section-title">洗练结果</h3>
-                    <div class="reforge-result glass-card">
-                      <div class="reforge-compare">
-                        <div class="reforge-old">
-                          <h4>原属性</h4>
-                          <div v-for="(val, key) in reforgeResult.oldStats" :key="key" class="reforge-stat">
-                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
-                          </div>
-                        </div>
-                        <div class="reforge-arrow">→</div>
-                        <div class="reforge-new">
-                          <h4>新属性</h4>
-                          <div v-for="(val, key) in reforgeResult.newStats" :key="key" class="reforge-stat">
-                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
-                          </div>
-                        </div>
-                      </div>
-                      <div class="reforge-actions">
-                        <button class="btn-small" @click="reforgeResult = null">保留原属性</button>
-                        <button class="btn-small btn-primary" @click="confirmReforgeResult">确认替换</button>
-                      </div>
-                    </div>
-                  </div>
-                </template>
-              </template>
             </template>
 
             <!-- 分解子菜单 -->
@@ -998,10 +998,22 @@
       speed: '速度',
       critRate: '暴击率',
       critDamage: '暴击伤害',
+      critDamageBoost: '暴击伤害加成',
+      critDamageReduce: '暴击伤害减免',
+      critResist: '抗暴击率',
       dodgeRate: '闪避率',
+      dodgeResist: '抗闪避率',
       blockRate: '格挡率',
+      counterRate: '反击率',
+      counterResist: '抗反击率',
+      stunRate: '眩晕率',
+      stunResist: '抗眩晕率',
+      comboRate: '连击率',
+      comboResist: '抗连击率',
+      vampireRate: '吸血率',
       hpRegen: '生命恢复',
       mpRegen: '法力恢复',
+      maxMana: '最大法力',
       goldFind: '金币获取',
       expGain: '经验获取',
       dropRate: '掉落率',
@@ -1010,13 +1022,17 @@
       damageReduction: '伤害减免',
       skillDamage: '技能伤害',
       healingEffect: '治疗效果',
+      healBoost: '治疗加成',
       elementalDamage: '元素伤害',
       elementalResist: '元素抗性',
+      resistanceBoost: '抗性加成',
       petAttack: '宠物攻击',
       petDefense: '宠物防御',
       petHealth: '宠物生命',
       allStats: '全属性',
       finalDamage: '最终伤害',
+      finalDamageBoost: '最终伤害加成',
+      finalDamageReduce: '最终伤害减免',
       finalDefense: '最终防御',
       damagePerSecond: '每秒伤害',
       damagePerHit: '每次伤害',
@@ -1025,9 +1041,12 @@
       lifesteal: '吸血',
       spellDamage: '法术伤害',
       physicalDamage: '物理伤害',
-      maxMana: '最大法力',
       energyRegen: '能量恢复',
-      skillCooldown: '技能冷却'
+      skillCooldown: '技能冷却',
+      haste: '急速',
+      spiritRate: '灵力获取',
+      cultivationRate: '修炼速度',
+      combatBoost: '战斗加成'
     }
     return statNames[statKey] || statKey
   }
@@ -1959,22 +1978,28 @@
   }
 
   .reforge-result {
-    padding: 20px;
+    padding: 16px;
+    max-height: 60vh;
+    overflow-y: auto;
   }
 
   .reforge-compare {
     display: flex;
-    justify-content: space-around;
-    gap: 20px;
+    justify-content: space-between;
+    gap: 12px;
     margin-bottom: 16px;
+    flex-wrap: wrap;
   }
 
   .reforge-old,
   .reforge-new {
     flex: 1;
-    padding: 16px;
+    min-width: 140px;
+    padding: 12px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 8px;
+    max-height: 300px;
+    overflow-y: auto;
   }
 
   .reforge-old h4,
