@@ -103,6 +103,12 @@ const router = createRouter({
 
 router.beforeEach((to, from, next) => {
   if (to.meta.requiresGame) {
+    const auth = useAuthStore()
+    if (!auth.isLoggedIn) {
+      // 未登录：跳回开始界面
+      next('/')
+      return
+    }
     const playerStore = usePlayerStore()
     if (playerStore.isNewPlayer && !playerStore.name) {
       next('/')
