@@ -21,7 +21,7 @@ const enhanceConfig = {
     11: { type: 'supreme_enhance_stone', count: 4 },
     12: { type: 'supreme_enhance_stone', count: 8 }
   },
-  enhanceMult: 1.5
+  enhanceMult: 1.2
 }
 
 // 洗练配置

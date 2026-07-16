@@ -1,14 +1,70 @@
 export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
-<strong>当前版本：v1.3.0 · 神兵天工（2026-07-15）</strong>
+<strong>当前版本：v1.3.1 · 神兵天工（2026-07-15）</strong>
 
-<blockquote>一份基于游戏真实代码与数值的详尽攻略，覆盖宗门体系、角色定位、资源体系、修炼突破、装备 Build、灵宠、挂机探索（含小剧场）、分区难度、抽卡、丹药、战斗公式与进阶策略。</blockquote>
-
-
+<blockquote>一份基于游戏真实代码与数值的详尽攻略，覆盖两大核心系统（人物+装备）、宗门体系、角色定位、资源体系、修炼突破、装备 Build、灵宠、挂机探索、分区难度、抽卡、丹药、战斗公式与进阶策略。</blockquote>
 
 <hr>
 
-<h2>🆕 近期（最近 2 天）海量更新摘要</h2>
+<h2>🎯 核心玩法速览</h2>
+
+<blockquote><strong>最重要的认知</strong>：本游戏战力由<strong>两大核心系统</strong>构成——<strong>人物系统约占40%</strong>，<strong>装备系统约占60%</strong>。优先理解和投入这两大系统，是提升战力的最快途径。</blockquote>
+
+<table>
+<tr><td>系统</td><td>权重</td><td>核心内容</td><td>提升途径</td></tr>
+<thead>
+
+<tr><th>---</th><th>---</th><th>---</th><th>---</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td><strong>🧍 人物系统</strong></td><td><strong>40%</strong></td><td>天赋值、努力值、天赋技能、角色定位、灵宠加成</td><td>抽卡招募、培元丹、回炉重造升星、灵宠培养</td></tr>
+
+<tr><td><strong>⚔️ 装备系统</strong></td><td><strong>60%</strong></td><td>12件装备+法宝、6档品质、12级强化、洗练词条、10套套装</td><td>挂机掉落、抽卡、强化、洗练、套装收集</td></tr>
+
+</tbody>
+
+</table>
+
+<h3>战力构成总览</h3>
+
+<pre><code>角色战力 = (人物裸分 × 0.4 + 装备分 × 0.6) × 等级倍率
+
+├── 人物裸分（40%权重）
+│   ├── 基础属性分（攻击/生命/防御/速度）
+│   ├── 天赋技能分
+│   └── 灵宠分
+│
+├── 装备分（60%权重）
+│   ├── 12件装备评分
+│   └── 套装激活分
+│
+└── 等级倍率 = 1 + (等级-1) × 0.02
+</code></pre>
+
+<ul>
+
+<li><strong>装备是第一生产力</strong>：60%的权重意味着装备的提升对战力影响更大，优先追求高品质、高强化、好词条、套装齐全；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>人物是基础底盘</strong>：40%的权重提供稳定的属性基底，天赋值和努力值决定了角色的上限；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>两者相辅相成</strong>：人物基础属性越高，装备加成的绝对值也越大；装备越好，人物天赋的收益也越高。</li>
+
+</ul>
+
+<hr>
+
+<h2>🆕 近期更新摘要</h2>
 
 <table>
 <tr><td>模块</td><td>关键改动</td></tr>
@@ -20,77 +76,25 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <tbody>
 
-<tr><td><strong>人物系统</strong></td><td>移除详情页突破数字和手动突破按钮；50 名角色描述全面重写，从同质化的"自幼/行走江湖/最终"改为各有特色的事件描述</td></tr>
+<tr><td><strong>装备系统</strong></td><td>新增装备强化12级系统（每级1.2倍指数成长，+4/+8保护机制）、装备洗练系统、装备批量分解系统；装备评分公式改为 品质倍率 × 1.2^强化等级</td></tr>
 
-<tr><td><strong>性别比例</strong></td><td>三星/四星/五星角色调整为 70% 女性（35/50），名称、小传、背景设定同步更新</td></tr>
+<tr><td><strong>人物系统</strong></td><td>新增天赋值与努力值系统（详情页可见，影响基础属性），新增回炉重造升星系统（80级可升星，继承10%努力值为天赋值）</td></tr>
 
-<tr><td><strong>仙缘祈福</strong></td><td>五星角色获取概率从 3% 下调至 1%；每轮 9 连最多获得 2 个人物；4 星概率调整为 19%</td></tr>
+<tr><td><strong>丹方系统</strong></td><td>丹方通过通关对应地图第5重难度解锁，低等级地图对应低品丹方，高等级地图对应高品丹方</td></tr>
 
-<tr><td><strong>背包·素材</strong></td><td>新增多选卖出功能，可选择卖出个数后批量卖出</td></tr>
+<tr><td><strong>宗门系统</strong></td><td>人物数据面板优化，显示前7项数据，超出部分可滚动；点击人物详情在该位置弹出弹窗</td></tr>
 
 <tr><td><strong>背包·装备</strong></td><td>装备卡片显示分类标签（武器/法宝/防具/饰品）；修复仙缘祈福装备在背包不显示的问题</td></tr>
 
-<tr><td><strong>灵宠系统</strong></td><td>放生仅返还精华和升星碎片（不再返还无意义的素材）；升星按钮合并碎片提示</td></tr>
+<tr><td><strong>灵宠系统</strong></td><td>放生仅返还精华和升星碎片；升星按钮合并碎片提示</td></tr>
 
-<tr><td><strong>宗门系统</strong></td><td>人物数据面板限高，显示前 7 项数据，超出部分可滚动；点击人物详情在该位置弹出弹窗</td></tr>
+<tr><td><strong>仪表盘</strong></td><td>移除胜率统计；新增幻灵结晶统计（显示本次探索增量）</td></tr>
 
-<tr><td><strong>仪表盘</strong></td><td>移除胜率统计；在灵石统计后新增幻灵结晶统计（显示本次探索增量）；挂机过程不同角色定位起不同作用（加血、buff 等）</td></tr>
+<tr><td><strong>界面优化</strong></td><td>上品+装备获得弹窗移至挂机日志上方，5秒自动消失；ESC键关闭当前菜单</td></tr>
 
-<tr><td><strong>装备系统</strong></td><td>挂机结算界面显示装备评分，点击可查看详情；修复仪表盘最近获得装备列表数据渲染和评分错误</td></tr>
+</tbody>
 
-<tr><td><strong>界面优化</strong></td><td>上品+装备获得弹窗移至挂机日志上方，5 秒自动消失；ESC 键关闭当前菜单；稀有宝物弹出框增加关闭按钮</td></tr>
-
-<tr><td><strong>版本系统</strong></td><td>新增版本号系统（v1.2.0·洞天万象），在首页、README、攻略中同步显示</td></tr>
-
-<tr><td><strong>攻略更新</strong></td><td>删除过时的"修炼与突破"章节；全面更新宗门信息和人物相关内容</td></tr>
-
-<tr><td><strong>GMTOOLS</strong></td><td>后端代理上传同步素材功能，GitHub PAT 永远不下发到浏览器</td></tr>
-
-<tr><td><strong>灵力系统</strong></td><td>界面最上方灵力改为幻灵结晶，移除灵力相关内容</td></tr>
-
-<tr><td><strong>立绘查看</strong></td><td>人物详情页点击头像可观看立绘大图，头像旁有小字提示</td></tr>
-
-<tr><td><strong>修为系统</strong></td><td>修为进入公共池，可分配给任意人物；分为前期(练气~金丹1-27级)、中期(元婴~化神28-45级)、后期(返虚~大乘46-72级)、终局(渡劫~大罗73-126级)</td></tr>
-
-<tr><td><strong>BOSS系统</strong></td><td>每个地图新增两个专属BOSS，凶险50%、绝境75%、灭世90%概率遇到，掉落专属素材(10%~20%)</td></tr>
-
-<tr><td><strong>难度调整</strong></td><td>高难度场灵石消耗增加（游历10、试炼25、凶险80、绝境200、灭世500）</td></tr>
-
-<tr><td><strong>天赋增益</strong></td><td>确认并修复角色天赋和定位增益实装到角色基础数据</td></tr>
-
-<tr><td><strong>洞天字号</strong></td><td>道号改为洞天字号，移除最上方境界显示（如"金丹四重"）</td></tr>
-
-<tr><td><strong>响应式设计</strong></td><td>移动端保留现有逻辑，桌面端(≥1024px)采用横屏布局，左侧固定导航栏</td></tr>
-
-<tr><td><strong>属性面板优化</strong></td><td>基础/战斗/特殊属性三表合一，最多显示7条，增加灵宠加成，百分比属性显示%</td></tr>
-
-<tr><td><strong>装备详情修复</strong></td><td>探索结算栏装备点击查看详情修复，弹出装备详情页</td></tr>
-
-<tr><td><strong>详情弹窗</strong></td><td>宗门人物详情弹窗靠下显示，不再居中</td></tr>
-
-<tr><td><strong>战斗日志增强</strong></td><td>实时战斗日志体现武器、法宝、天赋技能效果</td></tr>
-
-<tr><td><strong>天赋技能build</strong></td><td>天赋技能合理加入个体build强度计算</td></tr>
-
-<tr><td><strong>自动保存槽</strong></td><td>新增自动保存槽位设计，避免误覆盖存档</td></tr>
-
-<tr><td><strong>宗门标题</strong></td><td>宗门菜单显示洞天字号，如"宗门【无极岛】"</td></tr>
-
-<tr><td><strong>幻灵结晶修复</strong></td><td>修复仪表盘幻灵结晶+NaN错误</td></tr>
-
-<tr><td><strong>战斗平衡修复</strong></td><td>修复build不足时人物丝血不掉的不均衡问题</td></tr>
-
-<tr><td><strong>顶部布局修复</strong></td><td>修复界面最上方文字叠加显示不全问题</td></tr>
-
-<tr><td><strong>装备系统重大更新</strong></td><td>新增装备强化12级系统（每级1.5倍成长，+4/+8保护机制）、装备洗练系统、装备批量分解系统；装备评分公式改为 品质倍率 × 1.5^强化等级</td></tr>
-
-<tr><td><strong>人物系统重大更新</strong></td><td>新增天赋值与努力值系统（详情页可见，影响基础属性），新增回炉重造升星系统（80级可升星，继承10%努力值为天赋值）</td></tr>
-
-<tr><td><strong>丹方系统</strong></td><td>丹方通过通关对应地图第5重难度解锁，低等级地图对应低品丹方，高等级地图对应高品丹方，地图详情页显示解锁提示</td></tr>
-
-<tr><td><strong>挂机奖励UI优化</strong></td><td>移除奖励进度条，仅显示百分比</td></tr>
-
-<hr>
+</table>
 
 <hr>
 
@@ -99,12 +103,11 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 本作是一款 <strong>放置（idle）+ 数值成长</strong> 修仙游戏。核心循环如下：
 
 <pre><code>
-
 打坐修炼 / 自动修炼 → 积累修为至公共池 → 分配给角色升级突破
 
         ↓
 
-   角色"修炼层数"(等级)提升 → 解锁更高秘境 / 更高装备境界要求
+   角色等级提升 → 解锁更高秘境 / 更高装备境界要求
 
         ↓
 
@@ -120,11 +123,11 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
         ↓
 
-   挂机队伍协同战斗 + 小剧场增益 → 挑战更高秘境更高难度 → 更优掉落 → 反哺成长
+   挂机队伍协同战斗 → 挑战更高秘境更高难度 → 更优掉落 → 反哺成长
 
-</pre>
+</pre></code>
 
-<strong>最重要的一条认知</strong>：等级（修炼层数）本身<strong>不直接增加</strong>攻击/生命等战斗数值。真正让你变强的是 <strong>角色阵容、装备 Build、灵宠、套装、丹药永久加成、转生</strong>。等级的作用是：
+<strong>最重要的一条认知</strong>：等级本身<strong>不直接增加</strong>攻击/生命等战斗数值。真正让你变强的是 <strong>角色阵容、装备 Build、灵宠、套装、丹药永久加成、回炉重造</strong>。等级的作用是：
 
 <ul>
 
@@ -140,215 +143,209 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <ul>
 
-<li>每级增加少量基础属性（攻击/生命/防御/速度）。</li>
+<li>每级增加少量基础属性（攻击/生命/防御/速度），通过等级倍率放大战力。</li>
 
 </ul>
 
 <hr>
 
-<h2>2. 宗门系统：队伍与角色管理</h2>
+<h2>🧍 人物系统（40%战力 · 核心支柱一）</h2>
 
-<blockquote><strong>重要</strong>：原「人物」系统已完全被「宗门」取代。底部导航「宗门」即原「人物」页面（<code>Cultivation.vue</code>），所有角色管理、属性查看、装备穿戴、灵宠装备均在此处完成。</blockquote>
+<blockquote><strong>人物系统是游戏两大核心支柱之一，约占总战力的40%。</strong>理解天赋值、努力值、回炉重造三大机制，是打造强力角色的关键。</blockquote>
 
-<h3>2.1 宗门成员</h3>
+<h3>2.1 角色星级与基础属性</h3>
+
+角色分为三个星级，初始天赋值与成长率各不相同：
+
+<table>
+<tr><td>星级</td><td>初始天赋值</td><td>属性倍率</td><td>等级成长</td><td>努力值上限</td></tr>
+<thead>
+
+<tr><th>---</th><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td><strong>三星 ★★★</strong></td><td>100</td><td>×1.0</td><td>×1.0</td><td>135（四星基础×0.9）</td></tr>
+
+<tr><td><strong>四星 ★★★★</strong></td><td>150</td><td>×1.5</td><td>×1.2</td><td>202（五星基础×0.9）</td></tr>
+
+<tr><td><strong>五星 ★★★★★</strong></td><td>225</td><td>×2.5</td><td>×1.5</td><td>无上限</td></tr>
+
+</tbody>
+
+</table>
 
 <ul>
 
-<li>抽卡获得的角色会加入宗门，<strong>宗门上限人数</strong> 由 <code>maxSectSize</code> 控制；</li>
+<li><strong>天赋值决定基础属性基准</strong>：天赋值越高，角色的攻击/生命/防御/速度基础值越高；</li>
 
 </ul>
 
 <ul>
 
-<li>出战队伍最多 <strong>3 人</strong>，从宗门成员中编队；挂机时按队伍总 Build 强度结算战斗；</li>
+<li><strong>等级成长倍率</strong>：每级属性成长量，三星×1、四星×1.2、五星×1.5；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>重复角色自动转换</strong>：抽到已有的角色会自动转为「灵魂碎片」（3★=30、4★=60、5★=70），用于角色突破境界。</li>
+<li><strong>努力值上限</strong>：三/四星努力值有上限（下一星天赋值×0.9），五星无上限，可无限培养。</li>
 
 </ul>
 
-  \`\`<code>
+<h3>2.2 天赋值系统</h3>
 
-  essenceAmount = star × 10 + (star >= 4 ? 20 : 0)
-
-  </code>\`<code>
-
-<h3>2.2 宗门成员管理界面</h3>
-
-在「宗门」页面可以：
+<strong>天赋值（talentValue）</strong>是角色的天生潜力，决定基础属性的基准倍率：
 
 <ul>
 
-<li><strong>下拉选择</strong>查看任一已加入队伍的角色（避免一次展示过多）；</li>
+<li>三星初始天赋值：<strong>100</strong></li>
 
 </ul>
 
 <ul>
 
-<li><strong>三段式属性面板</strong>：显示基础/加成/最终三列，涵盖：</li>
-
-</ul>
-
-  - 主属性（攻击/生命/防御/速度）
-
-  - 战斗属性（暴击率/连击率/反击率/眩晕率/闪避率/吸血率）
-
-  - 特殊属性（抗暴击/抗连击/抗反击/抗眩晕/抗闪避/抗吸血/治疗强化/暴伤强化/暴伤减免/最终增伤/最终减伤/战意/抗性）
-
-<ul>
-
-<li><strong>装备系统</strong>：12 个装备槽位（武器/头部/衣服/裤子/鞋子/肩甲/手套/护腕/项链/戒指×2/腰带），手动穿脱或<strong>一键自动穿戴</strong>最优装备；</li>
+<li>四星初始天赋值：<strong>150</strong></li>
 
 </ul>
 
 <ul>
 
-<li><strong>灵宠系统</strong>：每个角色可装备 1 只灵宠，加成实时叠加到最终属性；<strong>灵宠统一在宗门菜单管理</strong>，背包仅可查看详情；</li>
+<li>五星初始天赋值：<strong>225</strong></li>
 
 </ul>
 
 <ul>
 
-<li><strong>一键卸装</strong>：快速卸下该角色所有装备与灵宠（归还共享背包）；</li>
+<li>天赋值可通过<strong>回炉重造</strong>升星永久提升；</li>
 
 </ul>
 
 <ul>
 
-<li>查看未出战的<strong>候补成员</strong>列表。</li>
+<li>基础属性倍率 = 天赋值 / 星级基础天赋值。</li>
 
 </ul>
 
-<h3>2.3 角色 Build 强度计算</h3>
+<blockquote>例：一个天赋值为180的四星角色，基础属性倍率 = 180/150 = <strong>1.2倍</strong></blockquote>
 
-单个角色的 Build 强度 = 基础属性分 + 装备评分 + 灵宠分 + 套装激活分，再乘以等级倍率：
+<h3>2.3 努力值系统</h3>
 
-<pre><code>
-
-角色Build = (基础属性分 + Σ装备评分 + 灵宠分 + 套装激活分) × (1 + (等级-1)×0.02)
-
-</pre>
+<strong>努力值（effortValue）</strong>是角色后天锻炼的成果，通过服用<strong>培元丹系列丹药</strong>提升：
 
 <ul>
 
-<li>基础属性分 = 攻击×5 + 生命×0.5 + 防御×3 + 速度×8（含天赋加成和努力值加成）</li>
+<li>属性加成公式：<strong>1 + 努力值 / 天赋值</strong>（额外倍率）；</li>
 
 </ul>
 
 <ul>
 
-<li>装备评分 = 每件装备的完整 Build 评分（含词条/品质/强化）</li>
+<li><strong>三星努力值上限</strong>：135（四星基础天赋值150 × 0.9）；</li>
 
 </ul>
 
 <ul>
 
-<li>灵宠分 = 灵宠攻击×5 + 生命×0.5 + 防御×3 + 速度×8</li>
+<li><strong>四星努力值上限</strong>：202（五星基础天赋值225 × 0.9，向下取整）；</li>
 
 </ul>
 
 <ul>
 
-<li>套装激活分 = 2件+200 / 3件+100 / 4件+200 / 5件+300</li>
-
-</ul>
-
-<blockquote>队伍总 Build = 所有出战成员的 Build 之和，这是挂机匹配度的判定基准。</blockquote>
-
-<h3>2.4 天赋值与努力值系统</h3>
-
-<ul>
-
-<li><strong>天赋值（talentValue）</strong>：角色天生潜力，决定基础属性基准倍率；三星初始100，四星初始150，五星初始225；通过回炉重造升星可永久提升</li>
+<li><strong>五星努力值</strong>：无上限，可无限培养；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>努力值（effortValue）</strong>：通过服用培元丹系列丹药提升，后天锻炼成果；按 1+努力值/天赋值 公式额外加成基础属性；三/四星有上限，五星无上限</li>
+<li>努力值越高，属性加成越大，但边际收益递减（因为分母是天赋值）。</li>
+
+</ul>
+
+<blockquote>例：天赋值150、努力值100的四星角色，努力值加成 = 1 + 100/150 = <strong>1.67倍</strong></blockquote>
+
+<h3>2.4 角色属性总公式</h3>
+
+角色最终有效基础属性由天赋值和努力值共同决定：
+
+<pre><code>有效基础属性 = 模板基础属性 × (天赋值 / 星级基础天赋值) × (1 + 努力值 / 天赋值)
+
+简化后：
+有效基础属性 = 模板基础属性 × (天赋值 + 努力值) / 星级基础天赋值
+</code></pre>
+
+<ul>
+
+<li>天赋值和努力值共同作用，两者相加决定最终属性强度；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>属性计算公式</strong>：有效基础属性 = 模板基础属性 × (天赋值/星级基础天赋值) × (1 + 努力值/天赋值)</li>
+<li>提升天赋值（升星）既提升基准倍率，又提升努力值的作用效率；</li>
 
 </ul>
 
 <ul>
 
-<li>回炉重造后努力值归零，但10%永久转化为天赋值继承</li>
+<li>提升努力值直接增加属性总量，但受限于当前星级的上限。</li>
 
 </ul>
 
 <h3>2.5 回炉重造（角色升星）</h3>
 
+角色达到 <strong>80 级</strong> 后可在八卦炉→回炉转生进行升星（3★→4★→5★）：
+
+<table>
+<tr><td>项目</td><td>说明</td></tr>
+<thead>
+
+<tr><th>---</th><th>---</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td><strong>升星条件</strong></td><td>角色等级 ≥ 80级，当前星级 < 5星</td></tr>
+
+<tr><td><strong>等级变化</strong></td><td>重置为1级，需重新修炼</td></tr>
+
+<tr><td><strong>新天赋值</strong></td><td>下一星级基础天赋值 + 原努力值 × 10%</td></tr>
+
+<tr><td><strong>努力值</strong></td><td>归零（但10%已转化为天赋值永久继承）</td></tr>
+
+<tr><td><strong>基础属性</strong></td><td>按新天赋值重新计算（永久提升）</td></tr>
+
+</tbody>
+
+</table>
+
 <ul>
 
-<li>角色达到80级后可在八卦炉→回炉转生进行升星（3★→4★→5★）</li>
+<li><strong>核心价值</strong>：将临时的努力值转化为永久的天赋值，突破当前星级的上限；</li>
 
 </ul>
 
 <ul>
 
-<li>等级重置为1级，需重新修炼</li>
+<li><strong>最优策略</strong>：在升星前尽量把努力值堆满，让10%的继承量最大化；</li>
 
 </ul>
 
 <ul>
 
-<li>新天赋值 = 下一星级基础天赋值 + 原努力值 × 10%</li>
+<li><strong>后期意义</strong>：五星角色无努力值上限，是后期角色成长的终极形态。</li>
 
 </ul>
 
-<ul>
+<blockquote>例：三星角色努力值135（满值）升星到四星：新天赋值 = 150 + 135×10% = 150+13 = <strong>163</strong>（比初始四星的150还高13点）</blockquote>
 
-<li>基础属性按新天赋值重新计算（永久提升）</li>
+<h3>2.6 角色定位（五大修仙定位）</h3>
 
-</ul>
-
-<ul>
-
-<li>努力值归零，但继承的10%已转化为天赋值永久保留</li>
-
-</ul>
-
-<ul>
-
-<li>是后期提升角色上限的核心途径</li>
-
-</ul>
-
-<h3>2.6 共享背包</h3>
-
-宗门所有成员<strong>共享同一个背包</strong>：
-
-<ul>
-
-<li>装备、灵宠在背包中统一管理；</li>
-
-</ul>
-
-<ul>
-
-<li>给某角色装备的物品会从背包移出，卸下后归还背包；</li>
-
-</ul>
-
-<ul>
-
-<li>「一键自动穿戴」会从共享背包中为该角色挑选当前最优装备。</li>
-
-</ul>
-
-<hr>
-
-<h2>3. 角色定位系统（五大修仙定位）</h2>
-
-每个角色拥有一个<strong>定位（role）</strong>，影响挂机战斗中的行动描写与小剧场表现。定位名称采用修仙风命名，但可直观对应传统 RPG 角色：
+每个角色拥有一个<strong>定位（role）</strong>，决定初始属性偏向和挂机战斗中的行动风格：
 
 <table>
 <tr><td>定位</td><td>修仙名</td><td>图标</td><td>对应传统定位</td><td>说明</td></tr>
@@ -360,415 +357,328 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <tbody>
 
-<tr><td>vanguard</td><td><strong>先锋</strong></td><td>⚔️</td><td>主C</td><td>核心输出，队伍的主要战力担当</td></tr>
+<tr><td>vanguard</td><td><strong>先锋</strong></td><td>⚔️</td><td>主C</td><td>核心输出，攻击属性偏高</td></tr>
 
-<tr><td>blade</td><td><strong>刀锋</strong></td><td>🗡️</td><td>附C</td><td>副位输出，补充伤害与连击</td></tr>
+<tr><td>blade</td><td><strong>刀锋</strong></td><td>🗡️</td><td>附C</td><td>副位输出，速度/连击偏高</td></tr>
 
-<tr><td>herb</td><td><strong>药引</strong></td><td>🌿</td><td>辅助</td><td>辅助治疗，为队伍提供续航</td></tr>
+<tr><td>herb</td><td><strong>药引</strong></td><td>🌿</td><td>辅助</td><td>辅助治疗，生命/治疗偏高</td></tr>
 
-<tr><td>shield</td><td><strong>护法</strong></td><td>🛡️</td><td>坦克</td><td>承伤坦克，保护队友免受致命打击</td></tr>
+<tr><td>shield</td><td><strong>护法</strong></td><td>🛡️</td><td>坦克</td><td>承伤坦克，防御/生命偏高</td></tr>
 
-<tr><td>tactician</td><td><strong>掌阵</strong></td><td>📐</td><td>指挥官</td><td>战术核心，掌控全局节奏与阵法</td></tr>
+<tr><td>tactician</td><td><strong>掌阵</strong></td><td>📐</td><td>指挥官</td><td>战术核心，速度/增益偏高</td></tr>
 
-<h3>3.1 角色命名规则</h3>
+</tbody>
 
-角色名按星级分风格：
+</table>
+
+<h3>2.7 天赋技能</h3>
+
+每个角色拥有独特的<strong>天赋技能</strong>，提供永久属性加成或特殊效果：
 
 <ul>
 
-<li><strong>3★</strong>：武侠风命名（墨风、青石、烈无涯、冷月、惊鸿……）；</li>
+<li><strong>剑心通明</strong>：攻击+15%，暴击率+5%</li>
 
 </ul>
 
 <ul>
 
-<li><strong>4★</strong>：过渡风格，半武侠半仙侠（凌霜剑姬、玄机子、赤焰灵尊……）；</li>
+<li><strong>悟道天机</strong>：修炼效率+20%，灵力恢复+15%</li>
 
 </ul>
 
 <ul>
 
-<li><strong>5★</strong>：仙侠风命名（太虚剑帝、混元道祖、九阳焚天真君、万古冰帝……）。</li>
+<li><strong>炎躯</strong>：攻击+12%，最终增伤+10%</li>
 
 </ul>
 
-<h3>3.2 挂机中的角色行动</h3>
+<ul>
 
-挂机日志会<strong>逐一描写每个队伍成员</strong>的战斗行动（而非单纯的「你XXX」），按定位调用不同文案池：
+<li>每个角色的天赋技能各不相同，选择与Build搭配的天赋至关重要。</li>
 
-<pre><code>
+</ul>
 
-先锋：挺身而出，以凌厉攻势直取敌人要害……
+<h3>2.8 宗门与队伍编成</h3>
 
-刀锋：身影如鬼魅般闪烁，快剑连斩三道……
+<ul>
 
-药引：退后一步，指尖凝出碧绿灵光，为队友恢复气血……
+<li>抽卡获得的角色会加入宗门，出战队伍最多 <strong>3 人</strong>；</li>
 
-护法：横身挡在队伍前方，护体真气化作金钟罩……
+</ul>
 
-掌阵：在后方掐指推算，指点道：「左翼包抄，中军压上！」……
+<ul>
 
-</pre>
+<li>队伍总战力 = 所有出战成员的战力之和，决定挂机匹配度；</li>
 
-<blockquote>气血耗尽的角色会显示「气血耗尽，无法参战……」并跳过行动。</blockquote>
+</ul>
+
+<ul>
+
+<li>宗门成员共享同一个背包，装备/灵宠可自由调配；</li>
+
+</ul>
+
+<ul>
+
+<li>「一键自动穿戴」会从共享背包中为角色挑选当前最优装备。</li>
+
+</ul>
 
 <hr>
 
-<h2>4. 资源体系一览</h2>
+<h2>⚔️ 装备系统（60%战力 · 核心支柱二）</h2>
+
+<blockquote><strong>装备系统是游戏两大核心支柱之一，约占总战力的60%。</strong>装备的品质、强化、词条、套装是提升战力的最主要途径。</blockquote>
+
+<h3>3.1 装备品质（6档）</h3>
+
+装备分为6个品质等级，品质越高基础属性越强、词条越多、评分倍率越高：
 
 <table>
-<tr><td>资源</td><td>来源</td><td>用途</td></tr>
+<tr><td>品质</td><td>名称</td><td>颜色</td><td>评分倍率</td><td>词条数上限</td></tr>
 <thead>
 
-<tr><th>---</th><th>---</th><th>---</th></tr>
+<tr><th>---</th><th>---</th><th>---</th><th>---:</th><th>---:</th></tr>
 
 </thead>
 
 <tbody>
 
-<tr><td><strong>灵力</strong></td><td>随时间恢复（2 小时回满上限）、突破奖励</td><td>打坐修炼的消耗</td></tr>
+<tr><td>common</td><td>凡品</td><td>灰</td><td>×1</td><td>1</td></tr>
 
-<tr><td><strong>灵石</strong></td><td>挂机/探索/Boss/出售装备</td><td>购买、强化消耗、兑换幻灵结晶</td></tr>
+<tr><td>uncommon</td><td>良品</td><td>绿</td><td>×1.5</td><td>2</td></tr>
 
-<tr><td><strong>幻灵结晶</strong></td><td>挂机每场产出、灵石兑换（50:1）、新手福利</td><td><strong>抽卡专用货币</strong></td></tr>
+<tr><td>rare</td><td>上品</td><td>蓝</td><td>×2</td><td>3</td></tr>
 
-<tr><td><strong>强化石</strong></td><td>分解装备（按品质 1~6 颗）</td><td>装备强化（+10% 评分/级）</td></tr>
+<tr><td>epic</td><td>极品</td><td>紫</td><td>×3.5</td><td>4</td></tr>
 
-<tr><td><strong>洗练石</strong></td><td>分解非凡品装备（凡品 0，其余 1~5 颗）</td><td>重洗装备词条</td></tr>
+<tr><td>legendary</td><td>仙品</td><td>金</td><td>×6</td><td>5</td></tr>
 
-<tr><td><strong>灵宠精华</strong></td><td>分解灵宠、<strong>放生灵宠报恩</strong>、抽卡资源</td><td>灵宠升级</td></tr>
+<tr><td>mythic</td><td>神品</td><td>红</td><td>×10</td><td>6</td></tr>
 
-<tr><td><strong>灵魂碎片</strong></td><td><strong>抽到重复角色自动转换</strong></td><td>角色突破境界</td></tr>
+</tbody>
 
-<tr><td><strong>素材</strong>（灵草/矿料/灵液/妖核/奇遇）</td><td>挂机、抽卡、炼丹</td><td>炼制丹药</td></tr>
+</table>
 
-<tr><td><strong>修为</strong></td><td>打坐、自动修炼、挂机胜利、被动增长</td><td>突破境界的进度条</td></tr>
+<ul>
 
-<strong>灵力恢复</strong>：</code>regenerateSpirit()<code> 每帧按 </code>maxSpirit / 7,200,000 ms × spiritRate<code> 回充，约 <strong>2 小时回满一次上限</strong>；突破时 </code>spiritRate *= 1.2<code> 复利，越后期回得越快。
+<li>品质倍率直接乘以装备总分，是影响装备评分的关键因素；</li>
 
-<strong>装备分解产出</strong>（</code>QUALITY_STONE_MAP<code>）：
+</ul>
+
+<ul>
+
+<li>高品质装备不仅基础分高，还能拥有更多词条，进一步拉大差距。</li>
+
+</ul>
+
+<h3>3.2 装备槽位（12 + 法宝）</h3>
+
+<pre><code>
+weapon 武器 / head 头部 / body 衣服 / legs 裤子 / feet 鞋子
+shoulder 肩甲 / hands 手套 / wrist 护腕 / necklace 项链
+ring1 戒指 / ring2 戒指 / belt 腰带    ← 共 12 槽，宗门成员可装备
+artifact 法宝                            ← 仅高难 Boss / 抽卡产出
+</code></pre>
+
+<h3>3.3 装备评分公式</h3>
+
+单件装备评分由基础分、词条分、套装分、品质倍率、强化倍率共同决定：
+
+<pre><code>装备评分 = round( (基础分 + 词条分 + 套装分) × 品质倍率 × 1.2^强化等级 )</code></pre>
+
+<ul>
+
+<li><strong>基础分</strong>：装备自带的主属性（攻击/生命/防御/速度等）折算分数；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>词条分</strong>：所有附加词条的分数之和，按tier分级（tier1×1、tier2×1.5、tier3×2.5）；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>套装分</strong>：带套装id的装备固定+50分；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>品质倍率</strong>：凡品×1 → 神品×10；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>强化倍率</strong>：1.2的强化等级次方，指数成长。</li>
+
+</ul>
+
+<h3>3.4 装备强化系统</h3>
+
+装备可强化最多 <strong>12 级</strong>，每级提升 <strong>1.2 倍</strong>属性（指数成长）：
+
+<table>
+<tr><td>强化等级</td><td>属性倍率</td><td>强化石类型</td><td>强化石数量</td></tr>
+<thead>
+
+<tr><th>---:</th><th>---:</th><th>---</th><th>---:</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td>+1</td><td>×1.2</td><td>普通强化石</td><td>5</td></tr>
+
+<tr><td>+2</td><td>×1.44</td><td>普通强化石</td><td>10</td></tr>
+
+<tr><td>+3</td><td>×1.73</td><td>普通强化石</td><td>20</td></tr>
+
+<tr><td>+4</td><td>×2.07</td><td>普通强化石</td><td>40</td></tr>
+
+<tr><td>+5</td><td>×2.49</td><td>高级强化石</td><td>5</td></tr>
+
+<tr><td>+6</td><td>×2.99</td><td>高级强化石</td><td>10</td></tr>
+
+<tr><td>+7</td><td>×3.58</td><td>高级强化石</td><td>20</td></tr>
+
+<tr><td>+8</td><td>×4.30</td><td>高级强化石</td><td>40</td></tr>
+
+<tr><td>+9</td><td>×5.16</td><td>至尊强化石</td><td>1</td></tr>
+
+<tr><td>+10</td><td>×6.19</td><td>至尊强化石</td><td>2</td></tr>
+
+<tr><td>+11</td><td>×7.43</td><td>至尊强化石</td><td>4</td></tr>
+
+<tr><td>+12</td><td>×8.92</td><td>至尊强化石</td><td>8</td></tr>
+
+</tbody>
+
+</table>
+
+<h4>锁定等级机制（失败回退）</h4>
+
+<ul>
+
+<li><strong>+4 保护</strong>：强化 +1~+4 失败归零；+5~+8 失败回到 +4；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>+8 保护</strong>：强化 +9~+12 失败回到 +8；</li>
+
+</ul>
+
+<ul>
+
+<li>基础成功率 90%，随等级提升小幅下降（每级-3%）。</li>
+
+</ul>
+
+<h4>强化石获取途径</h4>
+
+<ul>
+
+<li><strong>普通强化石</strong>：所有地图挂机均可获得；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>高级强化石</strong>：龙渊（难度4）以上地图获得；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>至尊强化石</strong>：分解仙品以上装备概率获得，分解神品必出 1~3 个。</li>
+
+</ul>
+
+<h3>3.5 装备洗练系统</h3>
+
+消耗<strong>洗练石</strong>重洗装备词条属性：
+
+<ul>
+
+<li>支持<strong>全词条洗练</strong>和<strong>单条洗练</strong>两种模式；</li>
+
+</ul>
+
+<ul>
+
+<li>越稀有的装备越容易洗出稀有词条，数值也越高；</li>
+
+</ul>
+
+<ul>
+
+<li>可用<strong>定灵丹</strong>获得保底（洗练不会降低属性）；</li>
+
+</ul>
+
+<ul>
+
+<li>词条按 tier 分档：tier1×1、tier2×1.5、tier3×2.5。</li>
+
+</ul>
+
+<h3>3.6 装备分解系统</h3>
+
+支持<strong>多选批量分解</strong>，一键处理多余装备：
 
 <table>
 <tr><td>品质</td><td>强化石</td><td>洗练石</td></tr>
 <thead>
 
-<tr><th>---</th><th>---</th><th>---</th></tr>
+<tr><th>---</th><th>---:</th><th>---:</th></tr>
 
 </thead>
 
 <tbody>
 
-<tr><td>凡品 common</td><td>1</td><td>0</td></tr>
+<tr><td>凡品</td><td>1</td><td>0</td></tr>
 
-<tr><td>良品 uncommon</td><td>2</td><td>1</td></tr>
+<tr><td>良品</td><td>2</td><td>1</td></tr>
 
-<tr><td>上品 rare</td><td>3</td><td>2</td></tr>
+<tr><td>上品</td><td>3</td><td>2</td></tr>
 
-<tr><td>极品 epic</td><td>4</td><td>3</td></tr>
+<tr><td>极品</td><td>4</td><td>3</td></tr>
 
-<tr><td>仙品 legendary</td><td>5</td><td>4</td></tr>
+<tr><td>仙品</td><td>5</td><td>4</td></tr>
 
-<tr><td>神品 mythic</td><td>6</td><td>5</td></tr>
+<tr><td>神品</td><td>6</td><td>5</td></tr>
 
-<hr>
+</tbody>
 
-<h2>5. 修炼与突破：修为公共池与人物成长</h2>
-
-这是本手册最关键的一节，直接回答「修为如何分配？人物如何成长？有哪些数据上面的成长」。
-
-<h3>5.1 修为公共池</h3>
-
-获得修为后，修为<strong>进入公共池</strong>（</code>cultivationPool<code>），玩家可以自由分配给宗门中的任意角色。修为主要来源：
+</table>
 
 <ul>
 
-<li>挂机胜利</li>
+<li>仙品以上装备概率产出<strong>至尊强化石</strong>；</li>
 
 </ul>
 
 <ul>
 
-<li>打坐修炼 / 自动修炼</li>
+<li>神品装备分解必得 1~3 个至尊强化石。</li>
 
 </ul>
 
-<ul>
+<h3>3.7 套装系统</h3>
 
-<li>被动增长（每10秒）</li>
-
-</ul>
-
-<h3>5.2 修炼阶段划分</h3>
-
-人物修为分为四个阶段，共 <strong>126 级</strong>：
-
-<table>
-<tr><td>阶段</td><td>境界范围</td><td>等级范围</td><td>特点</td></tr>
-<thead>
-
-<tr><th>---</th><th>---</th><th>---</th><th>---</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td><strong>前期</strong></td><td>练气 ~ 金丹</td><td>1~27</td><td>基础成长，突破需求低</td></tr>
-
-<tr><td><strong>中期</strong></td><td>元婴 ~ 化神</td><td>28~45</td><td>成长加速，需要灵石和素材</td></tr>
-
-<tr><td><strong>后期</strong></td><td>返虚 ~ 大乘</td><td>46~72</td><td>高级成长，突破需BOSS专属素材</td></tr>
-
-<tr><td><strong>终局</strong></td><td>渡劫 ~ 大罗</td><td>73~126</td><td>极限成长，突破代价极高</td></tr>
-
-每个大境界包含9重（如练气一重~练气九重），每9级为一个大境界。
-
-<h3>5.3 升级经验计算</h3>
-
-每级所需经验按指数增长：
-
-<pre><code>
-
-升级经验 = floor(100 × 1.15^(等级-1))
-
-</pre>
-
-代表等级的升级经验：
-
-<table>
-<tr><td>等级</td><td>境界</td><td>升级经验</td></tr>
-<thead>
-
-<tr><th>---:</th><th>---</th><th>---:</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td>1</td><td>练气一重</td><td>100</td></tr>
-
-<tr><td>9</td><td>练气九重</td><td>307</td></tr>
-
-<tr><td>10</td><td>筑基一重</td><td>352</td></tr>
-
-<tr><td>27</td><td>金丹九重</td><td>2,985</td></tr>
-
-<tr><td>28</td><td>元婴一重</td><td>3,433</td></tr>
-
-<tr><td>45</td><td>化神九重</td><td>29,172</td></tr>
-
-<tr><td>46</td><td>返虚一重</td><td>33,549</td></tr>
-
-<tr><td>72</td><td>大乘九重</td><td>1,720,023</td></tr>
-
-<tr><td>73</td><td>渡劫一重</td><td>1,978,028</td></tr>
-
-<tr><td>126</td><td>大罗九重</td><td>6.78×10⁸</td></tr>
-
-<h3>5.4 突破机制</h3>
-
-当角色等级为9的倍数时（9、18、27...），升级需要进行<strong>境界突破</strong>。突破消耗：
-
-<ul>
-
-<li><strong>灵石</strong>：随等级和阶段倍率递增</li>
-
-</ul>
-
-<ul>
-
-<li><strong>修为</strong>：升级经验的2倍（含阶段倍率）</li>
-
-</ul>
-
-<ul>
-
-<li><strong>BOSS专属素材</strong>：每9级突破需要1个对应地图的BOSS素材</li>
-
-</ul>
-
-突破成本计算：
-
-<pre><code>
-
-灵石消耗 = floor(100 × 1.3^(等级-1)) × 阶段倍率
-
-修为消耗 = 升级经验 × 2 × 阶段倍率
-
-阶段倍率 = { 前期:1, 中期:3, 后期:10, 终局:30 }
-
-</pre>
-
-<h3>5.5 每级基础数值提升</h3>
-
-升级带来的基础属性增长：
-
-<pre><code>
-
-攻击 += floor(2 × 1.08^(等级-1))
-
-生命 += floor(15 × 1.08^(等级-1))
-
-防御 += floor(1.5 × 1.08^(等级-1))
-
-速度 += floor(0.5 × 1.08^(等级-1))
-
-</pre>
-
-<h3>5.6 BOSS专属素材</h3>
-
-每个地图有两个专属BOSS，击败后有10%~20%概率掉落突破素材。需要选择<strong>凶险及以上难度</strong>才有概率遇到：
-
-<table>
-<tr><td>遇到概率</td><td>凶险</td><td>绝境</td><td>灭世</td></tr>
-<thead>
-
-<tr><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td>遭遇BOSS</td><td>50%</td><td>75%</td><td>90%</td></tr>
-
-各地图BOSS素材：
-
-<table>
-<tr><td>等级</td><td>地图</td><td>素材1</td><td>素材2</td></tr>
-<thead>
-
-<tr><th>---:</th><th>---</th><th>---</th><th>---</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td>9</td><td>青萝林</td><td>野猪獠牙</td><td>山匪令牌</td></tr>
-
-<tr><td>18</td><td>迷雾谷</td><td>蛇鳞</td><td>灵狼皮毛</td></tr>
-
-<tr><td>27</td><td>凤凰窟</td><td>凤凰羽毛</td><td>火焰核心</td></tr>
-
-<tr><td>36</td><td>龙渊</td><td>龙鳞</td><td>龙元</td></tr>
-
-<tr><td>45</td><td>鬼荒原</td><td>鬼气精华</td><td>骨器</td></tr>
-
-<tr><td>54</td><td>冰雪宫</td><td>冰晶</td><td>冰封核心</td></tr>
-
-<tr><td>63</td><td>仙墟</td><td>仙人碎片</td><td>神性精华</td></tr>
-
-<tr><td>72</td><td>混沌界</td><td>混沌水晶</td><td>虚空精华</td></tr>
-
-<hr>
-
-<h2>6. 转生渡劫系统</h2>
-
-达到 <strong>50 级</strong> 可转生，重置等级为 1 但获得<strong>永久属性加成</strong>：
-
-<pre><code>
-
-第 N 世转生加成：
-
-  攻击 +5N    生命 +50N    防御 +3N    速度 +2N
-
-  修炼效率 +10%N    灵力效率 +10%N
-
-</pre>
-
-<ul>
-
-<li>加成<strong>永久沉淀</strong>到 </code>baseAttributes<code> 与倍率，越转越强；</li>
-
-</ul>
-
-<ul>
-
-<li>灵石、装备、物品、宗门成员<strong>全部保留</strong>；</li>
-
-</ul>
-
-<ul>
-
-<li>适合中后期卡 Build 或想冲极限数值的玩家。</li>
-
-</ul>
-
-<hr>
-
-<h2>7. 装备与 Build 体系</h2>
-
-<h3>7.1 装备品质（rarity）</h3>
-
-<table>
-<tr><td>品质</td><td>名称</td><td>颜色</td><td>评分倍率</td><td>词条数</td></tr>
-<thead>
-
-<tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td>common</td><td>凡品</td><td>灰</td><td>×1</td><td>0</td></tr>
-
-<tr><td>uncommon</td><td>良品</td><td>绿</td><td>×1.5</td><td>0~1</td></tr>
-
-<tr><td>rare</td><td>上品</td><td>蓝</td><td>×2</td><td>1~2</td></tr>
-
-<tr><td>epic</td><td>极品</td><td>紫</td><td>×3.5</td><td>2~3</td></tr>
-
-<tr><td>legendary</td><td>仙品</td><td>金</td><td>×6</td><td>3~4</td></tr>
-
-<tr><td>mythic</td><td>神品</td><td>红</td><td>×10</td><td>4~5</td></tr>
-
-<h3>7.2 装备槽位（12 + 法宝）</h3>
-
-<pre><code>
-
-weapon 武器 / head 头部 / body 衣服 / legs 裤子 / feet 鞋子
-
-shoulder 肩甲 / hands 手套 / wrist 护腕 / necklace 项链
-
-ring1 戒指 / ring2 戒指 / belt 腰带    ← 共 12 槽，宗门成员可装备
-
-artifact 法宝                            ← 仅高难 Boss / 抽卡产出
-
-</pre>
-
-<h3>7.3 词缀（affix）与品质倍率</h3>
-
-<ul>
-
-<li>词条按 </code>tier<code> 分档：</code>tier1 ×1<code>、</code>tier2 ×1.5<code>、</code>tier3 ×2.5<code>；</li>
-
-</ul>
-
-<ul>
-
-<li>高 tier 词条（如 </code>增伤/减伤/战意/抗性<code>）对 Build 评分贡献更大；</li>
-
-</ul>
-
-<ul>
-
-<li>单件装备评分公式：</li>
-
-</ul>
-
-<pre><code>
-
-装备评分 = round( (基础分 + 词条分 + 套装分) × 品质倍率 × (1 + 强化等级×0.1) )
-
-</pre>
-
-<h3>7.4 套装（setBonuses）</h3>
-
-集齐同套装多件触发百分比加成：
+集齐同套装多件触发额外Build加成分：
 
 <table>
 <tr><td>套装件数</td><td>Build 加成分</td></tr>
 <thead>
 
-<tr><th>---</th><th>---</th></tr>
+<tr><th>---</th><th>---:</th></tr>
 
 </thead>
 
@@ -782,9 +692,11 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <tr><td>5 件</td><td>+800</td></tr>
 
-游戏内置 10 套（烈焰刃/玄铁卫/疾风影/血牙/雷霆击/不灭体/反击道/灵气髓/战斗王/道仙尊），覆盖攻、防、速、吸血、暴击、生命、修炼等方向。
+</tbody>
 
-<h3>7.5 套装详细数据</h3>
+</table>
+
+游戏内置 10 套套装，覆盖攻、防、速、吸血、暴击、生命、修炼等方向：
 
 <table>
 <tr><td>套装</td><td>部位</td><td>2件效果</td><td>3件效果</td><td>4件效果</td><td>5件效果</td><td>特点</td></tr>
@@ -816,32 +728,162 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <tr><td><strong>道仙尊</strong></td><td>武器/头部/衣服/鞋子/法宝</td><td>攻击+10%</td><td>生命+15%</td><td>暴击率+10%</td><td>最终增伤+20%</td><td>传说套装，道法通天</td></tr>
 
+</tbody>
+
+</table>
+
 <blockquote><strong>套装选择建议</strong>：输出优先烈焰刃/血牙，坦克玄铁卫/不灭体，速度流疾风影，万能战斗王/道仙尊。4~5件套效果远超散件。</blockquote>
 
-<h3>7.5 Build 强度（总评分）</h3>
+<h3>3.8 装备总评分</h3>
 
-<pre><code>
-
-Build强度 = Σ(每件已装备评分) + Σ(套装激活分)
-
-</pre>
+<pre><code>装备总分 = Σ(每件已装备评分) + Σ(套装激活分)</code></pre>
 
 <ul>
 
-<li>挂机时，队伍总 Build = 所有出战成员的 Build 之和；</li>
+<li>挂机时，队伍总装备分按60%权重计入战力；</li>
 
 </ul>
 
 <ul>
 
-<li>这是挂机「推荐 Build 匹配度」的判定基准。</li>
+<li>装备系统是提升战力效率最高的途径，优先投入资源。</li>
 
 </ul>
 
-<h3>7.6 Build 强度参考阶梯（BUILD_TIERS）</h3>
+<hr>
+
+<h2>4. 战力计算详解</h2>
+
+<blockquote>战力是角色综合实力的数值体现，由人物系统（40%）和装备系统（60%）加权计算，再乘以等级倍率。</blockquote>
+
+<h3>4.1 战力总公式</h3>
+
+<pre><code>角色战力 = (人物裸分 × 0.4 + 装备分 × 0.6) × 等级倍率</code></pre>
+
+<h3>4.2 人物裸分构成（40%权重）</h3>
+
+<pre><code>人物裸分 = 基础属性分 + 天赋技能分 + 灵宠分</code></pre>
+
+<ul>
+
+<li><strong>基础属性分</strong> = 攻击×5 + 生命×0.5 + 防御×3 + 速度×8（含天赋值和努力值加成）；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>天赋技能分</strong>：角色天赋技能提供的属性折算分数；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>灵宠分</strong>：出战灵宠的属性折算分数（取0.5系数）。</li>
+
+</ul>
+
+<h3>4.3 装备分构成（60%权重）</h3>
+
+<pre><code>装备分 = 12件装备评分 + 套装激活分</code></pre>
+
+<ul>
+
+<li><strong>12件装备评分</strong>：每件装备的完整评分（含词条/品质/强化）；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>套装激活分</strong>：2件+200 / 3件+100 / 4件+200 / 5件+300。</li>
+
+</ul>
+
+<h3>4.4 等级倍率</h3>
+
+<pre><code>等级倍率 = 1 + (等级-1) × 0.02</code></pre>
+
+<ul>
+
+<li>每升1级，战力额外+2%；</li>
+
+</ul>
+
+<ul>
+
+<li>等级本身不直接增加基础属性，但通过倍率放大人和装备的总分。</li>
+
+</ul>
+
+<h3>4.5 队伍总战力</h3>
+
+<blockquote>队伍总战力 = 所有出战成员的战力之和，这是挂机「推荐 Build 匹配度」的判定基准。</blockquote>
+
+<hr>
+
+<h2>5. 资源体系一览</h2>
 
 <table>
-<tr><td>档位</td><td>名称</td><td>参考 Build</td><td>含义</td></tr>
+<tr><td>资源</td><td>来源</td><td>用途</td></tr>
+<thead>
+
+<tr><th>---</th><th>---</th><th>---</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td><strong>灵石</strong></td><td>挂机/探索/Boss/出售装备</td><td>强化消耗、兑换幻灵结晶、炼丹</td></tr>
+
+<tr><td><strong>幻灵结晶</strong></td><td>挂机每场产出、灵石兑换（50:1）、新手福利</td><td><strong>抽卡专用货币</strong></td></tr>
+
+<tr><td><strong>强化石</strong></td><td>分解装备（按品质 1~6 颗）</td><td>装备强化（1.2倍/级，指数成长）</td></tr>
+
+<tr><td><strong>洗练石</strong></td><td>分解非凡品装备（凡品 0，其余 1~5 颗）</td><td>重洗装备词条</td></tr>
+
+<tr><td><strong>灵宠精华</strong></td><td>分解灵宠、<strong>放生灵宠报恩</strong>、抽卡资源</td><td>灵宠升级</td></tr>
+
+<tr><td><strong>灵魂碎片</strong></td><td><strong>抽到重复角色自动转换</strong></td><td>角色突破境界</td></tr>
+
+<tr><td><strong>素材</strong>（灵草/矿料/灵液/妖核/奇遇）</td><td>挂机、抽卡、炼丹</td><td>炼制丹药</td></tr>
+
+<tr><td><strong>修为</strong></td><td>打坐、自动修炼、挂机胜利、被动增长</td><td>角色升级和突破</td></tr>
+
+</tbody>
+
+</table>
+
+<hr>
+
+<h2>6. 修炼与突破：修为公共池与人物成长</h2>
+
+<h3>6.1 修为公共池</h3>
+
+获得修为后，修为<strong>进入公共池</strong>（<code>cultivationPool</code>），玩家可以自由分配给宗门中的任意角色。修为主要来源：
+
+<ul>
+
+<li>挂机胜利</li>
+
+</ul>
+
+<ul>
+
+<li>打坐修炼 / 自动修炼</li>
+
+</ul>
+
+<ul>
+
+<li>被动增长（每10秒）</li>
+
+</ul>
+
+<h3>6.2 修炼阶段划分</h3>
+
+人物修为分为四个阶段，共 <strong>126 级</strong>：
+
+<table>
+<tr><td>阶段</td><td>境界范围</td><td>等级范围</td><td>特点</td></tr>
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th><th>---</th></tr>
@@ -850,175 +892,162 @@ Build强度 = Σ(每件已装备评分) + Σ(套装激活分)
 
 <tbody>
 
-<tr><td>入门</td><td>入门</td><td>68,000</td><td>全稀有(+10)基础满装</td></tr>
+<tr><td><strong>前期</strong></td><td>练气 ~ 金丹</td><td>1~27</td><td>基础成长，突破需求低</td></tr>
 
-<tr><td>强力</td><td>强力</td><td>686,000</td><td>传说/史诗混搭(+20)含套装</td></tr>
+<tr><td><strong>中期</strong></td><td>元婴 ~ 化神</td><td>28~45</td><td>成长加速，需要灵石和素材</td></tr>
 
-<tr><td>顶级</td><td>顶级</td><td>5,090,000</td><td>全神话(+50)含套装</td></tr>
+<tr><td><strong>后期</strong></td><td>返虚 ~ 大乘</td><td>46~72</td><td>高级成长，突破需BOSS专属素材</td></tr>
 
-<tr><td>极限</td><td>极限</td><td>20,000,000</td><td>全神话(+100)双五件套·混沌级</td></tr>
+<tr><td><strong>终局</strong></td><td>渡劫 ~ 大罗</td><td>73~126</td><td>极限成长，突破代价极高</td></tr>
 
-<h3>7.7 装备强化系统</h3>
+</tbody>
+
+</table>
+
+每个大境界包含9重（如练气一重~练气九重），每9级为一个大境界。
+
+<h3>6.3 升级经验计算</h3>
+
+每级所需经验按指数增长：
+
+<pre><code>升级经验 = floor(100 × 1.15^(等级-1))</code></pre>
+
+<h3>6.4 突破机制</h3>
+
+当角色等级为9的倍数时（9、18、27...），升级需要进行<strong>境界突破</strong>。突破消耗：
 
 <ul>
 
-<li>强化共12级，每级1.5倍成长（指数成长）</li>
+<li><strong>灵石</strong>：随等级和阶段倍率递增</li>
 
 </ul>
 
 <ul>
 
-<li><strong>+4保护机制</strong>：+1~+4失败归零，+5~+8失败回到+4</li>
+<li><strong>修为</strong>：升级经验的2倍（含阶段倍率）</li>
 
 </ul>
 
 <ul>
 
-<li><strong>+8保护机制</strong>：+9~+12失败回到+8</li>
+<li><strong>BOSS专属素材</strong>：每9级突破需要1个对应地图的BOSS素材</li>
 
 </ul>
 
-<ul>
+<pre><code>阶段倍率 = { 前期:1, 中期:3, 后期:10, 终局:30 }</code></pre>
 
-<li>基础成功率90%</li>
+<h3>6.5 每级基础数值提升</h3>
 
-</ul>
+升级带来的基础属性增长：
 
-<ul>
+<pre><code>攻击 += floor(2 × 1.08^(等级-1))
+生命 += floor(15 × 1.08^(等级-1))
+防御 += floor(1.5 × 1.08^(等级-1))
+速度 += floor(0.5 × 1.08^(等级-1))</code></pre>
 
-<li><strong>强化石类型</strong>：</li>
+<h3>6.6 BOSS专属素材</h3>
 
-</ul>
+每个地图有两个专属BOSS，击败后有概率掉落突破素材。需要选择<strong>凶险及以上难度</strong>才有概率遇到：
 
-  - 普通强化石：所有地图获得
-  - 高级强化石：龙渊难度4以上
-  - 至尊强化石：分解仙品以上装备概率获得，神品必出1~3个
+<table>
+<tr><td>遇到概率</td><td>凶险</td><td>绝境</td><td>灭世</td></tr>
+<thead>
 
-<h3>7.8 装备洗练系统</h3>
+<tr><th>---:</th><th>---:</th><th>---:</th><th>---:</th></tr>
 
-<ul>
+</thead>
 
-<li>消耗洗练石重洗词条</li>
+<tbody>
 
-</ul>
+<tr><td>遭遇BOSS</td><td>50%</td><td>75%</td><td>90%</td></tr>
 
-<ul>
+</tbody>
 
-<li>支持全词条洗练和单条洗练</li>
+</table>
 
-</ul>
+各地图BOSS素材：
 
-<ul>
+<table>
+<tr><td>等级</td><td>地图</td><td>素材1</td><td>素材2</td></tr>
+<thead>
 
-<li>越稀有装备越容易洗出稀有词条</li>
+<tr><th>---:</th><th>---</th><th>---</th><th>---</th></tr>
 
-</ul>
+</thead>
 
-<ul>
+<tbody>
 
-<li>可用<strong>定灵丹</strong>保底</li>
+<tr><td>9</td><td>青萝林</td><td>野猪獠牙</td><td>山匪令牌</td></tr>
 
-</ul>
+<tr><td>18</td><td>迷雾谷</td><td>蛇鳞</td><td>灵狼皮毛</td></tr>
 
-<h3>7.9 装备分解系统</h3>
+<tr><td>27</td><td>凤凰窟</td><td>凤凰羽毛</td><td>火焰核心</td></tr>
 
-<ul>
+<tr><td>36</td><td>龙渊</td><td>龙鳞</td><td>龙元</td></tr>
 
-<li>支持多选批量分解</li>
+<tr><td>45</td><td>鬼荒原</td><td>鬼气精华</td><td>骨器</td></tr>
 
-</ul>
+<tr><td>54</td><td>冰玄殿</td><td>冰晶</td><td>冰封核心</td></tr>
 
-<ul>
+<tr><td>63</td><td>仙陨墟</td><td>仙人碎片</td><td>神性精华</td></tr>
 
-<li>产出强化石+洗练石</li>
+<tr><td>72</td><td>混沌境</td><td>混沌水晶</td><td>虚空精华</td></tr>
 
-</ul>
+</tbody>
 
-<ul>
-
-<li>仙品以上概率产出至尊强化石</li>
-
-</ul>
-
-<ul>
-
-<li>神品必得1~3个至尊强化石</li>
-
-</ul>
-
-<ul>
-
-<li><strong>装备评分公式</strong>：装备评分 = round( (基础分 + 词条分 + 套装分) × 品质倍率 × 1.5^强化等级 )</li>
-
-</ul>
+</table>
 
 <hr>
 
-<h2>8. 灵宠系统与放生报恩</h2>
+<h2>7. 灵宠系统</h2>
 
 灵宠出战后为人物提供<strong>全属性加成</strong>（攻击/防御/生命 + 一众战斗属性）。加成由「品质 × 星级 × 等级 × 阶位」综合决定：
 
 <pre><code>
-
-qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal 3%
-
-每星加成:         各品质 1%~2%/星
-
-每级加成:         (等级-1) × 基础加成 × 10%
-
-每 5 星阶位:      阶位 × 基础加成 × 50%
-
+品质基础加成:  凡品3% / 灵品6% / 玄品9% / 仙品12% / 神品15%
+每星加成:      各品质 1%~2%/星
+每级加成:      (等级-1) × 基础加成 × 10%
+每 5 星阶位:   阶位 × 基础加成 × 50%
 最终加成 = 基础 + 星 + 等级 + 阶位（战斗属性取一半）
+</code></pre>
 
-</pre>
-
-<h3>8.1 灵宠操作</h3>
+<h3>7.1 灵宠操作</h3>
 
 <ul>
 
-<li><strong>升级</strong>（</code>upgradePet<code>）：吃灵宠精华，按品质倍率提升战斗属性；</li>
+<li><strong>升级</strong>：吃灵宠精华，按品质倍率提升战斗属性；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>升星</strong>（</code>evolvePet<code>）：消耗同名同品质灵宠，星级 +1，并返还被吃灵宠已耗精华；</li>
+<li><strong>升星</strong>：消耗同名同品质灵宠，星级 +1，并返还被吃灵宠已耗精华；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>装备到角色</strong>（</code>equipCharacterPet<code>）：在宗门页面为角色装备灵宠，加成实时叠加到最终属性；</li>
+<li><strong>装备到角色</strong>：在宗门页面为角色装备灵宠，加成实时叠加到最终属性；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>卸下灵宠</strong>（</code>unequipCharacterPet<code>）：从角色卸下灵宠，归还共享背包；</li>
+<li><strong>卸下灵宠</strong>：从角色卸下灵宠，归还共享背包；</li>
 
 </ul>
 
 <ul>
 
-<li><strong>放生报恩</strong>（</code>releasePet<code>）：放生灵宠获得精华回报。</li>
+<li><strong>放生报恩</strong>：放生灵宠获得精华回报。</li>
 
 </ul>
 
-<ul>
-
-<li><strong>注意</strong>：灵宠<strong>不再使用全局出战/召回系统</strong>，所有灵宠管理统一在宗门→角色菜单下完成，背包中仅可查看灵宠详情。</li>
-
-</ul>
-
-<h3>8.2 灵宠放生报恩</h3>
+<h3>7.2 灵宠放生报恩</h3>
 
 放生灵宠会根据其<strong>稀有度</strong>返还一定量的<strong>灵宠精华</strong>作为「报恩」：
 
-<pre><code>
-
-返还精华 = 稀有度基础 + 等级×2 + 星级×5
-
-</pre>
+<pre><code>返还精华 = 稀有度基础 + 等级×2 + 星级×5</code></pre>
 
 <table>
 <tr><td>灵宠品质</td><td>基础返还精华</td></tr>
@@ -1030,29 +1059,33 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tbody>
 
-<tr><td>神品 divine</td><td>100</td></tr>
+<tr><td>神品</td><td>100</td></tr>
 
-<tr><td>仙品 celestial</td><td>60</td></tr>
+<tr><td>仙品</td><td>60</td></tr>
 
-<tr><td>玄品 mystic</td><td>35</td></tr>
+<tr><td>玄品</td><td>35</td></tr>
 
-<tr><td>灵品 spiritual</td><td>20</td></tr>
+<tr><td>灵品</td><td>20</td></tr>
 
-<tr><td>凡品 mortal</td><td>10</td></tr>
+<tr><td>凡品</td><td>10</td></tr>
+
+</tbody>
+
+</table>
 
 <blockquote>放生后灵宠感恩离去，精华实时到账。养成高星高等级的灵宠放生回报更丰厚。</blockquote>
 
 <hr>
 
-<h2>9. 挂机探索系统（含小剧场）</h2>
+<h2>8. 挂机探索系统</h2>
 
-挂机是放置收益的核心。每 <strong>15 秒</strong> 一场遭遇，按地图 </code>rewards<code> 掉落结算。
+挂机是放置收益的核心。每 <strong>15 秒</strong> 一场遭遇，按地图掉落结算。
 
-<h3>9.1 队伍协同战斗</h3>
+<h3>8.1 队伍协同战斗</h3>
 
 <ul>
 
-<li>挂机时按<strong>队伍总 Build 强度</strong>与地图推荐 Build 计算匹配度；</li>
+<li>挂机时按<strong>队伍总战力</strong>与地图推荐 Build 计算匹配度；</li>
 
 </ul>
 
@@ -1074,7 +1107,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<h3>9.2 小剧场系统（idleBuffs）</h3>
+<h3>8.2 小剧场系统（idleBuffs）</h3>
 
 挂机过程中会<strong>随机触发队伍小剧场</strong>，为本次挂机提供临时增益或减益 buff：
 
@@ -1086,7 +1119,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>buff 类型包括：</code>cultivation<code>（修炼）、</code>combat<code>（战斗）、</code>attack<code>（攻击）、</code>speed<code>（速度）、</code>luck<code>（气运）；</li>
+<li>buff 类型包括：修炼、战斗、攻击、速度、气运；</li>
 
 </ul>
 
@@ -1102,75 +1135,9 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<strong>小剧场示例</strong>：
+<h3>8.3 挂机收益</h3>
 
-<table>
-<tr><td>小剧场</td><td>buff 类型</td><td>效果</td><td>持续</td><td>性质</td></tr>
-<thead>
-
-<tr><th>---</th><th>---</th><th>---</th><th>---</th><th>---</th></tr>
-
-</thead>
-
-<tbody>
-
-<tr><td>篝火笑话</td><td>心情愉悦</td><td>修炼+15%</td><td>5场</td><td>增益</td></tr>
-
-<tr><td>抢摘灵草</td><td>内讧</td><td>战斗-10%</td><td>3场</td><td>减益</td></tr>
-
-<tr><td>灵泉滋养</td><td>灵泉滋养</td><td>战斗+15%</td><td>5场</td><td>增益</td></tr>
-
-<tr><td>走火入魔</td><td>默契提升</td><td>战斗+10%</td><td>5场</td><td>增益</td></tr>
-
-<tr><td>切磋武艺</td><td>切磋增益</td><td>攻击+20%</td><td>4场</td><td>增益</td></tr>
-
-<tr><td>古碑参悟</td><td>功法感悟</td><td>修炼+25%</td><td>6场</td><td>增益</td></tr>
-
-<tr><td>争夺矿石</td><td>士气低落</td><td>战斗-15%</td><td>3场</td><td>减益</td></tr>
-
-<tr><td>踩中陷阱</td><td>受惊</td><td>战斗-12%</td><td>3场</td><td>减益</td></tr>
-
-<tr><td>游方老道</td><td>气运加持</td><td>气运+30%</td><td>5场</td><td>增益</td></tr>
-
-<blockquote>小剧场文案会自动填入队伍中随机 3 名成员的名字（</code>\${m1}<code>/</code>\${m2}<code>/</code>\${m3}<code>），增加代入感。</blockquote>
-
-<h3>9.3 实时结算画面</h3>
-
-挂机日志下方会<strong>实时显示当前最新一场遭遇的结算画面</strong>（而非结束后才显示），包括：
-
-<ul>
-
-<li>当前遭遇次数与胜负；</li>
-
-</ul>
-
-<ul>
-
-<li>敌人名称与层级；</li>
-
-</ul>
-
-<ul>
-
-<li>本场获得的所有奖励明细；</li>
-
-</ul>
-
-<ul>
-
-<li>队伍各成员实时气血状态；</li>
-
-</ul>
-
-<ul>
-
-<li>当前生效的小剧场 buff 列表。</li>
-
-</ul>
-
-<h3>9.4 挂机收益</h3>
-
-每场遭遇还会<strong>额外产出幻灵结晶</strong>（抽卡专用货币），数量随秘境难度递增（青萝林·游历约3~5/场，混沌界·灭世约16~25/场）。
+每场遭遇还会<strong>额外产出幻灵结晶</strong>（抽卡专用货币），数量随秘境难度递增。
 
 各秘境「凶险(标准)档」的掉落配置：
 
@@ -1194,21 +1161,20 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tr><td>鬼荒原</td><td>5</td><td>×4.0</td><td>52%</td><td>仙品/神品</td><td>40%</td><td>仙品/神品</td></tr>
 
-<tr><td>冰雪宫</td><td>6</td><td>×5.0</td><td>56%</td><td>神品</td><td>48%</td><td>神品</td></tr>
+<tr><td>冰玄殿</td><td>6</td><td>×5.0</td><td>56%</td><td>神品</td><td>48%</td><td>神品</td></tr>
 
-<tr><td>仙墟</td><td>7</td><td>×7.0</td><td>64%</td><td>神品</td><td>40%</td><td>神品</td></tr>
+<tr><td>仙陨墟</td><td>7</td><td>×7.0</td><td>64%</td><td>神品</td><td>40%</td><td>神品</td></tr>
 
-<tr><td>混沌界</td><td>8</td><td>×10.0</td><td>70%</td><td>神品</td><td>55%</td><td>神品</td></tr>
+<tr><td>混沌境</td><td>8</td><td>×10.0</td><td>70%</td><td>神品</td><td>55%</td><td>神品</td></tr>
 
-<h3>9.5 推荐 Build 与匹配度</h3>
+</tbody>
 
-<pre><code>
+</table>
 
-推荐Build(某难度) = 基础Build × 难度缩放系数
+<h3>8.4 推荐 Build 与匹配度</h3>
 
-匹配度 = 队伍总Build强度 ÷ 推荐Build
-
-</pre>
+<pre><code>推荐Build(某难度) = 基础Build × 难度缩放系数
+匹配度 = 队伍总战力 ÷ 推荐Build</code></pre>
 
 <ul>
 
@@ -1228,7 +1194,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<h3>9.6 五档难度系数</h3>
+<h3>8.5 五档难度系数</h3>
 
 <table>
 <tr><td>难度</td><td>名称</td><td>缩放</td><td>奖励倍率</td><td>每场耗灵石</td><td>掉落加成系数</td></tr>
@@ -1250,11 +1216,15 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tr><td>mieshi</td><td>灭世</td><td>2.50</td><td>2.8</td><td>500</td><td>1.8</td></tr>
 
+</tbody>
+
+</table>
+
 <hr>
 
-<h2>10. 八大秘境 × 五档难度 全数据表</h2>
+<h2>9. 八大秘境 × 五档难度 全数据表</h2>
 
-</code>ZONE_BUILD_BASE<code>（凶险档推荐 Build）与分区推荐属性：
+各秘境凶险档推荐 Build 与分区推荐属性：
 
 <table>
 <tr><td>秘境</td><td>难度</td><td>推荐攻击</td><td>推荐生命</td><td>凶险推荐Build</td><td>游历</td><td>试炼</td><td>绝境</td><td>灭世</td></tr>
@@ -1276,35 +1246,33 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tr><td>鬼荒原</td><td>5</td><td>150</td><td>1,500</td><td>400,000</td><td>120,000</td><td>240,000</td><td>640,000</td><td>1,000,000</td></tr>
 
-<tr><td>冰雪宫</td><td>6</td><td>300</td><td>3,000</td><td>800,000</td><td>240,000</td><td>480,000</td><td>1,280,000</td><td>2,000,000</td></tr>
+<tr><td>冰玄殿</td><td>6</td><td>300</td><td>3,000</td><td>800,000</td><td>240,000</td><td>480,000</td><td>1,280,000</td><td>2,000,000</td></tr>
 
-<tr><td>仙墟</td><td>7</td><td>600</td><td>6,000</td><td>2,000,000</td><td>600,000</td><td>1,200,000</td><td>3,200,000</td><td>5,000,000</td></tr>
+<tr><td>仙陨墟</td><td>7</td><td>600</td><td>6,000</td><td>2,000,000</td><td>600,000</td><td>1,200,000</td><td>3,200,000</td><td>5,000,000</td></tr>
 
-<tr><td>混沌界</td><td>8</td><td>1,000</td><td>10,000</td><td>7,000,000</td><td>2,100,000</td><td>4,200,000</td><td>11,200,000</td><td>17,500,000</td></tr>
+<tr><td>混沌境</td><td>8</td><td>1,000</td><td>10,000</td><td>7,000,000</td><td>2,100,000</td><td>4,200,000</td><td>11,200,000</td><td>17,500,000</td></tr>
 
-<blockquote>纵向看：从青萝林到混沌界，推荐 Build 从 3,000 平滑爬升到 700 万（凶险），灭世档高达 1,750 万——这正是「Build 阶梯」(入门 6.8万 → 强力 68.6万 → 顶级 509万 → 极限 2000万) 的用武之地。</blockquote>
+</tbody>
+
+</table>
 
 <hr>
 
-<h2>11. 仙缘祈福系统</h2>
+<h2>10. 仙缘祈福（抽卡）系统</h2>
 
-<h3>11.0 祈福货币：幻灵结晶</h3>
+<h3>10.1 祈福货币：幻灵结晶</h3>
 
 抽卡使用<strong>幻灵结晶</strong>（非灵石）。获取途径：
 
 <ul>
 
-<li><strong>挂机产出</strong>：每场遭遇自动产出幻灵结晶，数量随秘境难度递增：</li>
+<li><strong>挂机产出</strong>：每场遭遇自动产出幻灵结晶，数量随秘境难度递增；</li>
 
 </ul>
 
-  - 青萝林·游历：~3-5/场（5分钟约50-70个）
-
-  - 混沌界·灭世：~16-25/场（30分钟约2000-3000个）
-
 <ul>
 
-<li><strong>灵石兑换</strong>：50 灵石 = 1 幻灵结晶，在抽卡页面可批量兑换（10/50/100）；</li>
+<li><strong>灵石兑换</strong>：50 灵石 = 1 幻灵结晶，在抽卡页面可批量兑换；</li>
 
 </ul>
 
@@ -1314,7 +1282,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<h3>11.1 奖池总览</h3>
+<h3>10.2 奖池总览</h3>
 
 抽卡<strong>不一定 100% 抽到人物</strong>。人物概率 10%~25%，其余为灵石、装备、素材等。
 
@@ -1340,17 +1308,15 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tr><td>灵宠池</td><td>200</td><td>0%</td><td>0%</td><td>95%</td><td>5%</td></tr>
 
-<blockquote><strong>注意</strong>：资源奖励中的灵石返还量为 <strong>20~80 灵石</strong>（低于单次抽奖成本），确保抽卡不会「回本」，保持经济平衡。</blockquote>
+</tbody>
 
-<h3>11.2 角色星级概率</h3>
+</table>
 
-<pre><code>
+<h3>10.3 角色星级概率</h3>
 
-5星 = 3%    4星 = 20%    3星 = 77%
+<pre><code>5星 = 1%    4星 = 19%    3星 = 80%</code></pre>
 
-</pre>
-
-<h3>11.3 保底机制</h3>
+<h3>10.4 保底机制</h3>
 
 <ul>
 
@@ -1364,50 +1330,77 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<h3>11.4 稀有角色立绘弹窗</h3>
+<h3>10.5 装备品质权重</h3>
 
-抽到 <strong>4★ 或 5★</strong> 角色时，会<strong>自动弹出角色立绘详情</strong>（含名称、描述、流派、天赋、定位、基础属性）：
+凡品 40% / 良品 30% / 上品 18% / 极品 8% / 仙品 3% / 神品 1%。
 
-<ul>
-
-<li>单抽：抽到 4★/5★ 即弹窗；</li>
-
-</ul>
-
-<ul>
-
-<li>十连：自动展示最高星级角色的立绘。</li>
-
-</ul>
-
-<h3>11.5 装备品质权重</h3>
-
-凡品 40% / 良品 30% / 中品 18% / 上品 8% / 极品 3% / 仙品 1%。
-
-<h3>11.6 灵宠品质权重</h3>
+<h3>10.6 灵宠品质权重</h3>
 
 凡品 50% / 灵品 25% / 玄品 15% / 仙品 8% / 神品 2%。
 
-<h3>11.7 重复角色处理</h3>
+<h3>10.7 重复角色处理</h3>
 
 抽到已有的角色会<strong>自动转换为灵魂碎片</strong>（用于角色突破境界）：
 
-<pre><code>
-
-灵魂碎片 = star × 10 + (star >= 4 ? 20 : 0)
-
-3★ → 30 碎片    4★ → 60 碎片    5★ → 70 碎片
-
-</pre>
+<pre><code>灵魂碎片 = star × 10 + (star >= 4 ? 20 : 0)
+3★ → 30 碎片    4★ → 60 碎片    5★ → 70 碎片</code></pre>
 
 <hr>
 
-<h2>12. 丹药炼制系统</h2>
+<h2>11. 丹药炼制系统</h2>
 
-丹药按「品阶 grade (1~9)」决定<strong>基础成功率</strong>（一品 90% → 九品 10%）与材料需求。按功能分四类，效果随等级放大：
+<h3>11.1 丹方获取与地图对应</h3>
+
+<blockquote><strong>丹方通过通关对应地图第5重（灭世）难度解锁</strong>，低等级地图对应低品丹方，高等级地图对应高品丹方。</blockquote>
 
 <table>
-<tr><td>类型</td><td>倍率</td><td>代表丹药</td></tr>
+<tr><td>地图</td><td>难度</td><td>丹药品阶</td><td>解锁丹方</td></tr>
+<thead>
+
+<tr><th>---</th><th>---:</th><th>---</th><th>---</th></tr>
+
+</thead>
+
+<tbody>
+
+<tr><td><strong>青萝林</strong></td><td>1</td><td>一品</td><td>聚灵丹、洗髓丹、疗伤丹、小培元丹</td></tr>
+
+<tr><td><strong>迷雾谷</strong></td><td>2</td><td>二品</td><td>聚气丹、回灵丹、锻骨丹、解厄丹、悟道丹、培元丹</td></tr>
+
+<tr><td><strong>凤凰窟</strong></td><td>3</td><td>三品</td><td>雷灵丹、凝元丹、清心丹、寻宝丹、淬灵丹、定灵丹、大培元丹</td></tr>
+
+<tr><td><strong>龙渊</strong></td><td>4</td><td>四品</td><td>仙灵丹、火元丹、渡厄丹、极培元丹</td></tr>
+
+<tr><td><strong>鬼荒原</strong></td><td>5</td><td>五品</td><td>五行丹、天培元丹</td></tr>
+
+<tr><td><strong>冰玄殿</strong></td><td>6</td><td>六品</td><td>天元丹</td></tr>
+
+<tr><td><strong>仙陨墟</strong></td><td>7</td><td>七品</td><td>日月丹</td></tr>
+
+<tr><td><strong>混沌境</strong></td><td>8</td><td>八品</td><td>涅槃丹</td></tr>
+
+</tbody>
+
+</table>
+
+<ul>
+
+<li>地图详情页底部可查看该地图能解锁的丹方列表；</li>
+
+</ul>
+
+<ul>
+
+<li>通关灭世难度后自动解锁对应丹方，在八卦炉→炼丹中可炼制。</li>
+
+</ul>
+
+<h3>11.2 培元丹系列（努力值核心）</h3>
+
+培元丹系列是提升角色努力值的唯一途径，是人物系统成长的关键资源：
+
+<table>
+<tr><td>丹药</td><td>品阶</td><td>效果</td></tr>
 <thead>
 
 <tr><th>---</th><th>---</th><th>---</th></tr>
@@ -1416,15 +1409,21 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tbody>
 
-<tr><td>灵力类</td><td>×1.0</td><td>聚灵丹、回灵丹、日月丹(灵力上限)</td></tr>
+<tr><td>小培元丹</td><td>一品</td><td>提升少量努力值</td></tr>
 
-<tr><td>修炼类</td><td>×1.2</td><td>聚气丹、凝元丹、天元丹</td></tr>
+<tr><td>培元丹</td><td>二品</td><td>提升中量努力值</td></tr>
 
-<tr><td>属性类</td><td>×1.5</td><td>雷灵丹、五行丹、火元丹</td></tr>
+<tr><td>大培元丹</td><td>三品</td><td>提升大量努力值</td></tr>
 
-<tr><td>特殊类</td><td>×2.0</td><td>仙灵丹、涅槃丹、清心丹、渡厄丹</td></tr>
+<tr><td>极培元丹</td><td>四品</td><td>提升极多努力值</td></tr>
 
-<strong>关键丹药</strong>：
+<tr><td>天培元丹</td><td>五品</td><td>提升海量努力值</td></tr>
+
+</tbody>
+
+</table>
+
+<h3>11.3 关键丹药一览</h3>
 
 <table>
 <tr><td>丹药</td><td>功能</td><td>效果</td></tr>
@@ -1454,82 +1453,22 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <tr><td>渡厄丹</td><td>突破</td><td>突破成功率 +10%</td></tr>
 
-<blockquote>永久类（洗髓/锻骨）直接把数值写进 </code>baseAttributes<code> 并随存档沉淀，转生也保留。</blockquote>
+</tbody>
 
-<h3>丹方获取与地图对应</h3>
+</table>
 
-<ul>
-
-<li>丹方通过通关对应地图第5重（灭世）难度解锁</li>
-
-</ul>
-
-<ul>
-
-<li><strong>青萝林（难度1）</strong>：聚灵丹、洗髓丹、疗伤丹、小培元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>迷雾谷（难度2）</strong>：聚气丹、回灵丹、锻骨丹、解厄丹、悟道丹、培元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>凤凰窟（难度3）</strong>：雷灵丹、凝元丹、清心丹、寻宝丹、淬灵丹、定灵丹、大培元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>龙渊（难度4）</strong>：仙灵丹、火元丹、渡厄丹、极培元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>鬼荒原（难度5）</strong>：五行丹、天培元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>冰玄殿（难度6）</strong>：天元丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>仙陨墟（难度7）</strong>：日月丹</li>
-
-</ul>
-
-<ul>
-
-<li><strong>混沌境（难度8）</strong>：涅槃丹</li>
-
-</ul>
-
-<ul>
-
-<li>地图详情页底部可查看该地图能解锁的丹方列表</li>
-
-</ul>
+<blockquote>永久类（洗髓/锻骨）直接把数值写进基础属性并随存档沉淀，转生也保留。</blockquote>
 
 <hr>
 
-<h2>13. 战斗系统公式</h2>
+<h2>12. 战斗系统公式</h2>
 
 战斗为<strong>回合制</strong>（最多 10 回合，超时判负），按速度决定先手。伤害结算顺序：
 
 <pre><code>
-
 1) 基础伤害 = 攻击 × (1 + 战斗属性提升 combatBoost)
 
 2) 暴击：最终暴击率 = 攻方暴击率×(1+combatBoost) − 守方抗暴×(1+抗性提升)
-
          触发 → 伤害 ×= (1.5 + 暴伤强化)
 
 3) 连击：触发 → 伤害 ×= 1.3
@@ -1545,8 +1484,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 8) 若本次为暴击 → 再 ×= (1 − 暴伤减免)
 
 9) 最终减伤：伤害 ×= (1 − 最终减伤)
-
-</pre>
+</code></pre>
 
 <ul>
 
@@ -1566,17 +1504,17 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 </ul>
 
-<blockquote>实战要点：<strong>最终增伤/减伤、暴伤、吸血、连击</strong> 是后期碾压的核心；堆叠 </code>combatBoost<code> 与 </code>resistanceBoost<code> 能同时放大攻防两端。</blockquote>
+<blockquote>实战要点：<strong>最终增伤/减伤、暴伤、吸血、连击</strong> 是后期碾压的核心。</blockquote>
 
 <hr>
 
-<h2>14. 进阶策略与成长路线</h2>
+<h2>13. 进阶策略与成长路线</h2>
 
 <h3>前期（练气 ~ 金丹，1~27 级）</h3>
 
 <ul>
 
-<li>主线：手动/自动打坐把修为堆上去，靠突破把 </code>spiritRate<code> 复利拉起来；</li>
+<li>主线：手动/自动打坐把修为堆上去，靠突破提升修炼效率；</li>
 
 </ul>
 
@@ -1594,7 +1532,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>炼丹：优先 <strong>聚灵丹(灵力)、聚气丹(修炼)、洗髓/锻骨丹(永久属性)</strong>；</li>
+<li>炼丹：优先 <strong>聚灵丹、聚气丹、洗髓/锻骨丹（永久属性）</strong>；</li>
 
 </ul>
 
@@ -1608,7 +1546,7 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>目标：队伍总 Build 冲到 <strong>入门(6.8万)~强力(68.6万)</strong>；</li>
+<li>目标：队伍总战力冲到 <strong>入门(6.8万)~强力(68.6万)</strong>；</li>
 
 </ul>
 
@@ -1626,19 +1564,13 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>突破：60% 地板后用 <strong>渡厄丹</strong> 兜底；</li>
-
-</ul>
-
-<ul>
-
 <li>丹药：悟道丹+寻宝丹叠加，挂机收益最大化；</li>
 
 </ul>
 
 <ul>
 
-<li>重复角色转灵魂碎片用于突破。</li>
+<li>人物：开始吃培元丹堆努力值，准备80级回炉重造升星。</li>
 
 </ul>
 
@@ -1646,13 +1578,19 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>目标：Build 冲 <strong>顶级(509万)</strong>，挑战鬼荒原/冰雪宫 绝境~灭世；</li>
+<li>目标：战力冲 <strong>顶级(509万)</strong>，挑战鬼荒原/冰玄殿 绝境~灭世；</li>
 
 </ul>
 
 <ul>
 
-<li>装备：神品为主，法宝(artifact)优先补位；强化 +20~+50；</li>
+<li>装备：神品为主，法宝优先补位；强化 +8 以上；洗练极品词条；</li>
+
+</ul>
+
+<ul>
+
+<li>人物：完成首轮回炉重造，主力角色升到四星甚至五星；</li>
 
 </ul>
 
@@ -1660,17 +1598,11 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <li>灵宠：仙品/神品满星，精华集中养 1~2 只核心；</li>
 
-<li>解锁可装备的装备「境界要求」(</code>requiredRealm\`)；</li>
-
-<li>作为 Build 匹配度判定外的另一条进度主线；</li>
-
-<li>每级增加少量基础属性（攻击/生命/防御/速度）。</li>
-
 </ul>
 
 <ul>
 
-<li>转生：满 50 级可转生，永久 +攻/血/防/速 与 10% 效率，越转越强。</li>
+<li>努力值：五星角色无上限，持续用天培元丹堆。</li>
 
 </ul>
 
@@ -1678,19 +1610,25 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ul>
 
-<li>目标：Build 逼近 <strong>极限(2000万)</strong>，混沌界 灭世稳定挂机；</li>
+<li>目标：战力逼近 <strong>极限(2000万)</strong>，混沌界 灭世稳定挂机；</li>
 
 </ul>
 
 <ul>
 
-<li>全神话双五件套、法宝满配、神品满星灵宠、多次转生叠永久属性；</li>
+<li>全神品双五件套、法宝满配、神品满星灵宠；</li>
 
 </ul>
 
 <ul>
 
-<li>利用被动修为与离线结算，放置即可持续逼近大罗九重 1.4 亿修为上限。</li>
+<li>五星角色努力值无限堆叠，追求极致属性；</li>
+
+</ul>
+
+<ul>
+
+<li>利用被动修为与离线结算，放置即可持续逼近大罗九重。</li>
 
 </ul>
 
@@ -1698,13 +1636,19 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ol>
 
-<li><strong>队伍编成</strong>：5 人满编，注意定位搭配（先锋+刀锋输出、护法抗伤、药引续航、掌阵增益）；</li>
+<li><strong>装备优先（60%权重）</strong>：资源有限时优先投入装备系统，品质>强化>词条>套装；</li>
 
 </ol>
 
 <ol>
 
-<li><strong>Build 优先于等级</strong>：与其猛冲等级，不如先把 Build 堆到匹配当前图；</li>
+<li><strong>人物打底（40%权重）</strong>：好的角色是基础，天赋值越高装备收益越大；</li>
+
+</ol>
+
+<ol>
+
+<li><strong>回炉重造要趁早</strong>：先升星再堆努力值，五星无上限才是终极追求；</li>
 
 </ol>
 
@@ -1722,145 +1666,88 @@ qualityBonusMap:  divine 15% / celestial 12% / mystic 9% / spiritual 6% / mortal
 
 <ol>
 
-<li><strong>小剧场 buff</strong>：挂机时留意小剧场触发，正向 buff 可显著提升效率，负向 buff 时可考虑暂停或换图；</li>
+<li><strong>小剧场 buff</strong>：挂机时留意小剧场触发，正向 buff 可显著提升效率；</li>
 
 </ol>
 
 <ol>
 
-<li><strong>灵力倍率复利</strong>是隐藏引擎：多突破 = 灵力回得快 = 修炼不停；</li>
+<li><strong>永久丹药早吃早享受</strong>，转生不丢；</li>
 
 </ol>
 
 <ol>
 
-<li><strong>永久丹药</strong>早吃早享受，转生不丢；</li>
-
-</ol>
-
-<ol>
-
-<li><strong>灵宠放生</strong>：养成后再放生回报更高（等级×2 + 星级×5）；</li>
-
-</ol>
-
-<ol>
-
-<li><strong>匹配度 < 100% 别硬挂</strong>：会力竭提前结束，先把 Build 或难度降一档。</li>
+<li><strong>匹配度 < 100% 别硬挂</strong>：会力竭提前结束，先把战力或难度降一档。</li>
 
 </ol>
 
 <hr>
 
-<h2>15. 数据附录：关键公式汇总</h2>
+<h2>14. 数据附录：关键公式汇总</h2>
 
 <pre><code>
+// —— 战力公式（核心） ——
+
+角色战力     = (人物裸分 × 0.4 + 装备分 × 0.6) × 等级倍率
+人物裸分     = 基础属性分 + 天赋技能分 + 灵宠分
+装备分       = 12件装备评分 + 套装激活分
+等级倍率     = 1 + (等级-1) × 0.02
+
+
+// —— 人物属性 ——
+
+有效基础属性 = 模板属性 × (天赋值/星级基础天赋) × (1 + 努力值/天赋值)
+             = 模板属性 × (天赋值 + 努力值) / 星级基础天赋
+三星天赋值   = 100    四星天赋值 = 150    五星天赋值 = 225
+三星努力上限 = 135    四星努力上限 = 202  五星努力上限 = 无上限
+回炉新天赋   = 下一星基础天赋 + 原努力值 × 10%
+
 
 // —— 修为公共池 ——
 
 修为获取     = 挂机胜利 + 打坐修炼 + 被动增长
-
-修为分配     = 从公共池分配给指定角色，自动升级和突破
-
 升级经验     = floor(100 × 1.15^(等级-1))
-
-突破条件     = 等级为9的倍数时需突破（消耗灵石+修为+BOSS素材）
-
 阶段倍率     = { 前期:1, 中期:3, 后期:10, 终局:30 }
-
-被动修为/10s = max(1, floor(等级×0.8 + Build×0.00001))
-
-
-
-// —— 宗门 ——
-
-重复角色转化 = star × 10 + (star >= 4 ? 20 : 0)   // 3★=30 / 4★=60 / 5★=70
-
-角色Build   = (基础属性分 + Σ装备评分 + 灵宠分 + 套装激活分) × (1+(等级-1)×0.02)
-
-队伍总Build  = Σ(各出战成员Build)
-
-
-
-// —— 幻灵结晶 ——
-
-挂机产出/场 = floor(2 + 秘境难度×1.5 + 难度缩放×3) × (0.8~1.2)
-
-灵石兑换    = 50灵石 : 1幻灵结晶
-
-新手福利    = 20,000 幻灵结晶
-
 
 
 // —— 装备评分 ——
 
-装备评分 = round((基础分 + 词条分 + 套装分) × 品质倍率 × (1 + 强化等级×0.1))
-
-品质倍率   = common1 / uncommon1.5 / rare2 / epic3.5 / legendary6 / mythic10
-
+装备评分 = round((基础分 + 词条分 + 套装分) × 品质倍率 × 1.2^强化等级)
+品质倍率   = 凡品1 / 良品1.5 / 上品2 / 极品3.5 / 仙品6 / 神品10
+强化倍率   = 1.2^n（指数成长）
 词条tier倍 = tier1×1 / tier2×1.5 / tier3×2.5
-
 套装激活分 = 2件+200 / 3件+300 / 4件+500 / 5件+800
 
-Build强度  = Σ(已装备评分) + Σ(套装激活分)
 
+// —— 强化系统 ——
+
+强化等级     = 最高12级
+锁定等级     = +4 / +8（失败回退机制）
+强化石类型   = 普通（全地图）/ 高级（龙渊4+）/ 至尊（分解仙品+）
 
 
 // —— 挂机 ——
 
 推荐Build(难度) = ZONE_BUILD_BASE × 难度缩放(0.3/0.6/1.0/1.6/2.5)
-
-匹配度         = 队伍总Build ÷ 推荐Build
-
-胜利修为       = round(5 × 地图难度 × (1 + 匹配度×0.5))
-
-
-
-// —— 小剧场 buff ——
-
-buff持续 = duration 场遭遇，每场 -1，归零失效
-
-增益类型 = cultivation(修炼) / combat(战斗) / attack(攻击) / speed(速度) / luck(气运)
-
-
-
-// —— 灵宠加成 ——
-
-最终加成 = 品质基础(3%~15%) + 星级(1%~2%/星) + 等级(基础×10%×(级-1)) + 阶位(基础×50%×floor(星/5))
-
-战斗属性取最终加成的一半
-
-
-
-// —— 灵宠放生报恩 ——
-
-返还精华 = 稀有度基础(凡10/灵20/玄35/仙60/神100) + 等级×2 + 星级×5
-
+匹配度         = 队伍总战力 ÷ 推荐Build
 
 
 // —— 抽卡 ——
 
-抽卡货币   = 幻灵结晶（非灵石）
-
-角色概率   = 综合池15% / 人物池25%（其余为装备/灵宠/资源）
-
-角色星级   = 5星3% / 4星20% / 3星77%
-
-保底       = 人物池/综合池 每5次保底4★+
-
-资源灵石   = 20~80（低于单次抽卡成本）
-
+抽卡货币     = 幻灵结晶（非灵石）
+角色概率     = 综合池15% / 人物池25%
+角色星级     = 5星1% / 4星19% / 3星80%
+保底         = 人物池/综合池 每5次保底4★+
+重复角色转化 = star × 10 + (star >= 4 ? 20 : 0)
 
 
 // —— 战斗 ——
 
 伤害 = 攻击×(1+combatBoost) ×[暴击1.5+暴伤] ×[连击1.3] ×(1+最终增伤)
-
      × 100/(100+防御×(1+combatBoost)) ×(1−暴伤减免,若暴击) ×(1−最终减伤)
-
 闪避 = 守方闪避 − 攻方抗闪避；  反击 = 守方反击 − 攻方抗反击
-
-</pre>
+</code></pre>
 
 <hr>
 
