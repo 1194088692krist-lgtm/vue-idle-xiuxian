@@ -5,40 +5,32 @@
         <div class="char-modal-close" @click="$emit('close')">✕</div>
         <div class="char-modal-content">
           <div class="char-portrait-large">
-            <!-- 动态立绘：静态图始终作为底层，视频加载完成后淡入覆盖 -->
-            <template v-if="shouldShowVideo">
-              <img
-                v-if="avatar"
-                :src="avatar"
-                class="char-portrait-static"
-                :class="{ 'is-hidden': videoReady }"
-                alt="角色立绘"
-                draggable="false"
-              />
-              <video
-                ref="videoEl"
-                class="char-portrait-video"
-                :class="{ 'is-visible': videoReady }"
-                :src="videoSrc"
-                :poster="avatar || undefined"
-                preload="auto"
-                muted
-                loop
-                playsinline
-                webkit-playsinline
-                @canplay="onVideoReady"
-                @loadeddata="onVideoReady"
-                @error="onVideoError"
-              ></video>
-            </template>
-            <!-- 无动态视频：保留原 LivePortrait（分层视差 / 单图）兜底 -->
-            <LivePortrait
-              v-else
-              :avatar="avatar"
-              :layers="layers"
-              :name="character.name"
-              :star="character.star || 3"
+            <!-- 静态立绘：始终作为底层；无视频时直接展示，有视频时作为首帧垫底 -->
+            <img
+              v-if="avatar"
+              :src="avatar"
+              class="char-portrait-static"
+              :class="{ 'is-hidden': shouldShowVideo && videoReady }"
+              alt="角色立绘"
+              draggable="false"
             />
+            <!-- 动态视频：加载完成后淡入覆盖并自动播放 -->
+            <video
+              v-if="shouldShowVideo"
+              ref="videoEl"
+              class="char-portrait-video"
+              :class="{ 'is-visible': videoReady }"
+              :src="videoSrc"
+              :poster="avatar || undefined"
+              preload="auto"
+              muted
+              loop
+              playsinline
+              webkit-playsinline
+              @canplay="onVideoReady"
+              @loadeddata="onVideoReady"
+              @error="onVideoError"
+            ></video>
           </div>
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
@@ -52,9 +44,8 @@
 
 <script setup>
 import { computed, ref, watch, onBeforeUnmount } from 'vue'
-import { getCharacterAvatar, getCharacterLayers, getCharacterVideo } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterVideo } from '../plugins/characters'
 import { usePlayerStore } from '../stores/player'
-import LivePortrait from './LivePortrait.vue'
 
 const props = defineProps({
   character: { type: Object, default: null }
@@ -66,7 +57,6 @@ const videoEl = ref(null)
 const videoReady = ref(false)
 
 const avatar = computed(() => (props.character ? getCharacterAvatar(props.character) : null))
-const layers = computed(() => (props.character ? getCharacterLayers(props.character) : null))
 const videoSrc = computed(() => (props.character ? getCharacterVideo(props.character) : null))
 // 同时满足：动态效果开启 + 该角色配置了视频
 const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!videoSrc.value)

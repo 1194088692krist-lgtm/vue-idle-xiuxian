@@ -190,10 +190,6 @@ export async function loadSharedPortraits() {
         if (data.video) {
           entry.video = `${base}portraits/${data.video}`
         }
-        // 分层立绘（Live2D 伪视差用）
-        if (Array.isArray(data.layers) && data.layers.length > 0) {
-          entry.layers = data.layers.map(l => `${base}portraits/${l}`)
-        }
         sharedPortraitMap[id] = entry
       } else if (typeof data === 'string') {
         sharedPortraitMap[id] = {
@@ -233,7 +229,7 @@ export function getCharacterThumbnail(member) {
 /**
  * 获取角色的动态立绘视频 URL（用于点击立绘后的视频播放）
  * 优先从 sharedPortraitMap（站点共享包）读取，其次回退到 characterDefMap
- * 返回 null 表示未配置视频，调用方应回退到静态立绘 / 分层视差
+ * 返回 null 表示未配置视频，调用方应回退到静态立绘
  */
 export function getCharacterVideo(member) {
   if (!member) return null
@@ -246,28 +242,6 @@ export function getCharacterVideo(member) {
     return characterDefMap[id].video
   }
   return null
-}
-
-/**
- * 获取角色的分层立绘 URL 数组（用于伪 Live2D 视差效果）
- * 图层顺序从底到顶：[0]后发/背景层 → [1]身体层 → [2]前发层
- * 返回 null 表示无分层立绘，调用方应回退到单图模式
- */
-export function getCharacterLayers(member) {
-  if (!member) return null
-  const id = member.templateId || member.id
-  if (!id) return null
-  // 优先从 sharedPortraitMap 获取
-  if (sharedPortraitMap[id] && sharedPortraitMap[id].layers) {
-    return sharedPortraitMap[id].layers
-  }
-  // 其次从 characterDefMap 获取
-  if (characterDefMap[id] && characterDefMap[id].layers) {
-    return characterDefMap[id].layers
-  }
-  // 从角色定义列表获取
-  const t = characterList.find(c => c.id === id)
-  return (t && t.layers) || null
 }
 
 // 角色定位对应的初始战斗属性（独特数值信息）
