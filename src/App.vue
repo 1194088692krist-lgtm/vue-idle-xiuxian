@@ -144,7 +144,8 @@
     ArrowUpOutlined,
     DollarOutlined,
     StarOutlined,
-    FireOutlined
+    FireOutlined,
+    ShoppingOutlined
   } from '@ant-design/icons-vue'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
@@ -298,7 +299,7 @@ import SaveButton from './components/SaveButton.vue'
       { label: '宗门', key: 'cultivation', icon: BookOutlined },
       { label: '探索', key: 'exploration', icon: CompassOutlined },
       { label: '八卦炉', key: 'alchemy', icon: FireOutlined },
-      { label: '背包', key: 'inventory', icon: BackpackIcon },
+      { label: '背包', key: 'inventory', icon: ShoppingOutlined },
       { label: '仙缘祈福', key: 'gacha', icon: StarOutlined },
       { label: '攻略', key: 'guide', icon: FileTextOutlined },
       { label: '设置', key: 'settings', icon: SettingOutlined },
