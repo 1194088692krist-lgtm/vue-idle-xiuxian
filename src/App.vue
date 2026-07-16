@@ -129,6 +129,7 @@
 <script setup>
   import { useRouter, useRoute } from 'vue-router'
   import { usePlayerStore } from './stores/player'
+  import { useAuthStore } from './stores/auth'
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
   import { NIcon, darkTheme } from 'naive-ui'
   import {
@@ -222,6 +223,15 @@ import SaveButton from './components/SaveButton.vue'
 
     updateLoading('正在加载存档数据...', 20)
     await playerStore.initializePlayer()
+
+    // 已登录：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
+    if (useAuthStore().isLoggedIn) {
+      try {
+        await playerStore.migrate({ interactive: false })
+      } catch (e) {
+        console.warn('启动云同步失败（不影响本地游玩）:', e)
+      }
+    }
 
     updateLoading('正在加载角色定义...', 40)
     await initCharacterDefs()

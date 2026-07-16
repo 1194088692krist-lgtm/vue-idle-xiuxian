@@ -147,12 +147,159 @@
       </div>
     </div>
 
-    
+    <!-- 账号 / 云存档 / 礼包 -->
+    <div class="main-card glass-card">
+      <div class="card-header">
+        <div class="header-icon">
+          <UserOutlined />
+        </div>
+        <div class="header-info">
+          <h2 class="card-title gold-gradient-text">账号与云存档</h2>
+          <p class="card-subtitle">登录后存档自动云同步，支持多端续玩</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- 未登录：登录 / 注册 -->
+        <template v-if="!auth.isLoggedIn">
+          <div class="setting-row">
+            <label class="setting-label">账号（用户ID）</label>
+            <input
+              v-model="loginForm.username"
+              class="setting-input"
+              placeholder="输入账号"
+              maxlength="20"
+            />
+          </div>
+          <div class="setting-row">
+            <label class="setting-label">密码</label>
+            <input
+              v-model="loginForm.password"
+              type="password"
+              class="setting-input"
+              placeholder="输入密码"
+              maxlength="40"
+              @keyup.enter="loginMode === 'login' ? handleLogin() : handleRegister()"
+            />
+          </div>
+          <div class="setting-input-group">
+            <button
+              class="btn btn-primary"
+              :disabled="authBusy || !loginForm.username || !loginForm.password"
+              @click="handleLogin"
+            >
+              登录
+            </button>
+            <button
+              class="btn btn-outline"
+              :disabled="authBusy || !loginForm.username || !loginForm.password"
+              @click="handleRegister"
+            >
+              注册新账号
+            </button>
+          </div>
+          <p class="setting-hint">
+            登录仅用于云端存档备份与跨设备续玩；密码为明文存储，请勿使用重要密码。
+          </p>
+        </template>
+
+        <!-- 已登录：信息 + 操作 -->
+        <template v-else>
+          <div class="setting-row">
+            <label class="setting-label">当前账号</label>
+            <div class="setting-input-group">
+              <span class="account-name">{{ auth.user?.username }}</span>
+              <button class="btn btn-danger" @click="handleLogout">退出登录</button>
+            </div>
+          </div>
+          <div class="setting-row">
+            <div class="setting-input-group">
+              <button class="btn btn-success" :disabled="authBusy" @click="handleManualSync">
+                立即云同步
+              </button>
+              <span class="sync-status">{{ playerStore.cloudSyncStatus || '已开启自动云同步' }}</span>
+            </div>
+          </div>
+
+          <!-- 礼包收件箱 -->
+          <div class="setting-row">
+            <label class="setting-label">
+              我的礼包
+              <span v-if="gifts.length" class="badge">{{ gifts.length }}</span>
+            </label>
+            <div v-if="gifts.length" class="gift-list">
+              <div v-for="g in gifts" :key="g.id" class="gift-item">
+                <div class="gift-info">
+                  <div class="gift-msg">{{ g.message || 'GM 赠送的礼包' }}</div>
+                  <div class="gift-items">{{ formatGift(g.items_json) }}</div>
+                </div>
+                <button class="btn btn-small btn-primary" @click="handleClaim(g.id)">领取</button>
+              </div>
+            </div>
+            <p v-else class="setting-hint">暂无礼包，GM 发放的奖励会显示在这里。</p>
+          </div>
+        </template>
+
+        <!-- 本地备份（无需登录，存于本机） -->
+        <div class="setting-row">
+          <label class="setting-label">本地备份</label>
+          <div class="setting-input-group">
+            <button class="btn btn-info" @click="createBackup">创建本地备份</button>
+          </div>
+          <div v-if="localBackups.length" class="backup-list">
+            <div v-for="b in localBackups" :key="b.key" class="backup-item">
+              <div class="backup-info">
+                <span class="backup-name">{{ b.name }}</span>
+                <span class="backup-time">Lv.{{ b.level }} · {{ b.realm }} · {{ formatTime(b.time) }}</span>
+              </div>
+              <div class="backup-actions">
+                <button class="btn btn-small btn-success" @click="restoreBackup(b)">恢复</button>
+                <button class="btn btn-small btn-danger" @click="deleteBackup(b)">删除</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- 分支③：云端 / 本地存档冲突对比弹窗 -->
+    <div v-if="playerStore.cloudConflicts.length" class="modal-overlay">
+      <div class="modal-content conflict-modal glass-card">
+        <div class="modal-header">
+          <h3>存档冲突</h3>
+        </div>
+        <div class="modal-body conflict-body">
+          <p class="conflict-tip">检测到本地与云端都有存档，请为以下槽位选择保留哪一份：</p>
+          <div v-for="c in playerStore.cloudConflicts" :key="c.slot" class="conflict-row">
+            <div class="conflict-slot">槽位 {{ c.slot === 0 ? '当前档' : c.slot }}</div>
+            <div class="conflict-compare">
+              <div class="conflict-card">
+                <div class="conflict-side">本地存档</div>
+                <div class="conflict-name">{{ c.local.name }}</div>
+                <div class="conflict-detail">Lv.{{ c.local.level }} · {{ c.local.realm }}</div>
+                <div class="conflict-time">{{ c.localTime ? formatTime(c.localTime) : '未知时间' }}</div>
+                <button class="btn btn-small btn-success" @click="resolveConflict(c.slot, false)">用本地</button>
+              </div>
+              <div class="conflict-card">
+                <div class="conflict-side">云端存档</div>
+                <div class="conflict-name">{{ c.cloud.name }}</div>
+                <div class="conflict-detail">Lv.{{ c.cloud.level }} · {{ c.cloud.realm }}</div>
+                <div class="conflict-time">{{ c.cloudTime ? formatTime(c.cloudTime) : '未知时间' }}</div>
+                <button class="btn btn-small btn-primary" @click="resolveConflict(c.slot, true)">用云端</button>
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
 <script setup>
   import { usePlayerStore } from '../stores/player'
+  import { useAuthStore } from '../stores/auth'
+  import { GameDB } from '../stores/db'
+  import { decryptData } from '../plugins/crypto'
   import { ref, onMounted, computed, onUnmounted } from 'vue'
   import { useDialog, useMessage } from 'naive-ui'
   import { saveAs } from 'file-saver'
@@ -160,7 +307,8 @@
     SettingOutlined,
     SaveOutlined,
     InfoCircleOutlined,
-    GithubOutlined
+    GithubOutlined,
+    UserOutlined
   } from '@ant-design/icons-vue'
   import { GAME_VERSION, GAME_VERSION_NAME, GAME_VERSION_DATE } from '../plugins/version'
 
@@ -382,8 +530,163 @@
     playerStore.saveData()
   }
 
+  // ===== 账号 / 云存档 / 礼包 / 本地备份 =====
+  const auth = useAuthStore()
+  const loginForm = ref({ username: '', password: '' })
+  const loginMode = ref('login')
+  const authBusy = ref(false)
+
+  const handleLogin = async () => {
+    authBusy.value = true
+    try {
+      const data = await auth.login(loginForm.value.username.trim(), loginForm.value.password)
+      message.success(`欢迎回来，${data.user.username}`)
+      loginForm.value.password = ''
+      // 登录后默认拉取最新云存档（分支③弹窗对比，由用户抉择）
+      const res = await playerStore.migrate({ interactive: true })
+      if (!res.conflicts.length) message.success('已与云端存档同步')
+      await loadGifts()
+    } catch (e) {
+      message.error(e.message || '登录失败')
+    } finally {
+      authBusy.value = false
+    }
+  }
+  const handleRegister = async () => {
+    authBusy.value = true
+    try {
+      const data = await auth.register(loginForm.value.username.trim(), loginForm.value.password)
+      message.success(`注册成功，已登录 ${data.user.username}`)
+      loginForm.value.password = ''
+      await loadGifts()
+    } catch (e) {
+      message.error(e.message || '注册失败')
+    } finally {
+      authBusy.value = false
+    }
+  }
+  const handleLogout = () => {
+    auth.logout()
+    gifts.value = []
+    message.success('已退出登录（本地存档保留）')
+  }
+  const handleManualSync = async () => {
+    authBusy.value = true
+    try {
+      await playerStore.syncToCloud()
+      message.success('已同步到云端')
+    } catch (e) {
+      message.error('同步失败：' + (e.message || e))
+    } finally {
+      authBusy.value = false
+    }
+  }
+
+  // 礼包收件箱
+  const gifts = ref([])
+  const loadGifts = async () => {
+    if (!auth.isLoggedIn) { gifts.value = []; return }
+    try {
+      const r = await fetch('/api/inbox', { headers: { ...auth.authHeaders() } })
+      const data = await r.json().catch(() => ({}))
+      gifts.value = data.ok ? data.gifts : []
+    } catch {
+      gifts.value = []
+    }
+  }
+  const formatGift = (json) => {
+    try {
+      const it = JSON.parse(json)
+      const parts = []
+      if (it.num) for (const [k, v] of Object.entries(it.num)) parts.push(`${k}:${v}`)
+      if (it.materials) for (const m of it.materials) parts.push(`${m.name}×${m.count}`)
+      return parts.join('，') || '（空）'
+    } catch {
+      return '（内容解析失败）'
+    }
+  }
+  const handleClaim = async (id) => {
+    try {
+      await playerStore.claimGift(id)
+      message.success('礼包已领取并入存档')
+      gifts.value = gifts.value.filter(g => g.id !== id)
+    } catch (e) {
+      message.error(e.message || '领取失败')
+    }
+  }
+
+  // 本地备份（存于本机 IndexedDB）
+  const localBackups = ref([])
+  const BACKUP_KEY = 'xx_backups'
+  const loadBackups = () => {
+    try { localBackups.value = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]') } catch { localBackups.value = [] }
+  }
+  const createBackup = async () => {
+    try {
+      const blob = await playerStore.exportData()
+      if (!blob) { message.error('当前没有可导出的存档'); return }
+      const ts = Date.now()
+      const key = `backup_${ts}`
+      await GameDB.setData(key, blob)
+      const d = decryptData(blob)
+      const list = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]')
+      list.unshift({ key, time: ts, name: d?.name || '未知', level: d?.level || 1, realm: d?.realm || '' })
+      localStorage.setItem(BACKUP_KEY, JSON.stringify(list.slice(0, 20)))
+      message.success('已创建本地备份')
+      loadBackups()
+    } catch (e) {
+      message.error('备份失败：' + (e.message || e))
+    }
+  }
+  const restoreBackup = (b) => {
+    dialog.warning({
+      title: '恢复本地备份',
+      content: `确定恢复到 ${b.name}（${formatTime(b.time)}）吗？当前未保存的进度将丢失！`,
+      positiveText: '恢复',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          const blob = await GameDB.getData(b.key)
+          if (!blob) { message.error('备份数据缺失'); return }
+          await playerStore.importData(blob)
+          message.success('已从本地备份恢复')
+          await loadBackups()
+        } catch (e) {
+          message.error('恢复失败：' + (e.message || e))
+        }
+      }
+    })
+  }
+  const deleteBackup = (b) => {
+    dialog.warning({
+      title: '删除备份',
+      content: `确定删除本地备份 ${b.name} 吗？此操作不可恢复！`,
+      positiveText: '删除',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        await GameDB.setData(b.key, null)
+        const list = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]').filter(x => x.key !== b.key)
+        localStorage.setItem(BACKUP_KEY, JSON.stringify(list))
+        loadBackups()
+        message.success('已删除备份')
+      }
+    })
+  }
+
+  // 分支③：玩家抉择某一槽位用本地还是云端
+  const resolveConflict = async (slot, useCloud) => {
+    try {
+      await playerStore.resolveConflict(slot, useCloud)
+      if (!playerStore.cloudConflicts.length) message.success('存档冲突已解决，已重新载入')
+    } catch (e) {
+      message.error('处理失败：' + (e.message || e))
+    }
+  }
+
   onMounted(() => {
     loadSaveSlots()
+    loadBackups()
+    if (auth.isLoggedIn) loadGifts()
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     isFullscreen.value = !!document.fullscreenElement
   })
@@ -653,5 +956,162 @@
   .modal-body {
     display: flex;
     gap: 10px;
+  }
+
+  /* 账号与云存档 */
+  .account-name {
+    font-size: 16px;
+    font-weight: bold;
+    color: #F5DEB3;
+  }
+
+  .sync-status {
+    font-size: 12px;
+    color: #888;
+    align-self: center;
+  }
+
+  .badge {
+    display: inline-block;
+    min-width: 18px;
+    padding: 0 6px;
+    border-radius: 9px;
+    background: #DAA520;
+    color: #2b1700;
+    font-size: 12px;
+    font-weight: bold;
+    text-align: center;
+    margin-left: 6px;
+  }
+
+  /* 礼包 */
+  .gift-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+
+  .gift-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 10px;
+  }
+
+  .gift-msg {
+    font-size: 14px;
+    color: #F5DEB3;
+  }
+
+  .gift-items {
+    font-size: 12px;
+    color: #aaa;
+    margin-top: 2px;
+  }
+
+  /* 本地备份 */
+  .backup-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 8px;
+  }
+
+  .backup-item {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    gap: 10px;
+    padding: 8px 12px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 10px;
+  }
+
+  .backup-name {
+    font-size: 14px;
+    color: #F5DEB3;
+  }
+
+  .backup-time {
+    font-size: 12px;
+    color: #888;
+    margin-left: 8px;
+  }
+
+  .backup-actions {
+    display: flex;
+    gap: 6px;
+  }
+
+  /* 分支③冲突对比弹窗 */
+  .conflict-modal {
+    max-width: 560px;
+  }
+
+  .conflict-body {
+    flex-direction: column;
+    gap: 16px;
+  }
+
+  .conflict-tip {
+    margin: 0;
+    font-size: 13px;
+    color: #ddd;
+  }
+
+  .conflict-row {
+    border: 1px solid rgba(139, 69, 19, 0.3);
+    border-radius: 10px;
+    padding: 10px;
+  }
+
+  .conflict-slot {
+    font-size: 13px;
+    color: #DAA520;
+    font-weight: bold;
+    margin-bottom: 8px;
+  }
+
+  .conflict-compare {
+    display: flex;
+    gap: 12px;
+  }
+
+  .conflict-card {
+    flex: 1;
+    display: flex;
+    flex-direction: column;
+    gap: 4px;
+    padding: 10px;
+    background: rgba(0, 0, 0, 0.3);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 8px;
+  }
+
+  .conflict-side {
+    font-size: 12px;
+    color: #888;
+  }
+
+  .conflict-name {
+    font-size: 15px;
+    font-weight: bold;
+    color: #F5DEB3;
+  }
+
+  .conflict-detail {
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  .conflict-time {
+    font-size: 12px;
+    color: #888;
+    margin-bottom: 4px;
   }
 </style>

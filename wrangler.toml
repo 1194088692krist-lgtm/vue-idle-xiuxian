@@ -1,3 +1,16 @@
 name = "vue-idle-xiuxian"
 compatibility_date = "2024-09-01"
 pages_build_output_dir = "docs"
+
+# 账号 / 云存档 / GM 礼包 所需的 D1 数据库绑定
+# 首次部署前请执行：
+#   wrangler d1 create xiuxian
+# 并把返回的 database_id 填到下方 database_id。
+[[d1_databases]]
+binding = "DB"
+database_name = "xiuxian"
+database_id = "REPLACE_WITH_YOUR_D1_ID"
+
+# JWT 签名密钥。生产环境请用 wrangler secret put JWT_SECRET 覆盖，勿在此写真实密钥。
+[vars]
+JWT_SECRET = "change-me-in-production"

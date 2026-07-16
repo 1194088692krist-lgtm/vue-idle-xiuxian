@@ -1039,6 +1039,63 @@
           </div>
         </div>
       </div>
+
+      <!-- 礼包发放 -->
+      <div v-if="activeTab === 'gm-gift'" class="panel">
+        <div class="panel-section">
+          <h3>GM 登录</h3>
+          <div class="value-grid">
+            <div class="value-item">
+              <label>GM 账号</label>
+              <input v-model="gmForm.username" placeholder="GM 账号" :disabled="!!gmToken" />
+            </div>
+            <div class="value-item">
+              <label>GM 密码</label>
+              <input v-model="gmForm.password" type="password" placeholder="GM 密码" :disabled="!!gmToken" @keyup.enter="!gmToken && gmLogin()" />
+            </div>
+          </div>
+          <div class="panel-actions">
+            <button v-if="!gmToken" class="btn-primary" :disabled="gmBusy || !gmForm.username || !gmForm.password" @click="gmLogin">登录并获取凭证</button>
+            <button v-else class="btn-secondary" @click="gmLogout">退出 GM 凭证（{{ gmUsername }}）</button>
+          </div>
+          <p v-if="gmError" class="gift-error">{{ gmError }}</p>
+        </div>
+
+        <div class="panel-section">
+          <h3>发送礼包给玩家</h3>
+          <div class="value-grid">
+            <div class="value-item">
+              <label>目标玩家账号（用户ID）</label>
+              <input v-model="giftForm.username" placeholder="要发放的用户名" />
+            </div>
+            <div class="value-item">
+              <label>留言</label>
+              <input v-model="giftForm.message" placeholder="如：开服福利" />
+            </div>
+          </div>
+
+          <h4>数值资源</h4>
+          <div class="value-grid">
+            <div class="value-item" v-for="r in giftResourceFields" :key="r.key">
+              <label>{{ r.label }}</label>
+              <input type="number" min="0" v-model.number="giftForm.resources[r.key]" />
+            </div>
+          </div>
+
+          <h4>素材（强化石 / 洗练石）</h4>
+          <div class="value-grid">
+            <div class="value-item" v-for="m in giftMaterialFields" :key="m.id">
+              <label>{{ m.name }}</label>
+              <input type="number" min="0" v-model.number="giftForm.materials[m.id]" />
+            </div>
+          </div>
+
+          <div class="panel-actions">
+            <button class="btn-primary" :disabled="!gmToken || gmBusy || !giftForm.username" @click="sendGift">发送礼包</button>
+          </div>
+          <p v-if="giftResult" class="gift-result">{{ giftResult }}</p>
+        </div>
+      </div>
     </div>
   </div>
 </template>
@@ -1063,7 +1120,8 @@ const tabs = [
   { key: 'sets', label: '套装编辑' },
   { key: 'pets', label: '灵宠编辑' },
   { key: 'monsters', label: '怪物编辑' },
-  { key: 'assets', label: '素材管理' }
+  { key: 'assets', label: '素材管理' },
+  { key: 'gm-gift', label: '礼包发放' }
 ]
 
 // 默认游戏数值
@@ -2030,6 +2088,106 @@ const loadFromStorage = async () => {
     if (assets) assetsList.value = JSON.parse(assets)
   } catch (err) {
     console.error('加载配置失败:', err)
+  }
+}
+
+// ===== 礼包发放（GM 凭证系统）=====
+const GM_TOKEN_KEY = 'xx_gm_token'
+const gmToken = ref(localStorage.getItem(GM_TOKEN_KEY) || '')
+const gmUsername = ref(localStorage.getItem('xx_gm_username') || '')
+const gmBusy = ref(false)
+const gmError = ref('')
+const gmForm = ref({ username: '', password: '' })
+
+const gmLogin = async () => {
+  gmBusy.value = true
+  gmError.value = ''
+  try {
+    const r = await fetch('/api/gm/login', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json' },
+      body: JSON.stringify({ username: gmForm.value.username.trim(), password: gmForm.value.password })
+    })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok || !data.ok) throw new Error(data.error || 'GM 登录失败')
+    gmToken.value = data.token
+    gmUsername.value = data.username
+    localStorage.setItem(GM_TOKEN_KEY, data.token)
+    localStorage.setItem('xx_gm_username', data.username)
+    gmForm.value.password = ''
+  } catch (e) {
+    gmError.value = e.message || 'GM 登录失败'
+  } finally {
+    gmBusy.value = false
+  }
+}
+const gmLogout = () => {
+  gmToken.value = ''
+  gmUsername.value = ''
+  localStorage.removeItem(GM_TOKEN_KEY)
+  localStorage.removeItem('xx_gm_username')
+}
+
+const giftResourceFields = [
+  { key: 'spiritStones', label: '灵石' },
+  { key: 'phantomCrystals', label: '幻灵结晶' },
+  { key: 'reinforceStones', label: '强化石' },
+  { key: 'refinementStones', label: '洗练石' },
+  { key: 'petEssence', label: '灵宠精华' }
+]
+const giftMaterialFields = [
+  { id: 'common_enhance_stone', name: '普通强化石' },
+  { id: 'advanced_enhance_stone', name: '高级强化石' },
+  { id: 'supreme_enhance_stone', name: '至尊强化石' },
+  { id: 'reforge_stone', name: '洗练石' }
+]
+const giftForm = ref({
+  username: '',
+  message: '',
+  resources: {},
+  materials: {}
+})
+const giftResult = ref('')
+
+const sendGift = async () => {
+  if (!gmToken.value) { gmError.value = '请先登录 GM 凭证'; return }
+  gmBusy.value = true
+  giftResult.value = ''
+  try {
+    const resources = {}
+    for (const r of giftResourceFields) {
+      const v = Number(giftForm.value.resources[r.key]) || 0
+      if (v > 0) resources[r.key] = v
+    }
+    const materials = []
+    for (const m of giftMaterialFields) {
+      const v = Math.floor(Number(giftForm.value.materials[m.id]) || 0)
+      if (v > 0) materials.push({ id: m.id, count: v })
+    }
+    if (!Object.keys(resources).length && !materials.length) {
+      giftResult.value = '请至少填写一项大于 0 的礼包内容'
+      return
+    }
+    const r = await fetch('/api/gm/gift', {
+      method: 'POST',
+      headers: { 'content-type': 'application/json', Authorization: `Bearer ${gmToken.value}` },
+      body: JSON.stringify({
+        username: giftForm.value.username.trim(),
+        message: giftForm.value.message,
+        items: { resources, materials }
+      })
+    })
+    const data = await r.json().catch(() => ({}))
+    if (!r.ok || !data.ok) throw new Error(data.error || '发送失败')
+    giftResult.value = `已向「${data.to}」发放礼包：${JSON.stringify(data.items)}`
+    giftForm.value.username = ''
+    giftForm.value.message = ''
+    giftForm.value.resources = {}
+    giftForm.value.materials = {}
+  } catch (e) {
+    giftResult.value = '发送失败：' + (e.message || e)
+  } finally {
+    gmBusy.value = false
   }
 }
 
@@ -3000,5 +3158,18 @@ onMounted(async () => {
   .value-item.full {
     grid-column: span 1;
   }
+}
+
+.gift-error {
+  color: #ff6b6b;
+  font-size: 13px;
+  margin-top: 8px;
+}
+
+.gift-result {
+  color: #66BB6A;
+  font-size: 13px;
+  margin-top: 8px;
+  word-break: break-all;
 }
 </style>

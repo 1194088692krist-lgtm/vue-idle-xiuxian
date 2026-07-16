@@ -1,5 +1,6 @@
 import { defineStore } from 'pinia'
 import { GameDB } from './db'
+import { useAuthStore } from './auth'
 import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
@@ -27,12 +28,18 @@ const QUALITY_STONE_MAP = {
 // 严格排除 pet/material 等非装备类型
 const isEquipmentItem = item => !!item && item.type !== 'pet' && item.type !== 'material' && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
+// 云同步节流计时器（模块级，不进入存档）
+let cloudSyncTimer = null
+
 export const usePlayerStore = defineStore('player', {
   state: () => ({
     // 保存防抖计时器（不持久化）
     saveTimer: null,
     pendingSave: false,
     lastSaveTime: 0,
+    // 云存档：登录后保存自动同步；cloudConflicts 为分支③待用户抉择的冲突列表
+    cloudConflicts: [],
+    cloudSyncStatus: '',
     // 当前存档所在槽位（null 表示尚未指定，自动存档时默认写入槽位 1）
     currentSlot: null,
     // 是否新玩家
@@ -530,6 +537,7 @@ export const usePlayerStore = defineStore('player', {
       this.saveTimer = null
       this.pendingSave = false
       this.lastSaveTime = 0
+      this.cloudConflicts = []
       // 初始化主题设置：默认暗色模式
       const savedDarkMode = localStorage.getItem('darkMode')
       this.isDarkMode = savedDarkMode === null ? true : savedDarkMode === 'true'
@@ -590,6 +598,8 @@ export const usePlayerStore = defineStore('player', {
       } else {
         console.error('数据加密失败')
       }
+      // 登录后：本地落盘即自动云同步（节流）
+      this._scheduleCloudSync()
     },
     // 防抖保存：高频操作使用此接口，避免每次调用都加密写入 IndexedDB
     // 连续活动时会合并保存，但最多 10 秒强制保存一次，防止进度丢失
@@ -605,6 +615,176 @@ export const usePlayerStore = defineStore('player', {
       this.saveTimer = setTimeout(() => {
         this.saveData()
       }, delay)
+    },
+    // ===== 云存档同步 / 迁移 =====
+    // 取云端全部槽位：返回 { slot: { data, updated_at } }
+    async fetchCloudSaves() {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) return null
+      try {
+        const r = await fetch('/api/save', { headers: { ...auth.authHeaders() } })
+        const data = await r.json().catch(() => ({}))
+        if (!r.ok || !data.ok) return null
+        const map = {}
+        for (const s of data.saves || []) map[s.slot] = { data: s.data, updated_at: s.updated_at }
+        return map
+      } catch {
+        return null
+      }
+    },
+    // 上传单槽到云端
+    async pushSlotToCloud(slot, encryptedBlob, updatedAt) {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) return
+      try {
+        await fetch('/api/save', {
+          method: 'POST',
+          headers: { 'content-type': 'application/json', ...auth.authHeaders() },
+          body: JSON.stringify({ slot, data: encryptedBlob, updated_at: updatedAt })
+        })
+      } catch (e) {
+        console.warn('云同步上传失败', e)
+      }
+    },
+    // 从密文 blob 提取基础信息（用于分支③对比弹窗）
+    _slotInfo(blob) {
+      const d = decryptData(blob)
+      if (!d) return { name: '（损坏）', level: '-', realm: '-', time: null }
+      return { name: d.name || '未知', level: d.level || 1, realm: d.realm || '未知', time: d._saveTime || null }
+    },
+    // 保存后节流自动云同步：上传活动档(0) + 当前手动槽位
+    _scheduleCloudSync() {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) return
+      if (cloudSyncTimer) return
+      cloudSyncTimer = setTimeout(() => {
+        cloudSyncTimer = null
+        this.syncToCloud()
+      }, 3000)
+    },
+    async syncToCloud() {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) return
+      this.cloudSyncStatus = '同步中…'
+      try {
+        const blob = await GameDB.getData('playerData')
+        if (blob) await this.pushSlotToCloud(0, blob, Date.now())
+        const slot = this.currentSlot || this.autoSaveSlot
+        if (slot) {
+          const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
+          if (slotBlob) await this.pushSlotToCloud(slot, slotBlob, Date.now())
+        }
+        this.cloudSyncStatus = '已同步到云端'
+      } catch (e) {
+        this.cloudSyncStatus = '云同步失败'
+        console.warn(e)
+      }
+    },
+    // 迁移决策树（登录后调用）
+    // interactive=true 时，分支③(本地+云端都有) 收集为冲突交由 UI 弹窗抉择；
+    // interactive=false（启动自动）时以 updated_at 较新者胜（最后写入获胜）。
+    async migrate({ interactive = false } = {}) {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) throw new Error('请先登录')
+      const cloud = await this.fetchCloudSaves()
+      if (!cloud) throw new Error('拉取云端存档失败')
+
+      const slots = [0, 1, 2, 3, 4, 5]
+      const conflicts = []
+      for (const slot of slots) {
+        const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
+        const localBlob = await GameDB.getData(key)
+        let localTime = 0
+        if (localBlob) {
+          const d = decryptData(localBlob)
+          localTime = d?._saveTime || 0
+        }
+        const cloudSlot = cloud[slot]
+        const cloudBlob = cloudSlot?.data
+        const cloudTime = cloudSlot?.updated_at || 0
+
+        if (cloudBlob && !localBlob) {
+          // ② 云端有、本地无 → 下载
+          await GameDB.setData(key, cloudBlob)
+        } else if (!cloudBlob && localBlob) {
+          // ① 本地有、云端无 → 上传
+          await this.pushSlotToCloud(slot, localBlob, localTime || Date.now())
+        } else if (cloudBlob && localBlob) {
+          // ③ 两边都有 → 冲突
+          if (interactive) {
+            conflicts.push({
+              slot,
+              local: this._slotInfo(localBlob),
+              cloud: this._slotInfo(cloudBlob),
+              localTime,
+              cloudTime
+            })
+          } else if (cloudTime >= localTime) {
+            await GameDB.setData(key, cloudBlob)
+          } else {
+            await this.pushSlotToCloud(slot, localBlob, localTime)
+          }
+        }
+        // ④ 都没有 → 跳过
+      }
+
+      if (conflicts.length) {
+        this.cloudConflicts = conflicts
+        return { conflicts }
+      }
+      // 无冲突，统一重新初始化
+      this.$reset()
+      await this.initializePlayer()
+      this.cloudConflicts = []
+      return { conflicts: [] }
+    },
+    // 分支③：用户抉择某一槽位用本地还是云端
+    async resolveConflict(slot, useCloud) {
+      const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
+      if (useCloud) {
+        const cloud = await this.fetchCloudSaves()
+        const blob = cloud?.[slot]?.data
+        if (blob) await GameDB.setData(key, blob)
+      } else {
+        const localBlob = await GameDB.getData(key)
+        if (localBlob) {
+          const d = decryptData(localBlob)
+          await this.pushSlotToCloud(slot, localBlob, d?._saveTime || Date.now())
+        }
+      }
+      this.cloudConflicts = this.cloudConflicts.filter(c => c.slot !== slot)
+      if (!this.cloudConflicts.length) {
+        this.$reset()
+        await this.initializePlayer()
+      }
+    },
+    // 领取礼包：标记并入存档
+    async claimGift(giftId) {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) throw new Error('请先登录')
+      const r = await fetch('/api/inbox/claim', {
+        method: 'POST',
+        headers: { 'content-type': 'application/json', ...auth.authHeaders() },
+        body: JSON.stringify({ gift_id: giftId })
+      })
+      const data = await r.json().catch(() => ({}))
+      if (!r.ok || !data.ok) throw new Error(data.error || '领取失败')
+      const items = data.items
+      if (items?.num) {
+        for (const [k, v] of Object.entries(items.num)) {
+          if (typeof this[k] === 'number') this[k] += v
+        }
+      }
+      if (Array.isArray(items?.materials)) {
+        if (!Array.isArray(this.materials)) this.materials = []
+        for (const m of items.materials) {
+          for (let i = 0; i < m.count; i++) {
+            this.materials.push({ kind: 'ore', id: m.id, name: m.name })
+          }
+        }
+      }
+      this.queueSave()
+      return items
     },
     // 导出存档数据
     async exportData() {
