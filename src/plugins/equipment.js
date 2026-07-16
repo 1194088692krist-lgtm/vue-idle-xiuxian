@@ -60,8 +60,6 @@ const statCaps = {
   stunResist: 0.4,
   dodgeResist: 0.4,
   vampireResist: 0.4,
-  spiritRate: 0.5,
-  cultivationRate: 0.5,
   speed: 0.3,
   haste: 0.3,
   critDamageReduce: 0.5
@@ -97,19 +95,20 @@ const statBaseRanges = {
   critDamageReduce: { common: [0.03, 0.05], uncommon: [0.05, 0.08], rare: [0.08, 0.12], epic: [0.10, 0.18], legendary: [0.15, 0.30], mythic: [0.20, 0.45] }
 }
 
+// 可洗练词条池：仅保留战斗/特殊属性，排除 attack/health/defense/speed 等装备基础数据
 const reforgeableStats = {
-  head: ['defense', 'health', 'stunResist', 'critResist', 'healBoost'],
-  body: ['defense', 'health', 'finalDamageReduce', 'counterResist', 'comboResist'],
-  legs: ['defense', 'speed', 'dodgeRate', 'dodgeResist', 'counterRate'],
-  feet: ['defense', 'speed', 'dodgeRate', 'dodgeResist', 'haste'],
-  shoulder: ['defense', 'health', 'counterRate', 'stunResist', 'resistanceBoost'],
-  hands: ['attack', 'critRate', 'comboRate', 'vampireRate', 'speed'],
-  wrist: ['defense', 'counterRate', 'vampireRate', 'healBoost', 'critDamageReduce'],
-  necklace: ['health', 'healBoost', 'spiritRate', 'critRate', 'cultivationRate'],
-  ring1: ['attack', 'critDamageBoost', 'finalDamageBoost', 'comboRate', 'vampireRate'],
-  ring2: ['defense', 'critDamageReduce', 'resistanceBoost', 'dodgeRate', 'finalDamageReduce'],
-  belt: ['health', 'defense', 'combatBoost', 'healBoost', 'counterRate'],
-  artifact: ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost']
+  head: ['stunResist', 'critResist', 'healBoost'],
+  body: ['finalDamageReduce', 'counterResist', 'comboResist'],
+  legs: ['dodgeRate', 'dodgeResist', 'counterRate'],
+  feet: ['dodgeRate', 'dodgeResist', 'haste'],
+  shoulder: ['counterRate', 'stunResist', 'resistanceBoost'],
+  hands: ['critRate', 'comboRate', 'vampireRate'],
+  wrist: ['counterRate', 'vampireRate', 'healBoost', 'critDamageReduce'],
+  necklace: ['healBoost', 'critRate'],
+  ring1: ['critDamageBoost', 'finalDamageBoost', 'comboRate', 'vampireRate'],
+  ring2: ['critDamageReduce', 'resistanceBoost', 'dodgeRate', 'finalDamageReduce'],
+  belt: ['combatBoost', 'healBoost', 'counterRate'],
+  artifact: ['critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost']
 }
 
 // 强化石类型配置
@@ -203,7 +202,7 @@ function getStatBaseRange(stat, rarity) {
   const percentStats = ['critRate', 'critDamageBoost', 'critDamageReduce', 'dodgeRate', 'vampireRate',
     'finalDamageBoost', 'finalDamageReduce', 'comboRate', 'counterRate', 'stunRate', 'healBoost',
     'combatBoost', 'resistanceBoost', 'critResist', 'comboResist', 'counterResist', 'stunResist',
-    'dodgeResist', 'vampireResist', 'spiritRate', 'cultivationRate', 'haste']
+    'dodgeResist', 'vampireResist', 'haste']
   if (percentStats.includes(stat)) {
     const rarityRanges = {
       common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12],
@@ -226,6 +225,12 @@ function clampToStatCap(stat, value) {
   return value
 }
 
+const BASE_STATS = ['attack', 'health', 'defense', 'speed']
+const PERCENT_STATS = ['critRate', 'critDamageBoost', 'critDamageReduce', 'dodgeRate', 'vampireRate',
+  'finalDamageBoost', 'finalDamageReduce', 'comboRate', 'counterRate', 'stunRate', 'healBoost',
+  'combatBoost', 'resistanceBoost', 'critResist', 'comboResist', 'counterResist', 'stunResist',
+  'dodgeResist', 'vampireResist', 'haste']
+
 function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true, reforgeSafe = false, targetStat = null) {
   if (!equipment || !equipment.stats || !equipment.type) {
     return { success: false, message: '无效的装备' }
@@ -235,102 +240,104 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   }
   const oldStats = { ...equipment.stats }
   const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
-  const tempStats = { ...equipment.stats }
-  const originStats = Object.keys(tempStats)
   const rarity = equipment.rarity || 'common'
-  
-  const modifyIndexes = targetStat !== null
-    ? originStats.map((s, i) => s === targetStat ? i : -1).filter(i => i >= 0)
-    : [
-      ...new Set(
-        Array.from({ length: Math.floor(Math.random() * 3) + 1 }, () => Math.floor(Math.random() * originStats.length))
-      )
-    ].slice(0, 3)
-  if (modifyIndexes.length === 0 && originStats.length > 0) {
-    modifyIndexes.push(0)
+
+  // 分离基础属性与可洗练词条；基础属性不得洗练
+  const baseStats = {}
+  const affixStats = {}
+  Object.entries(equipment.stats).forEach(([stat, value]) => {
+    if (BASE_STATS.includes(stat)) {
+      baseStats[stat] = value
+    } else {
+      affixStats[stat] = value
+    }
+  })
+
+  // 旧存档中可能存在非法词条（如 spiritRate/cultivationRate/不在可用池中的属性），先清理为可用池
+  const cleanAffixStats = {}
+  Object.entries(affixStats).forEach(([stat, value]) => {
+    if (availableStats.includes(stat)) {
+      cleanAffixStats[stat] = value
+    }
+  })
+
+  // 如果指定了目标词条，仅修改该词条
+  let modifyKeys = []
+  if (targetStat !== null) {
+    if (cleanAffixStats[targetStat] !== undefined) modifyKeys = [targetStat]
+    else if (availableStats.includes(targetStat)) modifyKeys = [targetStat]
+  } else {
+    const keys = Object.keys(cleanAffixStats)
+    const count = Math.min(keys.length || 1, Math.floor(Math.random() * 3) + 1)
+    modifyKeys = [...keys].sort(() => Math.random() - 0.5).slice(0, count)
+    if (modifyKeys.length === 0) {
+      modifyKeys = [availableStats[Math.floor(Math.random() * availableStats.length)]].filter(Boolean)
+    }
   }
-  
-  modifyIndexes.forEach(index => {
-    const originStat = originStats[index]
+
+  const resultAffixes = { ...cleanAffixStats }
+
+  modifyKeys.forEach(originStat => {
     let currentStat = originStat
-    
+    // 尝试替换成新词条
     if (Math.random() < reforgeConfig.newStatChance) {
-      const availableNew = availableStats.filter(s => !originStats.includes(s) || s !== originStat)
+      const availableNew = availableStats.filter(s => s !== originStat && resultAffixes[s] === undefined)
       if (availableNew.length > 0) {
         const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
-        delete tempStats[originStat]
+        delete resultAffixes[originStat]
         currentStat = newStat
-        originStats[index] = newStat
       }
     }
-    
+
     const baseRange = getStatBaseRange(currentStat, rarity)
     let newValue = getRandomValueInRange(baseRange)
-    
+
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
     newValue = newValue * (1 + delta)
-    
     newValue = clampToStatCap(currentStat, newValue)
-    
+
     const baseMin = baseRange[0] * 0.7
     const baseMax = baseRange[1] * 1.3
     newValue = Math.max(baseMin, Math.min(newValue, baseMax))
-    
-    if (['critRate', 'critDamageBoost', 'critDamageReduce', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce',
-         'comboRate', 'counterRate', 'stunRate', 'healBoost', 'combatBoost', 'resistanceBoost',
-         'critResist', 'comboResist', 'counterResist', 'stunResist', 'dodgeResist', 'vampireResist',
-         'spiritRate', 'cultivationRate', 'haste'].includes(currentStat)) {
-      tempStats[currentStat] = Number(newValue.toFixed(3))
+
+    // 百分比词条保证最小值 > 0，且不低于该品质基础下限的 50%
+    if (PERCENT_STATS.includes(currentStat)) {
+      newValue = Math.max(baseRange[0] * 0.5, newValue)
+      resultAffixes[currentStat] = Number(newValue.toFixed(3))
     } else {
-      tempStats[currentStat] = Math.round(newValue)
+      resultAffixes[currentStat] = Math.round(newValue)
     }
   })
-  
-  if (Object.keys(tempStats).length === 0) {
-    const randomStat = availableStats[Math.floor(Math.random() * availableStats.length)]
-    const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
-    if (maxAffixes >= 1) {
-      const baseRange = getStatBaseRange(randomStat, rarity)
-      let value = getRandomValueInRange(baseRange)
-      value = clampToStatCap(randomStat, value)
-      if (statCaps[randomStat] !== undefined) {
-        tempStats[randomStat] = Number(value.toFixed(3))
-      } else {
-        tempStats[randomStat] = Math.round(value)
-      }
-    }
-  }
-  
+
+  // 补充词条到当前品质上限
   const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
-  while (Object.keys(tempStats).length < maxAffixes) {
-    const availableNew = availableStats.filter(s => !Object.keys(tempStats).includes(s))
+  while (Object.keys(resultAffixes).length < maxAffixes) {
+    const availableNew = availableStats.filter(s => resultAffixes[s] === undefined)
     if (availableNew.length === 0) break
     const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
     const baseRange = getStatBaseRange(newStat, rarity)
     let value = getRandomValueInRange(baseRange)
     value = clampToStatCap(newStat, value)
-    if (statCaps[newStat] !== undefined) {
-      tempStats[newStat] = Number(value.toFixed(3))
+    if (PERCENT_STATS.includes(newStat)) {
+      value = Math.max(baseRange[0] * 0.5, value)
+      resultAffixes[newStat] = Number(value.toFixed(3))
     } else {
-      tempStats[newStat] = Math.round(value)
+      resultAffixes[newStat] = Math.round(value)
     }
   }
-  
-  while (Object.keys(tempStats).length > maxAffixes) {
-    const keys = Object.keys(tempStats)
-    const removeKey = keys[Math.floor(Math.random() * keys.length)]
-    delete tempStats[removeKey]
-  }
-  
+
+  // 最终合并：基础属性保留 + 新词条
+  const finalStats = { ...baseStats, ...resultAffixes }
+
   if (confirmNewStats) {
-    equipment.stats = { ...tempStats }
+    equipment.stats = { ...finalStats }
   }
   return {
     success: true,
     message: confirmNewStats ? '洗练成功' : '保留原有属性',
     cost: reforgeConfig.costPerAttempt,
     oldStats,
-    newStats: tempStats,
+    newStats: finalStats,
     confirmed: confirmNewStats,
     targetStat
   }

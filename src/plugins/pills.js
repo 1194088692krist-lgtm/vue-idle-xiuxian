@@ -13,7 +13,7 @@ export const pillGrades = {
 
 // 丹药类型
 export const pillTypes = {
-  spirit: { name: '灵力类', effectMultiplier: 1 },
+  spirit_stone: { name: '灵石类', effectMultiplier: 1 },
   cultivation: { name: '修炼类', effectMultiplier: 1.2 },
   attribute: { name: '属性类', effectMultiplier: 1.5 },
   special: { name: '特殊类', effectMultiplier: 2 }
@@ -30,17 +30,17 @@ export const pillRecipes = [
   {
     id: 'spirit_gathering',
     name: '聚灵丹',
-    description: '提升灵力恢复速度的丹药',
+    description: '提升灵石获取效率的丹药',
     grade: 'grade1',
-    type: 'spirit',
+    type: 'spirit_stone',
     materials: [
-      { herb: 'spirit_grass', count: 2 },
-      { herb: 'cloud_flower', count: 1 }
+      { kind: 'herb', id: 'spirit_grass', count: 2 },
+      { kind: 'herb', id: 'cloud_flower', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade1'),
     baseEffect: {
-      type: 'spiritRate',
-      value: 0.2,
+      type: 'spiritStoneRate',
+      value: 0.1,
       duration: 3600
     }
   },
@@ -51,13 +51,13 @@ export const pillRecipes = [
     grade: 'grade2',
     type: 'cultivation',
     materials: [
-      { herb: 'cloud_flower', count: 2 },
-      { herb: 'thunder_root', count: 1 }
+      { kind: 'herb', id: 'cloud_flower', count: 2 },
+      { kind: 'herb', id: 'thunder_root', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
     baseEffect: {
       type: 'cultivationRate',
-      value: 0.3,
+      value: 0.15,
       duration: 1800
     }
   },
@@ -68,13 +68,13 @@ export const pillRecipes = [
     grade: 'grade3',
     type: 'attribute',
     materials: [
-      { herb: 'thunder_root', count: 2 },
-      { herb: 'dragon_breath_herb', count: 1 }
+      { kind: 'herb', id: 'thunder_root', count: 2 },
+      { kind: 'herb', id: 'dragon_breath_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
     baseEffect: {
       type: 'combatBoost',
-      value: 0.4,
+      value: 0.12,
       duration: 900
     }
   },
@@ -85,13 +85,13 @@ export const pillRecipes = [
     grade: 'grade4',
     type: 'special',
     materials: [
-      { herb: 'dragon_breath_herb', count: 2 },
-      { herb: 'immortal_jade_grass', count: 1 }
+      { kind: 'herb', id: 'dragon_breath_herb', count: 2 },
+      { kind: 'herb', id: 'immortal_jade_grass', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
     baseEffect: {
       type: 'allAttributes',
-      value: 0.5,
+      value: 0.2,
       duration: 600
     }
   },
@@ -102,13 +102,13 @@ export const pillRecipes = [
     grade: 'grade5',
     type: 'attribute',
     materials: [
-      { herb: 'five_elements_grass', count: 2 },
-      { herb: 'phoenix_feather_herb', count: 1 }
+      { kind: 'herb', id: 'five_elements_grass', count: 2 },
+      { kind: 'herb', id: 'phoenix_feather_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
     baseEffect: {
       type: 'allAttributes',
-      value: 0.8,
+      value: 0.3,
       duration: 1200
     }
   },
@@ -119,30 +119,30 @@ export const pillRecipes = [
     grade: 'grade6',
     type: 'cultivation',
     materials: [
-      { herb: 'celestial_dew_grass', count: 2 },
-      { herb: 'moonlight_orchid', count: 1 }
+      { kind: 'herb', id: 'celestial_dew_grass', count: 2 },
+      { kind: 'herb', id: 'moonlight_orchid', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade6'),
     baseEffect: {
       type: 'cultivationRate',
-      value: 1.0,
+      value: 0.35,
       duration: 1800
     }
   },
   {
     id: 'sun_moon_pill',
     name: '日月丹',
-    description: '融合日月精华的丹药，能大幅提升灵力上限',
+    description: '融合日月精华的丹药，能大幅提升灵石获取效率',
     grade: 'grade7',
-    type: 'spirit',
+    type: 'spirit_stone',
     materials: [
-      { herb: 'sun_essence_flower', count: 2 },
-      { herb: 'moonlight_orchid', count: 2 }
+      { kind: 'herb', id: 'sun_essence_flower', count: 2 },
+      { kind: 'herb', id: 'moonlight_orchid', count: 2 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade7'),
     baseEffect: {
-      type: 'spiritCap',
-      value: 1.5,
+      type: 'spiritStoneRate',
+      value: 0.35,
       duration: 2400
     }
   },
@@ -153,30 +153,30 @@ export const pillRecipes = [
     grade: 'grade8',
     type: 'special',
     materials: [
-      { herb: 'phoenix_feather_herb', count: 3 },
-      { herb: 'celestial_dew_grass', count: 1 }
+      { kind: 'herb', id: 'phoenix_feather_herb', count: 3 },
+      { kind: 'herb', id: 'celestial_dew_grass', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade8'),
     baseEffect: {
       type: 'autoHeal',
-      value: 0.1,
+      value: 0.05,
       duration: 3600
     }
   },
   {
     id: 'spirit_recovery',
     name: '回灵丹',
-    description: '快速恢复灵力的丹药',
+    description: '快速恢复灵石获取效率的丹药',
     grade: 'grade2',
-    type: 'spirit',
+    type: 'spirit_stone',
     materials: [
-      { herb: 'dark_yin_grass', count: 2 },
-      { herb: 'frost_lotus', count: 1 }
+      { kind: 'herb', id: 'dark_yin_grass', count: 2 },
+      { kind: 'herb', id: 'frost_lotus', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
     baseEffect: {
-      type: 'spiritRecovery',
-      value: 0.4,
+      type: 'spiritStoneRate',
+      value: 0.15,
       duration: 1200
     }
   },
@@ -187,13 +187,13 @@ export const pillRecipes = [
     grade: 'grade3',
     type: 'cultivation',
     materials: [
-      { herb: 'nine_leaf_lingzhi', count: 2 },
-      { herb: 'purple_ginseng', count: 1 }
+      { kind: 'herb', id: 'nine_leaf_lingzhi', count: 2 },
+      { kind: 'herb', id: 'purple_ginseng', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
     baseEffect: {
       type: 'cultivationEfficiency',
-      value: 0.5,
+      value: 0.18,
       duration: 1500
     }
   },
@@ -204,13 +204,13 @@ export const pillRecipes = [
     grade: 'grade3',
     type: 'special',
     materials: [
-      { herb: 'frost_lotus', count: 2 },
-      { herb: 'fire_heart_flower', count: 1 }
+      { kind: 'herb', id: 'frost_lotus', count: 2 },
+      { kind: 'herb', id: 'fire_heart_flower', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
     baseEffect: {
       type: 'comprehension',
-      value: 0.3,
+      value: 0.15,
       duration: 2400
     }
   },
@@ -221,13 +221,13 @@ export const pillRecipes = [
     grade: 'grade4',
     type: 'attribute',
     materials: [
-      { herb: 'fire_heart_flower', count: 2 },
-      { herb: 'dragon_breath_herb', count: 1 }
+      { kind: 'herb', id: 'fire_heart_flower', count: 2 },
+      { kind: 'herb', id: 'dragon_breath_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
     baseEffect: {
-      type: 'fireAttribute',
-      value: 0.6,
+      type: 'combatBoost',
+      value: 0.15,
       duration: 1800
     }
   },
@@ -266,7 +266,7 @@ export const pillRecipes = [
     name: '疗伤丹',
     description: '生肌续命，战斗中可嗑以回复生命',
     grade: 'grade1',
-    type: 'spirit',
+    type: 'attribute',
     func: 'battle',
     materials: [
       { kind: 'herb', id: 'flesh_growth_herb', count: 2 },
@@ -462,8 +462,10 @@ export const getZoneByPill = (pillId) => {
 export const calculatePillEffect = (recipe, playerLevel) => {
   const grade = pillGrades[recipe.grade]
   const type = pillTypes[recipe.type]
-  // 基础效果随境界提升
-  const levelMultiplier = 1 + (playerLevel - 1) * 0.1
+  // 数值类丹药（努力值、永久属性、战斗回血等）不受境界缩放，避免夸张
+  const fixedValueTypes = ['effortGain', 'permanentStat', 'healBattle', 'cleanse', 'reforgeSafe', 'breakthroughRate', 'enhanceRate']
+  const isFixed = fixedValueTypes.includes(recipe.baseEffect.type)
+  const levelMultiplier = isFixed ? 1 : Math.min(2, 1 + (playerLevel - 1) * 0.05)
   return {
     type: recipe.baseEffect.type,
     stat: recipe.baseEffect.stat,

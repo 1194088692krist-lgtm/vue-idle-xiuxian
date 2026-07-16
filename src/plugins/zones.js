@@ -3,7 +3,7 @@
 // rmMul : 奖励倍率相对该图基础倍率的系数
 // cost  : 每场遭遇的灵力消耗
 // drop  : 掉落率/品质加成
-const DIFFICULTY_TEMPLATES = [
+export const DIFFICULTY_TEMPLATES = [
   { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.6, cost: 10,  drop: 1.0 },
   { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.9, cost: 25, drop: 1.15 },
   { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 80, drop: 1.3 },

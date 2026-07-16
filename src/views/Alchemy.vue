@@ -83,6 +83,7 @@
                 <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.id || material.herb">
                   <div class="material-info">
                     <span class="material-name">{{ getMaterialName(material) }}</span>
+                    <span class="material-source">{{ getMaterialSource(material) }}</span>
                     <span class="material-need">需要: {{ material.count }}</span>
                   </div>
                   <div
@@ -578,6 +579,7 @@
   import { usePlayerStore } from '../stores/player'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { allMaterials } from '../plugins/materials'
+  import { zones, DIFFICULTY_TEMPLATES } from '../plugins/zones'
   import { starConfig, getEffortCap } from '../plugins/characters'
   import LogPanel from '../components/LogPanel.vue'
   import { useMessage } from 'naive-ui'
@@ -638,6 +640,38 @@
     return m ? m.name : material.id
   }
 
+  const getMaterialSource = material => {
+    const kind = material.kind || 'herb'
+    const mid = material.id || material.herb
+    const m = allMaterials.find(x => x.id === mid && x.kind === kind)
+    if (!m) return ''
+
+    // 灵草：任意地图探索均可掉落，高难地图有稀有灵草加成
+    if (kind === 'herb') {
+      const zoneMin = m.quality === 'legendary' ? 5 : m.quality === 'rare' ? 4 : 1
+      const diffLabel = zoneMin >= 5 ? '灭世' : zoneMin >= 4 ? '绝境' : '任意难度'
+      return `（探索·${diffLabel}）`
+    }
+    // 矿料/灵液：按 zoneMin 找最低可掉落地图
+    if (kind === 'ore' || kind === 'liquid') {
+      const zoneMin = m.zoneMin || 1
+      const zone = zones[Math.min(zoneMin - 1, zones.length - 1)]
+      const diff = DIFFICULTY_TEMPLATES[Math.max(0, zoneMin - 1)]
+      if (zone && diff) return `（${zone.name}·${diff.label}）`
+      return '（探索掉落）'
+    }
+    // 妖丹：按敌人档位
+    if (kind === 'core') {
+      const tierLabel = m.tier === 'boss' ? 'Boss' : m.tier === 'elite' ? '精英' : '普通'
+      return `（${tierLabel}敌人掉落）`
+    }
+    // 至宝
+    if (kind === 'special') {
+      return '（Boss/奇遇）'
+    }
+    return ''
+  }
+
   const currentEffect = computed(() => {
     if (!selectedRecipe.value) return null
     return calculatePillEffect(selectedRecipe.value, playerStore.level)
@@ -658,15 +692,31 @@
       case 'reforgeSafe':
         return { label: '洗练保底', value: `${Math.max(1, Math.round(e.value))} 次` }
       case 'healBattle':
-        return { label: '战斗回血', value: '战斗中使用' }
+        return { label: '战斗回血', value: `恢复最大生命值 ${(e.value * 100).toFixed(0)}%` }
       case 'cleanse':
         return { label: '战斗解控', value: '战斗中使用' }
       case 'expGain':
         return { label: '修为获取', value: `+${(e.value * 100).toFixed(0)}%` }
       case 'dropRate':
         return { label: '掉落加成', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'spiritStoneRate':
+        return { label: '灵石获取', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'cultivationRate':
+        return { label: '修炼速度', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'cultivationEfficiency':
+        return { label: '修炼效率', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'combatBoost':
+        return { label: '战斗属性', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'allAttributes':
+        return { label: '全属性', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'comprehension':
+        return { label: '悟性提升', value: `+${(e.value * 100).toFixed(0)}%` }
+      case 'autoHeal':
+        return { label: '自动回血', value: `每秒恢复 ${(e.value * 100).toFixed(0)}% 最大生命` }
+      case 'effortGain':
+        return { label: '努力值', value: `+${Math.round(e.value)} 点` }
       default:
-        return { label: '效果数值', value: `+${(e.value * 100).toFixed(1)}%` }
+        return { label: '效果数值', value: `+${e.value}` }
     }
   })
 
