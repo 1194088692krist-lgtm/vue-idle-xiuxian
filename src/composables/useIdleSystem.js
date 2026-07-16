@@ -1349,7 +1349,7 @@ function hideTreasureFlash() {
 }
 
 // ============ 生动日志：单场遭遇 ============
-function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults = [], roleEffects = []) {
+function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults = [], roleEffects = [], enemyStatusEffects = []) {
   const s = store()
   const team = s.getTeamMembersDetail()
 
@@ -1486,10 +1486,14 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
   }
 
   if (victory) {
-    const enemyStatusEffects = ['stun', 'bleed']
-    const enemyStatusCount = 1 + Math.floor(Math.random() * 2)
-    const shuffledStatus = [...enemyStatusEffects].sort(() => Math.random() - 0.5)
-    const selectedStatus = shuffledStatus.slice(0, enemyStatusCount)
+    // 优先使用调用方传入的状态效果列表（与仪表盘怪物面板同步），否则本地随机
+    const selectedStatus = enemyStatusEffects.length > 0
+      ? enemyStatusEffects
+      : (() => {
+          const possibleStatus = ['stun', 'bleed']
+          const statusCount = 1 + Math.floor(Math.random() * 2)
+          return [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
+        })()
     for (const statusType of selectedStatus) {
       const statusPool = COMBAT_EFFECTS[statusType]
       if (statusPool && statusPool.length > 0) {
@@ -1730,8 +1734,33 @@ async function runIdleEncounter() {
     const firstResult = teamResults[0]
     const enemyData = firstResult?.result?.enemy ? { mainEnemy: firstResult.result.enemy, allBosses: firstResult.result.allBosses || [] } : generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
     const enemy = enemyData.mainEnemy
-    currentIdleEnemy.value = enemy // 暴露给挂机仪表盘怪物状态面板
-    
+
+    // 计算本次遭遇附加在怪物身上的状态效果（与日志、仪表盘怪物面板同步）
+    let enemyStatusEffects = []
+    if (victory) {
+      const possibleStatus = ['stun', 'bleed']
+      const statusCount = 1 + Math.floor(Math.random() * 2)
+      enemyStatusEffects = [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
+    }
+
+    // 构建怪物快照：避免直接引用被战斗修改过的 CombatEntity 实例，确保血条显示初始满血
+    currentIdleEnemy.value = {
+      name: enemy.name,
+      tier: enemy.tier || 'normal',
+      realm: enemy.realm || '',
+      currentHealth: Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0),
+      maxHealth: Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0),
+      damage: Math.round(enemy.stats?.damage || 0),
+      defense: Math.round(enemy.stats?.defense || 0),
+      speed: Math.round(enemy.stats?.speed || 0),
+      critRate: enemy.stats?.critRate != null ? (enemy.stats.critRate * 100).toFixed(0) + '%' : '—',
+      effects: enemyStatusEffects.map(statusType => ({
+        type: 'debuff',
+        name: statusType === 'stun' ? '眩晕' : '流血',
+        duration: statusType === 'stun' ? 1 : 3
+      }))
+    }
+
     // 收集所有成员的战斗结果数据
     const combatResults = teamResults.map(tr => ({
       memberId: tr.member.memberId,
@@ -1740,8 +1769,8 @@ async function runIdleEncounter() {
       combatStats: tr.result.combatStats || {},
       enemy: tr.result.enemy
     }))
-    
-    logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects)
+
+    logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
     // 实时更新当前结算画面
     currentEncounterSummary.value = {
       count,
@@ -2308,29 +2337,7 @@ const idleDashboard = computed(() => {
     })),
     totalPhantomCrystals: runStats.value.phantomCrystals,
     // 当前挂机遭遇的怪物状态（挂机仪表盘怪物状态面板）
-    enemy: currentIdleEnemy.value ? (() => {
-      const en = currentIdleEnemy.value
-      const maxHP = Math.round(en.stats?.maxHealth || en.currentHealth || en.maxHealth || 0)
-      const curHP = Math.round(en.currentHealth ?? maxHP)
-      const effects = Array.isArray(en.effects) ? en.effects.map(e => ({
-        name: e?.name || '未知状态',
-        type: e?.type || 'debuff',
-        duration: e?.duration ?? null
-      })) : []
-      return {
-        name: en.name,
-        tier: en.tier || 'normal',
-        realm: en.realm || '',
-        currentHealth: curHP,
-        maxHealth: maxHP,
-        hpPercent: maxHP > 0 ? Math.max(0, Math.min(100, (curHP / maxHP) * 100)).toFixed(0) + '%' : '0%',
-        damage: Math.round(en.stats?.damage || 0),
-        defense: Math.round(en.stats?.defense || 0),
-        speed: Math.round(en.stats?.speed || 0),
-        critRate: en.stats?.critRate != null ? (en.stats.critRate * 100).toFixed(0) + '%' : '—',
-        effects
-      }
-    })() : null
+    enemy: currentIdleEnemy.value || null
   }
 })
 

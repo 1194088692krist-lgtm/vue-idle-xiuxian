@@ -3107,4 +3107,42 @@ html:not(.dark) .enemy-effect.debuff {
   color: #FFB3B3;
   border-color: rgba(255, 82, 82, 0.45);
 }
+
+/* 日间模式：可能获得报酬栏增加底衬，文字改为醒目的浅色 */
+html:not(.dark) .rewards-preview {
+  padding: 10px;
+  background: rgba(33, 29, 24, 0.32);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 215, 0, 0.18);
+}
+html:not(.dark) .rewards-title {
+  color: #FFD86B;
+}
+html:not(.dark) .reward-name {
+  color: #FBF7EF;
+}
+html:not(.dark) .reward-chance {
+  color: #FFD86B;
+}
+html:not(.dark) .pill-unlock-hint {
+  background: rgba(218, 165, 32, 0.15);
+}
+
+/* 日间模式：装备详情弹窗文字清晰可读（避免继承 Cultivation.vue 的夜间浅色样式） */
+html:not(.dark) .equip-select-modal .modal-content.glass-card {
+  color: #2E2A24;
+}
+html:not(.dark) .equip-select-modal .modal-header {
+  color: #5E564A;
+}
+html:not(.dark) .equip-select-modal .sub-title {
+  color: #5E564A;
+}
+html:not(.dark) .equip-select-modal .attr-col-label {
+  color: #5E564A;
+}
+html:not(.dark) .equip-select-modal .attr-col-final {
+  color: #8B6914;
+  font-weight: bold;
+}
 </style>
