@@ -1743,13 +1743,18 @@ async function runIdleEncounter() {
       enemyStatusEffects = [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
     }
 
-    // 构建怪物快照：避免直接引用被战斗修改过的 CombatEntity 实例，确保血条显示初始满血
+    // 构建怪物快照：展示战斗结算后的真实剩余血量（随结算真实下降），并补上百分比
+    const snapMaxHP = Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0)
+    const snapCurHP = Math.round(enemy.currentHealth ?? snapMaxHP)
+    const snapHpPct = snapMaxHP > 0 ? Math.max(0, Math.min(100, (snapCurHP / snapMaxHP) * 100)).toFixed(0) + '%' : '0%'
     currentIdleEnemy.value = {
       name: enemy.name,
       tier: enemy.tier || 'normal',
       realm: enemy.realm || '',
-      currentHealth: Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0),
-      maxHealth: Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0),
+      currentHealth: snapCurHP,
+      maxHealth: snapMaxHP,
+      hpPercent: snapHpPct,
+      dead: snapCurHP <= 0,
       damage: Math.round(enemy.stats?.damage || 0),
       defense: Math.round(enemy.stats?.defense || 0),
       speed: Math.round(enemy.stats?.speed || 0),

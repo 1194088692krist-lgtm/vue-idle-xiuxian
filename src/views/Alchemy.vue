@@ -2163,4 +2163,51 @@
     font-size: 14px;
     color: #ccc;
   }
+
+  /* 日间模式：统一为宗门页式深色卡片 + 亮色字体 */
+  html:not(.dark) .alchemy-page {
+    color: #F5F0E8;
+  }
+  html:not(.dark) .alchemy-page .glass-card {
+    background: rgba(45, 44, 42, 0.92);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #F5F0E8;
+  }
+  html:not(.dark) .alchemy-page .section-title {
+    color: #FFD86B;
+  }
+  html:not(.dark) .alchemy-page .material-item,
+  html:not(.dark) .alchemy-page .effect-item {
+    background: rgba(60, 59, 57, 0.85);
+  }
+  html:not(.dark) .alchemy-page .material-name {
+    color: #F5F0E8;
+  }
+  /* 单方需求材料备注（来源说明）使用白色，确保可读 */
+  html:not(.dark) .alchemy-page .material-source {
+    color: #FFFFFF;
+  }
+  html:not(.dark) .alchemy-page .material-need {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .alchemy-page .recipe-name {
+    color: #FFD86B;
+  }
+  html:not(.dark) .alchemy-page .recipe-desc,
+  html:not(.dark) .alchemy-page .effect-value,
+  html:not(.dark) .alchemy-page .effect-label,
+  html:not(.dark) .alchemy-page .craft-count-label {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .alchemy-page .effect-value.highlight {
+    color: #FFD86B;
+  }
+  html:not(.dark) .alchemy-page .tips-box {
+    background: rgba(60, 59, 57, 0.85);
+    color: #C9C4BA;
+  }
+  html:not(.dark) .alchemy-page .reforge-stat,
+  html:not(.dark) .alchemy-page .disassemble-summary {
+    color: #F5F0E8;
+  }
 </style>

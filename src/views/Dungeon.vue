@@ -1103,69 +1103,69 @@
     100% {
       transform: translateX(0) rotate(0deg);
     }
-  /* 日间模式：怪物面板改为浅色国风配色 */
+  /* 日间模式：怪物面板改为深色卡片 + 亮色文字（遵循暗底亮字原则） */
   html:not(.dark) .enemy-status-card {
-    background: linear-gradient(135deg, rgba(248, 245, 239, 0.92), rgba(255, 252, 247, 0.92));
-    border: 1px solid rgba(122, 158, 126, 0.35);
-    box-shadow: 0 4px 18px rgba(122, 158, 126, 0.12);
+    background: rgba(45, 44, 42, 0.92);
+    border: 1px solid rgba(255, 255, 255, 0.12);
+    box-shadow: 0 4px 18px rgba(0, 0, 0, 0.25);
   }
 
   html:not(.dark) .enemy-status-title {
-    color: #C44D4D;
+    color: #FFD86B;
   }
 
   html:not(.dark) .es-hp-label {
-    color: #5E564A;
+    color: #C9C4BA;
   }
 
   html:not(.dark) .es-hp-bar {
-    background: rgba(122, 158, 126, 0.25);
-    border-color: rgba(122, 158, 126, 0.2);
+    background: rgba(255, 255, 255, 0.12);
+    border-color: rgba(255, 255, 255, 0.2);
   }
 
   html:not(.dark) .es-hp-text {
-    color: #2E2A24;
+    color: #F5F0E8;
   }
 
   html:not(.dark) .es-stat {
-    background: rgba(122, 158, 126, 0.12);
-    border-color: rgba(122, 158, 126, 0.2);
+    background: rgba(255, 255, 255, 0.06);
+    border-color: rgba(255, 255, 255, 0.12);
   }
 
   html:not(.dark) .es-stat span {
-    color: #5E564A;
+    color: #C9C4BA;
   }
 
   html:not(.dark) .es-stat b {
-    color: #8B6914;
+    color: #FFD86B;
   }
 
   html:not(.dark) .es-status-title.positive {
-    color: #3A7A3F;
+    color: #B6E6B8;
     background: rgba(122, 158, 126, 0.18);
     border-color: rgba(122, 158, 126, 0.5);
   }
 
   html:not(.dark) .es-status-title.negative {
-    color: #C44D4D;
-    background: rgba(196, 77, 77, 0.12);
-    border-color: rgba(196, 77, 77, 0.4);
+    color: #FF9B9B;
+    background: rgba(196, 77, 77, 0.18);
+    border-color: rgba(196, 77, 77, 0.5);
   }
 
   html:not(.dark) .es-status-chip.positive {
-    color: #3A7A3F;
+    color: #B6E6B8;
     background: rgba(122, 158, 126, 0.18);
     border-color: rgba(122, 158, 126, 0.5);
   }
 
   html:not(.dark) .es-status-chip.negative {
-    color: #C44D4D;
+    color: #FF9B9B;
     background: rgba(196, 77, 77, 0.15);
-    border-color: rgba(196, 77, 77, 0.4);
+    border-color: rgba(196, 77, 77, 0.5);
   }
 
   html:not(.dark) .es-status-empty {
-    color: #8B8376;
+    color: #C9C4BA;
   }
 
 </style>

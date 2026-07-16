@@ -2425,4 +2425,52 @@
     background: rgba(218, 165, 32, 0.1);
     border-radius: 6px;
   }
+
+  /* 日间模式：统一为宗门页式深色卡片 + 亮色字体 */
+  html:not(.dark) .inventory-page {
+    color: #F5F0E8;
+  }
+  html:not(.dark) .inventory-page .glass-card {
+    background: rgba(45, 44, 42, 0.92);
+    border-color: rgba(255, 255, 255, 0.08);
+    color: #F5F0E8;
+  }
+  html:not(.dark) .inventory-page .simple-card {
+    background: rgba(60, 59, 57, 0.85);
+    border-color: rgba(255, 255, 255, 0.08);
+  }
+  html:not(.dark) .inventory-page .card-header {
+    color: #FFD86B;
+  }
+  html:not(.dark) .inventory-page .card-body,
+  html:not(.dark) .inventory-page .card-body p {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .tab-item {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .tab-item.active {
+    color: #FFD86B;
+    border-bottom-color: #DAA520;
+  }
+  html:not(.dark) .inventory-page .simple-modal-content,
+  html:not(.dark) .inventory-page .modal-body,
+  html:not(.dark) .inventory-page .detail-row,
+  html:not(.dark) .inventory-page .affix-row,
+  html:not(.dark) .inventory-page .equip-meta {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .equip-name {
+    color: #F5F0E8;
+  }
+  html:not(.dark) .inventory-page .pill-desc,
+  html:not(.dark) .inventory-page .material-meta,
+  html:not(.dark) .inventory-page .material-price,
+  html:not(.dark) .inventory-page .material-total {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .target-name,
+  html:not(.dark) .inventory-page .target-level {
+    color: #F5F0E8;
+  }
 </style>

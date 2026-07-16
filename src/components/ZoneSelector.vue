@@ -362,7 +362,7 @@
             </div>
             <div class="enemy-hp-bar">
               <div class="enemy-hp-fill" :style="{ width: idleDashboard.enemy.hpPercent }"></div>
-              <span class="enemy-hp-text">{{ idleDashboard.enemy.currentHealth }} / {{ idleDashboard.enemy.maxHealth }}（{{ idleDashboard.enemy.hpPercent }}）</span>
+              <span class="enemy-hp-text">{{ idleDashboard.enemy.currentHealth }} / {{ idleDashboard.enemy.maxHealth }} · {{ idleDashboard.enemy.hpPercent }}<template v-if="idleDashboard.enemy.dead"> · 已阵亡</template></span>
             </div>
             <div class="enemy-stats-grid">
               <div class="enemy-stat"><span class="es-label">攻击</span><span class="es-value">{{ idleDashboard.enemy.damage }}</span></div>
@@ -3132,24 +3132,6 @@ html:not(.dark) .reward-chance {
 }
 html:not(.dark) .pill-unlock-hint {
   background: rgba(218, 165, 32, 0.15);
-}
-
-/* 日间模式：装备详情弹窗文字清晰可读（避免继承 Cultivation.vue 的夜间浅色样式） */
-html:not(.dark) .equip-select-modal .modal-content.glass-card {
-  color: #2E2A24;
-}
-html:not(.dark) .equip-select-modal .modal-header {
-  color: #5E564A;
-}
-html:not(.dark) .equip-select-modal .sub-title {
-  color: #5E564A;
-}
-html:not(.dark) .equip-select-modal .attr-col-label {
-  color: #5E564A;
-}
-html:not(.dark) .equip-select-modal .attr-col-final {
-  color: #8B6914;
-  font-weight: bold;
 }
 
 /* 日间模式：探索页统一使用宗门页式深色卡片策略，确保所有文字清晰可读 */

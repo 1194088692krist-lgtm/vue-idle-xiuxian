@@ -1179,4 +1179,24 @@
     line-height: 1.5;
   }
 
+  /* 日间模式：祈福物品详情弹窗改为深色卡片 + 亮色文字（遵循暗底亮字原则） */
+  html:not(.dark) .simple-modal-content {
+    background: rgba(45, 44, 42, 0.96);
+    border-color: rgba(255, 255, 255, 0.12);
+    color: #F5F0E8;
+  }
+  html:not(.dark) .simple-modal-content .modal-header h3 {
+    color: #FFD86B;
+  }
+  html:not(.dark) .simple-modal-content .detail-row {
+    color: #F5F0E8;
+    border-bottom-color: rgba(255, 255, 255, 0.08);
+  }
+  html:not(.dark) .simple-modal-content .detail-row span:first-child {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .simple-modal-content .modal-body {
+    color: #F5F0E8;
+  }
+
 </style>
