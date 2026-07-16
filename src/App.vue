@@ -1,5 +1,5 @@
 <template>
-  <n-config-provider :theme="playerStore.isDarkMode ? darkTheme : null">
+  <n-config-provider :theme="playerStore.isDarkMode ? darkTheme : null" :theme-overrides="playerStore.isDarkMode ? null : lightThemeOverrides">
     <n-message-provider>
       <n-dialog-provider>
         <div v-if="isLoading" class="loading-screen">
@@ -49,14 +49,14 @@
                   <n-icon class="resource-icon"><StarOutlined /></n-icon>
                   <div class="resource-content">
                     <span class="resource-label">幻灵结晶</span>
-                    <span class="resource-value">{{ formatResource(animatedCrystals) }}</span>
+                    <span class="resource-value">{{ formatNumber(animatedCrystals) }}</span>
                   </div>
                 </div>
                 <div class="resource-item gold">
                   <n-icon class="resource-icon"><DollarOutlined /></n-icon>
                   <div class="resource-content">
                     <span class="resource-label">灵石</span>
-                    <span class="resource-value">{{ formatResource(animatedStones) }}</span>
+                    <span class="resource-value">{{ formatNumber(animatedStones) }}</span>
                   </div>
                 </div>
               </div>
@@ -66,7 +66,7 @@
             <div class="cultivation-bar">
               <div class="cultivation-info">
                 <span class="cultivation-label">修为池</span>
-                <span class="cultivation-text">{{ formatLargeNumber(animatedCultivation) }}</span>
+                <span class="cultivation-text">{{ formatNumber(animatedCultivation) }}</span>
               </div>
               <div class="cultivation-progress">
                 <div class="progress-bar">
@@ -147,10 +147,38 @@
     FireOutlined,
     ShoppingOutlined
   } from '@ant-design/icons-vue'
+  import { formatNumber } from './utils/formatNumber.js'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
 import { initCharacterDefs } from './plugins/characters'
 import SaveButton from './components/SaveButton.vue'
+
+  // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）
+  const lightThemeOverrides = {
+    common: {
+      primaryColor: '#7A9E7E',
+      primaryColorHover: '#8FB88C',
+      primaryColorPressed: '#5E8A63',
+      primaryColorSuppl: '#7A9E7E',
+      textColorBase: '#2E2A24',
+      textColor1: '#2E2A24',
+      textColor2: '#5E564A',
+      textColor3: '#8B8376',
+      bodyColor: '#F8F5EF',
+      cardColor: '#F8F5EF',
+      modalColor: '#F8F5EF',
+      borderColor: 'rgba(122, 158, 126, 0.35)',
+      dividerColor: 'rgba(122, 158, 126, 0.25)'
+    },
+    Button: {
+      textColor: '#2E2A24',
+      textColorPrimary: '#FFFFFF',
+      colorPrimary: '#7A9E7E',
+      colorPrimaryHover: '#8FB88C',
+      colorPrimaryPressed: '#5E8A63',
+      borderColorPrimary: '#7A9E7E'
+    }
+  }
 
   const router = useRouter()
   const route = useRoute()
@@ -394,25 +422,6 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   const baseGainRate = 1
-
-  // 灵石/幻灵结晶格式化：不足1万用数字，超过1万用x万
-  const formatResource = (num) => {
-    if (num == null) return '0'
-    const n = Number(num) || 0
-    if (n >= 10000) {
-      return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
-    }
-    return Math.floor(n).toLocaleString()
-  }
-
-  // 修为池等大数据格式化：超过10000万(1亿)按x万显示，否则直接显示数字
-  const formatLargeNumber = (num) => {
-    const n = Number(num) || 0
-    if (n >= 100000000) {
-      return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
-    }
-    return Math.floor(n).toLocaleString()
-  }
 
   const animateValue = (ref, target, duration, raf_ref) => {
     if (raf_ref.value) {
@@ -998,36 +1007,36 @@ import SaveButton from './components/SaveButton.vue'
     }
   }
 
-  /* 白天模式（日间模式）样式 */
+  /* 白天模式（日间模式）样式 - 国风青绿山水配色 */
   html:not(.dark) .game-container {
-    background: linear-gradient(135deg, #F5EFE0 0%, #E8DCC4 50%, #F0E6D2 100%);
+    background: linear-gradient(135deg, #F8F5EF 0%, #EDE8DD 50%, #F8F5EF 100%);
   }
 
   html:not(.dark) .top-bar {
-    background: rgba(245, 239, 224, 0.95);
-    border-bottom: 1px solid rgba(139, 69, 19, 0.4);
+    background: rgba(255, 252, 247, 0.95);
+    border-bottom: 1px solid rgba(122, 158, 126, 0.4);
   }
 
   html:not(.dark) .player-name-only {
-    color: #5B3A1A;
+    color: #2E2A24;
   }
 
   html:not(.dark) .resource-label {
-    color: #6B4226;
+    color: #5E564A;
   }
 
   html:not(.dark) .resource-value {
-    color: #4A2C12;
+    color: #2E2A24;
   }
 
   html:not(.dark) .resource-item {
-    background: rgba(139, 69, 19, 0.08);
-    border: 1px solid rgba(139, 69, 19, 0.25);
+    background: rgba(122, 158, 126, 0.1);
+    border: 1px solid rgba(122, 158, 126, 0.3);
   }
 
   html:not(.dark) .resource-item.gold {
-    border-color: rgba(184, 134, 11, 0.5);
-    background: rgba(218, 165, 32, 0.1);
+    border-color: rgba(201, 163, 61, 0.5);
+    background: rgba(201, 163, 61, 0.1);
   }
 
   html:not(.dark) .resource-item.crystal {
@@ -1052,12 +1061,12 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   html:not(.dark) .cultivation-bar {
-    background: rgba(240, 230, 210, 0.9);
-    border-bottom: 1px solid rgba(139, 69, 19, 0.25);
+    background: rgba(248, 245, 239, 0.95);
+    border-bottom: 1px solid rgba(122, 158, 126, 0.3);
   }
 
   html:not(.dark) .cultivation-label {
-    color: #6B4226;
+    color: #5E564A;
   }
 
   html:not(.dark) .cultivation-text {
@@ -1065,29 +1074,44 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   html:not(.dark) .bottom-nav {
-    background: rgba(245, 239, 224, 0.98);
-    border-top: 1px solid rgba(139, 69, 19, 0.3);
+    background: rgba(248, 245, 239, 0.98);
+    border-top: 1px solid rgba(122, 158, 126, 0.3);
   }
 
   html:not(.dark) .nav-item {
-    color: #6B4226;
+    color: #5E564A;
   }
 
   html:not(.dark) .nav-item.active {
-    color: #8B6914;
+    color: #7A9E7E;
   }
 
   html:not(.dark) .desktop-sidebar {
-    background: rgba(240, 230, 210, 0.98);
-    border-right: 1px solid rgba(139, 69, 19, 0.3);
+    background: rgba(248, 245, 239, 0.98);
+    border-right: 1px solid rgba(122, 158, 126, 0.3);
   }
 
   html:not(.dark) .sidebar-logo {
-    color: #8B6914;
+    color: #7A9E7E;
   }
 
   html:not(.dark) .content-area {
-    color: #3B240F;
+    position: relative;
+    color: #2E2A24;
+    background-image: url('/assets/bg/main_bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    isolation: isolate;
+  }
+
+  html:not(.dark) .content-area::before {
+    content: '';
+    position: absolute;
+    inset: 0;
+    background: rgba(248, 245, 239, 0.72);
+    pointer-events: none;
+    z-index: -1;
   }
 
   /* ================== 人物星级光效 ================== */

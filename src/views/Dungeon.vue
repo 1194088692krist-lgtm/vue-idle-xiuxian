@@ -1098,5 +1098,69 @@
     100% {
       transform: translateX(0) rotate(0deg);
     }
+  /* 日间模式：怪物面板改为浅色国风配色 */
+  html:not(.dark) .enemy-status-card {
+    background: linear-gradient(135deg, rgba(248, 245, 239, 0.92), rgba(255, 252, 247, 0.92));
+    border: 1px solid rgba(122, 158, 126, 0.35);
+    box-shadow: 0 4px 18px rgba(122, 158, 126, 0.12);
   }
+
+  html:not(.dark) .enemy-status-title {
+    color: #C44D4D;
+  }
+
+  html:not(.dark) .es-hp-label {
+    color: #5E564A;
+  }
+
+  html:not(.dark) .es-hp-bar {
+    background: rgba(122, 158, 126, 0.25);
+    border-color: rgba(122, 158, 126, 0.2);
+  }
+
+  html:not(.dark) .es-hp-text {
+    color: #2E2A24;
+  }
+
+  html:not(.dark) .es-stat {
+    background: rgba(122, 158, 126, 0.12);
+    border-color: rgba(122, 158, 126, 0.2);
+  }
+
+  html:not(.dark) .es-stat span {
+    color: #5E564A;
+  }
+
+  html:not(.dark) .es-stat b {
+    color: #8B6914;
+  }
+
+  html:not(.dark) .es-status-title.positive {
+    color: #3A7A3F;
+    background: rgba(122, 158, 126, 0.18);
+    border-color: rgba(122, 158, 126, 0.5);
+  }
+
+  html:not(.dark) .es-status-title.negative {
+    color: #C44D4D;
+    background: rgba(196, 77, 77, 0.12);
+    border-color: rgba(196, 77, 77, 0.4);
+  }
+
+  html:not(.dark) .es-status-chip.positive {
+    color: #3A7A3F;
+    background: rgba(122, 158, 126, 0.18);
+    border-color: rgba(122, 158, 126, 0.5);
+  }
+
+  html:not(.dark) .es-status-chip.negative {
+    color: #C44D4D;
+    background: rgba(196, 77, 77, 0.15);
+    border-color: rgba(196, 77, 77, 0.4);
+  }
+
+  html:not(.dark) .es-status-empty {
+    color: #8B8376;
+  }
+
 </style>

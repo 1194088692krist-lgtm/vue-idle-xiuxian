@@ -437,18 +437,12 @@ import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
+import { formatNumber } from '../utils/formatNumber.js'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
 
 const allocateAmount = ref(100)
-
-// 大数据格式化：超过10000万(1亿)按x万显示，否则直接显示数字
-const formatNumber = num => {
-  const n = Number(num) || 0
-  if (n >= 100000000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
-  return Math.floor(n).toLocaleString()
-}
 
 const getRequiredExp = (level) => {
   return calculateLevelExp(level || 1)

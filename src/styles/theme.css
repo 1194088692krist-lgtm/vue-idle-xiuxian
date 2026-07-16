@@ -34,14 +34,51 @@ html {
   min-height: 100vh;
 }
 
-/* 白天模式背景 */
+/* 日间模式变量覆盖（青绿山水、米白雾霭、淡金点缀、深墨文字） */
 html:not(.dark) {
-  background: linear-gradient(135deg, #F5EFE0 0%, #E8DCC4 50%, #F0E6D2 100%);
-  color: #3B240F;
+  --color-primary: #7A9E7E;
+  --color-primary-light: #8FB88C;
+  --color-primary-dark: #5E8A63;
+  --color-secondary: #8B8376;
+  --color-secondary-light: #A49E91;
+  --color-accent-gold: #C9A33D;
+  --color-accent-red: #C44D4D;
+  --color-accent-blue: #4A90A4;
+  --color-accent-green: #5E8A63;
+  --color-accent-purple: #8B6B9E;
+  --color-bg-dark: #F8F5EF;
+  --color-bg-card: rgba(255, 252, 247, 0.92);
+  --color-bg-card-light: rgba(248, 245, 239, 0.95);
+  --color-text-primary: #2E2A24;
+  --color-text-secondary: #5E564A;
+  --color-text-muted: #8B8376;
+  --color-border: rgba(122, 158, 126, 0.35);
+  --color-glow-gold: rgba(201, 163, 61, 0.4);
+  --color-glow-red: rgba(196, 77, 77, 0.4);
+  --color-glow-blue: rgba(74, 144, 164, 0.4);
+  --shadow-glow-gold: 0 0 20px rgba(201, 163, 61, 0.25);
+  --shadow-glow-red: 0 0 20px rgba(196, 77, 77, 0.25);
+  --shadow-glow-blue: 0 0 20px rgba(74, 144, 164, 0.25);
+
+  background: linear-gradient(135deg, #F8F5EF 0%, #EDE8DD 50%, #F8F5EF 100%);
+  color: #2E2A24;
 }
 
 html:not(.dark) body {
-  color: #3B240F;
+  color: #2E2A24;
+}
+
+/* 日间模式滚动条 */
+html:not(.dark) ::-webkit-scrollbar-track {
+  background: rgba(122, 158, 126, 0.12);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb {
+  background: rgba(122, 158, 126, 0.45);
+}
+
+html:not(.dark) ::-webkit-scrollbar-thumb:hover {
+  background: rgba(122, 158, 126, 0.65);
 }
 
 body {
@@ -81,10 +118,22 @@ body {
 
   /* 白天模式 glass-card */
   html:not(.dark) .glass-card {
-    background: rgba(255, 252, 245, 0.85);
-    border: 1px solid rgba(139, 69, 19, 0.25);
-    box-shadow: 0 8px 32px rgba(139, 69, 19, 0.15);
-    color: #3B240F;
+    background: var(--color-bg-card);
+    border: 1px solid var(--color-border);
+    box-shadow: 0 8px 32px rgba(122, 158, 126, 0.12);
+    color: var(--color-text-primary);
+  }
+
+  html:not(.dark) .glass-card-hover:hover {
+    border-color: rgba(201, 163, 61, 0.45);
+    box-shadow: var(--shadow-glow-gold);
+  }
+
+  html:not(.dark) .gold-gradient-text {
+    background: linear-gradient(135deg, #B8860B, #C9A33D, #B8860B);
+    -webkit-background-clip: text;
+    -webkit-text-fill-color: transparent;
+    background-clip: text;
   }
 
   .glass-card-hover:hover {

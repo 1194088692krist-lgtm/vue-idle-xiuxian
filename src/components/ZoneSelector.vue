@@ -107,7 +107,7 @@
             </div>
             <div class="member-build">
               <span class="build-label">Build</span>
-              <span class="build-value">{{ formatBuild(playerStore.getCharacterBuildStrength(member)) }}</span>
+              <span class="build-value">{{ formatNumber(playerStore.getCharacterBuildStrength(member)) }}</span>
             </div>
           </div>
         </div>
@@ -129,7 +129,7 @@
           </div>
         </div>
         <div v-if="currentDifficulty" class="diff-info">
-          <span>推荐Build <b>{{ formatBuild(currentDifficulty.recommendedBuild) }}</b></span>
+          <span>推荐Build <b>{{ formatNumber(currentDifficulty.recommendedBuild) }}</b></span>
           <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
           <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
@@ -142,11 +142,11 @@
         </div>
         <div class="stat-row">
           <span class="stat-label">推荐Build</span>
-          <span class="stat-value">{{ formatBuild(currentDifficulty?.recommendedBuild) }}</span>
+          <span class="stat-value">{{ formatNumber(currentDifficulty?.recommendedBuild) }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">你的Build</span>
-          <span class="stat-value" :style="{ color: matchColor }">{{ formatBuild(playerBuildStrength) }}</span>
+          <span class="stat-value" :style="{ color: matchColor }">{{ formatNumber(playerBuildStrength) }}</span>
         </div>
         <div class="stat-row">
           <span class="stat-label">匹配度</span>
@@ -166,7 +166,7 @@
       <div class="build-hint" :style="{ borderColor: matchColor }">
         <span class="build-hint-dot" :style="{ background: matchColor }"></span>
         <span :style="{ color: matchColor }">{{ matchText }}</span>
-        <span class="build-hint-sub">（推荐 {{ formatBuild(currentRecommendedBuild) }} · 你的 {{ formatBuild(playerBuildStrength) }}）</span>
+        <span class="build-hint-sub">（推荐 {{ formatNumber(currentRecommendedBuild) }} · 你的 {{ formatNumber(playerBuildStrength) }}）</span>
       </div>
 
       <!-- 奖励预览 -->
@@ -536,7 +536,7 @@
                       <span v-for="i in member.star" :key="i" class="star">★</span>
                     </div>
                   </div>
-                  <div class="sect-member-build">{{ formatBuild(playerStore.getCharacterBuildStrength(member)) }}</div>
+                  <div class="sect-member-build">{{ formatNumber(playerStore.getCharacterBuildStrength(member)) }}</div>
                   <div class="sect-member-school">{{ characterSchools[member.school]?.name || member.school }}</div>
                   <div v-if="isMemberInTeam(member.id)" class="sect-member-selected">✓</div>
                 </div>
@@ -606,6 +606,7 @@ import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 import { getStatName, formatStatValue } from '../plugins/stats'
+import { formatNumber } from '../utils/formatNumber.js'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getPillsByZone } from '../plugins/pills'
 
@@ -660,13 +661,6 @@ const {
   getZoneDifficulty
 } = useIdleSystem()
 
-// Build 强度数值格式化：超过10000万(1亿)按x万显示，否则直接显示数字
-const formatBuild = (v) => {
-  if (v == null || v === 0) return '0'
-  const n = Number(v) || 0
-  if (n >= 100000000) return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
-  return Math.floor(n).toLocaleString()
-}
 // 匹配度配色
 const matchColor = computed(() => {
   const r = buildRatio.value

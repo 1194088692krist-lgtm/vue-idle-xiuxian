@@ -6,6 +6,7 @@
 
 <script setup>
   import { ref, watch, onMounted, onUnmounted } from 'vue'
+  import { formatNumber } from '../utils/formatNumber.js'
 
   const props = defineProps({
     value: {
@@ -22,13 +23,7 @@
     },
     format: {
       type: Function,
-      default: (num) => {
-        const n = Number(num) || 0
-        if (n >= 100000000) {
-          return (n / 10000).toFixed(1).replace(/\.0$/, '') + '万'
-        }
-        return Math.floor(n).toLocaleString()
-      }
+      default: formatNumber
     }
   })
 
