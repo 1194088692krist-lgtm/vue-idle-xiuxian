@@ -2943,98 +2943,104 @@ onUnmounted(() => {
 
 /* ===== 日间模式：挂机仪表盘配色覆盖（深墨文字 + 浅色容器） ===== */
 html:not(.dark) .idle-section {
-  border-top-color: rgba(122, 158, 126, 0.25);
+  border-top-color: rgba(255, 255, 255, 0.08);
 }
 html:not(.dark) .idle-title {
-  color: #7A9E7E;
+  color: #FFD86B;
 }
 html:not(.dark) .idle-card {
-  background: rgba(122, 158, 126, 0.1);
-  border-color: rgba(122, 158, 126, 0.25);
+  background: rgba(60, 59, 57, 0.85);
+  border-color: rgba(255, 255, 255, 0.1);
 }
 html:not(.dark) .idle-card.selected {
-  border-color: #7A9E7E;
-  background: rgba(122, 158, 126, 0.18);
+  border-color: #DAA520;
+  background: rgba(80, 70, 50, 0.85);
 }
 html:not(.dark) .dur-time {
-  color: #2E2A24;
+  color: #F5F0E8;
 }
 html:not(.dark) .dur-info,
 html:not(.dark) .idle-count,
 html:not(.dark) .log-meta {
-  color: #5E564A;
+  color: #C9C4BA;
 }
 html:not(.dark) .dur-cost {
-  color: #C9A33D;
+  color: #FFD86B;
 }
 html:not(.dark) .idle-timer {
-  color: #C9A33D;
+  color: #FFD86B;
 }
 html:not(.dark) .idle-hp {
-  background: rgba(122, 158, 126, 0.12);
+  background: rgba(0, 0, 0, 0.25);
 }
 html:not(.dark) .idle-hp-label {
-  color: #5E564A;
+  color: #C9C4BA;
 }
 html:not(.dark) .idle-hp-num {
-  color: #2E2A24;
+  color: #F5F0E8;
 }
 html:not(.dark) .idle-count {
-  color: #5E564A;
+  color: #C9C4BA;
 }
 html:not(.dark) .idle-log-section {
-  background: rgba(255, 252, 247, 0.7);
-  border-color: rgba(122, 158, 126, 0.25);
+  background: rgba(60, 59, 57, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 html:not(.dark) .section-title {
-  color: #7A9E7E;
+  color: #FFD86B;
 }
 html:not(.dark) .log-line.scene {
-  color: #5E564A;
-  border-left-color: rgba(122, 158, 126, 0.5);
-  background: rgba(122, 158, 126, 0.08);
+  color: #C9C4BA;
+  border-left-color: rgba(255, 255, 255, 0.2);
+  background: rgba(255, 255, 255, 0.04);
 }
 html:not(.dark) .log-line.enemy-normal {
-  color: #6B4F2A;
+  color: #E8E3DB;
   border-left-color: rgba(122, 158, 126, 0.6);
 }
 html:not(.dark) .log-line.enemy-elite {
-  color: #7A4FB0;
-  border-left-color: #7A4FB0;
-  background: rgba(122, 90, 160, 0.1);
+  color: #D8B8F0;
+  border-left-color: #9A6BC8;
+  background: rgba(122, 90, 160, 0.15);
   text-shadow: none;
 }
 html:not(.dark) .log-line.enemy-boss {
-  color: #B8860B;
+  color: #FFD86B;
   border-left-color: #C44D4D;
-  background: rgba(196, 77, 77, 0.1);
+  background: rgba(196, 77, 77, 0.15);
   text-shadow: none;
 }
 html:not(.dark) .idle-hp-warn {
-  color: #C44D4D;
+  color: #FF8585;
 }
 html:not(.dark) .material-detail-section {
-  background: rgba(255, 252, 247, 0.75);
-  border-color: rgba(122, 158, 126, 0.35);
+  background: rgba(60, 59, 57, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 html:not(.dark) .material-detail-title {
-  color: #3A7A3F;
+  color: #FFD86B;
 }
 html:not(.dark) .material-detail-item {
-  background: rgba(122, 158, 126, 0.14);
-  border-color: rgba(122, 158, 126, 0.3);
+  background: rgba(255, 255, 255, 0.06);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 html:not(.dark) .material-name {
-  color: #2E2A24;
+  color: #F5F0E8;
 }
 html:not(.dark) .material-amount {
-  color: #8B6914;
+  color: #FFD86B;
 }
 
-/* 日间模式：挂机仪表盘深色底衬（适度、不厚重），文字清晰可读 */
+/* 日间模式：挂机仪表盘深色底衬（与宗门页风格一致） */
+html:not(.dark) .idle-section {
+  background: rgba(45, 44, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  border-radius: 12px;
+  padding: 12px;
+}
 html:not(.dark) .idle-dashboard {
-  background: rgba(33, 29, 24, 0.35);
-  border-color: rgba(255, 215, 0, 0.28);
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
 }
 html:not(.dark) .dashboard-title {
   color: #FFD86B;
@@ -3072,9 +3078,9 @@ html:not(.dark) .eq-rarity {
   color: #CFC8BC;
 }
 
-/* 日间模式：秘境怪物状态面板深色底衬（略浅于仪表盘主底衬） */
+/* 日间模式：秘境怪物状态面板深色底衬（与宗门页风格一致） */
 html:not(.dark) .dash-enemy {
-  background: rgba(40, 35, 28, 0.3);
+  background: rgba(60, 59, 57, 0.85);
 }
 html:not(.dark) .dash-enemy-title {
   color: #FF8585;
@@ -3144,5 +3150,116 @@ html:not(.dark) .equip-select-modal .attr-col-label {
 html:not(.dark) .equip-select-modal .attr-col-final {
   color: #8B6914;
   font-weight: bold;
+}
+
+/* 日间模式：探索页统一使用宗门页式深色卡片策略，确保所有文字清晰可读 */
+html:not(.dark) .exploration-header {
+  background: rgba(45, 44, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .card-subtitle {
+  color: #C9C4BA;
+}
+html:not(.dark) .filter-chip:not(.active) {
+  background: rgba(45, 44, 42, 0.8);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #E8E3DB;
+}
+html:not(.dark) .zone-card {
+  background: rgba(45, 44, 42, 0.9);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .zone-card:hover {
+  border-color: rgba(218, 165, 32, 0.5);
+}
+html:not(.dark) .zone-body {
+  background: transparent;
+}
+html:not(.dark) .meta-item,
+html:not(.dark) .monster-tag {
+  color: #C9C4BA;
+  background: rgba(255, 255, 255, 0.06);
+}
+html:not(.dark) .zone-detail {
+  background: rgba(45, 44, 42, 0.92);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .detail-desc {
+  color: #C9C4BA;
+}
+html:not(.dark) .team-selector {
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .team-count {
+  color: #C9C4BA;
+  background: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .team-member-card {
+  background: rgba(60, 59, 57, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .member-school,
+html:not(.dark) .build-label {
+  color: #C9C4BA;
+}
+html:not(.dark) .team-empty {
+  color: #C9C4BA;
+  background: rgba(55, 54, 52, 0.85);
+}
+html:not(.dark) .difficulty-selector {
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .diff-label,
+html:not(.dark) .diff-info {
+  color: #C9C4BA;
+}
+html:not(.dark) .diff-chip:not(.active) {
+  background: rgba(60, 59, 57, 0.85);
+  color: #E8E3DB;
+}
+html:not(.dark) .detail-stats .stat-row {
+  background: rgba(60, 59, 57, 0.85);
+}
+html:not(.dark) .stat-label {
+  color: #C9C4BA;
+}
+html:not(.dark) .build-hint {
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .build-hint-sub {
+  color: #C9C4BA;
+}
+html:not(.dark) .rewards-preview {
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .pill-unlock-hint {
+  background: rgba(55, 54, 52, 0.85);
+  border-color: rgba(218, 165, 32, 0.25);
+}
+html:not(.dark) .pill-text {
+  color: #C9C4BA;
+}
+
+/* 日间模式：装备详情弹窗同步使用深色卡片 */
+html:not(.dark) .equip-select-modal .modal-content.glass-card {
+  background: rgba(45, 44, 42, 0.96);
+  color: #F5F0E8;
+  border-color: rgba(255, 255, 255, 0.1);
+}
+html:not(.dark) .equip-select-modal .modal-header {
+  color: #C9C4BA;
+}
+html:not(.dark) .equip-select-modal .sub-title {
+  color: #C9C4BA;
+}
+html:not(.dark) .equip-select-modal .attr-col-label {
+  color: #C9C4BA;
+}
+html:not(.dark) .equip-select-modal .attr-col-final {
+  color: #FFD86B;
 }
 </style>
