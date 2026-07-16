@@ -40,6 +40,59 @@ const reforgeConfig = {
   }
 }
 
+// 全局属性上限配置（单装备）
+const statCaps = {
+  critRate: 0.4,
+  critDamageBoost: 0.5,
+  comboRate: 0.3,
+  counterRate: 0.3,
+  stunRate: 0.2,
+  dodgeRate: 0.35,
+  vampireRate: 0.25,
+  healBoost: 0.4,
+  finalDamageBoost: 0.25,
+  finalDamageReduce: 0.25,
+  combatBoost: 0.2,
+  resistanceBoost: 0.2,
+  critResist: 0.4,
+  comboResist: 0.4,
+  counterResist: 0.4,
+  stunResist: 0.4,
+  dodgeResist: 0.4,
+  vampireResist: 0.4,
+  spiritRate: 0.5,
+  cultivationRate: 0.5,
+  speed: 0.3
+}
+
+// 装备基础数值范围（用于洗练时重置数值）
+const statBaseRanges = {
+  attack: { common: [5, 15], uncommon: [10, 25], rare: [18, 40], epic: [30, 60], legendary: [50, 90], mythic: [80, 130] },
+  defense: { common: [3, 10], uncommon: [6, 18], rare: [10, 30], epic: [18, 45], legendary: [30, 70], mythic: [50, 100] },
+  health: { common: [30, 80], uncommon: [50, 140], rare: [90, 240], epic: [150, 380], legendary: [250, 600], mythic: [400, 900] },
+  speed: { common: [2, 6], uncommon: [4, 10], rare: [7, 16], epic: [12, 25], legendary: [20, 40], mythic: [32, 60] },
+  critRate: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.35] },
+  critDamageBoost: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] },
+  comboRate: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.3] },
+  counterRate: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.3] },
+  stunRate: { common: [0.01, 0.03], uncommon: [0.02, 0.05], rare: [0.03, 0.08], epic: [0.05, 0.12], legendary: [0.08, 0.18], mythic: [0.12, 0.2] },
+  dodgeRate: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.35] },
+  vampireRate: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.2], mythic: [0.18, 0.25] },
+  healBoost: { common: [0.03, 0.08], uncommon: [0.05, 0.12], rare: [0.08, 0.18], epic: [0.12, 0.25], legendary: [0.18, 0.35], mythic: [0.25, 0.4] },
+  finalDamageBoost: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.22], mythic: [0.18, 0.25] },
+  finalDamageReduce: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.22], mythic: [0.18, 0.25] },
+  combatBoost: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.15], legendary: [0.12, 0.18], mythic: [0.15, 0.2] },
+  resistanceBoost: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.15], legendary: [0.12, 0.18], mythic: [0.15, 0.2] },
+  critResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  comboResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  counterResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  stunResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  dodgeResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  vampireResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
+  spiritRate: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] },
+  cultivationRate: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] }
+}
+
 const reforgeableStats = {
   weapon: ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost'],
   head: ['defense', 'health', 'stunResist', 'critResist', 'healBoost'],
@@ -114,7 +167,16 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
   const oldLevel = currentLevel
   Object.keys(equipment.stats).forEach(stat => {
     if (typeof equipment.stats[stat] === 'number') {
-      equipment.stats[stat] = Math.round(equipment.stats[stat] * enhanceConfig.enhanceMult)
+      const cap = statCaps[stat]
+      if (cap !== undefined) {
+        const potentialNewValue = equipment.stats[stat] * enhanceConfig.enhanceMult
+        equipment.stats[stat] = Math.min(potentialNewValue, cap)
+        if (equipment.stats[stat] !== potentialNewValue) {
+          equipment.stats[stat] = Number(equipment.stats[stat].toFixed(3))
+        }
+      } else {
+        equipment.stats[stat] = Math.round(equipment.stats[stat] * enhanceConfig.enhanceMult)
+      }
     }
   })
   equipment.enhanceLevel = currentLevel + 1
@@ -131,6 +193,18 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
   }
 }
 
+function getRandomValueInRange(range) {
+  if (!range || !Array.isArray(range) || range.length < 2) return 0
+  return range[0] + Math.random() * (range[1] - range[0])
+}
+
+function clampToStatCap(stat, value) {
+  if (statCaps[stat] !== undefined) {
+    return Math.min(value, statCaps[stat])
+  }
+  return value
+}
+
 function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true, reforgeSafe = false, targetStat = null) {
   if (!equipment || !equipment.stats || !equipment.type) {
     return { success: false, message: '无效的装备' }
@@ -142,6 +216,8 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   const availableStats = reforgeableStats[equipment.type] || reforgeableStats.weapon
   const tempStats = { ...equipment.stats }
   const originStats = Object.keys(tempStats)
+  const rarity = equipment.rarity || 'common'
+  
   const modifyIndexes = targetStat !== null
     ? originStats.map((s, i) => s === targetStat ? i : -1).filter(i => i >= 0)
     : [
@@ -152,10 +228,11 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   if (modifyIndexes.length === 0 && originStats.length > 0) {
     modifyIndexes.push(0)
   }
+  
   modifyIndexes.forEach(index => {
     const originStat = originStats[index]
     let currentStat = originStat
-    const baseValue = tempStats[originStat] || 1
+    
     if (Math.random() < reforgeConfig.newStatChance) {
       const availableNew = availableStats.filter(s => !originStats.includes(s) || s !== originStat)
       if (availableNew.length > 0) {
@@ -165,38 +242,65 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
         originStats[index] = newStat
       }
     }
+    
+    const baseRange = statBaseRanges[currentStat]?.[rarity] || [5, 15]
+    let newValue = getRandomValueInRange(baseRange)
+    
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
-    const newValue = baseValue * (1 + delta)
-    if (['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce'].includes(currentStat)) {
-      tempStats[currentStat] = Math.min(Math.max(Number(newValue.toFixed(2)), baseValue * 0.7), baseValue * 1.3)
+    newValue = newValue * (1 + delta)
+    
+    newValue = clampToStatCap(currentStat, newValue)
+    
+    const baseMin = baseRange[0] * 0.7
+    const baseMax = baseRange[1] * 1.3
+    newValue = Math.max(baseMin, Math.min(newValue, baseMax))
+    
+    if (['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce', 
+         'comboRate', 'counterRate', 'stunRate', 'healBoost', 'combatBoost', 'resistanceBoost',
+         'critResist', 'comboResist', 'counterResist', 'stunResist', 'dodgeResist', 'vampireResist',
+         'spiritRate', 'cultivationRate'].includes(currentStat)) {
+      tempStats[currentStat] = Number(newValue.toFixed(3))
     } else {
-      tempStats[currentStat] = Math.min(
-        Math.max(Math.round(newValue), Math.round(baseValue * 0.7)),
-        Math.round(baseValue * 1.3)
-      )
+      tempStats[currentStat] = Math.round(newValue)
     }
   })
+  
   if (Object.keys(tempStats).length === 0) {
     const randomStat = availableStats[Math.floor(Math.random() * availableStats.length)]
-    const rarity = equipment.rarity || 'common'
     const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
     if (maxAffixes >= 1) {
-      tempStats[randomStat] = Math.round((Math.random() * 10 + 5))
+      const baseRange = statBaseRanges[randomStat]?.[rarity] || [5, 15]
+      let value = getRandomValueInRange(baseRange)
+      value = clampToStatCap(randomStat, value)
+      if (statCaps[randomStat] !== undefined) {
+        tempStats[randomStat] = Number(value.toFixed(3))
+      } else {
+        tempStats[randomStat] = Math.round(value)
+      }
     }
   }
-  const rarity = equipment.rarity || 'common'
+  
   const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
   while (Object.keys(tempStats).length < maxAffixes) {
     const availableNew = availableStats.filter(s => !Object.keys(tempStats).includes(s))
     if (availableNew.length === 0) break
     const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
-    tempStats[newStat] = Math.round((Math.random() * 10 + 5))
+    const baseRange = statBaseRanges[newStat]?.[rarity] || [5, 15]
+    let value = getRandomValueInRange(baseRange)
+    value = clampToStatCap(newStat, value)
+    if (statCaps[newStat] !== undefined) {
+      tempStats[newStat] = Number(value.toFixed(3))
+    } else {
+      tempStats[newStat] = Math.round(value)
+    }
   }
+  
   while (Object.keys(tempStats).length > maxAffixes) {
     const keys = Object.keys(tempStats)
     const removeKey = keys[Math.floor(Math.random() * keys.length)]
     delete tempStats[removeKey]
   }
+  
   if (confirmNewStats) {
     equipment.stats = { ...tempStats }
   }
@@ -253,7 +357,7 @@ function disassembleEquipment(equipment) {
 import { calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
 
 export { 
-  enhanceConfig, reforgeConfig, reforgeableStats, 
+  enhanceConfig, reforgeConfig, reforgeableStats, statCaps, statBaseRanges,
   enhanceEquipment, reforgeEquipment, disassembleEquipment,
   getEnhanceSpiritStoneCost, getEnhanceStoneCost, getLockLevel,
   calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses 

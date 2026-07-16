@@ -74,10 +74,10 @@ export const equipmentStatPool = {
   defense: { min: [2, 6], max: [12, 30], growth: 4 },
   health: { min: [20, 50], max: [100, 300], growth: 30 },
   speed: { min: [1, 3], max: [5, 15], growth: 2 },
-  critRate: { min: [0.01, 0.02], max: [0.05, 0.15], growth: 0.02 },
-  comboRate: { min: [0.01, 0.02], max: [0.05, 0.12], growth: 0.02 },
-  dodgeRate: { min: [0.01, 0.02], max: [0.04, 0.10], growth: 0.02 },
-  vampireRate: { min: [0.01, 0.02], max: [0.04, 0.10], growth: 0.02 }
+  critRate: { min: [0.01, 0.02], max: [0.05, 0.15], growth: 0.02, cap: 0.4 },
+  comboRate: { min: [0.01, 0.02], max: [0.05, 0.12], growth: 0.02, cap: 0.3 },
+  dodgeRate: { min: [0.01, 0.02], max: [0.04, 0.10], growth: 0.02, cap: 0.35 },
+  vampireRate: { min: [0.01, 0.02], max: [0.04, 0.10], growth: 0.02, cap: 0.25 }
 }
 
 // 抽奖池配置
@@ -218,9 +218,14 @@ export const generateEquipment = (playerLevel = 1, specificType = null) => {
     const maxVal = config.max[0] + (config.max[1] - config.max[0]) * (playerLevel / 100)
     let value = minVal + Math.random() * (maxVal - minVal)
     value *= multiplier
-    // 百分比属性取整到小数点后两位
+    
+    const cap = config.cap
+    if (cap !== undefined) {
+      value = Math.min(value, cap)
+    }
+    
     if (['critRate', 'comboRate', 'dodgeRate', 'vampireRate'].includes(stat)) {
-      stats[stat] = Math.min(0.5, Math.round(value * 100) / 100)
+      stats[stat] = Math.round(value * 1000) / 1000
     } else {
       stats[stat] = Math.round(value)
     }
