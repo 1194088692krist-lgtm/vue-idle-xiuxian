@@ -241,8 +241,10 @@ import SaveButton from './components/SaveButton.vue'
       console.error('初始化存档失败，尝试继续:', e)
     }
 
-    // 已登录：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
-    if (useAuthStore().isLoggedIn) {
+    // 已登录且非开发者模式：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
+    // 开发者模式：跳过云同步，仅使用本地存档
+    const authStore = useAuthStore()
+    if (authStore.isLoggedIn && !authStore.devMode) {
       try {
         // 5 秒超时，防止网络请求 hang 住导致加载卡死
         await Promise.race([
@@ -254,6 +256,8 @@ import SaveButton from './components/SaveButton.vue'
       }
       // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点
       playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
+    } else if (authStore.devMode) {
+      console.info('[开发者模式] 跳过云同步，仅使用本地存档')
     }
 
     updateLoading('正在加载角色定义...', 40)

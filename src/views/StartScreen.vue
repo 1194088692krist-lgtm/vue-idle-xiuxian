@@ -63,6 +63,11 @@
           <span v-if="loginMode === 'login'">没有账号？<a @click="loginMode = 'register'">立即注册</a></span>
           <span v-else>已有账号？<a @click="loginMode = 'login'">前往登录</a></span>
         </div>
+        <!-- 开发者通道：仅触发后显示，玩家不可见 -->
+        <button v-if="showDevEntry" class="btn-dev-entry" @click="enterDevMode">
+          <span class="btn-icon">🛠</span>
+          <span class="btn-text">开发者通道</span>
+        </button>
       </div>
 
       <!-- 已登录：主菜单 -->
@@ -229,6 +234,8 @@ const saveSlots = ref([])
 const loginForm = ref({ username: '', password: '' })
 const loginMode = ref('login')
 const authBusy = ref(false)
+// 开发者通道入口是否显示（连击 10 次后显示）
+const showDevEntry = ref(false)
 
 const loadSlots = async () => {
   try {
@@ -256,8 +263,8 @@ const startNewGame = async () => {
           message.error('初始化失败: ' + (e.message || e))
           return false // 阻止对话框关闭，让用户看到错误
         }
-        // 云同步不阻塞导航，失败只警告
-        if (auth.isLoggedIn) {
+        // 云同步不阻塞导航，失败只警告；开发者模式跳过云同步
+        if (auth.isLoggedIn && !auth.devMode) {
           playerStore.syncToCloud().catch(e => console.warn('云同步失败:', e))
         }
         router.push('/cultivation')
@@ -277,8 +284,8 @@ const loadGame = async (slot) => {
     message.error('加载存档失败: ' + (error.message || error))
     return
   }
-  // 云同步不阻塞导航
-  if (auth.isLoggedIn) {
+  // 云同步不阻塞导航；开发者模式跳过云同步
+  if (auth.isLoggedIn && !auth.devMode) {
     playerStore.syncToCloud().catch(e => console.warn('云同步失败:', e))
   }
   router.push('/cultivation')
@@ -478,16 +485,39 @@ let clickTimer = null
 const handleTitleClick = () => {
   clickCount++
   if (clickTimer) clearTimeout(clickTimer)
-  if (clickCount >= 5) {
+  // 5 次：切换 GM 模式（已有彩蛋）
+  if (clickCount === 5) {
     playerStore.isGMMode = !playerStore.isGMMode
     localStorage.setItem('isGMMode', playerStore.isGMMode)
     message.success(playerStore.isGMMode ? 'GM模式已开启' : 'GM模式已关闭')
-    clickCount = 0
-  } else {
-    clickTimer = setTimeout(() => {
-      clickCount = 0
-    }, 2000)
   }
+  // 10 次：显示开发者通道入口（仅开发者可知，玩家通常不会连击 10 次）
+  if (clickCount >= 10 && !auth.isLoggedIn) {
+    showDevEntry.value = true
+    message.info('开发者通道已解锁')
+  }
+  // 重置计时器：2 秒内无点击则清零
+  clickTimer = setTimeout(() => {
+    clickCount = 0
+  }, 2000)
+}
+
+// 开发者通道：无需密码，直接进入游戏（专为智能体调试设计）
+const enterDevMode = async () => {
+  auth.enableDevMode()
+  message.success('开发者模式已启用，正在进入游戏...')
+  // 开发者模式：直接新建角色并进入游戏（仅本地存档）
+  try {
+    await playerStore.clearData()
+    playerStore.$reset()
+    playerStore.initNewPlayer()
+    await playerStore.saveData()
+  } catch (e) {
+    console.error('开发者模式初始化失败:', e)
+    message.error('初始化失败: ' + (e.message || e))
+    return
+  }
+  router.push('/cultivation')
 }
 
 onMounted(() => {
@@ -1276,11 +1306,30 @@ onMounted(() => {
   border-top: 1px solid rgba(139, 105, 20, 0.4);
 }
 
-.conflict-modal .modal-footer .btn-primary,
-.conflict-modal .modal-footer .btn-secondary {
-  flex: 1;
-  font-size: 14px;
-  padding: 10px;
-  max-width: none;
+/* ===== 开发者通道 ===== */
+.btn-dev-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  margin: 12px auto 0;
+  padding: 10px 20px;
+  border-radius: 2px;
+  font-size: 13px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: transparent;
+  color: #6B5B3F;
+  border: 1px dashed rgba(139, 105, 20, 0.4);
+  letter-spacing: 2px;
 }
+
+.btn-dev-entry:hover {
+  color: #DAA520;
+  border-color: #DAA520;
+  background: rgba(20, 15, 5, 0.4);
+}
+
 </style>

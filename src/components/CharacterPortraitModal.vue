@@ -5,35 +5,41 @@
         <div class="char-modal-close" @click="$emit('close')">✕</div>
         <div class="char-modal-content">
           <div class="char-portrait-large">
+            <!-- 加载占位：图片/视频未就绪时显示 -->
+            <div v-if="!avatarLoaded" class="char-portrait-loading">
+              <div class="loading-spinner"></div>
+            </div>
             <!-- 静态立绘：始终作为底层；无视频时直接展示，有视频时作为首帧垫底 -->
             <img
               v-if="avatar"
+              ref="imgEl"
               :src="avatar"
               class="char-portrait-static"
-              :class="{ 'is-hidden': shouldShowVideo && videoReady }"
+              :class="{ 'is-loaded': avatarLoaded, 'is-hidden': shouldShowVideo && videoReady }"
               alt="角色立绘"
               draggable="false"
+              @load="onAvatarLoad"
+              @error="onAvatarError"
             />
             <!-- 动态视频：加载完成后淡入覆盖并自动播放。
-                 preload=auto 确保 canplay/loadeddata 事件触发，从而调用 tryPlay() 播放视频。
-                 仅在 shouldShowVideo 为 true（即用户点击了有视频的立绘）时才渲染 video 元素，
-                 避免不必要的视频下载 -->
+                 用 <source> 标签让浏览器快速决策 codec，loadeddata 事件首帧就绪即触发，
+                 比 canplay（需缓冲足够数据）快很多 -->
             <video
               v-if="shouldShowVideo"
               ref="videoEl"
               class="char-portrait-video"
               :class="{ 'is-visible': videoReady }"
-              :src="videoSrc"
               :poster="avatar || undefined"
               preload="auto"
               muted
               loop
               playsinline
               webkit-playsinline
-              @canplay="onVideoReady"
               @loadeddata="onVideoReady"
               @error="onVideoError"
-            ></video>
+            >
+              <source :src="videoSrc" type="video/mp4" />
+            </video>
           </div>
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
@@ -57,12 +63,22 @@ defineEmits(['close'])
 
 const playerStore = usePlayerStore()
 const videoEl = ref(null)
+const imgEl = ref(null)
 const videoReady = ref(false)
+const avatarLoaded = ref(false)
 
 const avatar = computed(() => (props.character ? getCharacterAvatar(props.character) : null))
 const videoSrc = computed(() => (props.character ? getCharacterVideo(props.character) : null))
 // 同时满足：动态效果开启 + 该角色配置了视频
 const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!videoSrc.value)
+
+// 静态图加载完成回调
+const onAvatarLoad = () => {
+  avatarLoaded.value = true
+}
+const onAvatarError = () => {
+  avatarLoaded.value = false
+}
 
 const tryPlay = () => {
   const v = videoEl.value
@@ -71,6 +87,7 @@ const tryPlay = () => {
   if (p && p.catch) p.catch(() => { /* 自动播放被拦截时静默忽略，仍显示静态图 */ })
 }
 
+// loadeddata：首帧已解码就绪，立即显示并播放（比 canplay 快）
 const onVideoReady = () => {
   videoReady.value = true
   tryPlay()
@@ -81,8 +98,12 @@ const onVideoError = () => {
   videoReady.value = false
 }
 
-// 组件挂载后立即尝试播放（处理视频已缓存、canplay 不再触发的情况）
+// 组件挂载后立即尝试播放（处理视频已缓存、loadeddata 不再触发的情况）
 onMounted(() => {
+  // 静态图可能已缓存（complete 状态），直接标记为已加载
+  if (imgEl.value && imgEl.value.complete) {
+    avatarLoaded.value = true
+  }
   if (shouldShowVideo.value) {
     nextTick(() => requestAnimationFrame(tryPlay))
   }
@@ -93,6 +114,7 @@ watch(
   () => [props.character, shouldShowVideo.value, videoSrc.value],
   () => {
     videoReady.value = false
+    avatarLoaded.value = false
     if (shouldShowVideo.value) {
       // 等待 video 元素渲染后再尝试播放
       nextTick(() => requestAnimationFrame(tryPlay))
@@ -155,16 +177,41 @@ onBeforeUnmount(() => {
   background: linear-gradient(180deg, rgba(218,165,32,0.1) 0%, transparent 100%);
   overflow: hidden;
 }
+/* 加载占位 */
+.char-portrait-loading {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 0;
+}
+.loading-spinner {
+  width: 32px;
+  height: 32px;
+  border: 2px solid rgba(218, 165, 32, 0.2);
+  border-top-color: rgba(218, 165, 32, 0.8);
+  border-radius: 50%;
+  animation: spin 0.8s linear infinite;
+}
+@keyframes spin {
+  to { transform: rotate(360deg); }
+}
 .char-portrait-static {
   position: absolute;
   top: 0; left: 0;
   width: 100%;
   height: 100%;
   object-fit: contain;
-  transition: opacity 0.4s ease;
+  opacity: 0;
+  transition: opacity 0.3s ease;
   z-index: 1;
   user-select: none;
   -webkit-user-drag: none;
+}
+.char-portrait-static.is-loaded {
+  opacity: 1;
 }
 .char-portrait-static.is-hidden {
   opacity: 0;

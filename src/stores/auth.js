@@ -3,14 +3,20 @@ import { defineStore } from 'pinia'
 
 const TOKEN_KEY = 'xx_token'
 const USER_KEY = 'xx_user'
+const DEV_KEY = 'xx_dev'
 
 export const useAuthStore = defineStore('auth', {
   state: () => ({
     token: localStorage.getItem(TOKEN_KEY) || '',
-    user: JSON.parse(localStorage.getItem(USER_KEY) || 'null')
+    user: JSON.parse(localStorage.getItem(USER_KEY) || 'null'),
+    // 开发者通道：免登录进入游戏，仅使用本地存档，跳过云同步
+    // 专为智能体调试设计，无需密码，仅通过隐藏入口触发
+    devMode: localStorage.getItem(DEV_KEY) === 'true'
   }),
   getters: {
-    isLoggedIn: s => !!s.token
+    // 开发者模式下视为已登录，路由守卫放行
+    isLoggedIn: s => !!s.token || s.devMode,
+    isDev: s => s.devMode
   },
   actions: {
     async login(username, password) {
@@ -49,6 +55,17 @@ export const useAuthStore = defineStore('auth', {
     },
     authHeaders() {
       return this.token ? { Authorization: `Bearer ${this.token}` } : {}
+    },
+    // 开发者通道：直接启用，无需密码（专为智能体调试设计）
+    enableDevMode() {
+      this.devMode = true
+      this.user = { username: '开发者', dev: true }
+      localStorage.setItem(DEV_KEY, 'true')
+    },
+    disableDevMode() {
+      this.devMode = false
+      if (this.user && this.user.dev) this.user = null
+      localStorage.removeItem(DEV_KEY)
     }
   }
 })
