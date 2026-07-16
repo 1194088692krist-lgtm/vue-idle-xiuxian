@@ -472,6 +472,24 @@
         </div>
       </div>
 
+      <!-- 获得素材汇总 -->
+      <div v-if="lastSummary && !isIdling && lastSummary.materialSummary && lastSummary.materialSummary.length" class="material-detail-section">
+        <div class="material-detail-header">
+          <span class="material-detail-title">📦 获得素材</span>
+        </div>
+        <div class="material-detail-list">
+          <div
+            v-for="m in lastSummary.materialSummary"
+            :key="m.type"
+            class="material-detail-item"
+          >
+            <img v-if="m.icon" :src="m.icon" class="material-icon" :alt="m.name" />
+            <span class="material-name">{{ m.name }}</span>
+            <span class="material-amount">×{{ formatNumber(m.amount) }}</span>
+          </div>
+        </div>
+      </div>
+
       <!-- 获得装备详情 -->
       <div v-if="lastSummary && !isIdling && lastSummary.equipmentList && lastSummary.equipmentList.length > 0" class="equipment-detail-section">
         <div class="equipment-detail-header">
@@ -2390,6 +2408,57 @@ onUnmounted(() => {
   border: 1px solid rgba(218, 165, 32, 0.2);
 }
 
+/* 素材汇总区域 */
+.material-detail-section {
+  margin-top: 16px;
+  padding: 12px;
+  background: rgba(0, 0, 0, 0.25);
+  border-radius: 10px;
+  border: 1px solid rgba(122, 158, 126, 0.3);
+}
+
+.material-detail-header {
+  margin-bottom: 10px;
+}
+
+.material-detail-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #7A9E7E;
+}
+
+.material-detail-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+
+.material-detail-item {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  padding: 6px 10px;
+  background: rgba(122, 158, 126, 0.12);
+  border: 1px solid rgba(122, 158, 126, 0.25);
+  border-radius: 8px;
+  font-size: 13px;
+}
+
+.material-icon {
+  width: 20px;
+  height: 20px;
+  object-fit: contain;
+}
+
+.material-name {
+  color: #E8E2D4;
+}
+
+.material-amount {
+  color: #C9A33D;
+  font-weight: bold;
+}
+
 .equipment-detail-header {
   margin-bottom: 10px;
 }
@@ -2770,5 +2839,22 @@ html:not(.dark) .log-line.enemy-boss {
 }
 html:not(.dark) .idle-hp-warn {
   color: #C44D4D;
+}
+html:not(.dark) .material-detail-section {
+  background: rgba(255, 252, 247, 0.75);
+  border-color: rgba(122, 158, 126, 0.35);
+}
+html:not(.dark) .material-detail-title {
+  color: #3A7A3F;
+}
+html:not(.dark) .material-detail-item {
+  background: rgba(122, 158, 126, 0.14);
+  border-color: rgba(122, 158, 126, 0.3);
+}
+html:not(.dark) .material-name {
+  color: #2E2A24;
+}
+html:not(.dark) .material-amount {
+  color: #8B6914;
 }
 </style>

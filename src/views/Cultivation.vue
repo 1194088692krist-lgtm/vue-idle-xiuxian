@@ -384,7 +384,7 @@
             @click="equipItem(item)"
           >
             <span class="item-name" :style="{ color: getItemColor(item) }">{{ item.name }}</span>
-            <span class="item-meta">{{ item.level ? 'Lv.' + item.level : '' }}</span>
+            <span class="item-score">评分 {{ calculateEquipmentScore(item) || 0 }}</span>
           </div>
         </div>
         <div v-else class="equip-select-empty">没有可用的装备</div>
@@ -435,6 +435,7 @@ import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
+import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 import { formatNumber } from '../utils/formatNumber.js'
@@ -592,11 +593,14 @@ const getPetColor = (pet) => pet?.color || rarityColorMap[pet?.rarity] || '#9fe0
 
 const availableItemsForSlot = computed(() => {
   if (!selectSlot.value) return []
-  return (playerStore.items || []).filter(item => {
-    if (item.equipped) return false
-    if (item.slot === selectSlot.value || item.type === selectSlot.value) return true
-    return false
-  })
+  return (playerStore.items || [])
+    .filter(item => {
+      if (item.equipped) return false
+      if (item.slot === selectSlot.value || item.type === selectSlot.value) return true
+      return false
+    })
+    // 默认按装备评分从高到低排序
+    .sort((a, b) => (calculateEquipmentScore(b) || 0) - (calculateEquipmentScore(a) || 0))
 })
 
 const availablePets = computed(() => {
@@ -1927,9 +1931,9 @@ watch([allMembers, teamMembers], () => {
   border-radius: 12px;
 }
 .equip-select-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
   margin-bottom: 12px;
 }
 .equip-select-item {
@@ -1948,6 +1952,12 @@ watch([allMembers, teamMembers], () => {
 .item-name {
   font-size: 14px;
   font-weight: bold;
+}
+.item-score {
+  font-size: 12px;
+  color: #C9A33D;
+  font-weight: bold;
+  white-space: nowrap;
 }
 .item-meta {
   font-size: 12px;

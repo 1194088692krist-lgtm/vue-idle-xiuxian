@@ -35,6 +35,40 @@ const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
+const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
+
+// 素材类型展示信息（用于结算栏汇总显示）
+const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'pet_fragment', 'phantom_crystal', 'boss_material', 'fortune']
+const MATERIAL_DISPLAY = {
+  herb: { name: '灵草', icon: '/assets/icons/reward_mat_herb.png' },
+  ore: { name: '矿料', icon: '/assets/icons/reward_mat_ore.png' },
+  liquid: { name: '灵液', icon: '/assets/icons/reward_mat_liquid.png' },
+  core: { name: '妖兽内丹', icon: '/assets/icons/reward_mat_core.png' },
+  pet_fragment: { name: '升星碎片', icon: '/assets/icons/reward_mat_pet_fragment.png' },
+  phantom_crystal: { name: '幻灵结晶', icon: '/assets/icons/reward_mat_phantom_crystal.png' },
+  boss_material: { name: 'BOSS素材', icon: '/assets/icons/reward_mat_core.png' },
+  fortune: { name: '奇遇材料', icon: '/assets/icons/reward_mat_core.png' }
+}
+// 将一次遭遇的奖励累计进本次挂机素材统计
+function accumulateMaterials(rewards) {
+  if (!rewards || !rewards.length) return
+  const next = { ...sessionMaterials.value }
+  for (const r of rewards) {
+    if (MATERIAL_DISPLAY[r.type]) {
+      next[r.type] = (next[r.type] || 0) + (r.amount || 1)
+    }
+  }
+  sessionMaterials.value = next
+}
+// 生成结算栏展示用的素材汇总（仅含数量>0的项，按固定顺序）
+function buildMaterialSummary() {
+  return MATERIAL_ORDER.filter(t => sessionMaterials.value[t]).map(t => ({
+    type: t,
+    name: MATERIAL_DISPLAY[t].name,
+    amount: sessionMaterials.value[t],
+    icon: MATERIAL_DISPLAY[t].icon
+  }))
+}
 
 // 角色定位特殊作用（每场战斗后触发）
 const ROLE_EFFECTS = {
@@ -1603,6 +1637,8 @@ async function runIdleEncounter() {
           foundEquipment.value.push(r.item)
         }
       })
+      // 累计本次挂机获得的各类素材
+      accumulateMaterials(rewards)
       
       // 触发角色定位特殊效果
       for (const memberState of teamMemberStates.value) {
@@ -1922,6 +1958,7 @@ function runOfflineEncounter(zone, diff, count) {
   const effectiveZone = buildEffectiveZone(zone, diff)
   if (victory) {
     const rewards = grantReward(effectiveZone, true)
+    accumulateMaterials(rewards)
     s.dungeonTotalKills++; s.explorationCount++
     logEncounter(zone, diff, count, { name: zone.monsters[0], tier: 'normal' }, true, rewards, 0)
     runStats.value.victories++
@@ -1968,6 +2005,7 @@ function startIdle(durationMinutes) {
   logs.value = []
   currentEncounterSummary.value = null
   idleBuffs.value = []
+  sessionMaterials.value = {}
 
   const team = s.getTeamMembersDetail()
   teamMemberStates.value = team.map(member => {
@@ -2081,6 +2119,7 @@ function finishIdle() {
     defeated: allDead,
     logs: [...logs.value],
     equipmentList: [...foundEquipment.value],
+    materialSummary: buildMaterialSummary(),
     teamStates: [...teamMemberStates.value]
   }
   s.stopIdleExploration()
