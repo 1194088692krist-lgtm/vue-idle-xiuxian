@@ -410,7 +410,7 @@
                       </div>
                     </div>
                     <div class="equip-info">
-                      <span>词条数: {{ Object.keys(equip.stats || {}).length }}/{{ reforgeConfig.affixMaxCount[equip.rarity || 'common'] }}</span>
+                      <span>词条数: {{ (equip.affixes ? equip.affixes.length : 0) }}/{{ reforgeConfig.affixMaxCount[equip.rarity || 'common'] }}</span>
                       <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
                     </div>
                   </div>

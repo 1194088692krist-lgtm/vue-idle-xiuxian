@@ -492,6 +492,23 @@ export const usePlayerStore = defineStore('player', {
                 console.warn(`数据清理完成：移除了 ${removedCount} 个错误格式物品`)
               }
             }
+            // 数据清理：移除装备中数值为 0 的属性（旧版洗练可能残留 0 值无意义词条，如 吸血=0）
+            // 基础属性(stats)与词条(affixes)一并清理，避免详情页/八卦炉显示无意义的 0 数值
+            const cleanZeroStats = (eq) => {
+              if (!eq || typeof eq !== 'object') return
+              if (eq.stats && typeof eq.stats === 'object') {
+                Object.keys(eq.stats).forEach(k => {
+                  if (eq.stats[k] === 0 || eq.stats[k] === null || eq.stats[k] === undefined) delete eq.stats[k]
+                })
+              }
+              if (Array.isArray(eq.affixes)) {
+                eq.affixes = eq.affixes.filter(a => a && Number(a.value) !== 0)
+              }
+            }
+            if (Array.isArray(this.items)) this.items.forEach(cleanZeroStats)
+            if (this.equippedArtifacts && typeof this.equippedArtifacts === 'object') {
+              Object.values(this.equippedArtifacts).forEach(cleanZeroStats)
+            }
           } else {
             console.error('存档数据验证失败，使用初始数据')
           }
