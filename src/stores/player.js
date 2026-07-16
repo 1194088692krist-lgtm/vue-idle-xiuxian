@@ -1822,17 +1822,23 @@ export const usePlayerStore = defineStore('player', {
             }
             member.effortValue = Math.round(newValue)
             changes.push({ stat: '努力值', old: Math.round(oldValue), new: Math.round(newValue), delta: actualGain })
-            // 同步提升 baseStats
-            if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
-            const stats = ['attack', 'health', 'defense', 'speed']
-            stats.forEach(statKey => {
-              const oldStat = member.baseStats[statKey] || 0
-              const bonus = Math.round(oldStat * 0.005 * actualGain)
-              if (bonus > 0) {
-                member.baseStats[statKey] = oldStat + bonus
-                changes.push({ stat: statNameMap[statKey], old: oldStat, new: oldStat + bonus, delta: bonus })
-              }
-            })
+            // 直接属性增益
+            if (effect.extraStats) {
+              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+              Object.entries(effect.extraStats).forEach(([stat, val]) => {
+                const roundedVal = Math.round(val)
+                if (roundedVal <= 0) return
+                if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+                const oldStat = member.baseStats[stat] || 0
+                member.baseStats[stat] = oldStat + roundedVal
+                if (member.permanentBonuses[stat] !== undefined) {
+                  member.permanentBonuses[stat] += roundedVal
+                } else {
+                  member.permanentBonuses[stat] = roundedVal
+                }
+                changes.push({ stat: statNameMap[stat] || stat, old: oldStat, new: oldStat + roundedVal, delta: roundedVal })
+              })
+            }
             break
           }
           case 'healBattle':

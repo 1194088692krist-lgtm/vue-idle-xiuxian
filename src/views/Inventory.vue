@@ -403,7 +403,7 @@
           </span>
         </div>
         <div class="simple-divider">基础属性</div>
-        <div v-for="(value, stat) in selectedEquipment.stats" :key="stat" class="detail-row">
+        <div v-for="(value, stat) in filteredEquipmentStats" :key="stat" class="detail-row">
           <span>{{ getStatName(stat) }}</span><span>{{ formatStatValue(stat, value) }}</span>
         </div>
         <div v-if="selectedEquipment.affixes && selectedEquipment.affixes.length > 0" class="affixes-section">
@@ -893,8 +893,16 @@
         return `悟性提升 +${(effect.value * 100).toFixed(0)}%`
       case 'autoHeal':
         return `每秒恢复 ${(effect.value * 100).toFixed(0)}% 最大生命`
-      case 'effortGain':
-        return `努力值 +${Math.round(effect.value)} 点`
+      case 'effortGain': {
+        let text = `努力值 +${Math.round(effect.value)} 点`
+        if (effect.extraStats) {
+          const extras = Object.entries(effect.extraStats)
+            .map(([stat, val]) => `${statNames[stat] || stat} +${Math.round(val)}`)
+            .join('，')
+          text += `，${extras}`
+        }
+        return text
+      }
       default:
         return `效果 +${effect.value}`
     }
@@ -1369,6 +1377,18 @@
   const showEquipmentDetailModal = ref(false)
   const selectedEquipment = ref(null)
 
+  // 过滤掉值为0/NaN/null的无意义词条，基础属性始终显示
+  const filteredEquipmentStats = computed(() => {
+    if (!selectedEquipment.value || !selectedEquipment.value.stats) return {}
+    const result = {}
+    Object.entries(selectedEquipment.value.stats).forEach(([stat, value]) => {
+      if (['attack', 'health', 'defense', 'speed'].includes(stat) || (value && value !== 0 && !Number.isNaN(value))) {
+        result[stat] = value
+      }
+    })
+    return result
+  })
+
   // 出售预览灵石（按评分折价）
   const sellPreview = computed(() => {
     if (!selectedEquipment.value) return 0
@@ -1835,8 +1855,8 @@
     }
 
     .equipment-detail-modal .equipment-detail-content {
-      width: 60vw;
-      max-width: 900px;
+      width: 50vw;
+      max-width: 720px;
       height: 80vh;
       max-height: 80vh;
       border-radius: 14px;

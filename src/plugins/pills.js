@@ -363,7 +363,7 @@ export const pillRecipes = [
   {
     id: 'minor_foundation_pill',
     name: '小培元丹',
-    description: '固本培元，少量提升根骨潜力（努力值+5）',
+    description: '固本培元，少量提升根骨潜力（努力值+1，生命+10）',
     grade: 'grade1',
     type: 'attribute',
     func: 'effort',
@@ -372,12 +372,12 @@ export const pillRecipes = [
       { kind: 'ore', id: 'iron_essence', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade1'),
-    baseEffect: { type: 'effortGain', value: 5, duration: 0 }
+    baseEffect: { type: 'effortGain', value: 1, duration: 0, extraStats: { health: 10 } }
   },
   {
     id: 'foundation_pill',
     name: '培元丹',
-    description: '强筋健骨，稳步提升根骨潜力（努力值+12）',
+    description: '强筋健骨，稳步提升根骨潜力（努力值+2，攻击+15，生命+20）',
     grade: 'grade2',
     type: 'attribute',
     func: 'effort',
@@ -386,12 +386,12 @@ export const pillRecipes = [
       { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
-    baseEffect: { type: 'effortGain', value: 12, duration: 0 }
+    baseEffect: { type: 'effortGain', value: 2, duration: 0, extraStats: { attack: 15, health: 20 } }
   },
   {
     id: 'great_foundation_pill',
     name: '大培元丹',
-    description: '脱胎换骨，大幅提升根骨潜力（努力值+30）',
+    description: '脱胎换骨，大幅提升根骨潜力（努力值+3，攻击+30，生命+40，防御+15）',
     grade: 'grade3',
     type: 'attribute',
     func: 'effort',
@@ -401,12 +401,12 @@ export const pillRecipes = [
       { kind: 'core', id: 'elite_core', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
-    baseEffect: { type: 'effortGain', value: 30, duration: 0 }
+    baseEffect: { type: 'effortGain', value: 3, duration: 0, extraStats: { attack: 30, health: 40, defense: 15 } }
   },
   {
     id: 'extreme_foundation_pill',
     name: '极培元丹',
-    description: '逆天改命，极限提升根骨潜力（努力值+80）',
+    description: '逆天改命，极限提升根骨潜力（努力值+4，攻击+50，生命+60，防御+25，速度+10）',
     grade: 'grade4',
     type: 'special',
     func: 'effort',
@@ -416,12 +416,12 @@ export const pillRecipes = [
       { kind: 'core', id: 'demon_king_core', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
-    baseEffect: { type: 'effortGain', value: 80, duration: 0 }
+    baseEffect: { type: 'effortGain', value: 4, duration: 0, extraStats: { attack: 50, health: 60, defense: 25, speed: 10 } }
   },
   {
     id: 'heaven_foundation_pill',
     name: '天培元丹',
-    description: '夺天地造化，突破潜力极限（努力值+200，无视上限）',
+    description: '夺天地造化，突破潜力极限（努力值+5，全属性大幅提升，无视上限）',
     grade: 'grade5',
     type: 'special',
     func: 'effort',
@@ -431,7 +431,7 @@ export const pillRecipes = [
       { kind: 'herb', id: 'sun_essence_flower', count: 2 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
-    baseEffect: { type: 'effortGain', value: 200, duration: 0, ignoreCap: true }
+    baseEffect: { type: 'effortGain', value: 5, duration: 0, ignoreCap: true, extraStats: { attack: 80, health: 100, defense: 40, speed: 20 } }
   }
 ]
 
@@ -471,7 +471,8 @@ export const calculatePillEffect = (recipe, playerLevel) => {
     stat: recipe.baseEffect.stat,
     value: recipe.baseEffect.value * type.effectMultiplier * levelMultiplier,
     duration: recipe.baseEffect.duration || 0,
-    successRate: grade.successRate
+    successRate: grade.successRate,
+    extraStats: recipe.baseEffect.extraStats || null
   }
 }
 

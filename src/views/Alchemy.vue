@@ -742,8 +742,16 @@
         return { label: '悟性提升', value: `+${(e.value * 100).toFixed(0)}%` }
       case 'autoHeal':
         return { label: '自动回血', value: `每秒恢复 ${(e.value * 100).toFixed(0)}% 最大生命` }
-      case 'effortGain':
-        return { label: '努力值', value: `+${Math.round(e.value)} 点` }
+      case 'effortGain': {
+        let valueText = `+${Math.round(e.value)} 点`
+        if (e.extraStats) {
+          const extras = Object.entries(e.extraStats)
+            .map(([stat, val]) => `${statNames[stat] || stat} +${Math.round(val)}`)
+            .join('，')
+          valueText += `，${extras}`
+        }
+        return { label: '努力值', value: valueText }
+      }
       default:
         return { label: '效果数值', value: `+${e.value}` }
     }

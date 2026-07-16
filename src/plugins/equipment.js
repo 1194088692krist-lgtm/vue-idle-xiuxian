@@ -253,7 +253,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       return
     }
     if (!availableStats.includes(stat)) return
-    if (PERCENT_STATS.includes(stat) && (!value || value === 0 || Number.isNaN(value))) return
+    if (!value || value === 0 || Number.isNaN(value)) return
     cleanedStats[stat] = value
   })
   equipment.stats = cleanedStats
@@ -311,7 +311,8 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
 
     const baseRange = getStatBaseRange(currentStat, rarity)
     const isPercent = PERCENT_STATS.includes(currentStat)
-    let newValue = getRandomValueInRange(baseRange, isPercent ? baseRange[0] * 0.5 : null)
+    const minFloor = isPercent ? baseRange[0] * 0.5 : 1
+    let newValue = getRandomValueInRange(baseRange, minFloor)
 
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
     newValue = newValue * (1 + delta)
@@ -338,7 +339,8 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
     const baseRange = getStatBaseRange(newStat, rarity)
     const isPercent = PERCENT_STATS.includes(newStat)
-    let value = getRandomValueInRange(baseRange, isPercent ? baseRange[0] * 0.5 : null)
+    const minFloor = isPercent ? baseRange[0] * 0.5 : 1
+    let value = getRandomValueInRange(baseRange, minFloor)
     value = clampToStatCap(newStat, value)
     if (isPercent) {
       value = Math.max(baseRange[0] * 0.5, value)
@@ -350,6 +352,13 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
 
   // 最终合并：基础属性保留 + 新词条
   const finalStats = { ...baseStats, ...resultAffixes }
+
+  // 最终过滤：移除所有值为0/NaN/null的词条
+  Object.keys(finalStats).forEach(key => {
+    if (BASE_STATS.includes(key)) return
+    const v = finalStats[key]
+    if (!v || v === 0 || Number.isNaN(v)) delete finalStats[key]
+  })
 
   if (confirmNewStats) {
     equipment.stats = { ...finalStats }

@@ -164,7 +164,14 @@ function getAffixesForSlot(slot, rarity) {
     used.add(affix.id)
     const [minVal, maxVal] = affix.baseRange
     let value = minVal + Math.random() * (maxVal - minVal)
-    const roundedValue = affix.valueType === 'percent' ? Math.round(value * 1000) / 1000 : Math.round(value)
+    if (affix.valueType === 'percent') {
+      value = Math.max(minVal * 0.5, value)
+      value = Math.round(value * 1000) / 1000
+    } else {
+      value = Math.max(1, value)
+      value = Math.round(value)
+    }
+    const roundedValue = value
     result.push({
       id: affix.id,
       name: affix.name,
