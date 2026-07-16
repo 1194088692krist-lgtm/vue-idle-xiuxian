@@ -292,7 +292,12 @@ class CombatManager {
         this.log.push(`${secondAttacker.name}获得胜利！`)
       }
     }
-    return { results, state: this.state }
+    return {
+      results,
+      state: this.state,
+      playerCurrentHealth: Math.round(this.player.currentHealth),
+      enemyCurrentHealth: Math.round(this.enemy.currentHealth)
+    }
   }
   // 获取战斗日志
   getCombatLog() {

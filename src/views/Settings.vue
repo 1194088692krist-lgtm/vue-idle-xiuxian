@@ -916,7 +916,7 @@
   }
 
   .slot-name.empty-text {
-    color: #666;
+    color: #C9C4BA;
     font-weight: normal;
   }
 

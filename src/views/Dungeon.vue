@@ -344,7 +344,7 @@
 </template>
 
 <script setup>
-  import { ref, computed, onUnmounted } from 'vue'
+  import { ref, computed, onUnmounted, reactive } from 'vue'
   import { usePlayerStore } from '../stores/player'
   import { getRealmName } from '../plugins/realm'
   import { CombatManager, CombatEntity, generateEnemy, CombatType } from '../plugins/combat'
@@ -365,7 +365,7 @@
     }, ms)
   })
   const stopCombatLoop = () => {
-    dungeonState.value.inCombat = false
+    dungeonState.inCombat = false
     if (combatTimer) {
       clearTimeout(combatTimer)
       combatTimer = null
@@ -404,7 +404,7 @@
   })
 
   // 副本状态
-  const dungeonState = ref({
+  const dungeonState = reactive({
     floor: floorData.value,
     inCombat: false,
     showingOptions: false,
@@ -414,7 +414,7 @@
 
   // 当前遭遇怪物的正面状态（抗性类等对怪物有利的战斗状态）
   const enemyPositiveStatuses = computed(() => {
-    const e = dungeonState.value.combatManager?.enemy
+    const e = dungeonState.combatManager?.enemy
     if (!e || !e.stats) return []
     const s = e.stats
     return [
@@ -428,7 +428,7 @@
 
   // 当前遭遇怪物的负面状态（眩晕/吸血等异常类、对玩家不利的战斗状态）
   const enemyNegativeStatuses = computed(() => {
-    const e = dungeonState.value.combatManager?.enemy
+    const e = dungeonState.combatManager?.enemy
     if (!e || !e.stats) return []
     const s = e.stats
     return [
@@ -510,24 +510,19 @@
   // 开始新的副本
   const startDungeon = () => {
     const startingFloor = floorData.value
-    dungeonState.value = {
-      floor: startingFloor,
-      inCombat: false,
-      showingOptions: false,
-      currentOptions: [],
-      combatManager: null
-    }
+    dungeonState.floor = startingFloor
+    dungeonState.inCombat = false
+    dungeonState.showingOptions = false
+    dungeonState.currentOptions = []
+    dungeonState.combatManager = null
     playerStore.dungeonTotalRuns++ // 增加总探索次数
     nextFloor()
   }
 
   // 进入下一层
   const nextFloor = () => {
-    dungeonState.value = {
-      ...dungeonState.value,
-      floor: dungeonState.value.floor + 1
-    }
-    const floor = dungeonState.value.floor
+    dungeonState.floor = dungeonState.floor + 1
+    const floor = dungeonState.floor
     // 检查是否需要显示选项
     if (floor === 1 || floor % 5 === 0) {
       const randRefres = Math.floor(Math.random() * 3) + 1
@@ -541,30 +536,30 @@
 
   // 显示随机选项
   const showOptions = () => {
-    dungeonState.value.showingOptions = true
-    dungeonState.value.currentOptions = getRandomOptions(dungeonState.value.floor)
+    dungeonState.showingOptions = true
+    dungeonState.currentOptions = getRandomOptions(dungeonState.floor)
   }
 
   // 选择选项
   const selectOption = option => {
     dungeonBuffs.apply(playerStore, option)
     message.success(`选择了：${option.name}`)
-    dungeonState.value.showingOptions = false
-    dungeonState.value.currentOptions = []
+    dungeonState.showingOptions = false
+    dungeonState.currentOptions = []
     startCombat()
   }
 
   // 处理失败
   const handleDefeat = () => {
-    dungeonState.value.inCombat = false
+    dungeonState.inCombat = false
     infoShow.value = false
     infoType.value = ''
-    message.error(`在第 ${dungeonState.value.floor} 层被击败了...`)
+    message.error(`在第 ${dungeonState.floor} 层被击败了...`)
     playerStore.dungeonDeathCount++
     // 清除所有临时增益效果
     dungeonBuffs.clear(playerStore)
     // 记录失败层数
-    playerStore.dungeonLastFailedFloor = dungeonState.value.floor
+    playerStore.dungeonLastFailedFloor = dungeonState.floor
     // 随机跌落境界或修为
     if (playerStore.dungeonDifficulty !== 100) {
       // 损失一定修为值作为惩罚
@@ -585,7 +580,7 @@
 
   // 开始战斗
   const startCombat = () => {
-    const floor = dungeonState.value.floor
+    const floor = dungeonState.floor
     const isBossFloor = floor % 10 === 0
     const isEliteFloor = floor % 5 === 0
     const enemyType = isBossFloor ? CombatType.BOSS : isEliteFloor ? CombatType.ELITE : CombatType.NORMAL
@@ -594,23 +589,27 @@
     // 创建敌人
     const enemy = generateEnemy(floor, enemyType, playerStore.dungeonDifficulty)
     // 创建战斗管理器
-    dungeonState.value.combatManager = new CombatManager(playerEntity, enemy, log => {
+    dungeonState.combatManager = new CombatManager(playerEntity, enemy, log => {
       if (logRef.value) {
         logRef.value.addLog(log)
       }
     })
-    dungeonState.value.inCombat = true
-    dungeonState.value.combatManager.start() // 初始化战斗状态
+    dungeonState.inCombat = true
+    dungeonState.combatManager.start() // 初始化战斗状态
     autoCombat() // 开始自动战斗
   }
 
   // 自动战斗
   const autoCombat = async () => {
-    while (dungeonState.value.inCombat) {
-      const result = dungeonState.value.combatManager.executeTurn()
-      const getCombatLog = dungeonState.value.combatManager.getCombatLog()
+    while (dungeonState.inCombat) {
+      const result = dungeonState.combatManager.executeTurn()
+      if (result) {
+        dungeonState.combatManager.enemy.currentHealth = result.enemyCurrentHealth
+        dungeonState.combatManager.player.currentHealth = result.playerCurrentHealth
+      }
+      const getCombatLog = dungeonState.combatManager.getCombatLog()
       // 添加动画效果
-      if (result && result.attacker === dungeonState.value.combatManager.player) {
+      if (result && result.attacker === dungeonState.combatManager.player) {
         playerAttacking.value = true
         enemyHurt.value = true
         await sleep(500)
@@ -623,7 +622,7 @@
         enemyAttacking.value = false
         playerHurt.value = false
       }
-      if (!result || !dungeonState.value.inCombat) break
+      if (!result || !dungeonState.inCombat) break
       // 更新战斗日志
       getCombatLog.forEach(item => {
         logRef.value?.addLog('info', item)
@@ -643,27 +642,27 @@
 
   onUnmounted(() => {
     stopCombatLoop()
-    dungeonState.value.combatManager = null
+    dungeonState.combatManager = null
     combatLog.value = []
   })
 
   // 处理胜利
   const handleVictory = () => {
-    dungeonState.value.inCombat = false
-    message.success(`击败了第 ${dungeonState.value.floor} 层的敌人！`)
+    dungeonState.inCombat = false
+    message.success(`击败了第 ${dungeonState.floor} 层的敌人！`)
     // 更新统计数据
     playerStore.dungeonTotalKills++
-    if (dungeonState.value.floor % 10 === 0) {
+    if (dungeonState.floor % 10 === 0) {
       playerStore.dungeonBossKills++
-    } else if (dungeonState.value.floor % 5 === 0) {
+    } else if (dungeonState.floor % 5 === 0) {
       // 增加洗练石
       playerStore.refinementStones += playerStore.dungeonDifficulty
       playerStore.dungeonEliteKills++
       message.success(`获得了${playerStore.dungeonDifficulty}颗洗练石`)
     }
     // 更新最高层数记录
-    if (dungeonState.value.floor > playerStore.dungeonHighestFloor) {
-      playerStore.dungeonHighestFloor = dungeonState.value.floor
+    if (dungeonState.floor > playerStore.dungeonHighestFloor) {
+      playerStore.dungeonHighestFloor = dungeonState.floor
     }
     // 获得奖励
     const rewards = generateRewards()
@@ -680,7 +679,7 @@
   const generateRewards = () => {
     const rewards = []
     // 灵石奖励
-    const baseStones = 10 * dungeonState.value.floor * playerStore.dungeonDifficulty
+    const baseStones = 10 * dungeonState.floor * playerStore.dungeonDifficulty
     rewards.push({
       type: 'spirit_stones',
       amount: baseStones

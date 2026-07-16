@@ -605,11 +605,13 @@
           </div>
           <div class="detail-row">
             <span>服用数量</span>
-            <div class="pill-quantity-selector">
-              <button class="btn-small" @click="pillConsumeCount = Math.max(1, pillConsumeCount - 1)">-</button>
-              <span>{{ pillConsumeCount }}</span>
-              <button class="btn-small" @click="pillConsumeCount = Math.min(selectedPill?.count || 1, pillConsumeCount + 1)">+</button>
-            </div>
+            <n-input-number
+              v-model:value="pillConsumeCount"
+              :min="1"
+              :max="selectedPill?.count || 1"
+              size="small"
+              style="width: 140px;"
+            />
           </div>
           <div class="detail-row">
             <span>说明</span>
@@ -986,30 +988,36 @@
     if (!selectedPill.value) return
     const count = pillConsumeCount.value || 1
     let allSuccess = true
+    let failureMsg = ''
     const allChanges = []
     for (let i = 0; i < count; i++) {
       const result = playerStore.consumePill(selectedPill.value.id, member.id)
       if (!result.success) {
         allSuccess = false
-        if (result.message) window.$message?.error(result.message)
+        failureMsg = result.message || '服用失败'
         break
       }
       if (result.changes) allChanges.push(...result.changes)
     }
-    if (allSuccess) {
-      if (allChanges.length > 0) {
-        const deltaMap = {}
-        allChanges.forEach(c => {
-          if (!deltaMap[c.stat]) deltaMap[c.stat] = 0
-          deltaMap[c.stat] += c.delta
-        })
-        Object.entries(deltaMap).forEach(([stat, delta]) => {
-          window.$message?.success(`${member.name} ${stat} +${delta}`)
-        })
-      }
-      showPillConsumeModal.value = false
-      selectedPill.value = null
+    if (!allSuccess) {
+      message.warning(failureMsg)
+      return
     }
+    if (allChanges.length > 0) {
+      const deltaMap = {}
+      allChanges.forEach(c => {
+        if (!deltaMap[c.stat]) deltaMap[c.stat] = 0
+        deltaMap[c.stat] += c.delta
+      })
+      const summary = Object.entries(deltaMap)
+        .map(([stat, delta]) => `${stat} +${delta}`)
+        .join('，')
+      message.success(`${member.name} 服用 ${selectedPill.value.name} ×${count}：${summary}`)
+    } else {
+      message.success(`${member.name} 服用 ${selectedPill.value.name} ×${count}`)
+    }
+    showPillConsumeModal.value = false
+    selectedPill.value = null
   }
 
   // 标签页
@@ -1901,10 +1909,10 @@
     }
 
     .equipment-detail-modal .equipment-detail-content {
-      width: 50vw;
-      max-width: 520px;
-      height: 80vh;
-      max-height: 80vh;
+      width: 45vw;
+      max-width: 480px;
+      height: 75vh;
+      max-height: 75vh;
       border-radius: 14px;
       padding: 18px 20px 24px;
     }
@@ -2471,6 +2479,13 @@
   }
   html:not(.dark) .inventory-page .target-name,
   html:not(.dark) .inventory-page .target-level {
+    color: #F5F0E8;
+  }
+  html:not(.dark) .inventory-page .empty-state,
+  html:not(.dark) .inventory-page .pagination-info,
+  html:not(.dark) .inventory-page .pagination-info span,
+  html:not(.dark) .inventory-page .simple-modal-content p,
+  html:not(.dark) .inventory-page .modal-body p {
     color: #F5F0E8;
   }
 </style>

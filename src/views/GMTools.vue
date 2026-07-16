@@ -2226,7 +2226,7 @@ onMounted(async () => {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(218, 165, 32, 0.3);
   border-radius: 8px;
-  color: #8B8B8B;
+  color: #C9C4BA;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -2592,7 +2592,7 @@ onMounted(async () => {
 
 .form-item label {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
 }
 
 .form-item input,
@@ -2649,13 +2649,13 @@ onMounted(async () => {
 }
 
 .upload-zone p {
-  color: #8B8B8B;
+  color: #F5DEB3;
   margin-bottom: 5px;
 }
 
 .upload-hint {
   font-size: 12px;
-  color: #555;
+  color: #C9C4BA;
 }
 
 .assets-preview h3 {

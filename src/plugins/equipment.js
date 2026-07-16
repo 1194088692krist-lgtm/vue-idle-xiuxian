@@ -213,8 +213,11 @@ function getStatBaseRange(stat, rarity) {
   return [5, 15]
 }
 
-function getRandomValueInRange(range, minFloor = null) {
-  if (!range || !Array.isArray(range) || range.length < 2) return 0
+function getRandomValueInRange(range, minFloor = null, isPercent = false) {
+  if (!range || !Array.isArray(range) || range.length < 2) {
+    if (isPercent) return minFloor !== null ? minFloor * 0.5 : 0.01
+    return 1
+  }
   const value = range[0] + Math.random() * (range[1] - range[0])
   if (minFloor !== null) {
     return Math.max(minFloor, value)
@@ -242,6 +245,15 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   if (playerReforgeStones < reforgeConfig.costPerAttempt) {
     return { success: false, message: '洗练石不足' }
   }
+  // 预处理：直接删除非法值的可洗练词条
+  Object.keys(equipment.stats).forEach(key => {
+    if (BASE_STATS.includes(key)) return
+    const v = equipment.stats[key]
+    if (v === 0 || v === null || v === undefined || Number.isNaN(v)) {
+      delete equipment.stats[key]
+    }
+  })
+
   const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
   const rarity = equipment.rarity || 'common'
 
@@ -309,10 +321,15 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       }
     }
 
+    if (!availableStats.includes(currentStat)) {
+      delete resultAffixes[currentStat]
+      return
+    }
+
     const baseRange = getStatBaseRange(currentStat, rarity)
     const isPercent = PERCENT_STATS.includes(currentStat)
     const minFloor = isPercent ? baseRange[0] * 0.5 : 1
-    let newValue = getRandomValueInRange(baseRange, minFloor)
+    let newValue = getRandomValueInRange(baseRange, minFloor, isPercent)
 
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
     newValue = newValue * (1 + delta)
@@ -340,7 +357,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const baseRange = getStatBaseRange(newStat, rarity)
     const isPercent = PERCENT_STATS.includes(newStat)
     const minFloor = isPercent ? baseRange[0] * 0.5 : 1
-    let value = getRandomValueInRange(baseRange, minFloor)
+    let value = getRandomValueInRange(baseRange, minFloor, isPercent)
     value = clampToStatCap(newStat, value)
     if (isPercent) {
       value = Math.max(baseRange[0] * 0.5, value)

@@ -1543,7 +1543,7 @@ watch([allMembers, teamMembers], () => {
 }
 .pool-hint {
   font-size: 12px;
-  color: #666;
+  color: #C9C4BA;
   margin-top: 6px;
 }
 .allocate-section {
@@ -1862,7 +1862,7 @@ watch([allMembers, teamMembers], () => {
 }
 .resonance-hint {
   font-size: 12px;
-  color: #666;
+  color: #C9C4BA;
 }
 .resonance-list {
   display: flex;
@@ -2117,7 +2117,7 @@ watch([allMembers, teamMembers], () => {
 }
 
 .char-detail-header .char-potential .divider {
-  color: #666;
+  color: #C9C4BA;
 }
 
 .skill-list {
