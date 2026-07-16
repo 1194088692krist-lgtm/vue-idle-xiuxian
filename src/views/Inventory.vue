@@ -18,7 +18,6 @@
           <div class="pet-actions">
             <select v-model="equipmentFilterCategory" class="simple-select">
               <option value="">全部分类</option>
-              <option value="weapon">武器</option>
               <option value="artifact">法宝</option>
               <option value="armor">防具</option>
               <option value="accessory">饰品</option>
@@ -388,17 +387,6 @@
         >
           <div class="card-header">
             <span class="equip-name">{{ equipment.name }}</span>
-            <button
-              v-if="!isEquipped(equipment)"
-              class="btn-small btn-equip"
-              @click.stop="equipItem(equipment)"
-              :disabled="(equipment.requiredRealm || 1) > playerStore.level"
-            >装备</button>
-            <button
-              v-else
-              class="btn-small btn-danger"
-              @click.stop="unequipItem(equipment.slot || equipment.type)"
-            >卸下</button>
           </div>
           <div class="card-body">
             <div class="equip-meta">
@@ -462,40 +450,28 @@
             <span>{{ bonus.label }}</span>
           </div>
         </div>
-        <div v-if="equipmentComparison && selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot]?.id" class="stats-comparison">
-          <div class="simple-divider">属性对比</div>
-          <table class="simple-table">
-            <thead>
-              <tr><th>属性</th><th>当前</th><th>选中</th><th>变化</th></tr>
-            </thead>
-            <tbody>
-              <tr v-for="(comparison, stat) in equipmentComparison" :key="stat">
-                <td>{{ getStatName(stat) }}</td>
-                <td>{{ formatStatValue(stat, comparison.current) }}</td>
-                <td>{{ formatStatValue(stat, comparison.selected) }}</td>
-                <td :class="comparison.isPositive ? 'positive' : 'negative'">
-                  {{ comparison.isPositive ? '+' : '' }}{{ formatStatValue(stat, comparison.diff) }}
-                </td>
-              </tr>
-            </tbody>
-          </table>
+        <div class="enhance-preview-section">
+          <div class="simple-divider">强化预览 (+1 ~ +12)</div>
+          <div class="enhance-preview-grid">
+            <div class="enhance-preview-header">
+              <span>等级</span>
+              <span>倍率</span>
+              <span>评分</span>
+            </div>
+            <div v-for="p in enhancePreview" :key="p.level" class="enhance-preview-row">
+              <span>+{{ p.level }}</span>
+              <span>×{{ Math.round(p.multiplier * 100) / 100 }}</span>
+              <span>{{ p.score }}</span>
+            </div>
+          </div>
         </div>
         <div class="modal-actions four-grid">
           <button
-            v-if="selectedEquipment?.id != playerStore.equippedArtifacts[selectedEquipment?.slot || selectedEquipment?.type]?.id"
             class="btn-small"
-            @click="equipItem(selectedEquipment)"
-            :disabled="playerStore.level < (selectedEquipment?.requiredRealm || 1)"
+            @click="showEquipTargetModal = true"
+            :disabled="playerStore.level < (selectedEquipment?.requiredRealm || 1) || equipTargetMembers.length === 0"
           >
             装备
-          </button>
-          <button
-            v-else
-            class="btn-small"
-            @click="unequipItem(selectedEquipment?.slot || selectedEquipment?.type)"
-            :disabled="playerStore.level < (selectedEquipment?.requiredRealm || 1)"
-          >
-            卸下
           </button>
           <button
             class="btn-small btn-danger"
@@ -503,6 +479,34 @@
           >
             出售/分解
           </button>
+        </div>
+      </div>
+    </div>
+  </div>
+
+  <!-- 选择出战角色弹窗 -->
+  <div v-if="showEquipTargetModal" class="simple-modal" @click.self="showEquipTargetModal = false">
+    <div class="simple-modal-content">
+      <div class="modal-header">
+        <h3>选择装备对象</h3>
+        <button class="btn-small" @click="showEquipTargetModal = false">关闭</button>
+      </div>
+      <div class="modal-body">
+        <p>将「{{ selectedEquipment?.name }}」装备给：</p>
+        <div v-if="equipTargetMembers.length === 0" class="empty-state">
+          当前没有出战角色
+        </div>
+        <div v-else class="equip-target-list">
+          <div
+            v-for="member in equipTargetMembers"
+            :key="member.id"
+            class="equip-target-item"
+            @click="equipToMember(member)"
+          >
+            <img v-if="member.portraitThumbnail" :src="member.portraitThumbnail" class="target-avatar" />
+            <span class="target-name">{{ member.name }}</span>
+            <span class="target-level">Lv.{{ member.level }}</span>
+          </div>
         </div>
       </div>
     </div>
@@ -559,6 +563,41 @@
       <div class="modal-actions">
         <button class="btn-small" @click="showMaterialSellModal = false">取消</button>
         <button class="btn-small btn-danger" @click="confirmSellMaterials">确认卖出</button>
+      </div>
+    </div>
+  </div>
+
+  <!-- 素材快速卖出弹窗 -->
+  <div v-if="showQuickSellModal" class="simple-modal" @click.self="showQuickSellModal = false">
+    <div class="simple-modal-content">
+      <div class="modal-header">
+        <h3>快速卖出</h3>
+        <button class="btn-small" @click="showQuickSellModal = false">关闭</button>
+      </div>
+      <div class="modal-body">
+        <p v-if="quickSellMaterial">
+          {{ quickSellMaterial.name }}（持有 {{ quickSellMaterial.count }} 个）
+        </p>
+        <div class="quick-sell-count">
+          <span>卖出数量：</span>
+          <button class="btn-mini" @click="quickSellCount = Math.max(1, quickSellCount - 1)">-</button>
+          <input
+            type="number"
+            v-model.number="quickSellCount"
+            :min="1"
+            :max="quickSellMaterial?.count || 1"
+            class="count-input"
+          />
+          <button class="btn-mini" @click="quickSellCount = Math.min(quickSellMaterial?.count || 1, quickSellCount + 1)">+</button>
+          <span class="sell-max-btn" @click="quickSellCount = quickSellMaterial?.count || 1">全部</span>
+        </div>
+        <p v-if="quickSellMaterial">
+          预计获得：{{ getMaterialPrice(quickSellMaterial) * quickSellCount }} 灵石
+        </p>
+      </div>
+      <div class="modal-actions">
+        <button class="btn-small" @click="showQuickSellModal = false">取消</button>
+        <button class="btn-small btn-danger" @click="confirmQuickSell">确认卖出</button>
       </div>
     </div>
   </div>
@@ -696,6 +735,26 @@
   const selectedMaterialIds = ref([])
   const materialSellCounts = ref({})
   const showMaterialSellModal = ref(false)
+  const showQuickSellModal = ref(false)
+  const quickSellMaterial = ref(null)
+  const quickSellCount = ref(1)
+
+  const openQuickSell = (mat) => {
+    quickSellMaterial.value = mat
+    quickSellCount.value = 1
+    showQuickSellModal.value = true
+  }
+
+  const confirmQuickSell = () => {
+    if (!quickSellMaterial.value) return
+    const result = playerStore.sellMaterial(quickSellMaterial.value.kind, quickSellMaterial.value.id, quickSellCount.value)
+    if (result.success) {
+      message.success(`卖出 ${quickSellCount.value} 个${quickSellMaterial.value.name}，获得 ${result.totalPrice} 灵石`)
+      showQuickSellModal.value = false
+    } else {
+      message.error(result.message || '卖出失败')
+    }
+  }
 
   const toggleMaterialSelectMode = () => {
     isMaterialSelectMode.value = !isMaterialSelectMode.value
@@ -719,6 +778,8 @@
   const handleMaterialClick = (mat) => {
     if (isMaterialSelectMode.value) {
       toggleMaterialSelect(mat)
+    } else {
+      openQuickSell(mat)
     }
   }
 
@@ -975,7 +1036,6 @@
 
   // 装备类型配置
   const equipmentTypes = {
-    weapon: '武器',
     head: '头部',
     body: '衣服',
     legs: '裤子',
@@ -991,7 +1051,7 @@
   }
 
   // 所有装备槽位（用于识别装备类物品，兼容 gacha 与挂机两种生成形态）
-  const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+  const EQUIPMENT_SLOTS = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
   const isEquipmentItem = item => !!item && item.type !== 'pet' && item.type !== 'material' && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
   // 是否有可装备物品（用于禁用一键按钮）
@@ -1053,14 +1113,12 @@
 
   // 装备分类映射
   const equipmentCategoryMap = {
-    weapon: ['weapon'],
     artifact: ['artifact'],
     armor: ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'belt'],
     accessory: ['necklace', 'ring1', 'ring2']
   }
 
   const getEquipCategoryName = (slot) => {
-    if (equipmentCategoryMap.weapon.includes(slot)) return '武器'
     if (equipmentCategoryMap.artifact.includes(slot)) return '法宝'
     if (equipmentCategoryMap.armor.includes(slot)) return '防具'
     if (equipmentCategoryMap.accessory.includes(slot)) return '饰品'
@@ -1195,6 +1253,40 @@
 
   // 出售 / 分解选择弹窗
   const showSellDisassemble = ref(false)
+
+  // 装备给出战角色弹窗
+  const showEquipTargetModal = ref(false)
+  const equipTargetMembers = computed(() => {
+    return playerStore.getTeamMembersDetail().filter(m => m)
+  })
+  const equipToMember = (member) => {
+    if (!selectedEquipment.value) return
+    const slot = selectedEquipment.value.slot || selectedEquipment.value.type
+    const result = playerStore.equipCharacterArtifact(member.id, selectedEquipment.value, slot)
+    if (result.success) {
+      message.success(result.message)
+      showEquipTargetModal.value = false
+      showEquipmentDetailModal.value = false
+    } else {
+      message.error(result.message || '装备失败')
+    }
+  }
+
+  // 强化预览：计算 +1 到 +12 的属性
+  const enhancePreview = computed(() => {
+    if (!selectedEquipment.value) return []
+    const base = selectedEquipment.value
+    const previews = []
+    for (let lv = 1; lv <= 12; lv++) {
+      const multiplier = Math.pow(1.2, lv)
+      const stats = {}
+      for (const [stat, value] of Object.entries(base.stats || {})) {
+        stats[stat] = typeof value === 'number' ? Math.round(value * multiplier * 10) / 10 : value
+      }
+      previews.push({ level: lv, multiplier, stats, score: Math.round(calculateEquipmentScore({ ...base, enhanceLevel: lv })) })
+    }
+    return previews
+  })
 
   // 使用装备（兼容 gacha 的 type=槽位 与 挂机生成的 type='equipment'，统一取 slot）
   const equipItem = equipment => {
@@ -2042,5 +2134,83 @@
     border-radius: 4px;
     margin-left: 6px;
     font-weight: normal;
+  }
+
+  /* 强化预览 */
+  .enhance-preview-section {
+    margin-top: 8px;
+  }
+  .enhance-preview-grid {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+    font-size: 12px;
+    max-height: 200px;
+    overflow-y: auto;
+  }
+  .enhance-preview-header,
+  .enhance-preview-row {
+    display: grid;
+    grid-template-columns: 1fr 1fr 1fr;
+    gap: 8px;
+    padding: 4px 8px;
+    text-align: center;
+  }
+  .enhance-preview-header {
+    background: rgba(139, 69, 19, 0.2);
+    color: #F5DEB3;
+    font-weight: bold;
+    position: sticky;
+    top: 0;
+  }
+  .enhance-preview-row:nth-child(even) {
+    background: rgba(255, 255, 255, 0.03);
+  }
+
+  /* 装备目标选择 */
+  .equip-target-list {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    margin-top: 10px;
+  }
+  .equip-target-item {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    padding: 10px 12px;
+    background: rgba(0, 0, 0, 0.2);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+  }
+  .equip-target-item:hover {
+    background: rgba(218, 165, 32, 0.1);
+    border-color: rgba(218, 165, 32, 0.4);
+  }
+  .target-avatar {
+    width: 40px;
+    height: 40px;
+    border-radius: 50%;
+    object-fit: cover;
+    border: 2px solid rgba(218, 165, 32, 0.4);
+  }
+  .target-name {
+    font-weight: bold;
+    color: #F5DEB3;
+    flex: 1;
+  }
+  .target-level {
+    font-size: 12px;
+    color: #aaa;
+  }
+
+  /* 快速卖出 */
+  .quick-sell-count {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin: 12px 0;
   }
 </style>

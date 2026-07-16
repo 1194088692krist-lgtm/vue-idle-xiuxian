@@ -704,7 +704,7 @@ function buildEffectiveZone(zone, diff) {
 }
 
 // ============ 装备 / 灵宠 / 敌人生成 ============
-const SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
+const SLOTS = ['artifact', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
 const RARITY_MULT = { common: 1, uncommon: 1.3, rare: 1.8, epic: 2.5, legendary: 4, mythic: 7 }
 
 // 使用真实装备名库（与抽卡系统一致），避免挂机产出「良品戒」这类虚拟命名
@@ -1151,7 +1151,6 @@ async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = fals
 let flashTimer = null
 // 奖励类型对应图标路径
 const REWARD_ICON_MAP = {
-  weapon: '/assets/icons/reward_eq_weapon.png',
   head: '/assets/icons/reward_eq_head.png',
   body: '/assets/icons/reward_eq_body.png',
   legs: '/assets/icons/reward_eq_legs.png',
@@ -1180,7 +1179,6 @@ const REWARD_ICON_MAP = {
 
 // 奖励类型对应 emoji
 const REWARD_EMOJI_MAP = {
-  weapon: '⚔️',
   head: '👑',
   body: '🦺',
   legs: '🩳',
@@ -2067,7 +2065,7 @@ const idleDashboard = computed(() => {
       id: eq.id,
       name: eq.name,
       slot: eq.slot || eq.type,
-      slotName: ({weapon:'武器',head:'头部',body:'衣服',legs:'裤子',feet:'鞋子',shoulder:'肩甲',hands:'手套',wrist:'护腕',necklace:'项链',ring1:'戒指1',ring2:'戒指2',belt:'腰带',artifact:'法宝'})[eq.slot || eq.type] || (eq.slot || eq.type),
+      slotName: ({head:'头部',body:'衣服',legs:'裤子',feet:'鞋子',shoulder:'肩甲',hands:'手套',wrist:'护腕',necklace:'项链',ring1:'戒指1',ring2:'戒指2',belt:'腰带',artifact:'法宝'})[eq.slot || eq.type] || (eq.slot || eq.type),
       rarity: eq.rarity,
       rarityName: (eq.qualityInfo && eq.qualityInfo.name) || eq.rarity || '',
       color: (eq.qualityInfo && eq.qualityInfo.color) || '#9e9e9e',

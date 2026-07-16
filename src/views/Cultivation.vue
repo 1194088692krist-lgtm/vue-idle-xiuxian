@@ -548,10 +548,9 @@ const resonanceDesc = computed(() => {
 })
 
 // 槽位中文映射
-const slotNames = { weapon:'武器', head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带' }
+const slotNames = { head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带' }
 const slots = Object.keys(slotNames)
 const slotBgImages = {
-  weapon: '/assets/icons/reward_eq_weapon.png',
   head: '/assets/icons/reward_eq_head.png',
   body: '/assets/icons/reward_eq_body.png',
   legs: '/assets/icons/reward_eq_legs.png',
@@ -1904,11 +1903,11 @@ watch([allMembers, teamMembers], () => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: flex-end;
+  align-items: flex-start;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  padding-bottom: 80px;
+  padding-top: 60px;
 }
 .modal-content {
   width: 100%;

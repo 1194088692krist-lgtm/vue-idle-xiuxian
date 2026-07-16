@@ -1,6 +1,6 @@
 export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
-<strong>当前版本：v1.3.1 · 神兵天工（2026-07-15）</strong>
+<strong>当前版本：v1.4.0 · 万法归宗（2026-07-16）</strong>
 
 <blockquote>一份基于游戏真实代码与数值的详尽攻略，覆盖两大核心系统（人物+装备）、宗门体系、角色定位、资源体系、修炼突破、装备 Build、灵宠、挂机探索、分区难度、抽卡、丹药、战斗公式与进阶策略。</blockquote>
 
@@ -22,7 +22,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <tr><td><strong>🧍 人物系统</strong></td><td><strong>40%</strong></td><td>天赋值、努力值、天赋技能、角色定位、灵宠加成</td><td>抽卡招募、培元丹、回炉重造升星、灵宠培养</td></tr>
 
-<tr><td><strong>⚔️ 装备系统</strong></td><td><strong>60%</strong></td><td>12件装备+法宝、6档品质、12级强化、洗练词条、10套套装</td><td>挂机掉落、抽卡、强化、洗练、套装收集</td></tr>
+<tr><td><strong>⚔️ 装备系统</strong></td><td><strong>60%</strong></td><td>12件装备（含法宝）、6档品质、12级强化、洗练词条、10套套装</td><td>挂机掉落、抽卡、强化、洗练、套装收集</td></tr>
 
 </tbody>
 
@@ -38,7 +38,7 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 │   └── 灵宠分
 │
 ├── 装备分（60%权重）
-│   ├── 12件装备评分
+│   ├── 12件装备评分（含法宝）
 │   └── 套装激活分
 │
 └── 等级倍率 = 1 + (等级-1) × 0.02
@@ -82,9 +82,11 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 <tr><td><strong>丹方系统</strong></td><td>丹方通过通关对应地图第5重难度解锁，低等级地图对应低品丹方，高等级地图对应高品丹方</td></tr>
 
-<tr><td><strong>宗门系统</strong></td><td>人物数据面板优化，显示前7项数据，超出部分可滚动；点击人物详情在该位置弹出弹窗</td></tr>
+<tr><td><strong>宗门系统</strong></td><td>人物数据面板优化，显示前7项数据，超出部分可滚动；点击人物详情在该位置弹出弹窗；新增宗派共鸣系统（同宗派2/3人出战加成）</td></tr>
 
-<tr><td><strong>背包·装备</strong></td><td>装备卡片显示分类标签（武器/法宝/防具/饰品）；修复仙缘祈福装备在背包不显示的问题</td></tr>
+<tr><td><strong>背包·装备</strong></td><td>背包装备列表不再显示装备按钮，点击装备查看详情改为强化预览（+1到+12）；素材点击可快速卖出</td></tr>
+
+<tr><td><strong>导航图标</strong></td><td>八卦炉图标改为丹炉风格，仙缘祈福图标改为星辰风格</td></tr>
 
 <tr><td><strong>灵宠系统</strong></td><td>放生仅返还精华和升星碎片；升星按钮合并碎片提示</td></tr>
 
@@ -425,6 +427,40 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 </ul>
 
+<h3>2.9 宗派共鸣系统</h3>
+
+<blockquote>出战队伍中若有 <strong>2 名或 3 名同宗派角色</strong>，将触发宗派共鸣加成，显著提升队伍整体战力。</blockquote>
+
+<ul>
+
+<li><strong>共鸣条件</strong>：出战队伍最多 3 人，其中同宗派角色达到 2 人或 3 人时激活；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>2 人共鸣</strong>：同宗派 2 人出战时，全队攻击 +10%、生命 +10%；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>3 人共鸣</strong>：同宗派 3 人出战时，全队攻击 +20%、生命 +20%、最终增伤 +5%；</li>
+
+</ul>
+
+<ul>
+
+<li><strong>宗派搭配加成</strong>：特定宗派组合（如青云门+天音寺）出战可额外获得速度 +8% 的羁绊效果；</li>
+
+</ul>
+
+<ul>
+
+<li>共鸣加成实时计入队伍总战力，是后期 Build 搭配的重要策略维度。</li>
+
+</ul>
+
 <hr>
 
 <h2>⚔️ 装备系统（60%战力 · 核心支柱二）</h2>
@@ -473,13 +509,12 @@ export const guideHtml = `<h1>《修仙挂机录》完整攻略手册</h1>
 
 </ul>
 
-<h3>3.2 装备槽位（12 + 法宝）</h3>
+<h3>3.2 装备槽位（12件装备，含法宝）</h3>
 
 <pre><code>
-weapon 武器 / head 头部 / body 衣服 / legs 裤子 / feet 鞋子
+artifact 法宝 / head 头部 / body 衣服 / legs 裤子 / feet 鞋子
 shoulder 肩甲 / hands 手套 / wrist 护腕 / necklace 项链
 ring1 戒指 / ring2 戒指 / belt 腰带    ← 共 12 槽，宗门成员可装备
-artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 </code></pre>
 
 <h3>3.3 装备评分公式</h3>
@@ -708,15 +743,15 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <tbody>
 
-<tr><td><strong>烈焰刃</strong></td><td>武器/手套/戒指1</td><td>攻击+10%</td><td>暴击伤害+20%</td><td>—</td><td>—</td><td>火系攻击，暴击输出</td></tr>
+<tr><td><strong>烈焰刃</strong></td><td>法宝/手套/戒指1</td><td>攻击+10%</td><td>暴击伤害+20%</td><td>—</td><td>—</td><td>火系攻击，暴击输出</td></tr>
 
 <tr><td><strong>玄铁卫</strong></td><td>头部/衣服/腰带/戒指2</td><td>防御+15%</td><td>生命+10%</td><td>最终减伤+10%</td><td>—</td><td>坦克防御，减伤核心</td></tr>
 
 <tr><td><strong>疾风影</strong></td><td>鞋子/裤子/护腕</td><td>速度+15%</td><td>闪避率+10%</td><td>—</td><td>—</td><td>速度闪避，风筝打法</td></tr>
 
-<tr><td><strong>血牙</strong></td><td>武器/护腕/戒指1/手套</td><td>吸血率+8%</td><td>连击率+10%</td><td>最终增伤+12%</td><td>—</td><td>吸血续航，持续战斗</td></tr>
+<tr><td><strong>血牙</strong></td><td>法宝/护腕/戒指1/手套</td><td>吸血率+8%</td><td>连击率+10%</td><td>最终增伤+12%</td><td>—</td><td>吸血续航，持续战斗</td></tr>
 
-<tr><td><strong>雷霆击</strong></td><td>武器/头部/手套/法宝</td><td>眩晕率+6%</td><td>暴击率+8%</td><td>暴击伤害+25%</td><td>—</td><td>眩晕暴击，一击制敌</td></tr>
+<tr><td><strong>雷霆击</strong></td><td>法宝/头部/手套/戒指1</td><td>眩晕率+6%</td><td>暴击率+8%</td><td>暴击伤害+25%</td><td>—</td><td>眩晕暴击，一击制敌</td></tr>
 
 <tr><td><strong>不灭体</strong></td><td>衣服/项链/腰带/头部</td><td>生命+20%</td><td>治疗效果+30%</td><td>最终减伤+15%</td><td>—</td><td>生命恢复，极致生存</td></tr>
 
@@ -724,9 +759,9 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <tr><td><strong>灵气髓</strong></td><td>项链/头部/戒指2</td><td>灵力获取+20%</td><td>修炼效率+20%</td><td>—</td><td>—</td><td>修炼加速，道法自然</td></tr>
 
-<tr><td><strong>战斗王</strong></td><td>武器/衣服/戒指1/戒指2/法宝</td><td>战斗属性+5%</td><td>战斗抗性+5%</td><td>最终增伤+15%</td><td>最终减伤+15%</td><td>全能战斗，攻防兼备</td></tr>
+<tr><td><strong>战斗王</strong></td><td>法宝/衣服/戒指1/戒指2/项链</td><td>战斗属性+5%</td><td>战斗抗性+5%</td><td>最终增伤+15%</td><td>最终减伤+15%</td><td>全能战斗，攻防兼备</td></tr>
 
-<tr><td><strong>道仙尊</strong></td><td>武器/头部/衣服/鞋子/法宝</td><td>攻击+10%</td><td>生命+15%</td><td>暴击率+10%</td><td>最终增伤+20%</td><td>传说套装，道法通天</td></tr>
+<tr><td><strong>道仙尊</strong></td><td>法宝/头部/衣服/鞋子/项链</td><td>攻击+10%</td><td>生命+15%</td><td>暴击率+10%</td><td>最终增伤+20%</td><td>传说套装，道法通天</td></tr>
 
 </tbody>
 
@@ -747,6 +782,26 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 <ul>
 
 <li>装备系统是提升战力效率最高的途径，优先投入资源。</li>
+
+</ul>
+
+<h3>3.9 背包装备交互</h3>
+
+<ul>
+
+<li>背包装备列表<strong>不再显示装备按钮</strong>，点击装备直接进入详情；</li>
+
+</ul>
+
+<ul>
+
+<li>装备详情页改为<strong>强化预览</strong>，可查看该装备从 +1 到 +12 的各级属性变化；</li>
+
+</ul>
+
+<ul>
+
+<li>素材支持<strong>点击快速卖出</strong>，无需进入多选模式即可一键出售。</li>
 
 </ul>
 
@@ -784,11 +839,11 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <h3>4.3 装备分构成（60%权重）</h3>
 
-<pre><code>装备分 = 12件装备评分 + 套装激活分</code></pre>
+<pre><code>装备分 = 12件装备评分（含法宝） + 套装激活分</code></pre>
 
 <ul>
 
-<li><strong>12件装备评分</strong>：每件装备的完整评分（含词条/品质/强化）；</li>
+<li><strong>12件装备评分（含法宝）</strong>：每件装备的完整评分（含词条/品质/强化）；</li>
 
 </ul>
 
@@ -1302,8 +1357,6 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 <tr><td>装备池</td><td>120</td><td>0%</td><td>95%</td><td>0%</td><td>5%</td></tr>
 
-<tr><td>武器池</td><td>120</td><td>0%</td><td>80%</td><td>0%</td><td>5%（含法宝15%）</td></tr>
-
 <tr><td>法宝池</td><td>180</td><td>0%</td><td>10%</td><td>0%</td><td>5%（法宝85%）</td></tr>
 
 <tr><td>灵宠池</td><td>200</td><td>0%</td><td>0%</td><td>95%</td><td>5%</td></tr>
@@ -1691,7 +1744,7 @@ artifact 法宝                            ← 仅高难 Boss / 抽卡产出
 
 角色战力     = (人物裸分 × 0.4 + 装备分 × 0.6) × 等级倍率
 人物裸分     = 基础属性分 + 天赋技能分 + 灵宠分
-装备分       = 12件装备评分 + 套装激活分
+装备分       = 12件装备评分（含法宝） + 套装激活分
 等级倍率     = 1 + (等级-1) × 0.02
 
 

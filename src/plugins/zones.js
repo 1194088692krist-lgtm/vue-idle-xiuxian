@@ -55,7 +55,7 @@ export const zones = [
         stats: { attack: 12, health: 124, defense: 4, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [30, 75] },
-          { type: 'equipment', chance: 0.1, rarity: ['common', 'uncommon'], slot: 'weapon' },
+          { type: 'equipment', chance: 0.1, rarity: ['common', 'uncommon'], slot: 'artifact' },
           { type: 'herb', chance: 0.5, amount: [2, 5] }
         ],
         dropRateBonus: 1.0
@@ -151,7 +151,7 @@ export const zones = [
         stats: { attack: 50, health: 496, defense: 18, speed: 12 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [150, 375] },
-          { type: 'equipment', chance: 0.1167, rarity: ['rare', 'epic'], slot: 'weapon' },
+          { type: 'equipment', chance: 0.1167, rarity: ['rare', 'epic'], slot: 'artifact' },
           { type: 'herb', chance: 0.5, amount: [5, 15] }
         ],
         dropRateBonus: 1.3
@@ -396,7 +396,7 @@ export const zones = [
         stats: { attack: 744, health: 12400, defense: 210, speed: 30 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
-          { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'weapon' },
+          { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'artifact' },
           { type: 'pet', chance: 0.02, rarity: ['divine'] }
         ],
         dropRateBonus: 2.0

@@ -94,7 +94,6 @@ const statBaseRanges = {
 }
 
 const reforgeableStats = {
-  weapon: ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost'],
   head: ['defense', 'health', 'stunResist', 'critResist', 'healBoost'],
   body: ['defense', 'health', 'finalDamageReduce', 'counterResist', 'comboResist'],
   legs: ['defense', 'speed', 'dodgeRate', 'dodgeResist', 'counterRate'],
@@ -106,7 +105,7 @@ const reforgeableStats = {
   ring1: ['attack', 'critDamageBoost', 'finalDamageBoost', 'comboRate', 'vampireRate'],
   ring2: ['defense', 'critDamageReduce', 'resistanceBoost', 'dodgeRate', 'finalDamageReduce'],
   belt: ['health', 'defense', 'combatBoost', 'healBoost', 'counterRate'],
-  artifact: ['attack', 'critRate', 'comboRate', 'finalDamageBoost', 'vampireRate']
+  artifact: ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost']
 }
 
 // 强化石类型配置
@@ -213,7 +212,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     return { success: false, message: '洗练石不足' }
   }
   const oldStats = { ...equipment.stats }
-  const availableStats = reforgeableStats[equipment.type] || reforgeableStats.weapon
+  const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
   const tempStats = { ...equipment.stats }
   const originStats = Object.keys(tempStats)
   const rarity = equipment.rarity || 'common'

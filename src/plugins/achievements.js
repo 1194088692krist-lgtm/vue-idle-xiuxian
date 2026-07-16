@@ -1,5 +1,4 @@
 const equipmentTypes = {
-  weapon: '武器',
   head: '头部',
   body: '衣服',
   legs: '裤子',

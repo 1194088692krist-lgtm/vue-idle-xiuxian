@@ -357,7 +357,7 @@
             :class="eq.quality"
             @click="editEquipment(eq)"
           >
-            <div class="eq-icon">{{ eq.type === 'weapon' ? '⚔️' : eq.type === 'body' ? '👕' : eq.type === 'head' ? '🪖' : eq.type === 'feet' ? '👢' : eq.type === 'legs' ? '👖' : eq.type === 'shoulder' ? '🦾' : eq.type === 'necklace' ? '📿' : eq.type === 'belt' ? '💼' : eq.type === 'wrist' ? '🧤' : eq.type === 'ring1' || eq.type === 'ring2' ? '💍' : eq.type === 'artifact' ? '🔮' : '💎' }}</div>
+            <div class="eq-icon">{{ eq.type === 'artifact' ? '🔮' : eq.type === 'body' ? '👕' : eq.type === 'head' ? '🪖' : eq.type === 'feet' ? '👢' : eq.type === 'legs' ? '👖' : eq.type === 'shoulder' ? '🦾' : eq.type === 'necklace' ? '📿' : eq.type === 'belt' ? '💼' : eq.type === 'wrist' ? '🧤' : eq.type === 'ring1' || eq.type === 'ring2' ? '💍' : eq.type === 'hands' ? '🧤' : '💎' }}</div>
             <div class="eq-info">
               <div class="eq-name">{{ eq.name }}</div>
               <div class="eq-type">{{ getEquipmentTypeName(eq.type) }}</div>
@@ -379,7 +379,6 @@
               <div class="form-item">
                 <label>类型</label>
                 <select v-model="editingEquipment.type">
-                  <option value="weapon">武器</option>
                   <option value="head">头部</option>
                   <option value="body">衣服</option>
                   <option value="legs">裤子</option>
@@ -1096,7 +1095,6 @@ const editingAffix = ref(null)
 const affixRange = ref('')
 
 const equipmentSlots = [
-  { key: 'weapon', name: '武器' },
   { key: 'head', name: '头部' },
   { key: 'body', name: '衣服' },
   { key: 'legs', name: '裤子' },
@@ -1156,7 +1154,7 @@ const addAffix = () => {
     valueType: 'flat',
     baseRange: [5, 15],
     tier: 1,
-    slots: ['weapon']
+    slots: ['artifact']
   }
   affixRange.value = '[5, 15]'
 }
@@ -1197,7 +1195,7 @@ const addSet = () => {
     id: `set_${Date.now()}`,
     name: '新套装',
     description: '',
-    pieces: ['weapon', 'head'],
+    pieces: ['artifact', 'head'],
     color: '#FFD700',
     bonus2: { stat: 'attack', value: 0.1, valueType: 'percent', label: '' },
     bonus3: null,
@@ -1364,7 +1362,6 @@ const filteredEquipment = computed(() => {
 
 const getEquipmentTypeName = (type) => {
   const names = {
-    weapon: '武器',
     head: '头部',
     body: '衣服',
     legs: '裤子',
@@ -1387,7 +1384,7 @@ const addEquipment = () => {
   editingEquipment.value = {
     id: `eq_${Date.now()}`,
     name: '新装备',
-    type: 'weapon',
+    type: 'artifact',
     quality: 'common',
     levelReq: 1,
     stats: { attack: 0, health: 0, defense: 0, speed: 0 },
@@ -1742,12 +1739,12 @@ const generateDefaultEquipment = () => {
   types.forEach(type => {
     qualities.forEach(quality => {
       const qualityInfo = equipmentQualities[quality]
-      const parts = equipmentNameParts[type] || equipmentNameParts.weapon
+      const parts = equipmentNameParts[type] || equipmentNameParts.artifact
       const namePart = parts[Math.floor(Math.random() * parts.length)]
       
       let baseStats = {}
       const statKeys = Object.keys(equipmentStatPool)
-      const numStats = type === 'weapon' ? 2 : type === 'artifact' ? 3 : 2
+      const numStats = type === 'artifact' ? 3 : 2
       
       for (let i = 0; i < numStats; i++) {
         const stat = statKeys[Math.floor(Math.random() * statKeys.length)]

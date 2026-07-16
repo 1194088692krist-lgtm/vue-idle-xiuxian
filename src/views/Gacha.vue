@@ -105,7 +105,7 @@
                   </div>
                   <span>{{ characterSchools[result.item.school]?.name || '' }}</span>
                 </template>
-                <template v-else-if="result.category === 'weapon' || result.category === 'artifact' || result.category === 'equipment'">
+                <template v-else-if="result.category === 'artifact' || result.category === 'equipment'">
                   <span>{{ result.category === 'artifact' || result.item.slot === 'artifact' ? '法宝' : '武器' }}</span>
                   <span>{{ result.item.qualityInfo?.name || '' }}</span>
                   <div v-if="result.item.setId" class="result-set" :style="{ color: getSetColor(result.item.setId) }">
@@ -229,7 +229,7 @@
       } else {
         showMessage('warning', addResult.message)
       }
-    } else if (category === 'weapon' || category === 'artifact' || category === 'equipment') {
+    } else if (category === 'artifact' || category === 'equipment') {
       playerStore.items.push(item)
     } else if (category === 'pet') {
       playerStore.items.push(item)
@@ -401,7 +401,6 @@
 
   const getResultTypeName = (result) => {
     if (result.category === 'character') return `人物`
-    if (result.category === 'weapon') return '武器'
     if (result.category === 'artifact') return '法宝'
     if (result.category === 'equipment') {
       if (result.item.slot === 'artifact' || result.item.type === 'artifact') return '法宝'

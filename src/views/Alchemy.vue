@@ -167,7 +167,6 @@
             <div class="forge-toolbar">
               <select v-model="forgeFilterType" class="forge-select" @change="onForgeFilterChange">
                 <option value="">全部种类</option>
-                <option value="weapon">武器</option>
                 <option value="head">头部</option>
                 <option value="body">衣服</option>
                 <option value="legs">裤子</option>
@@ -756,7 +755,7 @@
   }
 
   // ===== 装备锻打相关 =====
-  const EQUIPMENT_SLOTS_FORGE = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+  const EQUIPMENT_SLOTS_FORGE = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
   const isForgeEquipItem = (i) => i && i.type !== 'pet' && i.type !== 'material' && (i.type === 'equipment' || (i.slot && EQUIPMENT_SLOTS_FORGE.includes(i.slot)))
 
   // 收集所有被角色装备中的装备ID（玩家自身 + 宗门成员）

@@ -611,7 +611,7 @@ import { getPillsByZone } from '../plugins/pills'
 
 // 装备槽位中文映射（结算栏装备展示用）
 const SLOT_NAME_MAP = {
-  weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子',
+  head: '头部', body: '衣服', legs: '裤子', feet: '鞋子',
   shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链',
   ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝'
 }
@@ -778,7 +778,6 @@ const getZoneIcon = (id) => {
 }
 
 const EQUIP_ICON_MAP = {
-  weapon: '/assets/icons/reward_eq_weapon.png',
   head: '/assets/icons/reward_eq_head.png',
   body: '/assets/icons/reward_eq_body.png',
   legs: '/assets/icons/reward_eq_legs.png',
@@ -796,7 +795,6 @@ const EQUIP_ICON_MAP = {
 }
 
 const EQUIP_EMOJI_MAP = {
-  weapon: '⚔️',
   head: '👑',
   body: '🦺',
   legs: '🩳',

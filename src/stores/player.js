@@ -14,7 +14,7 @@ import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
 const SELL_DISCOUNT_RATE = 0.1
 // 分解产出映射（基于品质）：强化石数量 + 洗练石数量（凡品不产洗练石）
-const EQUIPMENT_SLOTS = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+const EQUIPMENT_SLOTS = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
 const QUALITY_STONE_MAP = {
   mythic: 6,
   legendary: 5,
@@ -156,7 +156,6 @@ export const usePlayerStore = defineStore('player', {
     artifacts: [], // 法宝装备
     // 装备栏位
     equippedArtifacts: {
-      weapon: null, // 武器
       head: null, // 头部
       body: null, // 衣服
       legs: null, // 裤子
@@ -439,6 +438,31 @@ export const usePlayerStore = defineStore('player', {
                 })
               }
               delete this.$state.herbs
+            }
+            // 迁移：旧版 weapon 槽位合并入 artifact（统一为法宝）
+            if (this.equippedArtifacts && this.equippedArtifacts.weapon) {
+              const w = this.equippedArtifacts.weapon
+              if (!this.equippedArtifacts.artifact) {
+                this.equippedArtifacts.artifact = w
+                console.log('数据迁移：旧武器已自动转入法宝槽位', w.name)
+              } else {
+                // 法宝槽已有装备，将旧武器放入背包
+                if (!Array.isArray(this.items)) this.items = []
+                this.items.push({ ...w, slot: 'artifact' })
+                console.log('数据迁移：旧武器已放入背包（法宝槽已被占用）', w.name)
+              }
+              delete this.equippedArtifacts.weapon
+            }
+            // 清理背包中 slot 为 weapon 的装备，统一改为 artifact
+            if (Array.isArray(this.items)) {
+              this.items.forEach(item => {
+                if (item && item.slot === 'weapon') {
+                  item.slot = 'artifact'
+                }
+                if (item && item.type === 'weapon') {
+                  item.type = 'artifact'
+                }
+              })
             }
             // 数据清理：移除被错误标记的混合数据
             // 1. type为'pet'但错误带有slot属性的物品（会被误判为装备）
@@ -1365,7 +1389,7 @@ export const usePlayerStore = defineStore('player', {
     },
     // 一键装备最强装备：遍历所有槽位，自动装备背包中评分最高且未被占用的装备
     autoEquipBest() {
-      const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
+      const slots = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
       const equipped = []
       let total = 0
       const occupiedIds = new Set()
@@ -1416,7 +1440,7 @@ export const usePlayerStore = defineStore('player', {
       return { success: true, message: `已一键装备 ${total} 件最强装备`, equipped }
     },
     // 装备槽位中文名映射（供 autoEquipBest 使用）
-    equipmentSlotNames: { weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子', shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链', ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝' },
+    equipmentSlotNames: { head: '头部', body: '衣服', legs: '裤子', feet: '鞋子', shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链', ring1: '戒指1', ring2: '戒指2', belt: '腰带', artifact: '法宝' },
     // 卸下装备：只把物品退回背包、清空槽位。自然属性本就不含装备数值，无需任何回退。
     unequipArtifact(slot) {
       const artifact = this.equippedArtifacts[slot]
@@ -2168,7 +2192,7 @@ export const usePlayerStore = defineStore('player', {
       const member = this.sectMembers.find(m => m.id === memberId)
       if (!member) return { success: false, message: '成员不存在' }
       if (!member.equippedArtifacts) member.equippedArtifacts = {}
-      const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
+      const slots = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
       let equippedCount = 0
       const equippedIds = new Set()
       this.sectMembers.forEach(m => {

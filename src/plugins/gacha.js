@@ -24,20 +24,19 @@ export const petRarities = {
 
 // 装备类型配置
 export const equipmentTypes = [
-  'weapon', 'head', 'body', 'legs', 'feet',
+  'head', 'body', 'legs', 'feet',
   'shoulder', 'hands', 'wrist', 'necklace',
   'ring1', 'ring2', 'belt', 'artifact'
 ]
 
 export const equipmentTypeNames = {
-  weapon: '武器', head: '头部', body: '衣服', legs: '裤子', feet: '鞋子',
+  head: '头部', body: '衣服', legs: '裤子', feet: '鞋子',
   shoulder: '肩甲', hands: '手套', wrist: '护腕', necklace: '项链',
   ring1: '戒指', ring2: '戒指', belt: '腰带', artifact: '法宝'
 }
 
 // 装备名称素材
 export const equipmentNameParts = {
-  weapon: ['青锋', '紫电', '玄霜', '赤焰', '天罡', '碧落', '幽冥', '星辰'],
   head: ['玄铁盔', '灵玉冠', '紫金环', '天仙帽', '云雾巾', '龙角盔'],
   body: ['天蚕甲', '玄龟铠', '灵蚕衣', '金丝袍', '星辰衫', '龙鳞铠'],
   legs: ['青云裤', '玄铁裙', '灵丝裤', '紫金裳', '星辉裙', '龙鳞护腿'],
@@ -49,7 +48,7 @@ export const equipmentNameParts = {
   ring1: ['灵玉戒', '紫金环', '星辰戒', '天机戒', '龙纹戒', '幽冥环'],
   ring2: ['灵玉戒', '紫金环', '星辰戒', '天机戒', '龙纹戒', '幽冥环'],
   belt: ['玄铁带', '灵丝带', '紫金腰', '星辰带', '龙纹带', '天机带'],
-  artifact: ['乾坤鼎', '混元钟', '太极图', '造化莲', '盘古幡', '混沌珠']
+  artifact: ['乾坤鼎', '混元钟', '太极图', '造化莲', '盘古幡', '混沌珠', '青锋', '紫电', '玄霜', '赤焰', '天罡', '碧落', '幽冥', '星辰']
 }
 
 // 灵宠名称素材
@@ -86,8 +85,7 @@ export const gachaPools = {
     name: '综合池',
     cost: 100,
     characterRate: 0.15,
-    weaponRate: 0.25,
-    artifactRate: 0.20,
+    artifactRate: 0.45,
     petRate: 0.15,
     resourceRate: 0.25
   },
@@ -95,8 +93,7 @@ export const gachaPools = {
     name: '人物池',
     cost: 150,
     characterRate: 0.25,
-    weaponRate: 0.25,
-    artifactRate: 0.20,
+    artifactRate: 0.45,
     petRate: 0.10,
     resourceRate: 0.20
   },
@@ -104,17 +101,7 @@ export const gachaPools = {
     name: '装备池',
     cost: 120,
     characterRate: 0,
-    weaponRate: 0.50,
-    artifactRate: 0.45,
-    petRate: 0,
-    resourceRate: 0.05
-  },
-  weapon: {
-    name: '武器池',
-    cost: 120,
-    characterRate: 0,
-    weaponRate: 0.80,
-    artifactRate: 0.15,
+    artifactRate: 0.95,
     petRate: 0,
     resourceRate: 0.05
   },
@@ -122,8 +109,7 @@ export const gachaPools = {
     name: '法宝池',
     cost: 180,
     characterRate: 0,
-    weaponRate: 0.10,
-    artifactRate: 0.85,
+    artifactRate: 0.95,
     petRate: 0,
     resourceRate: 0.05
   },
@@ -131,7 +117,6 @@ export const gachaPools = {
     name: '灵宠池',
     cost: 200,
     characterRate: 0,
-    weaponRate: 0,
     artifactRate: 0,
     petRate: 0.95,
     resourceRate: 0.05
@@ -322,11 +307,9 @@ export const doGacha = (poolType, playerLevel = 1, pityState = null) => {
   // 人物池/综合池：单抽也按概率正常出
   if (rand < pool.characterRate) {
     category = 'character'
-  } else if (rand < pool.characterRate + pool.weaponRate) {
-    category = 'weapon'
-  } else if (rand < pool.characterRate + pool.weaponRate + pool.artifactRate) {
+  } else if (rand < pool.characterRate + pool.artifactRate) {
     category = 'artifact'
-  } else if (rand < pool.characterRate + pool.weaponRate + pool.artifactRate + pool.petRate) {
+  } else if (rand < pool.characterRate + pool.artifactRate + pool.petRate) {
     category = 'pet'
   } else {
     category = 'resource'
@@ -336,9 +319,6 @@ export const doGacha = (poolType, playerLevel = 1, pityState = null) => {
   switch (category) {
     case 'character':
       result = { category, item: generateRandomCharacter() }
-      break
-    case 'weapon':
-      result = { category, item: generateEquipment(playerLevel, 'weapon') }
       break
     case 'artifact':
       result = { category, item: generateEquipment(playerLevel, 'artifact') }

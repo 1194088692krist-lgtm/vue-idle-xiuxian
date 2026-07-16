@@ -303,7 +303,7 @@ export function generateCharacterById(charId) {
     experience: 0,
     maxExperience: 100,
     equippedArtifacts: {
-      weapon: null,
+      artifact: null,
       head: null,
       body: null,
       legs: null,
