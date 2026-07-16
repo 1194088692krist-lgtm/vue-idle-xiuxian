@@ -174,8 +174,8 @@
         <div class="rewards-title">可能获得的报酬</div>
         <div class="rewards-list">
           <div v-for="rw in selectedZone.rewards" :key="rw.name" class="reward-row">
-            <img :src="getRewardIcon(rw.type)" class="reward-icon" :alt="rw.name" />
-            <span class="reward-name">{{ rw.name }}</span>
+            <img :src="getRewardIcon(rw.type)" class="reward-icon" :alt="getRewardTypeName(rw.type, rw.name)" />
+            <span class="reward-name">{{ getRewardTypeName(rw.type, rw.name) }}</span>
             <span class="reward-chance">{{ (rw.chance * 100).toFixed(0) }}%</span>
           </div>
         </div>
@@ -822,6 +822,21 @@ const REWARD_TYPE_ICON_MAP = {
   cultivation: '/assets/icons/reward_eq_default.png',
   equipment: '/assets/icons/reward_eq_default.png',
   pet: '/assets/icons/reward_pet.png'
+}
+
+const REWARD_TYPE_NAME_MAP = {
+  spirit_stone: '灵石',
+  herb: '灵草',
+  ore: '矿料',
+  liquid: '灵液',
+  fortune: '奇遇',
+  cultivation: '修为',
+  equipment: '装备',
+  pet: '灵宠'
+}
+
+const getRewardTypeName = (type, name) => {
+  return name || REWARD_TYPE_NAME_MAP[type] || type
 }
 
 const getEquipIcon = (slot) => {

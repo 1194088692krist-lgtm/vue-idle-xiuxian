@@ -1358,29 +1358,51 @@ export const usePlayerStore = defineStore('player', {
       })
       this.artifactBonuses = { ...this.artifactBonuses, ...bonus }
     },
-    // 一键装备最强装备：遍历所有槽位，自动装备背包中评分最高且满足境界要求的装备
+    // 一键装备最强装备：遍历所有槽位，自动装备背包中评分最高且未被占用的装备
     autoEquipBest() {
       const slots = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
       const equipped = []
       let total = 0
+      const occupiedIds = new Set()
+      // 收集所有已被占用的装备ID（玩家自身 + 宗门成员）
+      Object.values(this.equippedArtifacts || {}).forEach(e => { if (e?.id) occupiedIds.add(e.id) })
+      this.sectMembers.forEach(m => {
+        if (m.equippedArtifacts) {
+          Object.values(m.equippedArtifacts).forEach(e => { if (e?.id) occupiedIds.add(e.id) })
+        }
+      })
       for (const slot of slots) {
         // 找到该槽位下所有可装备物品（按 slot 字段匹配，兼容 type=槽位 与 type='equipment' 两种形态）
         const candidates = this.items.filter(item => {
-          if (!isEquipmentItem(item)) return false
+          if (!item || typeof item !== 'object') return false
+          // 排除非装备类型
+          if (item.type === 'pet' || item.type === 'material') return false
+          // 获取装备槽位：优先使用 slot 字段，其次使用 type 字段
           const itemSlot = item.slot || item.type
+          if (!itemSlot || !slots.includes(itemSlot)) return false
           if (itemSlot !== slot) return false
           // 满足境界要求
           if (item.requiredRealm && this.level < item.requiredRealm) return false
+          // 未被其他角色占用
+          if (item.id && occupiedIds.has(item.id)) return false
           return true
         })
         if (candidates.length === 0) continue
         // 按评分排序，取最高的
-        candidates.sort((a, b) => (calculateEquipmentScore(b) || 0) - (calculateEquipmentScore(a) || 0))
+        candidates.sort((a, b) => {
+          const scoreA = calculateEquipmentScore(a) || 0
+          const scoreB = calculateEquipmentScore(b) || 0
+          return scoreB - scoreA
+        })
         const best = candidates[0]
-        // 如果当前已装备的评分更低，则替换（否则也替换，因为用户明确点了"一键装备"）
-        this.equipArtifact(best, slot)
-        equipped.push(`${this.equipmentSlotNames[slot] || slot}：${best.name}（${calculateEquipmentScore(best)}分）`)
-        total++
+        const score = calculateEquipmentScore(best) || 0
+        // 装备
+        const result = this.equipArtifact(best, slot)
+        if (result.success) {
+          occupiedIds.add(best.id)
+          equipped.push(`${this.equipmentSlotNames[slot] || slot}：${best.name}（${score}分）`)
+          total++
+        }
       }
       this.queueSave()
       if (total === 0) {

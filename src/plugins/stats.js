@@ -39,8 +39,8 @@ export const getStatName = stat => {
 }
 // 格式化属性值（处理百分比和数值）
 export const formatStatValue = (stat, value) => {
-  // 处理null或undefined值
-  if (value === null || value === undefined) {
+  // 处理null、undefined或NaN值
+  if (value === null || value === undefined || !Number.isFinite(value)) {
     return '0'
   }
   // 这些属性需要显示为百分比
