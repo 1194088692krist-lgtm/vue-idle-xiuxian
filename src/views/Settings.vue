@@ -212,9 +212,13 @@
             </div>
           </div>
           <div class="setting-row">
+            <label class="setting-label">云存档操作</label>
             <div class="setting-input-group">
-              <button class="btn btn-success" :disabled="authBusy" @click="handleManualSync">
-                立即云同步
+              <button class="btn btn-success" :disabled="authBusy" @click="handleUploadToCloud">
+                上传到云端
+              </button>
+              <button class="btn btn-primary" :disabled="authBusy" @click="handleDownloadFromCloud">
+                从云端下载
               </button>
               <span class="sync-status">{{ playerStore.cloudSyncStatus || '已开启自动云同步' }}</span>
             </div>
@@ -570,16 +574,43 @@
     gifts.value = []
     message.success('已退出登录（本地存档保留）')
   }
-  const handleManualSync = async () => {
-    authBusy.value = true
-    try {
-      await playerStore.syncToCloud()
-      message.success('已同步到云端')
-    } catch (e) {
-      message.error('同步失败：' + (e.message || e))
-    } finally {
-      authBusy.value = false
-    }
+  const handleUploadToCloud = async () => {
+    dialog.warning({
+      title: '上传到云端',
+      content: '确定将本地所有存档上传到云端？云端已有存档将被覆盖！',
+      positiveText: '确定上传',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        authBusy.value = true
+        try {
+          await playerStore.syncToCloud()
+          message.success('已上传到云端')
+        } catch (e) {
+          message.error('上传失败：' + (e.message || e))
+        } finally {
+          authBusy.value = false
+        }
+      }
+    })
+  }
+  const handleDownloadFromCloud = async () => {
+    dialog.warning({
+      title: '从云端下载',
+      content: '确定从云端下载存档覆盖本地？本地未保存的进度将丢失！',
+      positiveText: '确定下载',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        authBusy.value = true
+        try {
+          await playerStore.pullFromCloud()
+          message.success('已从云端下载')
+        } catch (e) {
+          message.error('下载失败：' + (e.message || e))
+        } finally {
+          authBusy.value = false
+        }
+      }
+    })
   }
 
   // 礼包收件箱

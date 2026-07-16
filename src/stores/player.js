@@ -652,6 +652,32 @@ export const usePlayerStore = defineStore('player', {
       if (!d) return { name: '（损坏）', level: '-', realm: '-', time: null }
       return { name: d.name || '未知', level: d.level || 1, realm: d.realm || '未知', time: d._saveTime || null }
     },
+    // 从云端下载覆盖本地
+    async pullFromCloud() {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) throw new Error('请先登录')
+      this.cloudSyncStatus = '下载中…'
+      try {
+        const cloud = await this.fetchCloudSaves()
+        if (!cloud) throw new Error('拉取云端存档失败')
+        let count = 0
+        const slots = [0, 1, 2, 3, 4, 5]
+        for (const slot of slots) {
+          const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
+          const cloudBlob = cloud[slot]?.data
+          if (cloudBlob) {
+            await GameDB.setData(key, cloudBlob)
+            count++
+          }
+        }
+        this.$reset()
+        await this.initializePlayer()
+        this.cloudSyncStatus = `已从云端下载 ${count} 个存档槽位`
+      } catch (e) {
+        this.cloudSyncStatus = '下载失败'
+        throw e
+      }
+    },
     // 保存后节流自动云同步：上传活动档(0) + 当前手动槽位
     _scheduleCloudSync() {
       const auth = useAuthStore()
