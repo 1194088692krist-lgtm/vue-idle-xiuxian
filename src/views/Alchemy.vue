@@ -759,14 +759,27 @@
   const EQUIPMENT_SLOTS_FORGE = ['weapon', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
   const isForgeEquipItem = (i) => i && i.type !== 'pet' && i.type !== 'material' && (i.type === 'equipment' || (i.slot && EQUIPMENT_SLOTS_FORGE.includes(i.slot)))
 
+  // 收集所有被角色装备中的装备ID（玩家自身 + 宗门成员）
+  const equippedItemIds = computed(() => {
+    const ids = new Set()
+    // 玩家自身装备
+    Object.values(playerStore.equippedArtifacts || {}).forEach(e => { if (e?.id) ids.add(e.id) })
+    // 宗门成员装备
+    playerStore.sectMembers.forEach(m => {
+      if (m.equippedArtifacts) {
+        Object.values(m.equippedArtifacts).forEach(e => { if (e?.id) ids.add(e.id) })
+      }
+    })
+    return ids
+  })
+
+  // 八卦炉仅显示背包中未装备的装备
   const allEquipments = computed(() => {
-    const equipped = Object.values(playerStore.equippedArtifacts).filter(e => e)
-    const inventory = playerStore.items.filter(isForgeEquipItem)
-    return [...equipped, ...inventory]
+    return playerStore.items.filter(i => isForgeEquipItem(i) && !equippedItemIds.value.has(i.id))
   })
 
   const inventoryEquipments = computed(() => {
-    return playerStore.items.filter(isForgeEquipItem)
+    return playerStore.items.filter(i => isForgeEquipItem(i) && !equippedItemIds.value.has(i.id))
   })
 
   // 筛选+排序后的装备列表

@@ -2197,6 +2197,16 @@ export const usePlayerStore = defineStore('player', {
       const petIndex = this.items.findIndex(i => (i.uid === petUid || i.id === petUid) && i.type === 'pet')
       if (petIndex === -1) return { success: false, message: '灵宠不存在' }
       const pet = this.items[petIndex]
+      // 检查是否为出战灵宠
+      if (this.activePet && (this.activePet.uid === pet.uid || this.activePet.id === pet.id)) {
+        return { success: false, message: '出战中的灵宠无法放生，请先收回' }
+      }
+      // 检查是否被宗门成员装备
+      for (const m of this.sectMembers) {
+        if (m.equippedPet && (m.equippedPet.uid === pet.uid || m.equippedPet.id === pet.id)) {
+          return { success: false, message: `${m.name}正在装备该灵宠，无法放生` }
+        }
+      }
       const rarityReturnMap = {
         divine: 100,
         celestial: 60,

@@ -315,7 +315,14 @@
           >
             升星({{ getEvolveCost(selectedPet) }}碎片)
           </button>
-          <button class="btn-small btn-danger" @click="confirmReleasePet(selectedPet)">放生</button>
+          <button
+            class="btn-small btn-danger"
+            @click="confirmReleasePet(selectedPet)"
+            :disabled="equippedPetIds.has(selectedPet.uid || selectedPet.id)"
+            :title="equippedPetIds.has(selectedPet.uid || selectedPet.id) ? '出战或装备中的灵宠无法放生' : ''"
+          >
+            {{ equippedPetIds.has(selectedPet.uid || selectedPet.id) ? '装备中' : '放生' }}
+          </button>
         </div>
       </div>
     </div>
@@ -824,12 +831,26 @@
   // 选中的放生品阶
   const selectedRarityToRelease = ref('all')
 
+  // 收集被宗门成员装备的灵宠ID
+  const equippedPetIds = computed(() => {
+    const ids = new Set()
+    if (playerStore.activePet) {
+      ids.add(playerStore.activePet.uid || playerStore.activePet.id)
+    }
+    playerStore.sectMembers.forEach(m => {
+      if (m.equippedPet) {
+        ids.add(m.equippedPet.uid || m.equippedPet.id)
+      }
+    })
+    return ids
+  })
+
   // 批量放生函数
   const batchReleasePets = () => {
     const toRelease = playerStore.items.filter(
       item =>
         item.type === 'pet' &&
-        item.id !== playerStore.activePet?.id &&
+        !equippedPetIds.value.has(item.uid || item.id) &&
         (selectedRarityToRelease.value === 'all' || item.rarity === selectedRarityToRelease.value)
     )
     let totalEssence = 0
