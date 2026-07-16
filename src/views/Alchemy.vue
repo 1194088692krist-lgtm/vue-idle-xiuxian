@@ -1203,7 +1203,7 @@
 
   .card-subtitle {
     margin: 4px 0 0;
-    color: #888;
+    color: #C9C4BA;
     font-size: 14px;
   }
 
@@ -1228,14 +1228,14 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    color: #888;
+    color: #C9C4BA;
     font-size: 13px;
     text-align: center;
   }
 
   .furnace-tab:hover {
     background: rgba(218, 165, 32, 0.08);
-    color: #ccc;
+    color: #F5F0E8;
   }
 
   .furnace-tab.active {
@@ -1262,7 +1262,7 @@
     background: rgba(139, 69, 19, 0.1);
     border-radius: 8px;
     margin-bottom: 12px;
-    color: #aaa;
+    color: #F5DEB3;
     font-size: 13px;
   }
 
@@ -1324,13 +1324,13 @@
   .recipe-desc {
     margin: 0 0 12px;
     font-size: 14px;
-    color: #aaa;
+    color: #F5DEB3;
     line-height: 1.5;
   }
 
   .recipe-status {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     text-align: right;
   }
 
@@ -1341,7 +1341,7 @@
 
   .empty-hint {
     margin-top: 12px;
-    color: #888;
+    color: #C9C4BA;
     font-size: 14px;
   }
 
@@ -1373,7 +1373,7 @@
 
   .material-need {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .material-status {
@@ -1407,7 +1407,7 @@
 
   .effect-label {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     margin-bottom: 4px;
   }
 
@@ -1436,7 +1436,7 @@
 
   .craft-count-label {
     font-size: 14px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .btn {
@@ -1542,7 +1542,7 @@
   }
 
   .coming-soon-desc {
-    color: #888;
+    color: #C9C4BA;
     font-size: 14px;
     line-height: 1.6;
     margin: 8px 0 24px;
@@ -1561,7 +1561,7 @@
     flex-direction: column;
     align-items: center;
     gap: 6px;
-    color: #aaa;
+    color: #F5DEB3;
     font-size: 13px;
   }
 
@@ -1643,7 +1643,7 @@
 
   .member-detail {
     font-size: 13px;
-    color: #999;
+    color: #C9C4BA;
     margin-top: 2px;
   }
 
@@ -1663,7 +1663,7 @@
   .status-locked {
     padding: 4px 12px;
     background: rgba(158, 158, 158, 0.15);
-    color: #999;
+    color: #C9C4BA;
     border-radius: 12px;
     font-size: 12px;
   }
@@ -1690,7 +1690,7 @@
 
   .preview-label {
     font-size: 13px;
-    color: #888;
+    color: #C9C4BA;
     margin-bottom: 8px;
   }
 
@@ -1729,7 +1729,7 @@
   .preview-note p {
     margin: 6px 0;
     font-size: 13px;
-    color: #aaa;
+    color: #F5DEB3;
     line-height: 1.5;
   }
 
@@ -1765,7 +1765,7 @@
     border-radius: 8px;
     cursor: pointer;
     transition: all 0.3s ease;
-    color: #999;
+    color: #C9C4BA;
     border: 1px solid transparent;
   }
 
@@ -1841,7 +1841,7 @@
     gap: 8px;
     margin-bottom: 10px;
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     flex-wrap: wrap;
   }
 
@@ -1868,13 +1868,13 @@
     align-items: center;
     gap: 8px;
     font-size: 12px;
-    color: #999;
+    color: #C9C4BA;
   }
 
   .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .equipment-grid {
@@ -1956,7 +1956,7 @@
 
   .equip-stat {
     font-size: 13px;
-    color: #ccc;
+    color: #F5F0E8;
     display: flex;
     justify-content: space-between;
   }
@@ -1976,7 +1976,7 @@
 
   .enhance-label {
     font-size: 14px;
-    color: #999;
+    color: #C9C4BA;
   }
 
   .enhance-value {
@@ -2002,7 +2002,7 @@
 
   .cost-name {
     font-size: 14px;
-    color: #999;
+    color: #C9C4BA;
   }
 
   .cost-value {
@@ -2066,7 +2066,7 @@
     background: rgba(0, 0, 0, 0.3);
     border: 1px solid rgba(255, 255, 255, 0.1);
     border-radius: 6px;
-    color: #ccc;
+    color: #F5F0E8;
     cursor: pointer;
     transition: all 0.3s ease;
   }
@@ -2085,7 +2085,7 @@
   .reforge-safe {
     margin-top: 8px;
     font-size: 13px;
-    color: #999;
+    color: #C9C4BA;
     padding: 8px 12px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 6px;
@@ -2124,7 +2124,7 @@
   }
 
   .reforge-old h4 {
-    color: #999;
+    color: #C9C4BA;
   }
 
   .reforge-new h4 {
@@ -2133,7 +2133,7 @@
 
   .reforge-stat {
     font-size: 14px;
-    color: #ccc;
+    color: #F5F0E8;
     padding: 4px 0;
     display: flex;
     justify-content: space-between;
@@ -2161,7 +2161,7 @@
     background: rgba(0, 0, 0, 0.3);
     border-radius: 8px;
     font-size: 14px;
-    color: #ccc;
+    color: #F5F0E8;
   }
 
   /* 日间模式：统一为宗门页式深色卡片 + 亮色字体 */

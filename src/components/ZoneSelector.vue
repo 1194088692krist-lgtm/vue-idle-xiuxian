@@ -1075,7 +1075,7 @@ onUnmounted(() => {
 .card-subtitle {
   margin: 4px 0 0;
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 /* 筛选 */
@@ -1176,7 +1176,7 @@ onUnmounted(() => {
 }
 .meta-item {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 .zone-monsters {
   display: flex;
@@ -1188,7 +1188,7 @@ onUnmounted(() => {
   padding: 2px 6px;
   border-radius: 4px;
   background: rgba(255, 255, 255, 0.05);
-  color: #aaa;
+  color: #F5DEB3;
 }
 
 /* 详情 */
@@ -1212,7 +1212,7 @@ onUnmounted(() => {
 .detail-desc {
   margin: 0;
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
   max-width: 70%;
 }
 .zone-image {
@@ -1245,7 +1245,7 @@ onUnmounted(() => {
   border-radius: 6px;
   font-size: 13px;
 }
-.stat-label { color: #888; }
+.stat-label { color: #C9C4BA; }
 .stat-value { color: #fff; font-weight: bold; }
 .gold-text { color: #DAA520; }
 
@@ -1259,7 +1259,7 @@ onUnmounted(() => {
 }
 .diff-label {
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
   margin-bottom: 8px;
 }
 .diff-chips {
@@ -1274,7 +1274,7 @@ onUnmounted(() => {
   font-size: 13px;
   cursor: pointer;
   border: 1px solid var(--chip-color, #888);
-  color: #ccc;
+  color: #F5F0E8;
   background: rgba(255, 255, 255, 0.03);
   transition: all 0.2s;
 }
@@ -1289,7 +1289,7 @@ onUnmounted(() => {
   flex-wrap: wrap;
   gap: 12px;
   font-size: 12px;
-  color: #aaa;
+  color: #F5DEB3;
 }
 .diff-info b {
   color: #DAA520;
@@ -1318,7 +1318,7 @@ onUnmounted(() => {
   box-shadow: 0 0 6px currentColor;
 }
 .build-hint-sub {
-  color: #888;
+  color: #C9C4BA;
   font-size: 11px;
 }
 
@@ -1328,7 +1328,7 @@ onUnmounted(() => {
 }
 .rewards-title {
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
   margin-bottom: 8px;
 }
 .rewards-list {
@@ -1350,7 +1350,7 @@ onUnmounted(() => {
 }
 .reward-name {
   flex: 1;
-  color: #ccc;
+  color: #F5F0E8;
 }
 .reward-chance {
   width: 40px;
@@ -1366,7 +1366,7 @@ onUnmounted(() => {
   border: 1px solid rgba(218, 165, 32, 0.2);
   border-radius: 8px;
   font-size: 12px;
-  color: #999;
+  color: #C9C4BA;
   display: flex;
   flex-wrap: wrap;
   gap: 6px;
@@ -1376,7 +1376,7 @@ onUnmounted(() => {
   font-size: 14px;
 }
 .pill-text {
-  color: #aaa;
+  color: #F5DEB3;
 }
 .pill-names {
   color: #ffd700;
@@ -1399,7 +1399,7 @@ onUnmounted(() => {
 }
 .battle-pills-label {
   font-size: 13px;
-  color: #aaa;
+  color: #F5DEB3;
 }
 .battle-pill-btn {
   padding: 6px 14px;
@@ -1422,7 +1422,7 @@ onUnmounted(() => {
 .combat-round {
   text-align: center;
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
   margin-bottom: 8px;
 }
 .combat-scene {
@@ -1440,7 +1440,7 @@ onUnmounted(() => {
 }
 .combatant-name {
   font-size: 12px;
-  color: #ccc;
+  color: #F5F0E8;
 }
 .combatant-avatar {
   width: 50px; height: 50px;
@@ -1474,7 +1474,7 @@ onUnmounted(() => {
 }
 .hp-text {
   font-size: 10px;
-  color: #888;
+  color: #C9C4BA;
 }
 .vs-text {
   font-size: 14px;
@@ -1569,7 +1569,7 @@ onUnmounted(() => {
 }
 .dur-info {
   font-size: 10px;
-  color: #888;
+  color: #C9C4BA;
   margin-top: 2px;
 }
 .dur-cost {
@@ -1605,7 +1605,7 @@ onUnmounted(() => {
 }
 .idle-count {
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 /* 挂机血条 */
@@ -1623,7 +1623,7 @@ onUnmounted(() => {
 }
 .idle-hp-label {
   font-size: 12px;
-  color: #aaa;
+  color: #F5DEB3;
 }
 .idle-hp-num {
   font-size: 12px;
@@ -1676,7 +1676,7 @@ onUnmounted(() => {
 }
 .log-meta {
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
 }
 .idle-log-body {
   max-height: 320px;
@@ -1961,7 +1961,7 @@ onUnmounted(() => {
 .summary-label {
   display: block;
   font-size: 10px;
-  color: #888;
+  color: #C9C4BA;
 }
 .summary-value {
   display: block;
@@ -2008,7 +2008,7 @@ onUnmounted(() => {
 }
 .flash-desc {
   font-size: 14px;
-  color: #ccc;
+  color: #F5F0E8;
 }
 .treasure-flash.highlight .flash-content {
   border: 2px solid #4488ff;
@@ -2133,7 +2133,7 @@ onUnmounted(() => {
 
 .team-count {
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
   font-weight: normal;
   padding: 2px 8px;
   background: rgba(255, 255, 255, 0.08);
@@ -2160,7 +2160,7 @@ onUnmounted(() => {
   width: 100%;
   text-align: center;
   padding: 16px;
-  color: #888;
+  color: #C9C4BA;
   font-size: 13px;
   background: rgba(0, 0, 0, 0.2);
   border-radius: 8px;
@@ -2228,7 +2228,7 @@ onUnmounted(() => {
 
 .member-school {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 .member-build {
@@ -2238,7 +2238,7 @@ onUnmounted(() => {
 .build-label {
   display: block;
   font-size: 10px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 .build-value {
@@ -2298,7 +2298,7 @@ onUnmounted(() => {
 
 .modal-close {
   font-size: 20px;
-  color: #888;
+  color: #C9C4BA;
   cursor: pointer;
   background: none;
   border: none;
@@ -2403,7 +2403,7 @@ onUnmounted(() => {
 
 .sect-member-school {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 .sect-member-selected {
@@ -2533,7 +2533,7 @@ onUnmounted(() => {
 
 .eq-type {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
   margin-bottom: 6px;
 }
 
@@ -2595,7 +2595,7 @@ onUnmounted(() => {
 }
 .dash-label {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 .dash-value {
   font-size: 16px;
@@ -2636,7 +2636,7 @@ onUnmounted(() => {
   flex: 1;
 }
 .buff-remaining {
-  color: #888;
+  color: #C9C4BA;
   font-size: 11px;
 }
 .dash-pill-buffs {
@@ -2667,7 +2667,7 @@ onUnmounted(() => {
   flex: 1;
 }
 .pill-buff-remaining {
-  color: #888;
+  color: #C9C4BA;
   font-size: 11px;
 }
 .dash-team {
@@ -2689,7 +2689,7 @@ onUnmounted(() => {
 }
 .team-name {
   min-width: 50px;
-  color: #ccc;
+  color: #F5F0E8;
 }
 .team-hp-bar {
   flex: 1;
@@ -2710,7 +2710,7 @@ onUnmounted(() => {
 .team-hp-text {
   min-width: 36px;
   text-align: right;
-  color: #aaa;
+  color: #F5DEB3;
   font-size: 11px;
 }
 
@@ -2755,11 +2755,11 @@ onUnmounted(() => {
   font-weight: bold;
 }
 .eq-slot {
-  color: #888;
+  color: #C9C4BA;
   font-size: 11px;
 }
 .eq-rarity {
-  color: #aaa;
+  color: #F5DEB3;
   font-size: 11px;
 }
 .eq-score {
@@ -2910,7 +2910,7 @@ onUnmounted(() => {
 
 .avatar-fullscreen-placeholder {
   font-size: 28px;
-  color: #9e9e9e;
+  color: #C9C4BA;
   padding: 60px;
 }
 

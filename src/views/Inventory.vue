@@ -1614,7 +1614,7 @@
     padding: 10px 14px;
     white-space: nowrap;
     cursor: pointer;
-    color: #8B8B8B;
+    color: #C9C4BA;
     border-bottom: 2px solid transparent;
     transition: all 0.2s;
   }
@@ -1711,7 +1711,7 @@
 
   .simple-card .card-body {
     font-size: 13px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .simple-card .card-body p {
@@ -1787,7 +1787,7 @@
   .empty-state {
     text-align: center;
     padding: 40px 20px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .progress-line {
@@ -1832,7 +1832,7 @@
     gap: 8px;
     margin-bottom: 10px;
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     flex-wrap: wrap;
   }
 
@@ -1952,11 +1952,11 @@
     align-items: center;
     padding: 8px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .detail-row span:first-child {
-    color: #888;
+    color: #C9C4BA;
   }
 
   .modal-actions {
@@ -2199,7 +2199,7 @@
     display: inline-block;
     margin-top: 4px;
     font-size: 11px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .material-meta {
@@ -2213,7 +2213,7 @@
 
   .material-price {
     font-size: 11px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .material-total {
@@ -2371,7 +2371,7 @@
   }
   .target-level {
     font-size: 12px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   /* 快速卖出 */
@@ -2398,7 +2398,7 @@
     border-radius: 4px;
     margin-left: 6px;
     font-weight: normal;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .pill-count {
@@ -2415,7 +2415,7 @@
 
   .pill-desc {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     margin: 0;
   }
 

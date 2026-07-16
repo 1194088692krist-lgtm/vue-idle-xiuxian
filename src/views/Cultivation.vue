@@ -1152,7 +1152,7 @@ watch([allMembers, teamMembers], () => {
 }
 .char-level {
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
 }
 .build-strength {
   display: flex;
@@ -1186,7 +1186,7 @@ watch([allMembers, teamMembers], () => {
   margin-bottom: 4px;
   font-size: 13px;
 }
-.progress-label { color: #888; }
+.progress-label { color: #C9C4BA; }
 .progress-value { color: #fff; font-weight: bold; }
 .progress-bar-container {
   height: 10px;
@@ -1214,7 +1214,7 @@ watch([allMembers, teamMembers], () => {
 .progress-percentage {
   text-align: right;
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
   margin-top: 2px;
 }
 
@@ -1232,7 +1232,7 @@ watch([allMembers, teamMembers], () => {
 .sub-title {
   margin: 12px 0 8px;
   font-size: 14px;
-  color: #aaa;
+  color: #F5DEB3;
   font-weight: bold;
 }
 .attr-block { margin-top: 12px; }
@@ -1247,7 +1247,7 @@ watch([allMembers, teamMembers], () => {
 }
 .scroll-hint {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
   font-weight: normal;
   margin-left: 6px;
 }
@@ -1312,7 +1312,7 @@ watch([allMembers, teamMembers], () => {
 .attr-col-base { color: #9aa3b8; text-align: right; }
 .attr-col-final { color: #DAA520; font-weight: bold; text-align: right; }
 .attr-col-delta { color: #66BB6A; font-weight: bold; text-align: right; }
-.attr-col-delta.is-zero { color: #5a6378; font-weight: normal; }
+.attr-col-delta.is-zero { color: #8b93a8; font-weight: normal; }
 
 .resource-stats { margin-top: 12px; }
 .resource-grid {
@@ -1328,7 +1328,7 @@ watch([allMembers, teamMembers], () => {
   background: rgba(0, 0, 0, 0.15);
   border-radius: 6px;
 }
-.resource-label { font-size: 11px; color: #888; }
+.resource-label { font-size: 11px; color: #C9C4BA; }
 .resource-value { font-size: 14px; color: #DAA520; font-weight: bold; }
 
 .base-note {
@@ -1446,7 +1446,7 @@ watch([allMembers, teamMembers], () => {
   border-radius: 6px;
   font-size: 13px;
 }
-.detail-label { color: #888; }
+.detail-label { color: #C9C4BA; }
 .detail-value { color: #fff; font-weight: bold; }
 
 .log-section { margin-top: 8px; }
@@ -1459,7 +1459,7 @@ watch([allMembers, teamMembers], () => {
 }
 .rebirth-desc {
   font-size: 13px;
-  color: #888;
+  color: #C9C4BA;
   margin: 0 0 12px;
   line-height: 1.5;
 }
@@ -1478,7 +1478,7 @@ watch([allMembers, teamMembers], () => {
   border-radius: 6px;
   border: 1px solid rgba(255, 215, 0, 0.15);
 }
-.bonus-label { font-size: 10px; color: #888; }
+.bonus-label { font-size: 10px; color: #C9C4BA; }
 .bonus-value { font-size: 14px; color: #FFD700; font-weight: bold; }
 
 .btn-rebirth {
@@ -1502,7 +1502,7 @@ watch([allMembers, teamMembers], () => {
   text-align: center;
   margin-top: 8px;
   font-size: 14px;
-  color: #888;
+  color: #C9C4BA;
 }
 .rebirth-num {
   color: #FFD700;
@@ -1539,7 +1539,7 @@ watch([allMembers, teamMembers], () => {
 }
 .pool-label {
   font-size: 14px;
-  color: #888;
+  color: #C9C4BA;
 }
 .pool-hint {
   font-size: 12px;
@@ -1555,7 +1555,7 @@ watch([allMembers, teamMembers], () => {
   justify-content: space-between;
   align-items: center;
   font-size: 13px;
-  color: #aaa;
+  color: #F5DEB3;
   margin-bottom: 10px;
   flex-wrap: wrap;
   gap: 6px;
@@ -1623,7 +1623,7 @@ watch([allMembers, teamMembers], () => {
 }
 .sect-stat-label {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 .sect-stat-value {
   font-size: 16px;
@@ -1641,7 +1641,7 @@ watch([allMembers, teamMembers], () => {
 }
 .member-select label {
   font-size: 14px;
-  color: #aaa;
+  color: #F5DEB3;
   white-space: nowrap;
 }
 .member-select select {
@@ -1732,7 +1732,7 @@ watch([allMembers, teamMembers], () => {
 }
 .equip-slot-label {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
   margin-bottom: 4px;
 }
 .equip-slot-name {
@@ -1743,7 +1743,7 @@ watch([allMembers, teamMembers], () => {
 }
 .equip-slot-empty {
   font-size: 13px;
-  color: #5a6378;
+  color: #8b93a8;
 }
 
 /* 灵宠区域补充 */
@@ -1764,7 +1764,7 @@ watch([allMembers, teamMembers], () => {
 }
 .pet-meta {
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 /* 队伍管理 */
@@ -1824,7 +1824,7 @@ watch([allMembers, teamMembers], () => {
 .bench-empty {
   text-align: center;
   padding: 16px;
-  color: #5a6378;
+  color: #8b93a8;
   font-size: 13px;
 }
 
@@ -1897,7 +1897,7 @@ watch([allMembers, teamMembers], () => {
   border-radius: 4px;
 }
 .resonance-desc {
-  color: #aaa;
+  color: #F5DEB3;
   flex: 1;
 }
 
@@ -1961,12 +1961,12 @@ watch([allMembers, teamMembers], () => {
 }
 .item-meta {
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
 }
 .equip-select-empty {
   text-align: center;
   padding: 20px;
-  color: #5a6378;
+  color: #8b93a8;
   font-size: 13px;
 }
 
@@ -1980,7 +1980,7 @@ watch([allMembers, teamMembers], () => {
   border-top: 1px solid rgba(255,255,255,0.1);
 }
 .page-info {
-  color: #aaa;
+  color: #F5DEB3;
   font-size: 13px;
   min-width: 60px;
   text-align: center;
@@ -2003,7 +2003,7 @@ watch([allMembers, teamMembers], () => {
 
 .char-avatar-hint {
   font-size: 10px;
-  color: #9e9e9e;
+  color: #C9C4BA;
 }
 
 
@@ -2070,7 +2070,7 @@ watch([allMembers, teamMembers], () => {
   left: 50%;
   transform: translateX(-50%);
   font-size: 10px;
-  color: #aaa;
+  color: #F5DEB3;
   white-space: nowrap;
   opacity: 0.85;
   pointer-events: none;
@@ -2159,7 +2159,7 @@ watch([allMembers, teamMembers], () => {
 
 .skill-type {
   font-size: 10px;
-  color: #9e9e9e;
+  color: #C9C4BA;
   margin-top: 2px;
 }
 

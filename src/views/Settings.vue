@@ -760,7 +760,7 @@
 
   .card-subtitle {
     margin: 4px 0 0;
-    color: #888;
+    color: #C9C4BA;
     font-size: 13px;
   }
 
@@ -802,7 +802,7 @@
   .setting-hint {
     margin: 6px 0 0;
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .tips-box {
@@ -813,7 +813,7 @@
     background: rgba(255, 193, 7, 0.1);
     border-radius: 8px;
     margin-top: 12px;
-    color: #aaa;
+    color: #F5DEB3;
     font-size: 13px;
   }
 
@@ -905,7 +905,7 @@
 
   .slot-number {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     margin-bottom: 2px;
   }
 
@@ -924,12 +924,12 @@
     display: flex;
     gap: 10px;
     font-size: 12px;
-    color: #aaa;
+    color: #F5DEB3;
     margin-top: 2px;
   }
 
   .slot-time {
-    color: #888;
+    color: #C9C4BA;
   }
 
   .slot-actions {
@@ -989,7 +989,7 @@
 
   .sync-status {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     align-self: center;
   }
 
@@ -1031,7 +1031,7 @@
 
   .gift-items {
     font-size: 12px;
-    color: #aaa;
+    color: #F5DEB3;
     margin-top: 2px;
   }
 
@@ -1061,7 +1061,7 @@
 
   .backup-time {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     margin-left: 8px;
   }
 
@@ -1083,7 +1083,7 @@
   .conflict-tip {
     margin: 0;
     font-size: 13px;
-    color: #ddd;
+    color: #F5F0E8;
   }
 
   .conflict-row {
@@ -1117,7 +1117,7 @@
 
   .conflict-side {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .conflict-name {
@@ -1128,12 +1128,12 @@
 
   .conflict-detail {
     font-size: 12px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .conflict-time {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     margin-bottom: 4px;
   }
 </style>

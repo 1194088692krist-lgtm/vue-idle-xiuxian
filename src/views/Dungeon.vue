@@ -971,7 +971,7 @@
 
   .es-status-empty {
     font-size: 12px;
-    color: #888;
+    color: #C9C4BA;
     padding: 4px 8px;
     text-align: center;
     font-style: italic;

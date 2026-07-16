@@ -155,7 +155,7 @@
 
   .card-subtitle {
     margin: 4px 0 0;
-    color: #888;
+    color: #C9C4BA;
     font-size: 13px;
   }
 
@@ -179,7 +179,7 @@
 
   .welcome-subtext {
     font-size: 13px;
-    color: #aaa;
+    color: #F5DEB3;
     margin: 4px 0;
   }
 
@@ -245,7 +245,7 @@
     justify-content: center;
     background: linear-gradient(135deg, rgba(139, 69, 19, 0.3), rgba(139, 69, 19, 0.1));
     border-radius: 8px;
-    color: #ccc;
+    color: #F5F0E8;
     font-size: 16px;
   }
 
@@ -262,7 +262,7 @@
 
   .stat-label {
     font-size: 11px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .stat-value {
@@ -290,7 +290,7 @@
     align-items: center;
     gap: 8px;
     font-size: 13px;
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .tip-icon {

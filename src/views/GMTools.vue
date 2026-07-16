@@ -2274,7 +2274,7 @@ onMounted(async () => {
 
 .value-item label {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
 }
 
 .value-item input {
@@ -2445,7 +2445,7 @@ onMounted(async () => {
 
 .char-school {
   font-size: 11px;
-  color: #888;
+  color: #C9C4BA;
 }
 
 .avatar-upload-area {
@@ -2480,7 +2480,7 @@ onMounted(async () => {
   cursor: pointer;
   background: rgba(0, 0, 0, 0.2);
   font-size: 12px;
-  color: #888;
+  color: #C9C4BA;
   transition: all 0.2s;
 }
 
@@ -2532,7 +2532,7 @@ onMounted(async () => {
 .pet-rarity,
 .monster-level {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
 }
 
 .btn-delete {
@@ -2675,7 +2675,7 @@ onMounted(async () => {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(218, 165, 32, 0.3);
   border-radius: 6px;
-  color: #8B8B8B;
+  color: #C9C4BA;
   cursor: pointer;
 }
 
@@ -2723,7 +2723,7 @@ onMounted(async () => {
 
 .asset-name {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
   margin-top: 5px;
   word-break: break-all;
 }
@@ -2754,7 +2754,7 @@ onMounted(async () => {
   background: rgba(0, 0, 0, 0.3);
   border: 1px solid rgba(218, 165, 32, 0.3);
   border-radius: 8px;
-  color: #8B8B8B;
+  color: #C9C4BA;
   cursor: pointer;
   transition: all 0.2s;
 }
@@ -2915,7 +2915,7 @@ onMounted(async () => {
 
 .affix-stat {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
 }
 
 .affix-tier-badge {
@@ -2988,7 +2988,7 @@ onMounted(async () => {
 
 .set-pieces {
   font-size: 12px;
-  color: #8B8B8B;
+  color: #C9C4BA;
 }
 
 .set-bonuses {

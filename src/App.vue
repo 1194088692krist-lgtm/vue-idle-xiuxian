@@ -643,7 +643,7 @@ import SaveButton from './components/SaveButton.vue'
 
   .resource-label {
     font-size: 10px;
-    color: #8B8B8B;
+    color: #C9C4BA;
     white-space: nowrap;
   }
 
@@ -732,7 +732,7 @@ import SaveButton from './components/SaveButton.vue'
 
   .cultivation-label {
     font-size: 12px;
-    color: #8B8B8B;
+    color: #C9C4BA;
     white-space: nowrap;
   }
 
@@ -825,7 +825,7 @@ import SaveButton from './components/SaveButton.vue'
     height: 100%;
     cursor: pointer;
     transition: all 0.2s ease;
-    color: #8B8B8B;
+    color: #C9C4BA;
     border-radius: 8px;
     max-width: 80px;
   }

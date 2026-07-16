@@ -574,7 +574,7 @@
 
   .card-subtitle {
     margin: 4px 0 0;
-    color: #888;
+    color: #C9C4BA;
     font-size: 14px;
   }
 
@@ -586,7 +586,7 @@
     background: rgba(139, 69, 19, 0.1);
     border-radius: 8px;
     margin-bottom: 16px;
-    color: #aaa;
+    color: #F5DEB3;
     font-size: 13px;
   }
 
@@ -704,7 +704,7 @@
 
   .pool-desc {
     font-size: 11px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   /* 抽奖按钮 */
@@ -725,7 +725,7 @@
 
   .spirit-stone-display .label {
     font-size: 13px;
-    color: #888;
+    color: #C9C4BA;
   }
 
   .spirit-stone-display .value {
@@ -810,7 +810,7 @@
   }
   .exchange-info .rate {
     font-size: 11px;
-    color: #888;
+    color: #C9C4BA;
   }
   .exchange-actions {
     display: flex;
@@ -934,7 +934,7 @@
     justify-content: center;
     gap: 6px;
     font-size: 12px;
-    color: #aaa;
+    color: #F5DEB3;
     flex-wrap: wrap;
   }
 
@@ -1082,11 +1082,11 @@
     align-items: center;
     padding: 8px 0;
     border-bottom: 1px solid rgba(255, 255, 255, 0.05);
-    color: #aaa;
+    color: #F5DEB3;
   }
 
   .detail-row span:first-child {
-    color: #888;
+    color: #C9C4BA;
   }
 
   .simple-tag {
@@ -1175,7 +1175,7 @@
     background: rgba(139, 69, 19, 0.08);
     border-radius: 6px;
     font-size: 13px;
-    color: #ccc;
+    color: #F5F0E8;
     line-height: 1.5;
   }
 
