@@ -72,7 +72,7 @@
     <div v-if="selectedMember" class="char-card glass-card">
       <div class="char-header">
         <div class="char-avatar-container">
-          <div class="char-avatar" @click="openPortrait">
+          <div class="char-avatar" :class="selectedMember?.star >= 5 ? 'star-5' : (selectedMember?.star >= 4 ? 'star-4' : '')" @click="openPortrait">
             <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterThumbnail(selectedMember)" />
             <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
           </div>
@@ -235,9 +235,10 @@
     <div v-if="showMemberDetailModal && detailMember" class="equip-select-modal character-detail-modal" @click.self="closeMemberDetail">
       <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
         <div class="char-detail-header">
-          <div class="char-avatar large">
+          <div class="char-avatar large" :class="detailMember?.star >= 5 ? 'star-5' : (detailMember?.star >= 4 ? 'star-4' : '')" @click="openDetailPortrait" title="点击查看立绘">
             <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterThumbnail(detailMember)" />
             <span v-else>{{ detailMember.name?.[0] || '仙' }}</span>
+            <span class="char-avatar-hint">点击查看立绘</span>
           </div>
           <div class="char-info">
             <div class="char-name-row">
@@ -770,6 +771,11 @@ const portraitCharacter = ref(null)
 
 const openPortrait = () => {
   portraitCharacter.value = selectedMember.value
+  showPortrait.value = true
+}
+
+const openDetailPortrait = () => {
+  portraitCharacter.value = detailMember.value
   showPortrait.value = true
 }
 
@@ -1912,6 +1918,30 @@ watch([allMembers, teamMembers], () => {
   width: 70px;
   height: 70px;
   flex-shrink: 0;
+  position: relative;
+  cursor: pointer;
+  transition: transform 0.2s;
+}
+
+.char-detail-header .char-avatar.large:hover {
+  transform: scale(1.05);
+}
+
+.char-detail-header .char-avatar.large .char-avatar-hint {
+  position: absolute;
+  bottom: -22px;
+  left: 50%;
+  transform: translateX(-50%);
+  font-size: 10px;
+  color: #aaa;
+  white-space: nowrap;
+  opacity: 0.85;
+  pointer-events: none;
+}
+
+.char-detail-header .char-avatar.large:hover .char-avatar-hint {
+  color: #ffd700;
+  opacity: 1;
 }
 
 .char-detail-header .char-info {

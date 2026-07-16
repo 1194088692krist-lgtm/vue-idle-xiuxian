@@ -89,7 +89,7 @@
               :class="getResultClass(result)"
               @click="showCharacterDetail(result)"
             >
-              <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar">
+              <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar" :class="result.item.star >= 5 ? 'star-5-glow' : (result.item.star >= 4 ? 'star-4-glow' : '')">
                 <img :src="getCharacterThumbnail(result.item)" :alt="result.item.name" />
               </div>
               <div class="result-type" :style="{ color: getResultColor(result) }">
@@ -156,6 +156,7 @@
     gachaPools,
     doGacha,
     doMultiGacha,
+    doMultiGachaWithPity,
     equipmentTypeNames,
     petRarities,
     equipmentQualities
@@ -267,8 +268,18 @@
       return
     }
     playerStore.phantomCrystals -= cost
-    const result = doGacha(currentPool.value, playerStore.level)
+    // 人物池/综合池：传入持久化保底计数
+    const isCharPool = currentPool.value === 'character' || currentPool.value === 'all'
+    const pityState = isCharPool
+      ? { fiveStarPity: playerStore.gachaFiveStarPity, fourStarPity: playerStore.gachaFourStarPity }
+      : null
+    const result = doGacha(currentPool.value, playerStore.level, pityState)
     if (!result) return
+    // 同步回 store
+    if (isCharPool && pityState) {
+      playerStore.gachaFiveStarPity = pityState.fiveStarPity
+      playerStore.gachaFourStarPity = pityState.fourStarPity
+    }
     grantReward(result)
     gachaResults.value = [result]
     showMessage('success', `祈福获得：${getRewardName(result)}`)
@@ -289,7 +300,18 @@
       return
     }
     playerStore.phantomCrystals -= cost
-    const results = doMultiGacha(currentPool.value, 9, playerStore.level)
+    // 人物池/综合池：传入持久化保底计数（跨调用累计）
+    const isCharPool = currentPool.value === 'character' || currentPool.value === 'all'
+    const pityState = isCharPool
+      ? { fiveStarPity: playerStore.gachaFiveStarPity, fourStarPity: playerStore.gachaFourStarPity }
+      : null
+    const fn = isCharPool ? doMultiGachaWithPity : doMultiGacha
+    const results = fn(currentPool.value, 9, playerStore.level, pityState)
+    // 同步回 store
+    if (isCharPool && pityState) {
+      playerStore.gachaFiveStarPity = pityState.fiveStarPity
+      playerStore.gachaFourStarPity = pityState.fourStarPity
+    }
     results.forEach(r => grantReward(r))
     gachaResults.value = results
     const summary = {}
@@ -306,7 +328,15 @@
     if (summary.reinforce_stone) parts.push(`强化石奖励×${summary.reinforce_stone}`)
     if (summary.refinement_stone) parts.push(`洗练石奖励×${summary.refinement_stone}`)
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
-    showMessage('success', `九连祈福完成：${parts.join('，')}`)
+    // 提示保底进度
+    let pityHint = ''
+    if (isCharPool) {
+      const fp = playerStore.gachaFiveStarPity
+      const fhp = playerStore.gachaFourStarPity
+      if (fp >= 40) pityHint = `（五星保底${50 - fp}抽）`
+      else if (fhp >= 3) pityHint = `（四星保底${5 - fhp}抽）`
+    }
+    showMessage('success', `九连祈福完成：${parts.join('，')}${pityHint}`)
     // 十连中抽到4星/5星人物自动弹出立绘（取最高星级）
     const bestChar = results
       .filter(r => r.category === 'character' && r.item.star >= 4)
@@ -730,6 +760,24 @@
     height: 100%;
     object-fit: cover;
     display: block;
+  }
+
+  /* 4星/5星 抽卡结果头像光效（复刻宗门头像仙气/神气特效） */
+  @keyframes gachaStar4Glow {
+    0%, 100% { box-shadow: 0 0 8px 2px rgba(120, 220, 240, 0.55), 0 0 14px 4px rgba(80, 180, 220, 0.35); }
+    50% { box-shadow: 0 0 12px 3px rgba(160, 240, 255, 0.75), 0 0 22px 6px rgba(100, 200, 240, 0.5); }
+  }
+  @keyframes gachaStar5Glow {
+    0%, 100% { box-shadow: 0 0 10px 3px rgba(255, 200, 80, 0.7), 0 0 20px 5px rgba(255, 160, 40, 0.5); }
+    50% { box-shadow: 0 0 16px 4px rgba(255, 220, 120, 0.9), 0 0 32px 8px rgba(255, 180, 60, 0.7); }
+  }
+  .result-avatar.star-4-glow {
+    animation: gachaStar4Glow 3s ease-in-out infinite;
+    border-color: rgba(120, 220, 240, 0.7);
+  }
+  .result-avatar.star-5-glow {
+    animation: gachaStar5Glow 2.2s ease-in-out infinite;
+    border-color: rgba(255, 200, 80, 0.8);
   }
 
   .result-card.quality-mythic,

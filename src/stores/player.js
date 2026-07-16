@@ -246,6 +246,10 @@ export const usePlayerStore = defineStore('player', {
       cultivationRate: 0,
       spiritRate: 0
     },
+    // 人物池五星保底计数器（跨抽奖累计，抽出五星时归零）
+    gachaFiveStarPity: 0,
+    // 人物池四星保底计数器（跨抽奖累计，抽出四星或以上时归零）
+    gachaFourStarPity: 0,
     // 挂机探索状态
     idleExploration: {
       isActive: false,

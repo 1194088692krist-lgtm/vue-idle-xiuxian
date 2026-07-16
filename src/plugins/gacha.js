@@ -306,14 +306,20 @@ export const generateResource = () => {
 }
 
 // 执行一次抽奖
-// 返回 { category: 'character'|'weapon'|'artifact'|'pet'|'resource', item: {...} }
-export const doGacha = (poolType, playerLevel = 1) => {
+// pityState: 可选，{ fiveStarPity: number, fourStarPity: number } 用于跨调用累计
+// 若提供 pityState，会原地累加保底计数；返回结果后调用方需自行保存 pityState
+export const doGacha = (poolType, playerLevel = 1, pityState = null) => {
   const pool = gachaPools[poolType]
   if (!pool) return null
+
+  const isCharacterPool = poolType === 'character' || poolType === 'all'
+  const PITY_INTERVAL_5STAR = 50
+  const PITY_INTERVAL_4STAR = 5
 
   const rand = Math.random()
   let category
 
+  // 人物池/综合池：单抽也按概率正常出
   if (rand < pool.characterRate) {
     category = 'character'
   } else if (rand < pool.characterRate + pool.weaponRate) {
@@ -326,83 +332,150 @@ export const doGacha = (poolType, playerLevel = 1) => {
     category = 'resource'
   }
 
+  let result = null
   switch (category) {
     case 'character':
-      return { category, item: generateRandomCharacter() }
+      result = { category, item: generateRandomCharacter() }
+      break
     case 'weapon':
-      return { category, item: generateEquipment(playerLevel, 'weapon') }
+      result = { category, item: generateEquipment(playerLevel, 'weapon') }
+      break
     case 'artifact':
-      return { category, item: generateEquipment(playerLevel, 'artifact') }
+      result = { category, item: generateEquipment(playerLevel, 'artifact') }
+      break
     case 'pet':
-      return { category, item: generatePet(playerLevel) }
+      result = { category, item: generatePet(playerLevel) }
+      break
     case 'resource':
-      return { category, item: generateResource() }
+      result = { category, item: generateResource() }
+      break
   }
+
+  // 单抽保底：人物池/综合池 5 抽内无 4 星以上，第 5 抽替换为 4 星
+  // 50 抽内无 5 星，第 50 抽替换为 5 星
+  if (result && pityState && isCharacterPool) {
+    if (pityState.fiveStarPity === undefined) pityState.fiveStarPity = 0
+    if (pityState.fourStarPity === undefined) pityState.fourStarPity = 0
+
+    if (result.category === 'character') {
+      if (result.item.star === 5) {
+        pityState.fiveStarPity = 0
+        pityState.fourStarPity = 0
+      } else if (result.item.star === 4) {
+        pityState.fiveStarPity++
+        pityState.fourStarPity = 0
+      } else {
+        pityState.fiveStarPity++
+        pityState.fourStarPity++
+      }
+    } else {
+      pityState.fiveStarPity++
+      pityState.fourStarPity++
+    }
+
+    // 五星保底
+    if (pityState.fiveStarPity >= PITY_INTERVAL_5STAR) {
+      result = { category: 'character', item: generateRandomCharacter(5) }
+      pityState.fiveStarPity = 0
+      pityState.fourStarPity = 0
+    }
+    // 四星保底
+    else if (pityState.fourStarPity >= PITY_INTERVAL_4STAR) {
+      result = { category: 'character', item: generateRandomCharacter(4) }
+      pityState.fourStarPity = 0
+    }
+  }
+
+  return result
 }
 
 // 批量抽奖（保底规则：人物池/综合池每 5 次保底一次 4 星或以上；每 50 抽保底一次 5 星）
 // 5星基础概率1%、4星基础概率19%。若 5 次内未出现 4 星或以上人物，则把第 5 次替换为 4 星人物
 // 若 50 次内未出现 5 星人物，则把第 50 次替换为 5 星人物
 // 每轮最多获得 2 个人物
-export const doMultiGacha = (poolType, count, playerLevel = 1) => {
+// pityState: 可选，{ fiveStarPity: number, fourStarPity: number } 跨调用累计
+export const doMultiGacha = (poolType, count, playerLevel = 1, pityState = null) => {
   const results = []
   const isCharacterPool = poolType === 'character' || poolType === 'all'
   const PITY_INTERVAL_4STAR = 5
   const PITY_INTERVAL_5STAR = 50
-  let characterCount = 0
   const MAX_CHARACTERS = 2
-  let fiveStarPityCounter = 0
-  
+  let characterCount = 0
+
+  // 初始化保底状态
+  const localPity = pityState || { fiveStarPity: 0, fourStarPity: 0 }
+
   for (let i = 0; i < count; i++) {
-    const result = doGacha(poolType, playerLevel)
-    
+    // 在循环内部单独使用一份临时 pity 副本，doGacha 会修改它
+    const tempPity = { fiveStarPity: localPity.fiveStarPity, fourStarPity: localPity.fourStarPity }
+    const result = doGacha(poolType, playerLevel, isCharacterPool ? tempPity : null)
+    // 同步回 localPity
+    if (isCharacterPool) {
+      localPity.fiveStarPity = tempPity.fiveStarPity
+      localPity.fourStarPity = tempPity.fourStarPity
+    }
+
     // 限制每轮最多获得 2 个人物
     if (result && result.category === 'character' && characterCount >= MAX_CHARACTERS) {
-      // 超出限制，替换为资源
+      // 超出限制，替换为资源（不计入保底——保底只针对人物抽取次数）
       results.push({ category: 'resource', item: generateResource() })
     } else {
+      if (result) results.push(result)
       if (result && result.category === 'character') {
         characterCount++
-        if (result.item.star === 5) {
-          fiveStarPityCounter = 0
-        } else {
-          fiveStarPityCounter++
-        }
-      } else {
-        fiveStarPityCounter++
-      }
-      if (result) results.push(result)
-    }
-    
-    // 每 50 次五星保底：人物池/综合池 50 次内若没有 5 星人物，则把本次替换为 5 星
-    if (isCharacterPool && fiveStarPityCounter >= PITY_INTERVAL_5STAR) {
-      const startIdx = Math.max(0, i + 1 - PITY_INTERVAL_5STAR)
-      const window = results.slice(startIdx, i + 1)
-      const hasFiveStar = window.some(r => r.category === 'character' && r.item.star === 5)
-      if (!hasFiveStar) {
-        // 五星保底时，如果人物数量未超限，则替换为5星人物
-        if (characterCount < MAX_CHARACTERS) {
-          results[i] = { category: 'character', item: generateRandomCharacter(5) }
-          characterCount++
-          fiveStarPityCounter = 0
-        }
-      }
-    }
-    
-    // 每 5 次四星保底：人物池/综合池 5 次内若没有 4 星或以上人物，则把本次替换为 4 星
-    if (isCharacterPool && (i + 1) % PITY_INTERVAL_4STAR === 0) {
-      const startIdx = i + 1 - PITY_INTERVAL_4STAR
-      const window = results.slice(startIdx, i + 1)
-      const hasHighStar = window.some(r => r.category === 'character' && r.item.star >= 4)
-      if (!hasHighStar) {
-        // 保底时，如果人物数量未超限，则替换为4星人物
-        if (characterCount < MAX_CHARACTERS) {
-          results[i] = { category: 'character', item: generateRandomCharacter(4) }
-          characterCount++
-        }
-        // 若已超限，则不触发保底
       }
     }
   }
+
+  // 同步回传入的 pityState
+  if (pityState) {
+    pityState.fiveStarPity = localPity.fiveStarPity
+    pityState.fourStarPity = localPity.fourStarPity
+  }
+
+  return results
+}
+
+// 角色上限放宽的批量抽奖（保底版本）
+// 五星保底不受 MAX_CHARACTERS=2 限制（保底必出）
+// 四星保底也强制突破 2 人限制
+export const doMultiGachaWithPity = (poolType, count, playerLevel = 1, pityState = null) => {
+  const results = []
+  const isCharacterPool = poolType === 'character' || poolType === 'all'
+  const PITY_INTERVAL_4STAR = 5
+  const PITY_INTERVAL_5STAR = 50
+  const MAX_CHARACTERS = 2
+  let characterCount = 0
+
+  const localPity = pityState || { fiveStarPity: 0, fourStarPity: 0 }
+
+  for (let i = 0; i < count; i++) {
+    const tempPity = { fiveStarPity: localPity.fiveStarPity, fourStarPity: localPity.fourStarPity }
+    const result = doGacha(poolType, playerLevel, isCharacterPool ? tempPity : null)
+    if (isCharacterPool) {
+      localPity.fiveStarPity = tempPity.fiveStarPity
+      localPity.fourStarPity = tempPity.fourStarPity
+    }
+
+    // 五星/四星保底时不受人物上限限制（保底必出）
+    const isGuaranteedHighStar = result && result.category === 'character' && result.item.star >= 4
+      && (localPity.fiveStarPity === 0 || localPity.fourStarPity === 0)
+
+    if (result && result.category === 'character' && characterCount >= MAX_CHARACTERS && !isGuaranteedHighStar) {
+      // 超出限制，替换为资源
+      results.push({ category: 'resource', item: generateResource() })
+    } else {
+      if (result) results.push(result)
+      if (result && result.category === 'character') {
+        characterCount++
+      }
+    }
+  }
+
+  if (pityState) {
+    pityState.fiveStarPity = localPity.fiveStarPity
+    pityState.fourStarPity = localPity.fourStarPity
+  }
+
   return results
 }

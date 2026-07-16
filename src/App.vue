@@ -1079,4 +1079,76 @@ import SaveButton from './components/SaveButton.vue'
   html:not(.dark) .content-area {
     color: #3B240F;
   }
+
+  /* ================== 人物星级光效 ================== */
+  /* 4星（传说）仙气特效：青蓝/水绿光晕 + 呼吸 + 轻飘光点 */
+  @keyframes charStar4Glow {
+    0%, 100% { box-shadow: 0 0 8px 2px rgba(120, 220, 240, 0.55), 0 0 14px 4px rgba(80, 180, 220, 0.35), inset 0 0 6px rgba(255, 255, 255, 0.3); }
+    50% { box-shadow: 0 0 12px 3px rgba(160, 240, 255, 0.75), 0 0 22px 6px rgba(100, 200, 240, 0.5), inset 0 0 10px rgba(255, 255, 255, 0.45); }
+  }
+  @keyframes charStar4Float {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.7; }
+    50% { transform: translateY(-3px) scale(1.1); opacity: 1; }
+  }
+  .char-avatar.star-4 {
+    position: relative;
+    animation: charStar4Glow 3s ease-in-out infinite;
+  }
+  .char-avatar.star-4::before,
+  .char-avatar.star-4::after {
+    content: '';
+    position: absolute;
+    width: 6px;
+    height: 6px;
+    background: radial-gradient(circle, rgba(180, 240, 255, 0.95) 0%, rgba(120, 200, 240, 0.4) 60%, transparent 100%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+  }
+  .char-avatar.star-4::before {
+    top: -2px;
+    left: 30%;
+    animation: charStar4Float 2.8s ease-in-out infinite;
+  }
+  .char-avatar.star-4::after {
+    bottom: 2px;
+    right: 20%;
+    animation: charStar4Float 2.8s ease-in-out 1.4s infinite;
+  }
+
+  /* 5星（神话）神气特效：金色光晕 + 更强呼吸 + 飘动金点 */
+  @keyframes charStar5Glow {
+    0%, 100% { box-shadow: 0 0 10px 3px rgba(255, 200, 80, 0.7), 0 0 20px 5px rgba(255, 160, 40, 0.5), inset 0 0 8px rgba(255, 255, 200, 0.4); }
+    50% { box-shadow: 0 0 16px 4px rgba(255, 220, 120, 0.9), 0 0 32px 8px rgba(255, 180, 60, 0.7), inset 0 0 14px rgba(255, 255, 220, 0.6); }
+  }
+  @keyframes charStar5Float {
+    0%, 100% { transform: translateY(0) scale(1); opacity: 0.85; }
+    50% { transform: translateY(-4px) scale(1.2); opacity: 1; }
+  }
+  .char-avatar.star-5 {
+    position: relative;
+    animation: charStar5Glow 2.2s ease-in-out infinite;
+  }
+  .char-avatar.star-5::before,
+  .char-avatar.star-5::after {
+    content: '';
+    position: absolute;
+    width: 7px;
+    height: 7px;
+    background: radial-gradient(circle, rgba(255, 240, 180, 1) 0%, rgba(255, 200, 80, 0.5) 50%, transparent 100%);
+    border-radius: 50%;
+    pointer-events: none;
+    z-index: 2;
+    box-shadow: 0 0 4px rgba(255, 220, 120, 0.8);
+  }
+  .char-avatar.star-5::before {
+    top: -3px;
+    right: 25%;
+    animation: charStar5Float 2.2s ease-in-out infinite;
+  }
+  .char-avatar.star-5::after {
+    bottom: -2px;
+    left: 25%;
+    animation: charStar5Float 2.2s ease-in-out 1.1s infinite;
+  }
 </style>
