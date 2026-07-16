@@ -143,6 +143,82 @@
     </div>
 
     <CharacterPortraitModal v-if="showCharModal" :character="selectedCharacter" @close="closeCharModal" />
+
+    <!-- 祈福物品详情弹窗（装备/法宝/灵宠） -->
+    <div v-if="showGachaItemDetail" class="simple-modal" @click.self="closeGachaItemDetail">
+      <div class="simple-modal-content">
+        <div class="modal-header">
+          <h3>{{ selectedGachaItem?.name || '物品详情' }}</h3>
+          <button class="btn-small" @click="closeGachaItemDetail">关闭</button>
+        </div>
+        <div v-if="selectedGachaItem" class="modal-body">
+          <!-- 装备 / 法宝 -->
+          <template v-if="isGachaItemEquipment(selectedGachaItem)">
+            <div class="detail-row">
+              <span>品质</span>
+              <span class="simple-tag" :style="{ color: gachaQualityInfo(selectedGachaItem).color }">
+                {{ gachaQualityInfo(selectedGachaItem).name }}
+              </span>
+            </div>
+            <div class="detail-row">
+              <span>类型</span><span>{{ gachaEquipmentType(selectedGachaItem) }}</span>
+            </div>
+            <div class="detail-row">
+              <span>强化等级</span><span>+{{ selectedGachaItem.enhanceLevel || 0 }}</span>
+            </div>
+            <div class="detail-row">
+              <span>装备评分</span><span class="equipment-score">{{ calculateEquipmentScore(selectedGachaItem) }}</span>
+            </div>
+            <div v-if="selectedGachaItem.setId" class="detail-row">
+              <span>套装</span>
+              <span class="set-tag" :style="{ color: gachaSetInfo(selectedGachaItem.setId)?.color }">
+                {{ gachaSetInfo(selectedGachaItem.setId)?.name }}
+              </span>
+            </div>
+            <div class="simple-divider">基础属性</div>
+            <div v-for="(value, stat) in selectedGachaItem.stats" :key="stat" class="detail-row">
+              <span>{{ getStatName(stat) }}</span><span>{{ formatStatValue(stat, value) }}</span>
+            </div>
+            <div v-if="selectedGachaItem.affixes && selectedGachaItem.affixes.length > 0" class="affixes-section">
+              <div class="simple-divider">词条</div>
+              <div v-for="affix in selectedGachaItem.affixes" :key="affix.id" class="affix-row">
+                <span class="affix-name" :class="'affix-tier-' + affix.tier">{{ affix.name }}</span>
+                <span>{{ getStatName(affix.stat) }} {{ affix.valueType === 'percent' ? '+' + (affix.value * 100).toFixed(1) + '%' : '+' + affix.value }}</span>
+              </div>
+            </div>
+            <div v-if="selectedGachaItem.setId" class="set-bonus-section">
+              <div class="simple-divider">套装效果</div>
+              <div v-for="(bonus, idx) in gachaSetBonuses(selectedGachaItem.setId)" :key="idx" class="set-bonus-row">
+                <span>{{ bonus.label }}</span>
+              </div>
+            </div>
+          </template>
+
+          <!-- 灵宠 -->
+          <template v-else>
+            <div class="detail-row">
+              <span>品质</span>
+              <span class="simple-tag" :style="{ color: petRarities[selectedGachaItem.rarity]?.color }">
+                {{ petRarities[selectedGachaItem.rarity]?.name }}
+              </span>
+            </div>
+            <div class="detail-row">
+              <span>等级</span><span>{{ selectedGachaItem.level || 1 }}</span>
+            </div>
+            <div class="detail-row">
+              <span>星级</span><span>{{ selectedGachaItem.star || 0 }}</span>
+            </div>
+            <div v-if="selectedGachaItem.description" class="pet-desc">
+              {{ selectedGachaItem.description }}
+            </div>
+            <div class="simple-divider">战斗属性</div>
+            <div v-for="(value, stat) in selectedGachaItem.combatAttributes" :key="stat" class="detail-row">
+              <span>{{ getStatName(stat) }}</span><span>{{ formatStatValue(stat, value) }}</span>
+            </div>
+          </template>
+        </div>
+      </div>
+    </div>
   </div>
 </template>
 
@@ -151,7 +227,7 @@
   import { ref, computed } from 'vue'
   import { useMessage } from 'naive-ui'
   import { GiftOutlined, InfoCircleOutlined } from '@ant-design/icons-vue'
-  import { getStatName } from '../plugins/stats'
+  import { getStatName, formatStatValue } from '../plugins/stats'
   import {
     gachaPools,
     doGacha,
@@ -161,7 +237,7 @@
     petRarities,
     equipmentQualities
   } from '../plugins/gacha'
-  import { setBonuses } from '../plugins/buildSystem'
+  import { setBonuses, calculateEquipmentScore, rarityConfig } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
   import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
   import { characterSchools, characterTalents, characterRoles, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
@@ -174,6 +250,8 @@
   const gachaResults = ref([])
   const showCharModal = ref(false)
   const selectedCharacter = ref(null)
+  const selectedGachaItem = ref(null)
+  const showGachaItemDetail = ref(false)
 
   const poolList = computed(() => [
     { key: 'all', name: '综合池', cost: gachaPools.all.cost, desc: '人物/武器/法宝/灵宠/资源' },
@@ -354,6 +432,9 @@
     if (result.category === 'character') {
       selectedCharacter.value = result.item
       showCharModal.value = true
+    } else if (result.category === 'equipment' || result.category === 'artifact' || result.category === 'pet') {
+      selectedGachaItem.value = result.item
+      showGachaItemDetail.value = true
     }
   }
 
@@ -361,6 +442,45 @@
   const closeCharModal = () => {
     showCharModal.value = false
     selectedCharacter.value = null
+  }
+
+  // 关闭祈福物品详情弹窗
+  const closeGachaItemDetail = () => {
+    showGachaItemDetail.value = false
+    selectedGachaItem.value = null
+  }
+
+  // 判断当前选中的祈福物品是否为装备/法宝
+  const isGachaItemEquipment = (item) => {
+    if (!item) return false
+    return item.type !== 'pet'
+  }
+
+  // 装备品质信息（兼容 qualityInfo 缺失的情况）
+  const gachaQualityInfo = (item) => {
+    if (item && item.qualityInfo && item.qualityInfo.name) return item.qualityInfo
+    const cfg = rarityConfig[item?.quality]
+    if (cfg) return { name: cfg.name, color: cfg.color }
+    return { name: item?.quality || '未知', color: '#999' }
+  }
+
+  // 装备类型名称
+  const gachaEquipmentType = (item) => {
+    const slot = item?.slot || item?.type
+    return equipmentTypeNames[slot] || slot || '装备'
+  }
+
+  // 套装信息
+  const gachaSetInfo = (setId) => setBonuses.find(s => s.id === setId)
+  const gachaSetBonuses = (setId) => {
+    const setData = setBonuses.find(s => s.id === setId)
+    if (!setData) return []
+    const bonuses = []
+    if (setData.bonus2) bonuses.push(setData.bonus2)
+    if (setData.bonus3) bonuses.push(setData.bonus3)
+    if (setData.bonus4) bonuses.push(setData.bonus4)
+    if (setData.bonus5) bonuses.push(setData.bonus5)
+    return bonuses
   }
 
   // 幻灵结晶兑换
@@ -742,6 +862,13 @@
     border-radius: 8px;
     text-align: center;
     transition: all 0.2s;
+    cursor: pointer;
+  }
+
+  .result-card:hover {
+    transform: translateY(-2px);
+    border-color: rgba(218, 165, 32, 0.5);
+    box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
   }
 
   .result-avatar {
@@ -899,6 +1026,165 @@
     border-color: #6fb3ff;
     box-shadow: 0 0 10px rgba(111, 179, 255, 0.2);
     background: rgba(111, 179, 255, 0.04);
+  }
+
+  /* 祈福物品详情弹窗 */
+  .simple-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 20px;
+    box-sizing: border-box;
+  }
+
+  .simple-modal-content {
+    background: #1A1A2E;
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 480px;
+    max-height: calc(100vh - 60px);
+    overflow-y: auto;
+    padding: 18px 20px 24px;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  }
+
+  .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 14px;
+    padding-bottom: 12px;
+    border-bottom: 1px solid rgba(139, 69, 19, 0.3);
+  }
+
+  .modal-header h3 {
+    margin: 0;
+    font-size: 18px;
+    color: #F5DEB3;
+  }
+
+  .modal-header .btn-small {
+    min-width: 56px;
+    min-height: 36px;
+    padding: 8px 16px;
+    font-size: 14px;
+    flex-shrink: 0;
+  }
+
+  .modal-body {
+    font-size: 13px;
+  }
+
+  .detail-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 8px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.05);
+    color: #aaa;
+  }
+
+  .detail-row span:first-child {
+    color: #888;
+  }
+
+  .simple-tag {
+    display: inline-block;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 11px;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .simple-divider {
+    text-align: center;
+    margin: 12px 0;
+    color: #DAA520;
+    font-size: 13px;
+    position: relative;
+  }
+
+  .simple-divider::before,
+  .simple-divider::after {
+    content: '';
+    display: inline-block;
+    width: 30%;
+    height: 1px;
+    background: rgba(218, 165, 32, 0.3);
+    vertical-align: middle;
+    margin: 0 8px;
+  }
+
+  .equipment-score {
+    font-size: 18px;
+    font-weight: bold;
+    color: #FFD700;
+    text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  }
+
+  .set-tag {
+    font-weight: bold;
+    font-size: 14px;
+  }
+
+  .affixes-section {
+    margin-top: 8px;
+  }
+
+  .affix-row {
+    display: flex;
+    justify-content: space-between;
+    padding: 4px 0;
+    font-size: 13px;
+    border-bottom: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .affix-name {
+    font-weight: bold;
+  }
+
+  .affix-name.affix-tier-1 {
+    color: #32CD32;
+  }
+
+  .affix-name.affix-tier-2 {
+    color: #1E90FF;
+  }
+
+  .affix-name.affix-tier-3 {
+    color: #ffcf5e;
+  }
+
+  .set-bonus-section {
+    margin-top: 8px;
+  }
+
+  .set-bonus-row {
+    padding: 4px 8px;
+    background: rgba(139, 69, 19, 0.1);
+    border-radius: 4px;
+    margin-bottom: 4px;
+    font-size: 13px;
+    color: #F5DEB3;
+  }
+
+  .pet-desc {
+    margin: 10px 0;
+    padding: 8px 10px;
+    background: rgba(139, 69, 19, 0.08);
+    border-radius: 6px;
+    font-size: 13px;
+    color: #ccc;
+    line-height: 1.5;
   }
 
 </style>

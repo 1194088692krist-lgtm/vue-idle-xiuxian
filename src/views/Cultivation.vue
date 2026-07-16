@@ -284,6 +284,8 @@
                 <span v-if="getEffortCap(detailMember.star) !== null"> / {{ getEffortCap(detailMember.star) }}</span>
                 <span v-else>（无上限）</span>
               </span>
+              <span class="divider">|</span>
+              <span>突破: {{ detailMember.breakThrough || 0 }}/5</span>
             </div>
           </div>
           <button class="btn btn-warning btn-close" @click="closeMemberDetail">关闭</button>
@@ -323,8 +325,21 @@
               <div class="skill-desc">{{ skill.description }}</div>
             </div>
           </div>
-          <div v-if="detailMember.breakThrough < 5" class="skill-unlock-hint">
-            ⚡ 每突破一次可获得 2 个新技能
+          <div class="breakthrough-section">
+            <div v-if="detailMember.breakThrough < 5" class="skill-unlock-hint">
+              ⚡ 每突破一次可获得 2 个新技能
+            </div>
+            <button
+              v-if="(detailMember.breakThrough || 0) < 5"
+              class="btn-small btn-breakthrough"
+              @click="tryManualBreakthrough"
+              :disabled="(playerStore.characterEssence || 0) < 1"
+            >
+              手动突破 (消耗1灵魂碎片)
+            </button>
+            <div v-if="(detailMember.breakThrough || 0) >= 5" class="breakthrough-max">
+              ★ 已突破至最高境界 ★
+            </div>
           </div>
         </div>
 
@@ -2157,5 +2172,42 @@ watch([allMembers, teamMembers], () => {
   color: #ff9800;
   margin-top: 8px;
   text-align: center;
+}
+
+.breakthrough-section {
+  margin-top: 10px;
+  text-align: center;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.btn-breakthrough {
+  background: linear-gradient(135deg, #6a3df0, #8e44ff);
+  color: #fff;
+  border: 1px solid rgba(142, 68, 255, 0.6);
+  box-shadow: 0 2px 10px rgba(142, 68, 255, 0.35);
+  font-weight: bold;
+  cursor: pointer;
+  transition: all 0.25s ease;
+}
+
+.btn-breakthrough:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 14px rgba(142, 68, 255, 0.5);
+}
+
+.btn-breakthrough:disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+}
+
+.breakthrough-max {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFD700;
+  text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
+  padding: 6px 0;
 }
 </style>

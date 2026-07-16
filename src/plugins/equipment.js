@@ -62,7 +62,9 @@ const statCaps = {
   vampireResist: 0.4,
   spiritRate: 0.5,
   cultivationRate: 0.5,
-  speed: 0.3
+  speed: 0.3,
+  haste: 0.3,
+  critDamageReduce: 0.5
 }
 
 // 装备基础数值范围（用于洗练时重置数值）
@@ -90,7 +92,9 @@ const statBaseRanges = {
   dodgeResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
   vampireResist: { common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.4] },
   spiritRate: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] },
-  cultivationRate: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] }
+  cultivationRate: { common: [0.05, 0.1], uncommon: [0.08, 0.15], rare: [0.12, 0.22], epic: [0.18, 0.32], legendary: [0.25, 0.42], mythic: [0.35, 0.5] },
+  haste: { common: [0.03, 0.05], uncommon: [0.04, 0.08], rare: [0.05, 0.12], epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.30] },
+  critDamageReduce: { common: [0.03, 0.05], uncommon: [0.05, 0.08], rare: [0.08, 0.12], epic: [0.10, 0.18], legendary: [0.15, 0.30], mythic: [0.20, 0.45] }
 }
 
 const reforgeableStats = {
@@ -192,6 +196,24 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
   }
 }
 
+function getStatBaseRange(stat, rarity) {
+  const range = statBaseRanges[stat]?.[rarity]
+  if (range) return range
+  // 如果没有定义，根据属性类型给出合理的默认范围
+  const percentStats = ['critRate', 'critDamageBoost', 'critDamageReduce', 'dodgeRate', 'vampireRate',
+    'finalDamageBoost', 'finalDamageReduce', 'comboRate', 'counterRate', 'stunRate', 'healBoost',
+    'combatBoost', 'resistanceBoost', 'critResist', 'comboResist', 'counterResist', 'stunResist',
+    'dodgeResist', 'vampireResist', 'spiritRate', 'cultivationRate', 'haste']
+  if (percentStats.includes(stat)) {
+    const rarityRanges = {
+      common: [0.02, 0.05], uncommon: [0.03, 0.08], rare: [0.05, 0.12],
+      epic: [0.08, 0.18], legendary: [0.12, 0.25], mythic: [0.18, 0.35]
+    }
+    return rarityRanges[rarity] || [0.03, 0.08]
+  }
+  return [5, 15]
+}
+
 function getRandomValueInRange(range) {
   if (!range || !Array.isArray(range) || range.length < 2) return 0
   return range[0] + Math.random() * (range[1] - range[0])
@@ -242,7 +264,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       }
     }
     
-    const baseRange = statBaseRanges[currentStat]?.[rarity] || [5, 15]
+    const baseRange = getStatBaseRange(currentStat, rarity)
     let newValue = getRandomValueInRange(baseRange)
     
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
@@ -254,10 +276,10 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const baseMax = baseRange[1] * 1.3
     newValue = Math.max(baseMin, Math.min(newValue, baseMax))
     
-    if (['critRate', 'critDamageBoost', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce', 
+    if (['critRate', 'critDamageBoost', 'critDamageReduce', 'dodgeRate', 'vampireRate', 'finalDamageBoost', 'finalDamageReduce',
          'comboRate', 'counterRate', 'stunRate', 'healBoost', 'combatBoost', 'resistanceBoost',
          'critResist', 'comboResist', 'counterResist', 'stunResist', 'dodgeResist', 'vampireResist',
-         'spiritRate', 'cultivationRate'].includes(currentStat)) {
+         'spiritRate', 'cultivationRate', 'haste'].includes(currentStat)) {
       tempStats[currentStat] = Number(newValue.toFixed(3))
     } else {
       tempStats[currentStat] = Math.round(newValue)
@@ -268,7 +290,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const randomStat = availableStats[Math.floor(Math.random() * availableStats.length)]
     const maxAffixes = reforgeConfig.affixMaxCount[rarity] || 1
     if (maxAffixes >= 1) {
-      const baseRange = statBaseRanges[randomStat]?.[rarity] || [5, 15]
+      const baseRange = getStatBaseRange(randomStat, rarity)
       let value = getRandomValueInRange(baseRange)
       value = clampToStatCap(randomStat, value)
       if (statCaps[randomStat] !== undefined) {
@@ -284,7 +306,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const availableNew = availableStats.filter(s => !Object.keys(tempStats).includes(s))
     if (availableNew.length === 0) break
     const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
-    const baseRange = statBaseRanges[newStat]?.[rarity] || [5, 15]
+    const baseRange = getStatBaseRange(newStat, rarity)
     let value = getRandomValueInRange(baseRange)
     value = clampToStatCap(newStat, value)
     if (statCaps[newStat] !== undefined) {

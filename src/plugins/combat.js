@@ -228,7 +228,14 @@ class CombatManager {
       damage: firstResult.damage,
       isCrit: firstAttack.isCrit,
       isCombo: firstAttack.isCombo,
-      isDodged: firstResult.dodged
+      isDodged: firstResult.dodged,
+      isVampire: firstAttack.isVampire,
+      isStun: firstAttack.isStun,
+      isCounter: false,
+      attackerHP: Math.round(firstAttacker.currentHealth),
+      defenderHP: Math.round(secondAttacker.currentHealth),
+      attackerMaxHP: firstAttacker.stats.maxHealth,
+      defenderMaxHP: secondAttacker.stats.maxHealth
     })
 
     // 检查第二攻击者是否死亡
@@ -269,7 +276,14 @@ class CombatManager {
         damage: secondResult.damage,
         isCrit: secondAttack.isCrit,
         isCombo: secondAttack.isCombo,
-        isDodged: secondResult.dodged
+        isDodged: secondResult.dodged,
+        isVampire: secondAttack.isVampire,
+        isStun: secondAttack.isStun,
+        isCounter: firstResult.isCounter,
+        attackerHP: Math.round(secondAttacker.currentHealth),
+        defenderHP: Math.round(firstAttacker.currentHealth),
+        attackerMaxHP: secondAttacker.stats.maxHealth,
+        defenderMaxHP: firstAttacker.stats.maxHealth
       })
 
       // 检查第一攻击者是否死亡

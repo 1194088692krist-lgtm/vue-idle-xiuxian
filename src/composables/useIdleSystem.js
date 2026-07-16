@@ -8,6 +8,7 @@ import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } 
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
+import { getPillsByZone } from '../plugins/pills'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
@@ -1066,7 +1067,25 @@ function grantReward(effectiveZone, isIdleMode = false) {
     s.petFragments += fragmentAmount
     rewards.push({ type: 'pet_fragment', amount: fragmentAmount, name: '升星碎片' })
   }
-  
+
+  // 通关灭世难度有概率解锁丹方
+  if (diff >= 5 && Math.random() < 0.15) {
+    const pills = getPillsByZone(effectiveZone.id)
+    if (pills.length > 0) {
+      const lockedPills = pills.filter(p => !s.pillRecipes.includes(p.id))
+      if (lockedPills.length > 0) {
+        const pill = lockedPills[Math.floor(Math.random() * lockedPills.length)]
+        s.gainPillFragment(pill.id)
+        // 给足够多的残页直接解锁（灭世难度奖励）
+        const fragmentsNeeded = pill.fragmentsNeeded || 10
+        for (let i = 0; i < fragmentsNeeded; i++) {
+          s.gainPillFragment(pill.id)
+        }
+        rewards.push({ type: 'pill_recipe', name: pill.name + '丹方', amount: 1 })
+      }
+    }
+  }
+
   return rewards
 }
 
@@ -1273,14 +1292,64 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
       passiveSkills.forEach(skill => extras.push(`【${skill.name}】`))
       
       const combatResult = combatResults.find(cr => cr.memberId === member.id)
-      const damage = combatResult?.combatStats?.playerDamage || 0
-      const tookDamage = combatResult?.combatStats?.playerTookDamage || 0
-      const damageText = damage > 0 ? `\u521B\u6210 ${Math.floor(damage)} 点伤害` : ''
-      const tookDamageText = tookDamage > 0 ? `\u53D7\u5230 ${Math.floor(tookDamage)} 点伤害` : ''
-      const damageInfo = [damageText, tookDamageText].filter(Boolean).join('，')
+      const cs = combatResult?.combatStats
+      const damage = cs?.playerDamage || 0
+      const tookDamage = cs?.playerTookDamage || 0
+      const critCount = cs?.critCount || 0
+      const comboCount = cs?.comboCount || 0
+      const dodgeCount = cs?.dodgeCount || 0
+      const vampireCount = cs?.vampireCount || 0
+      const stunCount = cs?.stunCount || 0
+      const rounds = cs?.rounds || 0
+      
+      const damageText = damage > 0 ? `造成 ${Math.floor(damage)} 点伤害` : ''
+      const tookDamageText = tookDamage > 0 ? `受到 ${Math.floor(tookDamage)} 点伤害` : ''
+      const critText = critCount > 0 ? `暴击×${critCount}` : ''
+      const comboText = comboCount > 0 ? `连击×${comboCount}` : ''
+      const dodgeText = dodgeCount > 0 ? `闪避×${dodgeCount}` : ''
+      const vampireText = vampireCount > 0 ? `吸血×${vampireCount}` : ''
+      const stunText = stunCount > 0 ? `眩晕×${stunCount}` : ''
+      const roundsText = rounds > 0 ? `${rounds}回合` : ''
+      
+      const damageInfo = [damageText, tookDamageText, critText, comboText, dodgeText, vampireText, stunText, roundsText].filter(Boolean).join('，')
       
       if (extras.length > 0 || damageInfo) {
         text += '（' + [...extras, damageInfo].filter(Boolean).join('·') + '）'
+      }
+
+      // 显示每回合详细战斗数据
+      const roundDetails = cs?.roundDetails || []
+      if (roundDetails.length > 0) {
+        const memberRounds = roundDetails.filter(r => r.attacker === member.name || r.defender === member.name)
+        if (memberRounds.length > 0 && memberRounds.length <= 6) {
+          for (const rd of memberRounds) {
+            const hpPercent = rd.defenderMaxHP > 0 ? Math.round(rd.defenderHP / rd.defenderMaxHP * 100) : 0
+            const attackerHPPercent = rd.attackerMaxHP > 0 ? Math.round(rd.attackerHP / rd.attackerMaxHP * 100) : 0
+            let roundText = `第${rd.round}回合 `
+            if (rd.isPlayerAttack) {
+              if (rd.isDodged) {
+                roundText += `${rd.attacker}攻击被闪避`
+              } else {
+                roundText += `${rd.attacker}→${rd.defender} ${rd.damage}伤害`
+                if (rd.isCrit) roundText += ' [暴击]'
+                if (rd.isCombo) roundText += ' [连击]'
+                if (rd.isVampire) roundText += ' [吸血]'
+                if (rd.isStun) roundText += ' [眩晕]'
+              }
+              roundText += ` (敌方剩余${hpPercent}%`
+            } else {
+              if (rd.isDodged) {
+                roundText += `${rd.defender}闪避了${rd.attacker}的攻击`
+              } else {
+                roundText += `${rd.attacker}→${rd.defender} ${rd.damage}伤害`
+                if (rd.isCounter) roundText += ' [反击]'
+              }
+              roundText += ` (${rd.defender}剩余${hpPercent}%`
+            }
+            roundText += `/${rd.attacker}剩余${attackerHPPercent}%)`
+            addLog('combat', roundText)
+          }
+        }
       }
 
       const avatarUrl = getCharacterThumbnail(member)
@@ -1726,21 +1795,51 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     dodgeCount: 0,
     counterCount: 0,
     stunCount: 0,
-    vampireCount: 0
+    vampireCount: 0,
+    playerMaxHP: 0,
+    enemyMaxHP: 0,
+    playerFinalHP: 0,
+    enemyFinalHP: 0,
+    roundDetails: []
   }
   
   const collectTurnResults = (results) => {
     if (!results) return
     for (const r of results) {
-      if (r.attacker === playerEntity.name) {
+      const isPlayerAttacker = r.attacker === playerEntity.name
+      if (isPlayerAttacker) {
         combatStats.playerDamage += r.damage
         if (r.isCrit) combatStats.critCount++
         if (r.isCombo) combatStats.comboCount++
+        if (r.isVampire) combatStats.vampireCount++
+        if (r.isStun) combatStats.stunCount++
       } else {
         combatStats.enemyDamage += r.damage
         combatStats.playerTookDamage += r.damage
+        if (r.isCounter) combatStats.counterCount++
       }
       if (r.isDodged) combatStats.dodgeCount++
+      
+      // 记录每回合详情（限制数量避免内存膨胀）
+      if (combatStats.roundDetails.length < 20) {
+        combatStats.roundDetails.push({
+        round: combatStats.rounds,
+        attacker: r.attacker,
+        defender: r.defender,
+        damage: Math.round(r.damage),
+        isCrit: r.isCrit || false,
+        isCombo: r.isCombo || false,
+        isDodged: r.isDodged || false,
+        isVampire: r.isVampire || false,
+        isStun: r.isStun || false,
+        isCounter: r.isCounter || false,
+        attackerHP: r.attackerHP || 0,
+        defenderHP: r.defenderHP || 0,
+        attackerMaxHP: r.attackerMaxHP || 0,
+        defenderMaxHP: r.defenderMaxHP || 0,
+        isPlayerAttack: isPlayerAttacker
+      })
+      }
     }
   }
   

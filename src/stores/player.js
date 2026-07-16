@@ -7,7 +7,7 @@ import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEq
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats } from '../plugins/characters'
-import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig } from '../plugins/equipment'
+import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 
 // 装备出售/分解相关常量
@@ -1124,13 +1124,18 @@ export const usePlayerStore = defineStore('player', {
       if (!targetEquip) {
         return { success: false, message: '装备不存在' }
       }
-      if (this.refinementStones < enhanceConfig.costPerAttempt) {
+      if (this.refinementStones < reforgeConfig.costPerAttempt) {
         return { success: false, message: '洗练石不足' }
       }
       if (mode === 'single' && !targetStat) {
         return { success: false, message: '请选择要洗练的词条' }
       }
       const usedSafe = this.reforgeSafeCharges > 0
+      // 点击洗练立即扣费
+      this.refinementStones -= reforgeConfig.costPerAttempt
+      if (usedSafe) {
+        this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
+      }
       const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat)
       if (!result.success) {
         return result
@@ -1155,15 +1160,10 @@ export const usePlayerStore = defineStore('player', {
       if (!targetEquip) {
         return { success: false, message: '装备不存在' }
       }
-      if (this.refinementStones < enhanceConfig.costPerAttempt) {
+      if (this.refinementStones < reforgeConfig.costPerAttempt) {
         return { success: false, message: '洗练石不足' }
       }
       targetEquip.stats = { ...newStats }
-      this.refinementStones -= reforgeConfig.costPerAttempt
-      const usedSafe = this.reforgeSafeCharges > 0
-      if (usedSafe) {
-        this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
-      }
       this.queueSave()
       return { success: true, message: '洗练成功' }
     },
@@ -2049,7 +2049,7 @@ export const usePlayerStore = defineStore('player', {
       }
       if (!member.level) member.level = 1
       if (!member.experience) member.experience = 0
-      if (!member.baseStats) {
+      if (!member.baseStats || !member.baseStats.attack) {
         member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
       }
       this.cultivationPool -= numAmount
@@ -2100,11 +2100,12 @@ export const usePlayerStore = defineStore('player', {
         member.experience -= requiredExp
         member.level = nextLevel
         member.maxExperience = calculateLevelExp(member.level)
-        const statIncrease = calculateStatIncrease(member.level)
-        member.baseStats.attack += statIncrease.attack
-        member.baseStats.health += statIncrease.health
-        member.baseStats.defense += statIncrease.defense
-        member.baseStats.speed += statIncrease.speed
+        const starConfig = { 3: 1, 4: 1.2, 5: 1.5 }
+        const growth = starConfig[member.star] || 1
+        member.baseStats.attack = Math.round(member.baseStats.attack * (1 + 0.1 * growth))
+        member.baseStats.health = Math.round(member.baseStats.health * (1 + 0.15 * growth))
+        member.baseStats.defense = Math.round(member.baseStats.defense * (1 + 0.1 * growth))
+        member.baseStats.speed = Math.round(member.baseStats.speed * (1 + 0.08 * growth))
         levelsGained++
       }
       this.queueSave()
@@ -2138,7 +2139,15 @@ export const usePlayerStore = defineStore('player', {
       if (!result.success) {
         return { success: false, message: result.message }
       }
-      Object.assign(member, result.member)
+      // 保存突破次数（回炉重造保留突破数据）
+      const savedBreakThrough = member.breakThrough || 0
+      // 应用新的基础属性和天赋值
+      member.talentValue = result.newTalent
+      member.baseStats = result.newBaseStats
+      member.star = result.newStar
+      member.effortValue = 0
+      // 恢复突破次数
+      member.breakThrough = savedBreakThrough
       member.experience = 0
       member.level = 1
       member.maxExperience = calculateLevelExp(1)
