@@ -182,10 +182,15 @@ export async function loadSharedPortraits() {
     Object.entries(manifest).forEach(([id, data]) => {
       // 兼容新旧两种格式
       if (typeof data === 'object' && data.full) {
-        sharedPortraitMap[id] = {
+        const entry = {
           full: `${base}portraits/${data.full}`,
           thumbnail: data.thumbnail ? `${base}portraits/${data.thumbnail}` : null
         }
+        // 分层立绘（Live2D 伪视差用）
+        if (Array.isArray(data.layers) && data.layers.length > 0) {
+          entry.layers = data.layers.map(l => `${base}portraits/${l}`)
+        }
+        sharedPortraitMap[id] = entry
       } else if (typeof data === 'string') {
         sharedPortraitMap[id] = {
           full: `${base}portraits/${data}`,
@@ -219,6 +224,28 @@ export function getCharacterAvatar(member, size = 'full') {
 
 export function getCharacterThumbnail(member) {
   return getCharacterAvatar(member, 'thumbnail')
+}
+
+/**
+ * 获取角色的分层立绘 URL 数组（用于伪 Live2D 视差效果）
+ * 图层顺序从底到顶：[0]后发/背景层 → [1]身体层 → [2]前发层
+ * 返回 null 表示无分层立绘，调用方应回退到单图模式
+ */
+export function getCharacterLayers(member) {
+  if (!member) return null
+  const id = member.templateId || member.id
+  if (!id) return null
+  // 优先从 sharedPortraitMap 获取
+  if (sharedPortraitMap[id] && sharedPortraitMap[id].layers) {
+    return sharedPortraitMap[id].layers
+  }
+  // 其次从 characterDefMap 获取
+  if (characterDefMap[id] && characterDefMap[id].layers) {
+    return characterDefMap[id].layers
+  }
+  // 从角色定义列表获取
+  const t = characterList.find(c => c.id === id)
+  return (t && t.layers) || null
 }
 
 // 角色定位对应的初始战斗属性（独特数值信息）
