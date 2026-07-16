@@ -2698,4 +2698,77 @@ onUnmounted(() => {
 .sect-avatar {
   cursor: pointer;
 }
+
+/* ===== 日间模式：挂机仪表盘配色覆盖（深墨文字 + 浅色容器） ===== */
+html:not(.dark) .idle-section {
+  border-top-color: rgba(122, 158, 126, 0.25);
+}
+html:not(.dark) .idle-title {
+  color: #7A9E7E;
+}
+html:not(.dark) .idle-card {
+  background: rgba(122, 158, 126, 0.1);
+  border-color: rgba(122, 158, 126, 0.25);
+}
+html:not(.dark) .idle-card.selected {
+  border-color: #7A9E7E;
+  background: rgba(122, 158, 126, 0.18);
+}
+html:not(.dark) .dur-time {
+  color: #2E2A24;
+}
+html:not(.dark) .dur-info,
+html:not(.dark) .idle-count,
+html:not(.dark) .log-meta {
+  color: #5E564A;
+}
+html:not(.dark) .dur-cost {
+  color: #C9A33D;
+}
+html:not(.dark) .idle-timer {
+  color: #C9A33D;
+}
+html:not(.dark) .idle-hp {
+  background: rgba(122, 158, 126, 0.12);
+}
+html:not(.dark) .idle-hp-label {
+  color: #5E564A;
+}
+html:not(.dark) .idle-hp-num {
+  color: #2E2A24;
+}
+html:not(.dark) .idle-count {
+  color: #5E564A;
+}
+html:not(.dark) .idle-log-section {
+  background: rgba(255, 252, 247, 0.7);
+  border-color: rgba(122, 158, 126, 0.25);
+}
+html:not(.dark) .section-title {
+  color: #7A9E7E;
+}
+html:not(.dark) .log-line.scene {
+  color: #5E564A;
+  border-left-color: rgba(122, 158, 126, 0.5);
+  background: rgba(122, 158, 126, 0.08);
+}
+html:not(.dark) .log-line.enemy-normal {
+  color: #6B4F2A;
+  border-left-color: rgba(122, 158, 126, 0.6);
+}
+html:not(.dark) .log-line.enemy-elite {
+  color: #7A4FB0;
+  border-left-color: #7A4FB0;
+  background: rgba(122, 90, 160, 0.1);
+  text-shadow: none;
+}
+html:not(.dark) .log-line.enemy-boss {
+  color: #B8860B;
+  border-left-color: #C44D4D;
+  background: rgba(196, 77, 77, 0.1);
+  text-shadow: none;
+}
+html:not(.dark) .idle-hp-warn {
+  color: #C44D4D;
+}
 </style>

@@ -1009,11 +1009,16 @@ import SaveButton from './components/SaveButton.vue'
 
   /* 白天模式（日间模式）样式 - 国风青绿山水配色 */
   html:not(.dark) .game-container {
-    background: linear-gradient(135deg, #F8F5EF 0%, #EDE8DD 50%, #F8F5EF 100%);
+    background-color: #F8F5EF;
+    background-image: url('/assets/bg/main_bg.png');
+    background-size: cover;
+    background-position: center top;
+    background-repeat: no-repeat;
+    background-attachment: fixed;
   }
 
   html:not(.dark) .top-bar {
-    background: rgba(255, 252, 247, 0.95);
+    background: rgba(248, 245, 239, 0.55);
     border-bottom: 1px solid rgba(122, 158, 126, 0.4);
   }
 
@@ -1061,7 +1066,7 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   html:not(.dark) .cultivation-bar {
-    background: rgba(248, 245, 239, 0.95);
+    background: rgba(248, 245, 239, 0.6);
     border-bottom: 1px solid rgba(122, 158, 126, 0.3);
   }
 
@@ -1074,7 +1079,7 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   html:not(.dark) .bottom-nav {
-    background: rgba(248, 245, 239, 0.98);
+    background: rgba(248, 245, 239, 0.55);
     border-top: 1px solid rgba(122, 158, 126, 0.3);
   }
 
@@ -1087,7 +1092,7 @@ import SaveButton from './components/SaveButton.vue'
   }
 
   html:not(.dark) .desktop-sidebar {
-    background: rgba(248, 245, 239, 0.98);
+    background: rgba(248, 245, 239, 0.55);
     border-right: 1px solid rgba(122, 158, 126, 0.3);
   }
 
@@ -1098,10 +1103,6 @@ import SaveButton from './components/SaveButton.vue'
   html:not(.dark) .content-area {
     position: relative;
     color: #2E2A24;
-    background-image: url('/assets/bg/main_bg.png');
-    background-size: cover;
-    background-position: center top;
-    background-repeat: no-repeat;
     isolation: isolate;
   }
 
@@ -1109,7 +1110,7 @@ import SaveButton from './components/SaveButton.vue'
     content: '';
     position: absolute;
     inset: 0;
-    background: rgba(248, 245, 239, 0.72);
+    background: rgba(248, 245, 239, 0.62);
     pointer-events: none;
     z-index: -1;
   }

@@ -23,6 +23,61 @@
       <n-space vertical>
         <!-- 层数显示 -->
         <n-statistic label="当前层数" :value="dungeonState.floor" />
+        <!-- 当前遭遇怪物状态面板（常驻显示） -->
+        <n-card
+          v-if="dungeonState.combatManager?.enemy"
+          class="enemy-status-card"
+          :bordered="false"
+          style="margin-bottom: 12px"
+        >
+          <template #header>
+            <span class="enemy-status-title">👹 当前遭遇：{{ dungeonState.combatManager.enemy.name }}</span>
+          </template>
+          <!-- 血条 -->
+          <div class="es-hp-row">
+            <span class="es-hp-label">生命</span>
+            <div class="es-hp-bar">
+              <div
+                class="es-hp-fill"
+                :style="{
+                  width: `${
+                    (dungeonState.combatManager.enemy.currentHealth /
+                      dungeonState.combatManager.enemy.stats.maxHealth) *
+                    100
+                  }%`
+                }"
+              ></div>
+            </div>
+            <span class="es-hp-text">
+              {{ dungeonState.combatManager.enemy.currentHealth.toFixed(1) }} /
+              {{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}
+            </span>
+          </div>
+          <!-- 数值信息 -->
+          <div class="es-stats-grid">
+            <div class="es-stat"><span>攻击力</span><b>{{ dungeonState.combatManager.enemy.stats.damage.toFixed(1) }}</b></div>
+            <div class="es-stat"><span>防御力</span><b>{{ dungeonState.combatManager.enemy.stats.defense.toFixed(1) }}</b></div>
+            <div class="es-stat"><span>速度</span><b>{{ dungeonState.combatManager.enemy.stats.speed.toFixed(1) }}</b></div>
+            <div class="es-stat"><span>生命上限</span><b>{{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}</b></div>
+          </div>
+          <!-- 正面/负面状态 -->
+          <div class="es-status-group">
+            <div class="es-status-col">
+              <div class="es-status-title positive">正面状态</div>
+              <div v-for="s in enemyPositiveStatuses" :key="s.name" class="es-status-chip positive">
+                {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
+              </div>
+              <div v-if="enemyPositiveStatuses.length === 0" class="es-status-empty">无</div>
+            </div>
+            <div class="es-status-col">
+              <div class="es-status-title negative">负面状态</div>
+              <div v-for="s in enemyNegativeStatuses" :key="s.name" class="es-status-chip negative">
+                {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
+              </div>
+              <div v-if="enemyNegativeStatuses.length === 0" class="es-status-empty">无</div>
+            </div>
+          </div>
+        </n-card>
         <!-- 选项界面 -->
         <n-card v-if="dungeonState.showingOptions" title="选择增益">
           <template #header-extra>
@@ -99,56 +154,6 @@
                 </div>
               </div>
             </div>
-            <!-- 当前遭遇怪物状态面板 -->
-            <n-card class="enemy-status-card" :bordered="false" v-if="dungeonState.combatManager?.enemy">
-              <template #header>
-                <span class="enemy-status-title">👹 当前遭遇：{{ dungeonState.combatManager.enemy.name }}</span>
-              </template>
-              <!-- 血条 -->
-              <div class="es-hp-row">
-                <span class="es-hp-label">生命</span>
-                <div class="es-hp-bar">
-                  <div
-                    class="es-hp-fill"
-                    :style="{
-                      width: `${
-                        (dungeonState.combatManager.enemy.currentHealth /
-                          dungeonState.combatManager.enemy.stats.maxHealth) *
-                        100
-                      }%`
-                    }"
-                  ></div>
-                </div>
-                <span class="es-hp-text">
-                  {{ dungeonState.combatManager.enemy.currentHealth.toFixed(1) }} /
-                  {{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}
-                </span>
-              </div>
-              <!-- 数值信息 -->
-              <div class="es-stats-grid">
-                <div class="es-stat"><span>攻击力</span><b>{{ dungeonState.combatManager.enemy.stats.damage.toFixed(1) }}</b></div>
-                <div class="es-stat"><span>防御力</span><b>{{ dungeonState.combatManager.enemy.stats.defense.toFixed(1) }}</b></div>
-                <div class="es-stat"><span>速度</span><b>{{ dungeonState.combatManager.enemy.stats.speed.toFixed(1) }}</b></div>
-                <div class="es-stat"><span>生命上限</span><b>{{ dungeonState.combatManager.enemy.stats.maxHealth.toFixed(1) }}</b></div>
-              </div>
-              <!-- 正面/负面状态 -->
-              <div class="es-status-group">
-                <div class="es-status-col">
-                  <div class="es-status-title positive">正面状态</div>
-                  <div v-for="s in enemyPositiveStatuses" :key="s.name" class="es-status-chip positive">
-                    {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
-                  </div>
-                  <div v-if="enemyPositiveStatuses.length === 0" class="es-status-empty">无</div>
-                </div>
-                <div class="es-status-col">
-                  <div class="es-status-title negative">负面状态</div>
-                  <div v-for="s in enemyNegativeStatuses" :key="s.name" class="es-status-chip negative">
-                    {{ s.name }} {{ (s.value * 100).toFixed(1) }}%
-                  </div>
-                  <div v-if="enemyNegativeStatuses.length === 0" class="es-status-empty">无</div>
-                </div>
-              </div>
-            </n-card>
             <n-modal
               v-model:show="infoShow"
               preset="dialog"
