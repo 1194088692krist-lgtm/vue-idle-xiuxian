@@ -548,7 +548,7 @@ const resonanceDesc = computed(() => {
 })
 
 // 槽位中文映射
-const slotNames = { head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带' }
+const slotNames = { head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带', artifact:'法宝' }
 const slots = Object.keys(slotNames)
 const slotBgImages = {
   head: '/assets/icons/reward_eq_head.png',
@@ -561,7 +561,8 @@ const slotBgImages = {
   necklace: '/assets/icons/reward_eq_necklace.png',
   ring1: '/assets/icons/reward_eq_ring.png',
   ring2: '/assets/icons/reward_eq_ring.png',
-  belt: '/assets/icons/reward_eq_belt.png'
+  belt: '/assets/icons/reward_eq_belt.png',
+  artifact: '/assets/icons/reward_eq_artifact.png'
 }
 
 const rarityColorMap = {
@@ -1903,11 +1904,10 @@ watch([allMembers, teamMembers], () => {
   bottom: 0;
   background: rgba(0, 0, 0, 0.7);
   display: flex;
-  align-items: flex-start;
+  align-items: center;
   justify-content: center;
   z-index: 1000;
   padding: 16px;
-  padding-top: 60px;
 }
 .modal-content {
   width: 100%;

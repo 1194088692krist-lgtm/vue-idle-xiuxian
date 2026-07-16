@@ -67,17 +67,6 @@
                   {{ item.name }}
                   <span class="equip-category-tag">{{ getEquipCategoryName(item.slot) }}</span>
                 </span>
-                <button
-                  v-if="!isEquipped(item)"
-                  class="btn-small btn-primary"
-                  @click.stop="equipItem(item)"
-                  :disabled="(item.requiredRealm || 1) > playerStore.level"
-                >装备</button>
-                <button
-                  v-else
-                  class="btn-small btn-danger"
-                  @click.stop="unequipItem(item.slot || item.type)"
-                >卸下</button>
               </div>
               <div class="card-body">
                 <div class="equip-meta">
@@ -405,8 +394,8 @@
   </div>
 
   <!-- 装备详情弹窗 -->
-  <div v-if="showEquipmentDetailModal" class="simple-modal" @click.self="showEquipmentDetailModal = false">
-    <div class="simple-modal-content">
+  <div v-if="showEquipmentDetailModal" class="simple-modal equipment-detail-modal" @click.self="showEquipmentDetailModal = false">
+    <div class="simple-modal-content equipment-detail-content">
       <div class="modal-header">
         <h3>{{ selectedEquipment?.name || '装备详情' }}</h3>
         <button class="btn-small" @click="showEquipmentDetailModal = false">关闭</button>
@@ -1748,6 +1737,21 @@
   .simple-modal-content.wide {
     max-width: 90vw;
     max-height: calc(100vh - 50px);
+  }
+
+  /* 装备详情弹窗：直接铺满屏幕，底部预留空白条方便点击返回 */
+  .simple-modal.equipment-detail-modal {
+    padding: 0;
+    align-items: flex-start;
+  }
+
+  .equipment-detail-modal .equipment-detail-content {
+    width: 100%;
+    max-width: 100%;
+    height: calc(100vh - 80px);
+    max-height: calc(100vh - 80px);
+    border-radius: 0;
+    padding: 16px 16px 24px;
   }
 
   .modal-header {
