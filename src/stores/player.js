@@ -555,8 +555,21 @@ export const usePlayerStore = defineStore('player', {
       // 兼容初始化：旧存档可能没有新字段
       if (!this.ownedPills || typeof this.ownedPills !== 'object') this.ownedPills = {}
       if (!Array.isArray(this.activePillBuffs)) this.activePillBuffs = []
+      // 关键状态对象空值保护，防止 recomputeAttributes 中 Object.keys(null) 崩溃
+      if (!this.combatAttributes || typeof this.combatAttributes !== 'object') this.combatAttributes = {}
+      if (!this.combatResistance || typeof this.combatResistance !== 'object') this.combatResistance = {}
+      if (!this.specialAttributes || typeof this.specialAttributes !== 'object') this.specialAttributes = {}
+      if (!this.equippedArtifacts || typeof this.equippedArtifacts !== 'object') this.equippedArtifacts = {}
+      if (!this.baseAttributes || typeof this.baseAttributes !== 'object') this.baseAttributes = {}
+      if (!this.artifactBonuses || typeof this.artifactBonuses !== 'object') this.artifactBonuses = {}
+      if (!this.rebirthBonus || typeof this.rebirthBonus !== 'object') this.rebirthBonus = {}
+      if (!this.permanentBonuses || typeof this.permanentBonuses !== 'object') this.permanentBonuses = {}
       // 从干净基线重算派生属性（装备/套装/灵宠），根治「存档重载后加成重复叠加」
-      this.recomputeAttributes()
+      try {
+        this.recomputeAttributes()
+      } catch (e) {
+        console.error('重算属性失败，使用默认值:', e)
+      }
     },
     // 创建新玩家数据
     initNewPlayer() {

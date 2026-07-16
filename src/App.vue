@@ -235,12 +235,20 @@ import SaveButton from './components/SaveButton.vue'
     await new Promise(r => setTimeout(r, 100))
 
     updateLoading('正在加载存档数据...', 20)
-    await playerStore.initializePlayer()
+    try {
+      await playerStore.initializePlayer()
+    } catch (e) {
+      console.error('初始化存档失败，尝试继续:', e)
+    }
 
     // 已登录：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
     if (useAuthStore().isLoggedIn) {
       try {
-        await playerStore.migrate({ interactive: false })
+        // 5 秒超时，防止网络请求 hang 住导致加载卡死
+        await Promise.race([
+          playerStore.migrate({ interactive: false }),
+          new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 5000))
+        ])
       } catch (e) {
         console.warn('启动云同步失败（不影响本地游玩）:', e)
       }

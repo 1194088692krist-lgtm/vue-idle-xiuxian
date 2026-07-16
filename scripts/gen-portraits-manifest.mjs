@@ -1,13 +1,20 @@
 import { readFileSync, writeFileSync, readdirSync, existsSync, mkdirSync } from 'node:fs'
 import { dirname, join, extname, basename } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import sharp from 'sharp'
 
 const __dirname = dirname(fileURLToPath(import.meta.url))
 const root = join(__dirname, '..')
 const portraitsDir = join(root, 'public', 'portraits')
 const thumbnailsDir = join(portraitsDir, 'thumbnails')
 const charFile = join(root, 'src', 'plugins', 'characters.js')
+
+// 动态加载 sharp，未安装时优雅降级（跳过缩略图生成）
+let sharp = null
+try {
+  sharp = (await import('sharp')).default
+} catch {
+  console.warn('[portraits] sharp 未安装，跳过缩略图生成')
+}
 
 const idName = []
 try {
@@ -43,6 +50,10 @@ async function processFile(file) {
   const thumbnailPath = join(thumbnailsDir, thumbnailFile)
   
   if (!existsSync(thumbnailPath)) {
+    if (!sharp) {
+      // sharp 不可用时，manifest 仍记录图片但无缩略图
+      return { id, file, thumbnailFile: null, generated: false }
+    }
     try {
       await sharp(filePath)
         .resize(128, 128, { fit: 'cover' })
