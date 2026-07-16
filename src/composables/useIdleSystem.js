@@ -48,14 +48,14 @@ const ROLE_EFFECTS = {
   blade: {
     name: '刀锋连击',
     effect: (memberState, teamStates) => {
-      const bleed = Math.floor((memberState.baseStats?.attack || memberState.damage || 0) * 0.15)
+      const bleed = Math.floor((memberState.damage || memberState.attack || 0) * 0.15)
       return { type: 'damage_over_time', value: bleed, desc: `${memberState.name}触发刀锋连击，敌人陷入流血状态，每秒受到 ${bleed} 伤害` }
     }
   },
   herb: {
     name: '药引治疗',
     effect: (memberState, teamStates) => {
-      const healAmount = Math.floor((memberState.baseStats?.health || memberState.maxHealth || 0) * 0.15)
+      const healAmount = Math.floor((memberState.maxHealth || memberState.maxHP || 0) * 0.15)
       let healed = 0
       for (const ts of teamStates) {
         if (ts.hp > 0 && ts.hp < ts.maxHP) {
@@ -70,7 +70,7 @@ const ROLE_EFFECTS = {
   shield: {
     name: '护法护盾',
     effect: (memberState, teamStates) => {
-      const absorb = Math.floor((memberState.baseStats?.defense || memberState.defense || 0) * 0.2)
+      const absorb = Math.floor((memberState.defense || 0) * 0.2)
       return { type: 'shield', value: absorb, desc: `${memberState.name}开启护法护盾，全队获得吸收 ${absorb} 伤害的护盾` }
     }
   },
@@ -700,7 +700,8 @@ function buildEffectiveZone(zone, diff) {
     difficultyLabel: diff.label,
     difficultyColor: diff.color,
     enemyScale: diff.enemyScale,
-    dropBonus: diff.dropBonus
+    dropBonus: diff.dropBonus,
+    difficulty: diff.difficulty
   }
 }
 
@@ -1970,37 +1971,72 @@ function startIdle(durationMinutes) {
 
   const team = s.getTeamMembersDetail()
   teamMemberStates.value = team.map(member => {
-    let maxHP = member.baseStats?.health || 0
+    const baseStats = member.baseStats || {}
     const talentStats = member.talentStats || {}
-    const talentHealthMult = 1 + (talentStats.health || 0)
-    maxHP = Math.floor(maxHP * talentHealthMult)
-    
+
+    const calcFinalStat = (key, baseValue) => {
+      const talentVal = talentStats[key] || 0
+      if (['attack', 'health', 'defense', 'speed'].includes(key)) {
+        return Math.floor(baseValue * (1 + talentVal))
+      }
+      return baseValue + talentVal
+    }
+
+    let finalHealth = calcFinalStat('health', baseStats.health || 0)
+    let finalAttack = calcFinalStat('attack', baseStats.attack || 0)
+    let finalDefense = calcFinalStat('defense', baseStats.defense || 0)
+    let finalSpeed = calcFinalStat('speed', baseStats.speed || 0)
+
+    const equipBonus = {}
     const artifacts = member.equippedArtifacts || {}
-    let equipHealthFlat = 0
-    let equipHealthPct = 0
     Object.values(artifacts).forEach(eq => {
       if (!eq) return
-      if (eq.stats?.health) equipHealthFlat += eq.stats.health
+      if (eq.stats) {
+        Object.entries(eq.stats).forEach(([k, v]) => {
+          equipBonus[k] = (equipBonus[k] || 0) + v
+        })
+      }
       if (eq.affixes) {
         eq.affixes.forEach(a => {
-          if (a.stat === 'health') {
-            if (a.valueType === 'percent') equipHealthPct += a.value
-            else equipHealthFlat += a.value
+          if (a.valueType === 'percent') {
+            equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
+          } else if (a.stat) {
+            equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
           }
         })
       }
     })
-    maxHP = Math.floor((maxHP + equipHealthFlat) * (1 + equipHealthPct))
-    
-    if (member.equippedPet?.combatAttributes?.health) {
-      maxHP += member.equippedPet.combatAttributes.health
+
+    const applyEquipBonus = (key, baseVal) => {
+      const flat = equipBonus[key] || 0
+      const pct = equipBonus['__pct_' + key] || 0
+      return (baseVal + flat) * (1 + pct)
     }
-    
+
+    finalHealth = Math.floor(applyEquipBonus('health', finalHealth))
+    finalAttack = Math.floor(applyEquipBonus('attack', finalAttack))
+    finalDefense = Math.floor(applyEquipBonus('defense', finalDefense))
+    finalSpeed = Math.floor(applyEquipBonus('speed', finalSpeed))
+
+    const pet = member.equippedPet
+    if (pet && pet.combatAttributes) {
+      const pca = pet.combatAttributes
+      finalHealth += pca.health || 0
+      finalAttack += pca.attack || 0
+      finalDefense += pca.defense || 0
+      finalSpeed += pca.speed || 0
+    }
+
     return {
       memberId: member.id,
       name: member.name,
-      hp: maxHP,
-      maxHP: maxHP,
+      hp: finalHealth,
+      maxHP: finalHealth,
+      maxHealth: finalHealth,
+      attack: finalAttack,
+      damage: finalAttack,
+      defense: finalDefense,
+      speed: finalSpeed,
       buildStrength: s.getCharacterBuildStrength(member)
     }
   })
