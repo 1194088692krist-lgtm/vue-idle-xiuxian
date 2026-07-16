@@ -173,23 +173,35 @@ export async function initCharacterDefs() {
 
 export const sharedPortraitMap = reactive({})
 
-// 立绘资源加载状态：避免重复 fetch，并保证失败时使用静态回退
+// 立绘资源加载状态：避免重复 fetch
 let portraitsLoaded = false
 
 export async function loadSharedPortraits() {
   if (portraitsLoaded) return
   const base = import.meta.env.BASE_URL || './'
-  try {
-    // fetch 加 3 秒超时，防止网络慢或 hang 住导致游戏加载卡死
-    const res = await Promise.race([
-      fetch(`${base}portraits/manifest.json`, { cache: 'force-cache' }),
-      new Promise((_, reject) => setTimeout(() => reject(new Error('manifest 加载超时')), 3000))
-    ])
-    if (!res.ok) throw new Error(`HTTP ${res.status}`)
-    const manifest = await res.json()
-    if (manifest && typeof manifest === 'object') {
+
+  // 1. 立即用静态回退填充 sharedPortraitMap，头像立绘立即可见（不阻塞游戏加载）
+  characterList.forEach(c => {
+    if (!sharedPortraitMap[c.id]) {
+      sharedPortraitMap[c.id] = {
+        full: `${base}portraits/${c.id}.jpg`,
+        thumbnail: null
+      }
+    }
+  })
+  portraitsLoaded = true
+
+  // 2. 后台异步加载 manifest.json（不阻塞 initCharacterDefs）
+  //    成功后更新 sharedPortraitMap，补全 thumbnail 和 video 字段
+  //    由于 sharedPortraitMap 是 reactive，更新后 UI 会自动刷新
+  fetch(`${base}portraits/manifest.json`, { cache: 'force-cache' })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    })
+    .then(manifest => {
+      if (!manifest || typeof manifest !== 'object') return
       Object.entries(manifest).forEach(([id, data]) => {
-        // 兼容新旧两种格式
         if (typeof data === 'object' && data.full) {
           const entry = {
             full: `${base}portraits/${data.full}`,
@@ -207,21 +219,11 @@ export async function loadSharedPortraits() {
           }
         }
       })
-    }
-  } catch (e) {
-    console.warn('[portraits] 加载 manifest.json 失败，使用静态回退:', e.message)
-    // 静态回退：用 characterList 生成默认 sharedPortraitMap（假设图片文件存在）
-    // 这样即使 manifest.json 拉取失败，头像立绘也能立即显示，无需等待重试
-    characterList.forEach(c => {
-      if (!sharedPortraitMap[c.id]) {
-        sharedPortraitMap[c.id] = {
-          full: `${base}portraits/${c.id}.jpg`,
-          thumbnail: null
-        }
-      }
+      console.log('[portraits] manifest.json 后台加载完成，立绘资源已更新（含缩略图和视频）')
     })
-  }
-  portraitsLoaded = true
+    .catch(e => {
+      console.warn('[portraits] 后台加载 manifest.json 失败，使用静态回退:', e.message)
+    })
 }
 
 export function getCharacterAvatar(member, size = 'full') {

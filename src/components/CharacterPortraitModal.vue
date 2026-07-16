@@ -14,8 +14,10 @@
               alt="角色立绘"
               draggable="false"
             />
-            <!-- 动态视频：加载完成后淡入覆盖并自动播放。preload=metadata 仅拉取元数据，
-                 通过 tryPlay() 触发 play() 后才开始下载视频流，避免打开弹窗即下载整个 985KB -->
+            <!-- 动态视频：加载完成后淡入覆盖并自动播放。
+                 preload=auto 确保 canplay/loadeddata 事件触发，从而调用 tryPlay() 播放视频。
+                 仅在 shouldShowVideo 为 true（即用户点击了有视频的立绘）时才渲染 video 元素，
+                 避免不必要的视频下载 -->
             <video
               v-if="shouldShowVideo"
               ref="videoEl"
@@ -23,7 +25,7 @@
               :class="{ 'is-visible': videoReady }"
               :src="videoSrc"
               :poster="avatar || undefined"
-              preload="metadata"
+              preload="auto"
               muted
               loop
               playsinline
@@ -44,7 +46,7 @@
 </template>
 
 <script setup>
-import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { getCharacterAvatar, getCharacterVideo } from '../plugins/characters'
 import { usePlayerStore } from '../stores/player'
 
@@ -79,13 +81,21 @@ const onVideoError = () => {
   videoReady.value = false
 }
 
+// 组件挂载后立即尝试播放（处理视频已缓存、canplay 不再触发的情况）
+onMounted(() => {
+  if (shouldShowVideo.value) {
+    nextTick(() => requestAnimationFrame(tryPlay))
+  }
+})
+
 // 切换角色 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
 watch(
   () => [props.character, shouldShowVideo.value, videoSrc.value],
   () => {
     videoReady.value = false
     if (shouldShowVideo.value) {
-      requestAnimationFrame(tryPlay)
+      // 等待 video 元素渲染后再尝试播放
+      nextTick(() => requestAnimationFrame(tryPlay))
     }
   }
 )
