@@ -203,6 +203,28 @@
       <div class="team-actions">
         <button class="btn btn-success" @click="autoPickBestTeam">一键组建最强队伍</button>
       </div>
+      <!-- 宗派共鸣信息 -->
+      <div v-if="resonanceInfo && (resonanceInfo.uniform.length || resonanceInfo.combo.length)" class="resonance-panel">
+        <div class="resonance-header">
+          <span class="resonance-title">宗派共鸣</span>
+          <span class="resonance-mult">战力加成 ×{{ resonanceMultiplier }}</span>
+        </div>
+        <div class="resonance-list">
+          <div v-for="(u, idx) in resonanceInfo.uniform" :key="'u'+idx" class="resonance-item uniform">
+            <span class="resonance-name">{{ u.name }}</span>
+            <span class="resonance-level">{{ u.level }}人同宗</span>
+            <span class="resonance-desc">{{ u.desc }}</span>
+          </div>
+          <div v-for="(c, idx) in resonanceInfo.combo" :key="'c'+idx" class="resonance-item combo">
+            <span class="resonance-name">{{ c.name }}</span>
+            <span class="resonance-desc">{{ c.desc }}</span>
+          </div>
+        </div>
+      </div>
+      <div v-else-if="teamMembers.length > 0" class="resonance-panel empty">
+        <span class="resonance-title">宗派共鸣</span>
+        <span class="resonance-hint">当前队伍宗派搭配未触发共鸣效果</span>
+      </div>
       <div v-if="allMembers.length" class="bench-list">
         <div class="bench-pagination">
           <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
@@ -210,7 +232,7 @@
           <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
         </div>
         <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
-          <div class="bench-avatar">
+          <div class="bench-avatar" @click="openMemberPortrait(m)" title="点击查看立绘">
             <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
@@ -398,6 +420,7 @@ import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
+import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 
 const playerStore = usePlayerStore()
@@ -505,7 +528,24 @@ const sectSize = computed(() => playerStore.sectMembers?.length || 0)
 const sectMax = computed(() => playerStore.maxSectSize || 0)
 const teamSize = computed(() => playerStore.teamMembers?.length || 0)
 const teamMax = computed(() => playerStore.maxTeamSize || 0)
-const totalStrength = computed(() => teamMembers.value.reduce((sum, m) => sum + (playerStore.getCharacterBuildStrength(m) || 0), 0))
+const totalStrength = computed(() => {
+  const base = teamMembers.value.reduce((sum, m) => sum + (playerStore.getCharacterBuildStrength(m) || 0), 0)
+  const mult = getResonanceBuildMultiplier(teamMembers.value)
+  return Math.round(base * mult)
+})
+
+// 宗派共鸣信息
+const resonanceInfo = computed(() => {
+  const team = teamMembers.value
+  if (team.length === 0) return null
+  return getAllResonanceEffects(team)
+})
+const resonanceMultiplier = computed(() => getResonanceBuildMultiplier(teamMembers.value))
+const resonanceDesc = computed(() => {
+  const team = teamMembers.value
+  if (team.length === 0) return []
+  return getResonanceDesc(team)
+})
 
 // 槽位中文映射
 const slotNames = { weapon:'武器', head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带' }
@@ -776,6 +816,11 @@ const openPortrait = () => {
 
 const openDetailPortrait = () => {
   portraitCharacter.value = detailMember.value
+  showPortrait.value = true
+}
+
+const openMemberPortrait = (member) => {
+  portraitCharacter.value = member
   showPortrait.value = true
 }
 
@@ -1769,6 +1814,80 @@ watch([allMembers, teamMembers], () => {
   color: #5a6378;
   font-size: 13px;
 }
+
+/* 宗派共鸣面板 */
+.resonance-panel {
+  background: rgba(0, 0, 0, 0.25);
+  border: 1px solid rgba(218, 165, 32, 0.25);
+  border-radius: 8px;
+  padding: 10px 12px;
+  margin-bottom: 12px;
+}
+.resonance-panel.empty {
+  border-color: rgba(255, 255, 255, 0.08);
+  display: flex;
+  align-items: center;
+  gap: 10px;
+}
+.resonance-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 8px;
+}
+.resonance-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #DAA520;
+}
+.resonance-mult {
+  font-size: 12px;
+  color: #FFD700;
+  background: rgba(218, 165, 32, 0.15);
+  padding: 2px 8px;
+  border-radius: 4px;
+}
+.resonance-hint {
+  font-size: 12px;
+  color: #666;
+}
+.resonance-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+.resonance-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  font-size: 12px;
+  padding: 4px 8px;
+  background: rgba(255, 255, 255, 0.03);
+  border-radius: 6px;
+}
+.resonance-item.uniform {
+  border-left: 3px solid #ff6b6b;
+}
+.resonance-item.combo {
+  border-left: 3px solid #4ecdc4;
+}
+.resonance-name {
+  font-weight: bold;
+  color: #fff;
+  min-width: 80px;
+}
+.resonance-level {
+  color: #DAA520;
+  font-size: 11px;
+  background: rgba(218, 165, 32, 0.12);
+  padding: 1px 6px;
+  border-radius: 4px;
+}
+.resonance-desc {
+  color: #aaa;
+  flex: 1;
+}
+
 .btn-small {
   padding: 6px 10px;
   font-size: 12px;

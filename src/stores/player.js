@@ -8,6 +8,7 @@ import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig } from '../plugins/equipment'
+import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
@@ -1876,11 +1877,15 @@ export const usePlayerStore = defineStore('player', {
     getTeamMembersDetail() {
       return this.teamMembers.map(id => this.sectMembers.find(m => m.id === id)).filter(Boolean)
     },
-    // 获取队伍总Build强度
+    // 获取队伍总Build强度（含宗派共鸣加成）
     getTeamTotalBuild() {
-      return this.getTeamMembersDetail().reduce((sum, member) => {
+      const team = this.getTeamMembersDetail()
+      const baseTotal = team.reduce((sum, member) => {
         return sum + this.getCharacterBuildStrength(member)
       }, 0)
+      // 应用宗派共鸣战力加成
+      const resonanceMultiplier = getResonanceBuildMultiplier(team)
+      return Math.round(baseTotal * resonanceMultiplier)
     },
     // 获取单个角色的Build强度
     // 人物强度占40%，装备强度占60%

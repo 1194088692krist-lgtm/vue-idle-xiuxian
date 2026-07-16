@@ -2,6 +2,7 @@ import { ref, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
+import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
@@ -1707,7 +1708,12 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     resistanceBoost: calcFinalStat('resistanceBoost', specialAttrs.resistanceBoost || 0) + (equipBonus.resistanceBoost || 0) + (pet?.combatAttributes?.resistanceBoost || 0)
   }
   
-  const playerEntity = new CombatEntity(member.name, member.level, stats, member.schoolName)
+  // 应用宗派共鸣加成（基于当前出战队伍）
+  const team = s.getTeamMembersDetail()
+  const resonanceEffects = getAllResonanceEffects(team)
+  const resonancedStats = applyResonanceToCombatStats(stats, resonanceEffects)
+
+  const playerEntity = new CombatEntity(member.name, member.level, resonancedStats, member.schoolName)
   const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
   const allDrops = []
   
