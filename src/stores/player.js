@@ -40,6 +40,8 @@ export const usePlayerStore = defineStore('player', {
     // 云存档：登录后保存自动同步；cloudConflicts 为分支③待用户抉择的冲突列表
     cloudConflicts: [],
     cloudSyncStatus: '',
+    // GM 礼包收件箱（全局）：登录/启动自动拉取，供顶部铃铛红点与设置页共用
+    gifts: [],
     // 当前存档所在槽位（null 表示尚未指定，自动存档时默认写入槽位 1）
     currentSlot: null,
     // 是否新玩家
@@ -284,6 +286,8 @@ export const usePlayerStore = defineStore('player', {
     maxTeamSize: 3
   }),
   getters: {
+    // 待领取礼包数量（驱动顶部铃铛红点）
+    giftCount: s => (s.gifts || []).length,
     // 获取灵宠的属性加成
     getPetBonus() {
       if (!this.activePet)
@@ -784,6 +788,18 @@ export const usePlayerStore = defineStore('player', {
         await this.initializePlayer()
       }
     },
+    // 拉取当前玩家的待领取礼包（全局，供顶部铃铛与设置页共用）
+    async loadGifts() {
+      const auth = useAuthStore()
+      if (!auth.isLoggedIn) { this.gifts = []; return }
+      try {
+        const r = await fetch('/api/inbox', { headers: { ...auth.authHeaders() } })
+        const data = await r.json().catch(() => ({}))
+        this.gifts = data.ok ? (data.gifts || []) : []
+      } catch {
+        this.gifts = []
+      }
+    },
     // 领取礼包：标记并入存档
     async claimGift(giftId) {
       const auth = useAuthStore()
@@ -809,7 +825,9 @@ export const usePlayerStore = defineStore('player', {
           }
         }
       }
-      this.queueSave()
+      // 即时落盘（不再走防抖 queueSave）：领取结果立刻写入本地 + 触发云同步，
+      // 避免在网络同步/页面卸载前被领取前的旧存档覆盖，确保玩家「真的收到」
+      await this.saveData()
       return items
     },
     // 导出存档数据

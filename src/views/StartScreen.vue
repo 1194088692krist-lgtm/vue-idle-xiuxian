@@ -311,6 +311,8 @@ const handleLogin = async () => {
     } catch (e) {
       console.warn('云端迁移失败：', e)
     }
+    // 登录后立即拉取 GM 礼包收件箱，驱动全局铃铛红点
+    playerStore.loadGifts().catch(() => {})
   } catch (e) {
     message.error('登录失败：' + (e.message || e))
   } finally {
@@ -326,6 +328,8 @@ const handleRegister = async () => {
     const data = await auth.register(loginForm.value.username.trim(), loginForm.value.password)
     message.success(`注册成功，已自动登录 ${data.user.username}`)
     loginForm.value.password = ''
+    // 注册后拉取礼包收件箱
+    playerStore.loadGifts().catch(() => {})
   } catch (e) {
     message.error('注册失败：' + (e.message || e))
   } finally {

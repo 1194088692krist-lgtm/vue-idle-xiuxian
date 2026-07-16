@@ -60,6 +60,19 @@
                   </div>
                 </div>
               </div>
+              <!-- GM 礼包铃铛：有待领取礼包时显示红点，点击前往设置领取 -->
+              <div
+                v-if="playerStore.giftCount > 0"
+                class="top-actions"
+                @click="goGifts"
+                title="你有未领取的 GM 礼包"
+              >
+                <div class="gift-bell-wrap">
+                  <n-icon class="gift-bell"><GiftOutlined /></n-icon>
+                  <span class="gift-badge">{{ playerStore.giftCount > 99 ? '99+' : playerStore.giftCount }}</span>
+                </div>
+                <span class="gift-hint">礼包待领</span>
+              </div>
             </header>
 
             <!-- 修为池 -->
@@ -231,6 +244,8 @@ import SaveButton from './components/SaveButton.vue'
       } catch (e) {
         console.warn('启动云同步失败（不影响本地游玩）:', e)
       }
+      // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点
+      playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
     }
 
     updateLoading('正在加载角色定义...', 40)
@@ -431,6 +446,11 @@ import SaveButton from './components/SaveButton.vue'
     router.push(`/${key}`)
   }
 
+  // 点击顶部礼包铃铛：前往「设置」页领取
+  const goGifts = () => {
+    router.push('/settings')
+  }
+
   const baseGainRate = 1
 
   const animateValue = (ref, target, duration, raf_ref) => {
@@ -629,7 +649,67 @@ import SaveButton from './components/SaveButton.vue'
 
   .top-actions {
     display: flex;
+    align-items: center;
+    gap: 4px;
     flex-shrink: 0;
+    margin-left: 6px;
+    padding: 4px 10px;
+    border-radius: 12px;
+    cursor: pointer;
+    background: rgba(218, 165, 32, 0.12);
+    border: 1px solid rgba(218, 165, 32, 0.35);
+    transition: all 0.2s ease;
+  }
+
+  .top-actions:hover {
+    background: rgba(218, 165, 32, 0.22);
+    transform: translateY(-1px);
+  }
+
+  .top-actions:active {
+    transform: scale(0.96);
+  }
+
+  .gift-bell-wrap {
+    position: relative;
+    display: flex;
+    align-items: center;
+  }
+
+  .gift-bell {
+    font-size: 18px;
+    color: #FFD700;
+    filter: drop-shadow(0 0 6px rgba(255, 215, 0, 0.55));
+    animation: giftPulse 1.4s ease-in-out infinite;
+  }
+
+  @keyframes giftPulse {
+    0%, 100% { transform: scale(1); }
+    50% { transform: scale(1.12); }
+  }
+
+  .gift-badge {
+    position: absolute;
+    top: -7px;
+    right: -9px;
+    min-width: 16px;
+    height: 16px;
+    padding: 0 4px;
+    border-radius: 9px;
+    background: linear-gradient(135deg, #FF4D4F, #FF7875);
+    color: #fff;
+    font-size: 10px;
+    font-weight: bold;
+    line-height: 16px;
+    text-align: center;
+    box-shadow: 0 0 8px rgba(255, 77, 79, 0.6);
+    border: 1px solid rgba(255, 255, 255, 0.6);
+  }
+
+  .gift-hint {
+    font-size: 11px;
+    color: #FFD700;
+    white-space: nowrap;
   }
 
   /* 修为进度条 */
@@ -1069,6 +1149,21 @@ import SaveButton from './components/SaveButton.vue'
 
   html:not(.dark) .resource-item .resource-icon {
     color: #B8860B;
+  }
+
+  /* 日间模式：礼包铃铛 */
+  html:not(.dark) .top-actions {
+    background: rgba(201, 163, 61, 0.12);
+    border: 1px solid rgba(201, 163, 61, 0.5);
+  }
+
+  html:not(.dark) .gift-bell {
+    color: #8B6914;
+    filter: drop-shadow(0 0 6px rgba(201, 163, 61, 0.5));
+  }
+
+  html:not(.dark) .gift-hint {
+    color: #8B6914;
   }
 
   html:not(.dark) .resource-item.crystal .resource-icon {

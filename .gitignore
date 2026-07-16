@@ -23,3 +23,6 @@ docs
 *.njsproj
 *.sln
 *.sw?
+
+# 本地 wrangler 开发缓存（miniflare D1）
+.wrangler/

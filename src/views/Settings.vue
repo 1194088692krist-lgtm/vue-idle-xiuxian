@@ -228,10 +228,10 @@
           <div class="setting-row">
             <label class="setting-label">
               我的礼包
-              <span v-if="gifts.length" class="badge">{{ gifts.length }}</span>
+              <span v-if="playerStore.gifts.length" class="badge">{{ playerStore.gifts.length }}</span>
             </label>
-            <div v-if="gifts.length" class="gift-list">
-              <div v-for="g in gifts" :key="g.id" class="gift-item">
+            <div v-if="playerStore.gifts.length" class="gift-list">
+              <div v-for="g in playerStore.gifts" :key="g.id" class="gift-item">
                 <div class="gift-info">
                   <div class="gift-msg">{{ g.message || 'GM 赠送的礼包' }}</div>
                   <div class="gift-items">{{ formatGift(g.items_json) }}</div>
@@ -571,7 +571,7 @@
   }
   const handleLogout = () => {
     auth.logout()
-    gifts.value = []
+    playerStore.gifts = []
     message.success('已退出登录（本地存档保留）')
   }
   const handleUploadToCloud = async () => {
@@ -613,18 +613,8 @@
     })
   }
 
-  // 礼包收件箱
-  const gifts = ref([])
-  const loadGifts = async () => {
-    if (!auth.isLoggedIn) { gifts.value = []; return }
-    try {
-      const r = await fetch('/api/inbox', { headers: { ...auth.authHeaders() } })
-      const data = await r.json().catch(() => ({}))
-      gifts.value = data.ok ? data.gifts : []
-    } catch {
-      gifts.value = []
-    }
-  }
+  // 礼包收件箱：复用 player store 的全局 gifts（与顶部铃铛红点同源）
+  const loadGifts = () => playerStore.loadGifts()
   const formatGift = (json) => {
     try {
       const it = JSON.parse(json)
@@ -640,7 +630,8 @@
     try {
       await playerStore.claimGift(id)
       message.success('礼包已领取并入存档')
-      gifts.value = gifts.value.filter(g => g.id !== id)
+      // 领取后刷新全局收件箱（同步顶部红点与列表）
+      await playerStore.loadGifts()
     } catch (e) {
       message.error(e.message || '领取失败')
     }
