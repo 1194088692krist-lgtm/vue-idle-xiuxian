@@ -14,7 +14,8 @@
               alt="角色立绘"
               draggable="false"
             />
-            <!-- 动态视频：加载完成后淡入覆盖并自动播放 -->
+            <!-- 动态视频：加载完成后淡入覆盖并自动播放。preload=metadata 仅拉取元数据，
+                 通过 tryPlay() 触发 play() 后才开始下载视频流，避免打开弹窗即下载整个 985KB -->
             <video
               v-if="shouldShowVideo"
               ref="videoEl"
@@ -22,7 +23,7 @@
               :class="{ 'is-visible': videoReady }"
               :src="videoSrc"
               :poster="avatar || undefined"
-              preload="auto"
+              preload="metadata"
               muted
               loop
               playsinline

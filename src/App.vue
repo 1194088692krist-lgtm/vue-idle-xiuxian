@@ -429,8 +429,8 @@ import SaveButton from './components/SaveButton.vue'
     startAutoGain()
     window.addEventListener('beforeunload', flushSave)
     window.addEventListener('keydown', handleEscKey)
-    // 启动时从 IndexedDB 载入人物定义（含已上传立绘），保证 Gacha/阵容/战斗等界面无需先打开 GM 工具即可显示立绘
-    initCharacterDefs().catch(err => console.error('载入人物立绘定义失败:', err))
+    // 注：人物立绘定义已在 loadGame() 中通过 await initCharacterDefs() 加载完成
+    // 此处不再重复调用，避免与加载流程竞争造成 race condition（曾导致头像立绘 5 分钟后才显示）
   })
 
   onUnmounted(() => {

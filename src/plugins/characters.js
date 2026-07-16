@@ -173,32 +173,55 @@ export async function initCharacterDefs() {
 
 export const sharedPortraitMap = reactive({})
 
+// 立绘资源加载状态：避免重复 fetch，并保证失败时使用静态回退
+let portraitsLoaded = false
+
 export async function loadSharedPortraits() {
+  if (portraitsLoaded) return
   const base = import.meta.env.BASE_URL || './'
-  const res = await fetch(`${base}portraits/manifest.json`)
-  if (!res.ok) return
-  const manifest = await res.json()
-  if (manifest && typeof manifest === 'object') {
-    Object.entries(manifest).forEach(([id, data]) => {
-      // 兼容新旧两种格式
-      if (typeof data === 'object' && data.full) {
-        const entry = {
-          full: `${base}portraits/${data.full}`,
-          thumbnail: data.thumbnail ? `${base}portraits/${data.thumbnail}` : null
+  try {
+    // fetch 加 3 秒超时，防止网络慢或 hang 住导致游戏加载卡死
+    const res = await Promise.race([
+      fetch(`${base}portraits/manifest.json`, { cache: 'force-cache' }),
+      new Promise((_, reject) => setTimeout(() => reject(new Error('manifest 加载超时')), 3000))
+    ])
+    if (!res.ok) throw new Error(`HTTP ${res.status}`)
+    const manifest = await res.json()
+    if (manifest && typeof manifest === 'object') {
+      Object.entries(manifest).forEach(([id, data]) => {
+        // 兼容新旧两种格式
+        if (typeof data === 'object' && data.full) {
+          const entry = {
+            full: `${base}portraits/${data.full}`,
+            thumbnail: data.thumbnail ? `${base}portraits/${data.thumbnail}` : null
+          }
+          // 动态立绘视频（点击立绘时加载播放，首帧需与静态立绘一致）
+          if (data.video) {
+            entry.video = `${base}portraits/${data.video}`
+          }
+          sharedPortraitMap[id] = entry
+        } else if (typeof data === 'string') {
+          sharedPortraitMap[id] = {
+            full: `${base}portraits/${data}`,
+            thumbnail: null
+          }
         }
-        // 动态立绘视频（点击立绘时加载播放，首帧需与静态立绘一致）
-        if (data.video) {
-          entry.video = `${base}portraits/${data.video}`
-        }
-        sharedPortraitMap[id] = entry
-      } else if (typeof data === 'string') {
-        sharedPortraitMap[id] = {
-          full: `${base}portraits/${data}`,
+      })
+    }
+  } catch (e) {
+    console.warn('[portraits] 加载 manifest.json 失败，使用静态回退:', e.message)
+    // 静态回退：用 characterList 生成默认 sharedPortraitMap（假设图片文件存在）
+    // 这样即使 manifest.json 拉取失败，头像立绘也能立即显示，无需等待重试
+    characterList.forEach(c => {
+      if (!sharedPortraitMap[c.id]) {
+        sharedPortraitMap[c.id] = {
+          full: `${base}portraits/${c.id}.jpg`,
           thumbnail: null
         }
       }
     })
   }
+  portraitsLoaded = true
 }
 
 export function getCharacterAvatar(member, size = 'full') {
@@ -218,8 +241,10 @@ export function getCharacterAvatar(member, size = 'full') {
     }
     return portrait
   }
-  const t = characterList.find(c => c.id === id)
-  return (t && t.avatar) || null
+  // 静态回退：sharedPortraitMap 尚未加载完成时，构造默认 URL（假设图片文件存在）
+  // 这样头像可以立即显示，无需等待 manifest.json 加载完成
+  const base = import.meta.env.BASE_URL || './'
+  return `${base}portraits/${id}.jpg`
 }
 
 export function getCharacterThumbnail(member) {
