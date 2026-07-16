@@ -1,5 +1,6 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
+import { useAuthStore } from '../stores/auth'
 import StartScreen from '../views/StartScreen.vue'
 import Home from '../views/Home.vue'
 import Cultivation from '../views/Cultivation.vue'

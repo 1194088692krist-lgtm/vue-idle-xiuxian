@@ -246,13 +246,19 @@ const startNewGame = async () => {
       positiveText: '确定开始',
       negativeText: '取消',
       onPositiveClick: async () => {
-        await playerStore.clearData()
-        playerStore.$reset()
-        playerStore.initNewPlayer()
-        await playerStore.saveData()
-        // 已登录则自动云同步
+        try {
+          await playerStore.clearData()
+          playerStore.$reset()
+          playerStore.initNewPlayer()
+          await playerStore.saveData()
+        } catch (e) {
+          console.error('初始化新游戏失败:', e)
+          message.error('初始化失败: ' + (e.message || e))
+          return false // 阻止对话框关闭，让用户看到错误
+        }
+        // 云同步不阻塞导航，失败只警告
         if (auth.isLoggedIn) {
-          try { await playerStore.syncToCloud() } catch (e) { console.warn(e) }
+          playerStore.syncToCloud().catch(e => console.warn('云同步失败:', e))
         }
         router.push('/cultivation')
       }
@@ -266,15 +272,16 @@ const loadGame = async (slot) => {
   try {
     await playerStore.loadFromSlot(slot)
     playerStore.regenerateSpirit() // 加载存档后恢复离线灵力
-    // 已登录则自动云同步当前档
-    if (auth.isLoggedIn) {
-      try { await playerStore.syncToCloud() } catch (e) { console.warn(e) }
-    }
-    router.push('/cultivation')
   } catch (error) {
     console.error('加载存档失败:', error)
-    message.error('加载存档失败: ' + error.message)
+    message.error('加载存档失败: ' + (error.message || error))
+    return
   }
+  // 云同步不阻塞导航
+  if (auth.isLoggedIn) {
+    playerStore.syncToCloud().catch(e => console.warn('云同步失败:', e))
+  }
+  router.push('/cultivation')
 }
 
 const deleteSlot = async (slot) => {
@@ -304,14 +311,17 @@ const handleLogin = async () => {
     const data = await auth.login(loginForm.value.username.trim(), loginForm.value.password)
     message.success(`欢迎回来，${data.user.username}`)
     loginForm.value.password = ''
-    // 登录后拉取云端迁移（分支③冲突交由弹窗）
-    try {
-      const res = await playerStore.migrate({ interactive: true })
-      if (!res.conflicts?.length) message.success('已与云端同步')
-    } catch (e) {
-      console.warn('云端迁移失败：', e)
-    }
-    // 登录后立即拉取 GM 礼包收件箱，驱动全局铃铛红点
+    // 登录后异步拉取云端迁移，不阻塞 UI
+    playerStore.migrate({ interactive: true })
+      .then(res => {
+        if (res?.conflicts?.length) {
+          // 有冲突，弹窗会自动显示（cloudConflicts 已设置）
+        } else {
+          message.success('已与云端同步')
+        }
+      })
+      .catch(e => console.warn('云端迁移失败：', e))
+    // 登录后立即拉取 GM 礼包收件箱
     playerStore.loadGifts().catch(() => {})
   } catch (e) {
     message.error('登录失败：' + (e.message || e))
