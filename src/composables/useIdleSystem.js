@@ -8,7 +8,7 @@ import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } 
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
-import { getPillsByZone } from '../plugins/pills'
+import { getPillsByZone, pillRecipes } from '../plugins/pills'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
@@ -344,6 +344,38 @@ const buildRatio = computed(() => {
   return rec > 0 ? playerBuildStrength.value / rec : 1
 })
 
+// 当前生效丹药 buff 列表（用于 UI 显示），自动清理过期项
+const activePillBuffList = computed(() => {
+  cleanExpiredPillBuffs()
+  const s = store()
+  const effects = s.getActivePillEffects ? s.getActivePillEffects() : []
+  const now = Date.now()
+  const typeNames = {
+    spiritStoneRate: '灵石获取',
+    cultivationRate: '修炼速度',
+    expGain: '修为获取',
+    dropRate: '掉落加成',
+    combatBoost: '战斗加成',
+    allAttributes: '全属性'
+  }
+  return effects.map(buff => {
+    const recipe = pillRecipes.find(r => r.id === buff.pillId)
+    const remainingMs = Math.max(0, buff.expiresAt - now)
+    const remainingSec = Math.ceil(remainingMs / 1000)
+    const minutes = Math.floor(remainingSec / 60)
+    const seconds = remainingSec % 60
+    return {
+      ...buff,
+      name: recipe?.name || buff.pillId || '未知丹药',
+      description: recipe?.description || '',
+      typeName: typeNames[buff.type] || buff.type,
+      valueText: (buff.value > 0 ? '+' : '') + formatBuffPercent(buff.value || 0),
+      remainingText: minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`,
+      remainingMs
+    }
+  })
+})
+
 // 在线每场遭遇间隔：15 秒
 const ENCOUNTER_INTERVAL = 15000
 
@@ -351,6 +383,23 @@ let _store = null
 function store() {
   if (!_store) _store = usePlayerStore()
   return _store
+}
+
+// 清理已过期丹药 buff
+function cleanExpiredPillBuffs() {
+  const s = store()
+  if (!Array.isArray(s.activePillBuffs)) return
+  const now = Date.now()
+  s.activePillBuffs = s.activePillBuffs.filter(buff => buff.expiresAt > now)
+}
+
+// 丹药 buff 加成：读取 playerStore 生效效果，同类型 value 累加，返回 1 + total
+function getPillBuffMultiplier(type) {
+  const s = store()
+  cleanExpiredPillBuffs()
+  const effects = s.getActivePillEffects ? s.getActivePillEffects() : []
+  const total = effects.filter(e => e.type === type).reduce((sum, e) => sum + (e.value || 0), 0)
+  return 1 + total
 }
 
 let idleInterval = null
@@ -1030,16 +1079,21 @@ function grantReward(effectiveZone, isIdleMode = false) {
   const dropBonus = effectiveZone.dropBonus || 1
   // 掉落加成：小幅提升高品质概率
   const upgradeChance = Math.max(0, (dropBonus - 1) * 0.35)
+  const dropRateMult = getPillBuffMultiplier('dropRate')
   for (const rw of effectiveZone.rewards) {
-    if (Math.random() < rw.chance) {
+    const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
+      ? rw.chance
+      : Math.min(1, rw.chance * dropRateMult)
+    if (Math.random() < chance) {
       const amount = Array.isArray(rw.amount)
         ? Math.floor(Math.random() * (rw.amount[1] - rw.amount[0] + 1)) + rw.amount[0]
         : rw.amount || 1
       const multiplied = Math.floor(amount * effectiveZone.rewardMultiplier)
       if (rw.type === 'spirit_stone') {
-        s.spiritStones += multiplied
-        runStats.value.spiritStones += multiplied
-        rewards.push({ type: 'spirit_stone', amount: multiplied, name: '灵石' })
+        const final = Math.floor(multiplied * getPillBuffMultiplier('spiritStoneRate'))
+        s.spiritStones += final
+        runStats.value.spiritStones += final
+        rewards.push({ type: 'spirit_stone', amount: final, name: '灵石' })
       } else if (rw.type === 'herb') {
         for (let i = 0; i < multiplied; i++) { const h = getRandomHerb(effectiveZone); if (h) s.gainMaterial(h) }
         rewards.push({ type: 'herb', amount: multiplied, name: '灵草' })
@@ -1058,9 +1112,10 @@ function grantReward(effectiveZone, isIdleMode = false) {
         const pickItem = pool[Math.floor(Math.random() * pool.length)]
         if (pickItem) { s.gainMaterial(pickItem); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + pickItem.name, material: pickItem }) }
       } else if (rw.type === 'cultivation') {
-        s.cultivate(multiplied)
-        runStats.value.cultivation += multiplied
-        rewards.push({ type: 'cultivation', amount: multiplied, name: '修为' })
+        const final = Math.floor(multiplied * getPillBuffMultiplier('expGain'))
+        s.cultivate(final)
+        runStats.value.cultivation += final
+        rewards.push({ type: 'cultivation', amount: final, name: '修为' })
       } else if (rw.type === 'equipment') {
         let rarity = pickRarityByWeight(rw.rarity, EQUIP_RARITY_WEIGHTS)
         if (Math.random() < upgradeChance) {
@@ -1614,7 +1669,7 @@ async function runIdleEncounter() {
       const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
       s.spiritStones += recovered
       runStats.value.spiritStones += recovered
-      const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5))
+      const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5) * getPillBuffMultiplier('cultivationRate'))
       s.cultivate(cultBonus)
       runStats.value.cultivation += cultBonus
       if (count % 20 === 0 && Math.random() < 0.5) {
@@ -2281,6 +2336,9 @@ export function useIdleSystem() {
     currentRecommendedBuild,
     buildRatio,
     idleDashboard,
+    // 丹药 buff
+    activePillBuffList,
+    getPillBuffMultiplier,
     // 方法
     setSelectedZone: (z) => { selectedZone.value = z },
     setDifficulty: (k) => { selectedDifficultyKey.value = k },

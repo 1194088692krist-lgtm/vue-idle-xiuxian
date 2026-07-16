@@ -158,13 +158,22 @@
         <!-- 丹药 -->
         <div v-if="activeTab === 'pills'" class="tab-pane">
           <div v-if="groupedPills.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="pill in groupedPills" :key="pill.id" class="simple-card">
+            <div
+              v-for="pill in groupedPills"
+              :key="pill.id"
+              class="simple-card pill-card"
+              @click="openPillConsumeModal(pill)"
+            >
               <div class="card-header">
-                <span>{{ pill.name }}({{ pill.count }})</span>
-                <button class="btn-small btn-primary" @click="usePill(pill)">服用</button>
+                <span :style="{ color: getPillGradeColor(pill.grade) }">
+                  {{ pill.name }}
+                  <span class="pill-grade-tag">{{ pillGrades[pill.grade]?.name }}</span>
+                </span>
+                <span class="pill-count">×{{ pill.count }}</span>
               </div>
               <div class="card-body">
-                <p>{{ pill.description }}</p>
+                <p class="pill-effect">{{ pill.effectText }}</p>
+                <p class="pill-desc">{{ pill.description }}</p>
               </div>
             </div>
           </div>
@@ -591,6 +600,56 @@
     </div>
   </div>
 
+  <!-- 丹药服用弹窗 -->
+  <div v-if="showPillConsumeModal" class="simple-modal" @click.self="showPillConsumeModal = false">
+    <div class="simple-modal-content">
+      <div class="modal-header">
+        <h3>
+          服用
+          <span v-if="selectedPill" :style="{ color: getPillGradeColor(selectedPill.grade) }">
+            {{ selectedPill.name }}
+          </span>
+        </h3>
+        <button class="btn-small" @click="showPillConsumeModal = false">关闭</button>
+      </div>
+      <div class="modal-body">
+        <template v-if="selectedPill">
+          <div class="detail-row">
+            <span>效果</span>
+            <span class="pill-effect-value">{{ selectedPill.effectText }}</span>
+          </div>
+          <div class="detail-row">
+            <span>持有</span>
+            <span>×{{ selectedPill.count }}</span>
+          </div>
+          <div class="detail-row">
+            <span>说明</span>
+            <span>{{ selectedPill.description }}</span>
+          </div>
+          <div class="simple-divider">选择服用角色</div>
+          <p v-if="isTeamBuffPill(selectedPill.effect?.type)" class="team-buff-hint">
+            该丹药为全队增益，选择任意出战角色即可全队生效
+          </p>
+          <div v-if="pillConsumeMembers.length === 0" class="empty-state">
+            当前没有出战角色
+          </div>
+          <div v-else class="equip-target-list">
+            <div
+              v-for="member in pillConsumeMembers"
+              :key="member.id"
+              class="equip-target-item"
+              @click="consumePillForMember(member)"
+            >
+              <img v-if="member.portraitThumbnail || member.avatar" :src="member.portraitThumbnail || member.avatar" class="target-avatar" />
+              <span class="target-name">{{ member.name }}</span>
+              <span class="target-level">Lv.{{ member.level }}</span>
+            </div>
+          </div>
+        </template>
+      </div>
+    </div>
+  </div>
+
 </template>
 
 <script setup>
@@ -814,13 +873,107 @@
     materialSellCounts.value = {}
   }
 
-  // 使用丹药
-  const usePill = pill => {
-    const result = playerStore.usePill(pill)
+  // 丹药品阶颜色
+  const pillGradeColors = {
+    grade1: '#9e9e9e',
+    grade2: '#4caf50',
+    grade3: '#2196f3',
+    grade4: '#9c27b0',
+    grade5: '#ff9800',
+    grade6: '#f44336',
+    grade7: '#FFD700',
+    grade8: '#00BFFF',
+    grade9: '#FF00FF'
+  }
+  const getPillGradeColor = grade => pillGradeColors[grade] || '#DAA520'
+
+  // 丹药效果描述（复用 Alchemy.vue 逻辑）
+  const getEffectDescription = effect => {
+    if (!effect) return '-'
+    const statNames = { attack: '攻击', defense: '防御', health: '生命', speed: '速度' }
+    switch (effect.type) {
+      case 'permanentStat':
+        return `永久${statNames[effect.stat] || effect.stat} +${Math.round(effect.value)}`
+      case 'breakthroughRate':
+        return `突破成功率 +${(effect.value * 100).toFixed(0)}%`
+      case 'enhanceRate':
+        return `强化成功率 +${(effect.value * 100).toFixed(0)}%`
+      case 'reforgeSafe':
+        return `洗练保底 ${Math.max(1, Math.round(effect.value))} 次`
+      case 'healBattle':
+        return `战斗回血 ${(effect.value * 100).toFixed(0)}% 最大生命`
+      case 'cleanse':
+        return '战斗中解控'
+      case 'expGain':
+        return `修为获取 +${(effect.value * 100).toFixed(0)}%`
+      case 'dropRate':
+        return `掉落加成 +${(effect.value * 100).toFixed(0)}%`
+      case 'spiritStoneRate':
+        return `灵石获取 +${(effect.value * 100).toFixed(0)}%`
+      case 'cultivationRate':
+        return `修炼速度 +${(effect.value * 100).toFixed(0)}%`
+      case 'cultivationEfficiency':
+        return `修炼效率 +${(effect.value * 100).toFixed(0)}%`
+      case 'combatBoost':
+        return `战斗属性 +${(effect.value * 100).toFixed(0)}%`
+      case 'allAttributes':
+        return `全属性 +${(effect.value * 100).toFixed(0)}%`
+      case 'comprehension':
+        return `悟性提升 +${(effect.value * 100).toFixed(0)}%`
+      case 'autoHeal':
+        return `每秒恢复 ${(effect.value * 100).toFixed(0)}% 最大生命`
+      case 'effortGain':
+        return `努力值 +${Math.round(effect.value)} 点`
+      default:
+        return `效果 +${effect.value}`
+    }
+  }
+
+  // 基于 ownedPills 的丹药列表
+  const groupedPills = computed(() => {
+    return Object.entries(playerStore.ownedPills || {})
+      .map(([pillId, data]) => {
+        const recipe = pillRecipes.find(r => r.id === pillId)
+        if (!recipe) return null
+        const effect = calculatePillEffect(recipe, playerStore.level)
+        return {
+          id: pillId,
+          name: recipe.name,
+          description: recipe.description,
+          grade: recipe.grade,
+          type: recipe.type,
+          count: data.count || 0,
+          effect,
+          effectText: getEffectDescription(effect)
+        }
+      })
+      .filter(Boolean)
+  })
+
+  // 丹药服用弹窗
+  const showPillConsumeModal = ref(false)
+  const selectedPill = ref(null)
+  const pillConsumeMembers = computed(() => playerStore.getTeamMembersDetail().filter(m => m))
+
+  const openPillConsumeModal = pill => {
+    selectedPill.value = pill
+    showPillConsumeModal.value = true
+  }
+
+  // 全队 buff 类型（选择任意角色后全队生效）
+  const isTeamBuffPill = effectType => {
+    return ['spiritStoneRate', 'cultivationRate', 'cultivationEfficiency', 'expGain', 'dropRate', 'combatBoost', 'allAttributes', 'comprehension', 'autoHeal'].includes(effectType)
+  }
+
+  const consumePillForMember = member => {
+    if (!selectedPill.value) return
+    const result = playerStore.consumePill(selectedPill.value.id, member.id)
     if (result.success) {
       message.success(result.message)
+      showPillConsumeModal.value = false
+      selectedPill.value = null
     } else {
-      message.error(result.message)
+      message.error(result.message || '服用失败')
     }
   }
 
@@ -829,6 +982,8 @@
   const tabs = [
     { name: 'materials', label: '素材' },
     { name: 'equipment', label: '装备' },
+    { name: 'pills', label: '丹药' },
+    { name: 'formulas', label: '丹方' },
     { name: 'pets', label: '灵宠' }
   ]
 
@@ -1387,24 +1542,6 @@
   // 合并完整与残缺丹方
   const allFormulas = computed(() => {
     return [...groupedFormulas.value.complete, ...groupedFormulas.value.incomplete]
-  })
-
-  // 计算丹药分组
-  const groupedPills = computed(() => {
-    const groups = {}
-    playerStore.items
-      .filter(item => item.type === 'pill')
-      .forEach(pill => {
-        if (!groups[pill.name]) {
-          groups[pill.name] = {
-            ...pill,
-            count: 1
-          }
-        } else {
-          groups[pill.name].count++
-        }
-      })
-    return Object.values(groups)
   })
 
   // 使用物品
@@ -2216,5 +2353,57 @@
     align-items: center;
     gap: 8px;
     margin: 12px 0;
+  }
+
+  /* 丹药卡片 */
+  .pill-card {
+    position: relative;
+  }
+
+  .pill-card .card-header {
+    align-items: flex-start;
+  }
+
+  .pill-grade-tag {
+    font-size: 11px;
+    padding: 1px 6px;
+    background: rgba(0, 0, 0, 0.3);
+    border-radius: 4px;
+    margin-left: 6px;
+    font-weight: normal;
+    color: #aaa;
+  }
+
+  .pill-count {
+    font-size: 13px;
+    color: #DAA520;
+    font-weight: bold;
+    white-space: nowrap;
+  }
+
+  .pill-effect {
+    color: #9FD8A0;
+    margin: 0 0 6px;
+  }
+
+  .pill-desc {
+    font-size: 12px;
+    color: #888;
+    margin: 0;
+  }
+
+  /* 丹药服用弹窗 */
+  .pill-effect-value {
+    color: #9FD8A0;
+    font-weight: bold;
+  }
+
+  .team-buff-hint {
+    font-size: 12px;
+    color: #DAA520;
+    margin: 0 0 10px;
+    padding: 8px 10px;
+    background: rgba(218, 165, 32, 0.1);
+    border-radius: 6px;
   }
 </style>

@@ -329,6 +329,15 @@
               <span class="buff-remaining">剩{{ buff.remaining }}场</span>
             </div>
           </div>
+          <!-- 生效中的丹药 Buff -->
+          <div v-if="activePillBuffList.length" class="dash-pill-buffs">
+            <div class="dash-pill-buffs-title">💊 丹药增益</div>
+            <div v-for="buff in activePillBuffList" :key="buff.pillId + '_' + buff.expiresAt" class="dash-pill-buff-item">
+              <span class="pill-buff-name">{{ buff.name }}</span>
+              <span class="pill-buff-effect">{{ buff.typeName }}{{ buff.valueText }}</span>
+              <span class="pill-buff-remaining">剩{{ buff.remainingText }}</span>
+            </div>
+          </div>
           <!-- 队伍气血 -->
           <div v-if="idleDashboard.teamHP.length" class="dash-team">
             <div class="dash-team-title">🏥 队伍状态</div>
@@ -668,6 +677,7 @@ const {
   idlePlayerMaxHP,
   idlePlayerDefeated,
   idleDashboard,
+  activePillBuffList,
   setSelectedZone,
   setDifficulty,
   startIdle,
@@ -2601,6 +2611,37 @@ onUnmounted(() => {
   flex: 1;
 }
 .buff-remaining {
+  color: #888;
+  font-size: 11px;
+}
+.dash-pill-buffs {
+  margin-top: 10px;
+  padding-top: 10px;
+  border-top: 1px solid rgba(255,255,255,0.08);
+}
+.dash-pill-buffs-title {
+  font-size: 13px;
+  color: #FF69B4;
+  margin-bottom: 6px;
+}
+.dash-pill-buff-item {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 4px 8px;
+  margin-bottom: 4px;
+  border-radius: 4px;
+  font-size: 12px;
+  background: rgba(255, 105, 180, 0.12);
+  color: #ffb6c1;
+}
+.pill-buff-name {
+  font-weight: bold;
+}
+.pill-buff-effect {
+  flex: 1;
+}
+.pill-buff-remaining {
   color: #888;
   font-size: 11px;
 }

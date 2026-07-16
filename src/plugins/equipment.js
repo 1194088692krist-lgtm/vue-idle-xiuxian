@@ -213,9 +213,13 @@ function getStatBaseRange(stat, rarity) {
   return [5, 15]
 }
 
-function getRandomValueInRange(range) {
+function getRandomValueInRange(range, minFloor = null) {
   if (!range || !Array.isArray(range) || range.length < 2) return 0
-  return range[0] + Math.random() * (range[1] - range[0])
+  const value = range[0] + Math.random() * (range[1] - range[0])
+  if (minFloor !== null) {
+    return Math.max(minFloor, value)
+  }
+  return value
 }
 
 function clampToStatCap(stat, value) {
@@ -264,8 +268,10 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   // 如果指定了目标词条，仅修改该词条
   let modifyKeys = []
   if (targetStat !== null) {
-    if (cleanAffixStats[targetStat] !== undefined) modifyKeys = [targetStat]
-    else if (availableStats.includes(targetStat)) modifyKeys = [targetStat]
+    if (!availableStats.includes(targetStat) || cleanAffixStats[targetStat] === undefined) {
+      return { success: false, message: '该属性不可洗练' }
+    }
+    modifyKeys = [targetStat]
   } else {
     const keys = Object.keys(cleanAffixStats)
     const count = Math.min(keys.length || 1, Math.floor(Math.random() * 3) + 1)
@@ -279,8 +285,8 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
 
   modifyKeys.forEach(originStat => {
     let currentStat = originStat
-    // 尝试替换成新词条
-    if (Math.random() < reforgeConfig.newStatChance) {
+    // 尝试替换成新词条（仅全洗练时）
+    if (targetStat === null && Math.random() < reforgeConfig.newStatChance) {
       const availableNew = availableStats.filter(s => s !== originStat && resultAffixes[s] === undefined)
       if (availableNew.length > 0) {
         const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
@@ -290,7 +296,8 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     }
 
     const baseRange = getStatBaseRange(currentStat, rarity)
-    let newValue = getRandomValueInRange(baseRange)
+    const isPercent = PERCENT_STATS.includes(currentStat)
+    let newValue = getRandomValueInRange(baseRange, isPercent ? baseRange[0] * 0.5 : null)
 
     const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
     newValue = newValue * (1 + delta)
@@ -301,7 +308,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     newValue = Math.max(baseMin, Math.min(newValue, baseMax))
 
     // 百分比词条保证最小值 > 0，且不低于该品质基础下限的 50%
-    if (PERCENT_STATS.includes(currentStat)) {
+    if (isPercent) {
       newValue = Math.max(baseRange[0] * 0.5, newValue)
       resultAffixes[currentStat] = Number(newValue.toFixed(3))
     } else {
@@ -316,9 +323,10 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     if (availableNew.length === 0) break
     const newStat = availableNew[Math.floor(Math.random() * availableNew.length)]
     const baseRange = getStatBaseRange(newStat, rarity)
-    let value = getRandomValueInRange(baseRange)
+    const isPercent = PERCENT_STATS.includes(newStat)
+    let value = getRandomValueInRange(baseRange, isPercent ? baseRange[0] * 0.5 : null)
     value = clampToStatCap(newStat, value)
-    if (PERCENT_STATS.includes(newStat)) {
+    if (isPercent) {
       value = Math.max(baseRange[0] * 0.5, value)
       resultAffixes[newStat] = Number(value.toFixed(3))
     } else {

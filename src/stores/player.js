@@ -79,6 +79,8 @@ export const usePlayerStore = defineStore('player', {
     activeEffects: [], // 当前生效的丹药效果列表
     pillsCrafted: 0, // 炼制丹药次数
     pillsConsumed: 0, // 服用丹药次数
+    ownedPills: {}, // 丹药持有（pillId -> { count, craftedAt }）
+    activePillBuffs: [], // 生效中的丹药 buff（全局）
     // 基础战斗属性
     baseAttributes: {
       attack: 10, // 攻击
@@ -394,15 +396,23 @@ export const usePlayerStore = defineStore('player', {
     // 临时增益聚合（悟道丹修为加成 / 寻宝丹掉落加成），仅统计未过期项
     expBonus() {
       const now = Date.now()
-      return (this.pillEffects || [])
+      const fromOld = (this.pillEffects || [])
         .filter(e => e.type === 'expGain' && e.endTime > now)
         .reduce((s, e) => s + (e.value || 0), 0)
+      const fromNew = (this.activePillBuffs || [])
+        .filter(e => e.type === 'expGain' && e.expiresAt > now)
+        .reduce((s, e) => s + (e.value || 0), 0)
+      return fromOld + fromNew
     },
     dropBonus() {
       const now = Date.now()
-      return (this.pillEffects || [])
+      const fromOld = (this.pillEffects || [])
         .filter(e => e.type === 'dropRate' && e.endTime > now)
         .reduce((s, e) => s + (e.value || 0), 0)
+      const fromNew = (this.activePillBuffs || [])
+        .filter(e => e.type === 'dropRate' && e.expiresAt > now)
+        .reduce((s, e) => s + (e.value || 0), 0)
+      return fromOld + fromNew
     }
   },
   actions: {
@@ -530,6 +540,9 @@ export const usePlayerStore = defineStore('player', {
       if (gmMode !== null) {
         this.isGMMode = gmMode === 'true'
       }
+      // 兼容初始化：旧存档可能没有新字段
+      if (!this.ownedPills || typeof this.ownedPills !== 'object') this.ownedPills = {}
+      if (!Array.isArray(this.activePillBuffs)) this.activePillBuffs = []
       // 从干净基线重算派生属性（装备/套装/灵宠），根治「存档重载后加成重复叠加」
       this.recomputeAttributes()
     },
@@ -1260,46 +1273,6 @@ export const usePlayerStore = defineStore('player', {
         message: `${member.name}服用${pill.name}，根骨潜力+${actualGain}（${Math.round(oldValue)} → ${Math.round(newValue)}）`
       }
     },
-    // 炼制丹药
-    craftPill(recipeId) {
-      const recipe = pillRecipes.find(r => r.id === recipeId)
-      if (!recipe) return { success: false, message: '丹方不存在' }
-      // 尝试炼制丹药（以 player.materials 为材料来源）
-      const result = tryCreatePill(
-        recipe,
-        this.materials,
-        this,
-        this.pillFragments[recipe.id] || 0,
-        this.luck * this.alchemyRate
-      )
-      if (result.success) {
-        // 消耗材料（按 kind+id 精确扣减）
-        for (const material of recipe.materials) {
-          const kind = material.kind || 'herb'
-          const mid = material.id || material.herb
-          let remaining = material.count
-          for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
-            if (this.materials[i].kind === kind && this.materials[i].id === mid) {
-              this.materials.splice(i, 1)
-              remaining--
-            }
-          }
-        }
-        // 计算丹药效果
-        const effect = calculatePillEffect(recipe, this.level)
-        // 添加到物品栏
-        this.items.push({
-          id: `${recipe.id}_${Date.now()}`,
-          name: recipe.name,
-          type: 'pill',
-          description: recipe.description,
-          effect: effect
-        })
-        this.pillsCrafted++
-        this.queueSave()
-      }
-      return result
-    },
     // 使用灵宠（出战/召回）
     usePet(pet) {
       // 如果当前没有出战灵宠，直接出战新灵宠
@@ -1681,16 +1654,12 @@ export const usePlayerStore = defineStore('player', {
             }
           }
         })
-        // 创建丹药
-        const effect = calculatePillEffect(recipe, this.level)
-        const pill = {
-          id: `${recipe.id}_${Date.now()}`,
-          name: recipe.name,
-          description: recipe.description,
-          type: 'pill',
-          effect
+        // 创建丹药并加入持有
+        if (!this.ownedPills[recipeId]) {
+          this.ownedPills[recipeId] = { count: 0, craftedAt: Date.now() }
         }
-        this.items.push(pill)
+        this.ownedPills[recipeId].count++
+        this.ownedPills[recipeId].craftedAt = Date.now()
         this.pillsCrafted++
         this.queueSave()
       }
@@ -1707,6 +1676,144 @@ export const usePlayerStore = defineStore('player', {
     getActiveEffects() {
       const now = Date.now()
       return this.activeEffects.filter(effect => effect.endTime > now)
+    },
+    // 获取当前未过期的全局丹药 buff
+    getActivePillEffects() {
+      const now = Date.now()
+      return (this.activePillBuffs || []).filter(buff => buff.expiresAt > now)
+    },
+    // 服用丹药（从 ownedPills 消耗）
+    consumePill(pillId, memberId) {
+      const owned = this.ownedPills[pillId]
+      if (!owned || owned.count <= 0) {
+        window.$message?.error('丹药不足')
+        return { success: false, message: '丹药不足' }
+      }
+      const recipe = pillRecipes.find(r => r.id === pillId)
+      if (!recipe) {
+        window.$message?.error('未知丹药')
+        return { success: false, message: '未知丹药' }
+      }
+      const baseEffect = recipe.baseEffect
+      const effect = calculatePillEffect(recipe, this.level)
+      const now = Date.now()
+      const expiresAt = now + (baseEffect.duration || 0) * 1000
+
+      const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain', 'combatBoost', 'allAttributes']
+      const memberTypes = ['permanentStat', 'effortGain', 'healBattle', 'cleanse', 'autoHeal', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
+
+      if (globalTypes.includes(baseEffect.type)) {
+        this.activePillBuffs.push({
+          pillId,
+          type: baseEffect.type,
+          value: effect.value,
+          expiresAt,
+          scope: 'global'
+        })
+        // 兼容旧 getter：expGain / dropRate 同时写入 pillEffects
+        if (baseEffect.type === 'expGain' || baseEffect.type === 'dropRate') {
+          this.pillEffects.push({
+            type: baseEffect.type,
+            value: effect.value,
+            startTime: now,
+            endTime: expiresAt
+          })
+        }
+      } else if (memberTypes.includes(baseEffect.type)) {
+        if (!memberId) {
+          window.$message?.error('该丹药需要指定服用角色')
+          return { success: false, message: '该丹药需要指定服用角色' }
+        }
+        const member = this.sectMembers.find(m => m.id === memberId)
+        if (!member) {
+          window.$message?.error('角色不存在')
+          return { success: false, message: '角色不存在' }
+        }
+        if (!member.activePills) member.activePills = []
+        member.activePills.push({
+          pillId,
+          type: baseEffect.type,
+          value: effect.value,
+          expiresAt,
+          scope: 'member',
+          memberId
+        })
+        // 即时生效逻辑
+        switch (baseEffect.type) {
+          case 'permanentStat': {
+            const stat = effect.stat
+            const val = Math.round(effect.value)
+            if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+            if (member.permanentBonuses[stat] !== undefined) member.permanentBonuses[stat] += val
+            if (member.baseStats && member.baseStats[stat] !== undefined) member.baseStats[stat] += val
+            break
+          }
+          case 'effortGain': {
+            if (!member.star) member.star = 3
+            if (typeof member.effortValue !== 'number') member.effortValue = 0
+            const gain = effect.value || 0
+            const ignoreCap = effect.ignoreCap
+            const cap = getEffortCap(member.star)
+            if (!ignoreCap && member.effortValue >= cap) {
+              window.$message?.error(`${member.name}的努力值已达上限`)
+              return { success: false, message: '努力值已达上限' }
+            }
+            const oldValue = member.effortValue
+            let newValue = oldValue + gain
+            if (!ignoreCap) newValue = Math.min(newValue, cap)
+            const actualGain = Math.round(newValue - oldValue)
+            if (actualGain <= 0) {
+              window.$message?.error('努力值没有提升')
+              return { success: false, message: '努力值没有提升' }
+            }
+            member.effortValue = Math.round(newValue)
+            break
+          }
+          case 'healBattle':
+          case 'cleanse':
+            this.battlePills.push({
+              ...effect,
+              uid: `${effect.type}_${now}_${Math.floor(Math.random() * 1e6)}`,
+              used: false
+            })
+            break
+          case 'breakthroughRate':
+            if (!member.breakthroughBonus) member.breakthroughBonus = 0
+            member.breakthroughBonus = Math.min(0.9, member.breakthroughBonus + effect.value)
+            break
+          case 'enhanceRate':
+            if (!member.enhanceBonus) member.enhanceBonus = 0
+            member.enhanceBonus = Math.min(0.9, member.enhanceBonus + effect.value)
+            break
+          case 'reforgeSafe':
+            if (!member.reforgeSafeCharges) member.reforgeSafeCharges = 0
+            member.reforgeSafeCharges += Math.max(1, Math.round(effect.value))
+            break
+          case 'autoHeal':
+            // 仅存入 member.activePills，由战斗系统后续读取
+            break
+        }
+      } else {
+        // 未知类型默认全局
+        this.activePillBuffs.push({
+          pillId,
+          type: baseEffect.type,
+          value: effect.value,
+          expiresAt,
+          scope: 'global'
+        })
+      }
+
+      owned.count--
+      if (owned.count <= 0) {
+        delete this.ownedPills[pillId]
+      }
+      this.pillsConsumed++
+      this.queueSave()
+
+      const msg = `服用${recipe.name}成功`
+      window.$message?.success(msg)
+      return { success: true, message: msg }
     },
     // 添加装备到背包
     addEquipment(equipment) {
