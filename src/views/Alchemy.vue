@@ -1053,8 +1053,14 @@
     if (!selectedForgeEquip.value) return
     const result = playerStore.reforgeEquipmentPreview(selectedForgeEquip.value, reforgeMode.value, selectedReforgeStat.value)
     if (result.success) {
+      const oldStats = {}
+      Object.entries(selectedForgeEquip.value.stats).forEach(([stat, val]) => {
+        if (['attack', 'health', 'defense', 'speed'].includes(stat) || (val && val !== 0 && !Number.isNaN(val))) {
+          oldStats[stat] = val
+        }
+      })
       reforgeResult.value = {
-        oldStats: { ...selectedForgeEquip.value.stats },
+        oldStats,
         newStats: result.newStats,
         wasSafe: result.wasSafe
       }

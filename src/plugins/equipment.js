@@ -327,7 +327,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       newValue = Math.max(baseRange[0] * 0.5, newValue)
       resultAffixes[currentStat] = Number(newValue.toFixed(3))
     } else {
-      resultAffixes[currentStat] = Math.round(newValue)
+      resultAffixes[currentStat] = Math.max(1, Math.round(newValue))
     }
   })
 
@@ -346,7 +346,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       value = Math.max(baseRange[0] * 0.5, value)
       resultAffixes[newStat] = Number(value.toFixed(3))
     } else {
-      resultAffixes[newStat] = Math.round(value)
+      resultAffixes[newStat] = Math.max(1, Math.round(value))
     }
   }
 

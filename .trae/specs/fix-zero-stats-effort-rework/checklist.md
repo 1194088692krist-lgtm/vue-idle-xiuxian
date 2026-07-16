@@ -1,12 +1,12 @@
-- [ ] 装备词条生成时 percent>0 且 flat≥1
-- [ ] 洗练计算出的 flat 词条值不低于 1，percent 词条值不低于 baseRange[0]*0.5
-- [ ] reforgeEquipment 入口清理所有非 BASE_STATS 的 0/NaN/null 属性
-- [ ] Inventory.vue 装备属性展示过滤 0/NaN/null 词条
-- [ ] 小培元丹 baseEffect 改为 effortValue+1, health+10
-- [ ] 培元丹、大培元丹、极培元丹、天培元丹的 effortValue 调整为 1~5 并配置合理的 extraStats
-- [ ] calculatePillEffect 透传 extraStats
-- [ ] applyPillEffect 的 effortGain 分支移除 0.5% 自动增益，改为直接应用 extraStats 到 baseStats 与 permanentBonuses
-- [ ] Inventory.vue getEffectDescription 正确显示 effortGain 的 extraStats
-- [ ] 培元丹 description 文本与实际效果一致
-- [ ] 桌面端装备详情弹窗宽度为 50vw / max-width 720px
-- [ ] 构建通过且已推送到 main
+- [x] 装备词条生成时 percent>0 且 flat≥1
+- [x] 洗练计算出的 flat 词条值不低于 1，percent 词条值不低于 baseRange[0]*0.5
+- [x] reforgeEquipment 入口清理所有非 BASE_STATS 的 0/NaN/null 属性
+- [x] Inventory.vue 装备属性展示过滤 0/NaN/null 词条
+- [x] 小培元丹 baseEffect 改为 effortValue+1, health+10
+- [x] 培元丹、大培元丹、极培元丹、天培元丹的 effortValue 调整为 1~5 并配置合理的 extraStats
+- [x] calculatePillEffect 透传 extraStats
+- [x] applyPillEffect 的 effortGain 分支移除 0.5% 自动增益，改为直接应用 extraStats 到 baseStats 与 permanentBonuses
+- [x] Inventory.vue getEffectDescription 正确显示 effortGain 的 extraStats
+- [x] 培元丹 description 文本与实际效果一致
+- [x] 桌面端装备详情弹窗宽度为 50vw / max-width 720px
+- [x] 构建通过且已推送到 main

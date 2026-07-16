@@ -118,9 +118,14 @@
               批量卖出 ({{ selectedMaterials.length }})
             </button>
           </div>
-          <div v-if="filteredMaterials.length" class="simple-grid" :class="{ mobile: isMobile }">
+          <div v-if="filteredMaterials.length > materialPageSize" class="pagination-info">
+            共 {{ filteredMaterials.length }} 个素材，当前第 {{ currentMaterialPage }} 页
+            <button class="btn-small" :disabled="currentMaterialPage <= 1" @click="currentMaterialPage--">上一页</button>
+            <button class="btn-small" :disabled="currentMaterialPage * materialPageSize >= filteredMaterials.length" @click="currentMaterialPage++">下一页</button>
+          </div>
+          <div v-if="displayMaterials.length" class="simple-grid" :class="{ mobile: isMobile }">
             <div
-              v-for="mat in filteredMaterials"
+              v-for="mat in displayMaterials"
               :key="mat.id"
               class="simple-card material-card"
               :class="{ selected: isMaterialSelected(mat) }"
@@ -157,9 +162,14 @@
         </div>
         <!-- 丹药 -->
         <div v-if="activeTab === 'pills'" class="tab-pane">
-          <div v-if="groupedPills.length" class="simple-grid" :class="{ mobile: isMobile }">
+          <div v-if="groupedPills.length > pillPageSize" class="pagination-info">
+            共 {{ groupedPills.length }} 颗丹药，当前第 {{ currentPillPage }} 页
+            <button class="btn-small" :disabled="currentPillPage <= 1" @click="currentPillPage--">上一页</button>
+            <button class="btn-small" :disabled="currentPillPage * pillPageSize >= groupedPills.length" @click="currentPillPage++">下一页</button>
+          </div>
+          <div v-if="displayPills.length" class="simple-grid" :class="{ mobile: isMobile }">
             <div
-              v-for="pill in groupedPills"
+              v-for="pill in displayPills"
               :key="pill.id"
               class="simple-card pill-card"
               @click="openPillConsumeModal(pill)"
@@ -594,6 +604,14 @@
             <span>×{{ selectedPill.count }}</span>
           </div>
           <div class="detail-row">
+            <span>服用数量</span>
+            <div class="pill-quantity-selector">
+              <button class="btn-small" @click="pillConsumeCount = Math.max(1, pillConsumeCount - 1)">-</button>
+              <span>{{ pillConsumeCount }}</span>
+              <button class="btn-small" @click="pillConsumeCount = Math.min(selectedPill?.count || 1, pillConsumeCount + 1)">+</button>
+            </div>
+          </div>
+          <div class="detail-row">
             <span>说明</span>
             <span>{{ selectedPill.description }}</span>
           </div>
@@ -706,6 +724,15 @@
   const filteredMaterials = computed(() => {
     if (selectedMaterialCategory.value === 'all') return groupedMaterials.value
     return groupedMaterials.value.filter(m => m.kind === selectedMaterialCategory.value)
+  })
+
+  const currentMaterialPage = ref(1)
+  const materialPageSize = ref(12)
+
+  const displayMaterials = computed(() => {
+    const start = (currentMaterialPage.value - 1) * materialPageSize.value
+    const end = start + materialPageSize.value
+    return filteredMaterials.value.slice(start, end)
   })
 
   const materialQualityNames = {
@@ -929,13 +956,24 @@
       .filter(Boolean)
   })
 
+  const currentPillPage = ref(1)
+  const pillPageSize = ref(12)
+
+  const displayPills = computed(() => {
+    const start = (currentPillPage.value - 1) * pillPageSize.value
+    const end = start + pillPageSize.value
+    return groupedPills.value.slice(start, end)
+  })
+
   // 丹药服用弹窗
   const showPillConsumeModal = ref(false)
   const selectedPill = ref(null)
+  const pillConsumeCount = ref(1)
   const pillConsumeMembers = computed(() => playerStore.getTeamMembersDetail().filter(m => m))
 
   const openPillConsumeModal = pill => {
     selectedPill.value = pill
+    pillConsumeCount.value = 1
     showPillConsumeModal.value = true
   }
 
@@ -946,23 +984,31 @@
 
   const consumePillForMember = member => {
     if (!selectedPill.value) return
-    const result = playerStore.consumePill(selectedPill.value.id, member.id)
-    if (result.success) {
-      if (result.changes && result.changes.length > 0) {
-        result.changes.forEach(change => {
-          if (change.isGlobal) {
-            window.$message?.success(`全队${change.stat} +${change.delta}${change.unit || ''}`)
-          } else {
-            window.$message?.success(`${member.name} ${change.stat} +${change.delta}${change.unit || ''}`)
-          }
+    const count = pillConsumeCount.value || 1
+    let allSuccess = true
+    const allChanges = []
+    for (let i = 0; i < count; i++) {
+      const result = playerStore.consumePill(selectedPill.value.id, member.id)
+      if (!result.success) {
+        allSuccess = false
+        if (result.message) window.$message?.error(result.message)
+        break
+      }
+      if (result.changes) allChanges.push(...result.changes)
+    }
+    if (allSuccess) {
+      if (allChanges.length > 0) {
+        const deltaMap = {}
+        allChanges.forEach(c => {
+          if (!deltaMap[c.stat]) deltaMap[c.stat] = 0
+          deltaMap[c.stat] += c.delta
         })
-      } else {
-        message.success(result.message || '服用成功')
+        Object.entries(deltaMap).forEach(([stat, delta]) => {
+          window.$message?.success(`${member.name} ${stat} +${delta}`)
+        })
       }
       showPillConsumeModal.value = false
       selectedPill.value = null
-    } else {
-      message.error(result.message || '服用失败')
     }
   }
 
@@ -1856,7 +1902,7 @@
 
     .equipment-detail-modal .equipment-detail-content {
       width: 50vw;
-      max-width: 720px;
+      max-width: 520px;
       height: 80vh;
       max-height: 80vh;
       border-radius: 14px;
