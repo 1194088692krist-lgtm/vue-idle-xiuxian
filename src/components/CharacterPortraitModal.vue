@@ -5,7 +5,35 @@
         <div class="char-modal-close" @click="$emit('close')">✕</div>
         <div class="char-modal-content">
           <div class="char-portrait-large">
+            <!-- 动态立绘：静态图始终作为底层，视频加载完成后淡入覆盖 -->
+            <template v-if="shouldShowVideo">
+              <img
+                v-if="avatar"
+                :src="avatar"
+                class="char-portrait-static"
+                :class="{ 'is-hidden': videoReady }"
+                alt="角色立绘"
+                draggable="false"
+              />
+              <video
+                ref="videoEl"
+                class="char-portrait-video"
+                :class="{ 'is-visible': videoReady }"
+                :src="videoSrc"
+                :poster="avatar || undefined"
+                preload="auto"
+                muted
+                loop
+                playsinline
+                webkit-playsinline
+                @canplay="onVideoReady"
+                @loadeddata="onVideoReady"
+                @error="onVideoError"
+              ></video>
+            </template>
+            <!-- 无动态视频：保留原 LivePortrait（分层视差 / 单图）兜底 -->
             <LivePortrait
+              v-else
               :avatar="avatar"
               :layers="layers"
               :name="character.name"
@@ -23,8 +51,9 @@
 </template>
 
 <script setup>
-import { computed } from 'vue'
-import { getCharacterAvatar, getCharacterLayers } from '../plugins/characters'
+import { computed, ref, watch, onBeforeUnmount } from 'vue'
+import { getCharacterAvatar, getCharacterLayers, getCharacterVideo } from '../plugins/characters'
+import { usePlayerStore } from '../stores/player'
 import LivePortrait from './LivePortrait.vue'
 
 const props = defineProps({
@@ -32,8 +61,47 @@ const props = defineProps({
 })
 defineEmits(['close'])
 
+const playerStore = usePlayerStore()
+const videoEl = ref(null)
+const videoReady = ref(false)
+
 const avatar = computed(() => (props.character ? getCharacterAvatar(props.character) : null))
 const layers = computed(() => (props.character ? getCharacterLayers(props.character) : null))
+const videoSrc = computed(() => (props.character ? getCharacterVideo(props.character) : null))
+// 同时满足：动态效果开启 + 该角色配置了视频
+const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!videoSrc.value)
+
+const tryPlay = () => {
+  const v = videoEl.value
+  if (!v) return
+  const p = v.play()
+  if (p && p.catch) p.catch(() => { /* 自动播放被拦截时静默忽略，仍显示静态图 */ })
+}
+
+const onVideoReady = () => {
+  videoReady.value = true
+  tryPlay()
+}
+
+const onVideoError = () => {
+  // 视频加载失败：保持静态立绘显示，不报错
+  videoReady.value = false
+}
+
+// 切换角色 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
+watch(
+  () => [props.character, shouldShowVideo.value, videoSrc.value],
+  () => {
+    videoReady.value = false
+    if (shouldShowVideo.value) {
+      requestAnimationFrame(tryPlay)
+    }
+  }
+)
+
+onBeforeUnmount(() => {
+  videoReady.value = false
+})
 </script>
 
 <style scoped>
@@ -77,6 +145,7 @@ const layers = computed(() => (props.character ? getCharacterLayers(props.charac
   box-shadow: 0 0 40px rgba(218, 165, 32, 0.3);
 }
 .char-portrait-large {
+  position: relative;
   width: 100%;
   aspect-ratio: 3/4;
   display: flex;
@@ -84,6 +153,34 @@ const layers = computed(() => (props.character ? getCharacterLayers(props.charac
   justify-content: center;
   background: linear-gradient(180deg, rgba(218,165,32,0.1) 0%, transparent 100%);
   overflow: hidden;
+}
+.char-portrait-static {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  transition: opacity 0.4s ease;
+  z-index: 1;
+  user-select: none;
+  -webkit-user-drag: none;
+}
+.char-portrait-static.is-hidden {
+  opacity: 0;
+}
+.char-portrait-video {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%;
+  height: 100%;
+  object-fit: contain;
+  opacity: 0;
+  transition: opacity 0.4s ease;
+  z-index: 2;
+  background: transparent;
+}
+.char-portrait-video.is-visible {
+  opacity: 1;
 }
 .char-modal-footer {
   padding: 16px 20px 24px;

@@ -62,6 +62,23 @@
           </div>
         </div>
 
+        <!-- 立绘动态效果 -->
+        <div class="setting-row">
+          <label class="setting-label">立绘动态效果</label>
+          <div class="setting-input-group">
+            <button
+              class="btn"
+              :class="playerStore.dynamicPortrait ? 'btn-success' : 'btn-outline'"
+              @click="toggleDynamicPortrait"
+            >
+              {{ playerStore.dynamicPortrait ? '已开启（点击立绘播放视频）' : '已关闭（仅静态立绘）' }}
+            </button>
+          </div>
+          <p class="setting-hint">
+            开启后，点击已配置动态视频的角色立绘会自动加载并播放；关闭则始终显示静态立绘，更省流量。
+          </p>
+        </div>
+
         <!-- 危险操作 -->
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
@@ -531,6 +548,13 @@
     playerStore.isDarkMode = dark
     playerStore.updateHtmlDarkMode(dark)
     localStorage.setItem('darkMode', dark)
+    playerStore.saveData()
+  }
+
+  // 立绘动态效果开关
+  const toggleDynamicPortrait = () => {
+    playerStore.dynamicPortrait = !playerStore.dynamicPortrait
+    localStorage.setItem('dynamicPortrait', playerStore.dynamicPortrait)
     playerStore.saveData()
   }
 

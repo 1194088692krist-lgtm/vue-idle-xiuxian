@@ -27,15 +27,27 @@ try {
 }
 
 const IMG_EXT = new Set(['.png', '.jpg', '.jpeg', '.webp', '.gif', '.svg', '.avif'])
+const VIDEO_EXT = new Set(['.mp4', '.webm', '.mov', '.ogg'])
 
 if (!existsSync(portraitsDir)) mkdirSync(portraitsDir, { recursive: true })
 if (!existsSync(thumbnailsDir)) mkdirSync(thumbnailsDir, { recursive: true })
 
 async function processFile(file) {
   const ext = extname(file).toLowerCase()
+  const filePath = join(portraitsDir, file)
+  if (filePath.startsWith(thumbnailsDir)) return null
+  // 动态立绘视频：合并到同名角色的 manifest 条目（video 字段）
+  if (VIDEO_EXT.has(ext)) {
+    const stem = basename(file, ext)
+    const key = stem.trim().toLowerCase()
+    let hit = idName.find(c => c.id.toLowerCase() === key)
+    if (!hit) hit = idName.find(c => c.name.toLowerCase() === key)
+    if (!hit) hit = idName.find(c => key.includes(c.id.toLowerCase()) || key.includes(c.name.toLowerCase()))
+    const id = hit ? hit.id : stem
+    return { id, videoFile: file }
+  }
   if (!IMG_EXT.has(ext)) return null
   
-  const filePath = join(portraitsDir, file)
   const stem = basename(file, ext)
   
   if (filePath.startsWith(thumbnailsDir)) return null
@@ -75,12 +87,22 @@ async function main() {
   
   for (const file of files) {
     const result = await processFile(file)
-    if (result) {
-      if (result.generated) thumbnailsGenerated++
-      manifest[result.id] = {
+    if (!result) continue
+    if (result.generated) thumbnailsGenerated++
+    // 视频：合并到对应角色的条目（保留已存在的 full/thumbnail）
+    if (result.videoFile) {
+      if (!manifest[result.id]) manifest[result.id] = {}
+      manifest[result.id].video = result.videoFile
+    } else {
+      const entry = {
         full: result.file,
-        thumbnail: `thumbnails/${result.thumbnailFile}`
+        thumbnail: result.thumbnailFile ? `thumbnails/${result.thumbnailFile}` : null
       }
+      // 若视频已于本次扫描中先注册，则保留 video 字段
+      if (manifest[result.id] && manifest[result.id].video) {
+        entry.video = manifest[result.id].video
+      }
+      manifest[result.id] = entry
     }
   }
   

@@ -50,6 +50,8 @@ export const usePlayerStore = defineStore('player', {
     isGMMode: false,
     // 主题设置：默认日间模式（需用户主动开启才为夜间）
     isDarkMode: localStorage.getItem('darkMode') === 'true',
+    // 立绘动态效果开关（点击立绘时加载并播放视频），默认开启
+    dynamicPortrait: localStorage.getItem('dynamicPortrait') !== 'false',
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
@@ -547,6 +549,9 @@ export const usePlayerStore = defineStore('player', {
       this.isDarkMode = savedDarkMode === null ? true : savedDarkMode === 'true'
       // 同步暗黑模式状态到HTML标签
       this.updateHtmlDarkMode(this.isDarkMode)
+      // 初始化动态立绘设置：默认开启
+      const dynPortrait = localStorage.getItem('dynamicPortrait')
+      this.dynamicPortrait = dynPortrait === null ? true : dynPortrait === 'true'
       // 初始化GM模式设置
       const gmMode = localStorage.getItem('isGMMode')
       if (gmMode !== null) {

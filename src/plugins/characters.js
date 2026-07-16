@@ -186,6 +186,10 @@ export async function loadSharedPortraits() {
           full: `${base}portraits/${data.full}`,
           thumbnail: data.thumbnail ? `${base}portraits/${data.thumbnail}` : null
         }
+        // 动态立绘视频（点击立绘时加载播放，首帧需与静态立绘一致）
+        if (data.video) {
+          entry.video = `${base}portraits/${data.video}`
+        }
         // 分层立绘（Live2D 伪视差用）
         if (Array.isArray(data.layers) && data.layers.length > 0) {
           entry.layers = data.layers.map(l => `${base}portraits/${l}`)
@@ -224,6 +228,24 @@ export function getCharacterAvatar(member, size = 'full') {
 
 export function getCharacterThumbnail(member) {
   return getCharacterAvatar(member, 'thumbnail')
+}
+
+/**
+ * 获取角色的动态立绘视频 URL（用于点击立绘后的视频播放）
+ * 优先从 sharedPortraitMap（站点共享包）读取，其次回退到 characterDefMap
+ * 返回 null 表示未配置视频，调用方应回退到静态立绘 / 分层视差
+ */
+export function getCharacterVideo(member) {
+  if (!member) return null
+  const id = member.templateId || member.id
+  if (!id) return null
+  if (sharedPortraitMap[id] && sharedPortraitMap[id].video) {
+    return sharedPortraitMap[id].video
+  }
+  if (characterDefMap[id] && characterDefMap[id].video) {
+    return characterDefMap[id].video
+  }
+  return null
 }
 
 /**

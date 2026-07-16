@@ -9,7 +9,8 @@
   },
   "char_003": {
     "full": "char_003.jpg",
-    "thumbnail": "thumbnails/char_003_thumb.webp"
+    "thumbnail": "thumbnails/char_003_thumb.webp",
+    "video": "char_003.mp4"
   },
   "char_004": {
     "full": "char_004.jpg",
