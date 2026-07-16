@@ -1,4 +1,4 @@
-import { res, randomHex } from '../_utils.js'
+import { res, randomHex } from '../../_utils.js'
 
 // GM 登录：校验 gm_accounts 明文密码，签发随机长 token 写入 gm_tokens
 export async function onRequest({ request, env }) {

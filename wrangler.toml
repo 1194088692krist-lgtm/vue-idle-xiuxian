@@ -9,7 +9,7 @@ pages_build_output_dir = "docs"
 [[d1_databases]]
 binding = "DB"
 database_name = "xiuxian"
-database_id = "REPLACE_WITH_YOUR_D1_ID"
+database_id = "db5eb216-6195-4d7f-8e02-9cae689b39d8"
 
 # JWT 签名密钥。生产环境请用 wrangler secret put JWT_SECRET 覆盖，勿在此写真实密钥。
 [vars]
