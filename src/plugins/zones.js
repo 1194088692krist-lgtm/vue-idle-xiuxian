@@ -463,6 +463,7 @@ zones.forEach(zone => {
     key: t.key,
     label: t.label,
     color: t.color,
+    difficulty: idx + 1,
     spiritCost: costMult === 0 ? 0 : Math.round(MISTY_VALLEY_COSTS[idx] * costMult),
     rewardMultiplier: Math.round(baseRM * t.rmMul * 100) / 100,
     enemyScale: t.scale,
@@ -471,7 +472,6 @@ zones.forEach(zone => {
       attack: Math.max(1, Math.round(baseAtk * t.scale)),
       health: Math.max(1, Math.round(baseHp * t.scale))
     },
-    // Build 强度推荐值：以标准档为基准，按难度缩放（游历0.3 → 灭世2.5）
     recommendedBuild: Math.max(1, Math.round(baseBuild * t.scale))
   }))
   // 八图全开：移除等级锁

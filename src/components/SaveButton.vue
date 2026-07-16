@@ -46,23 +46,8 @@
     position: relative;
   }
 
-  .save-nav-item::before {
-    content: '';
-    position: absolute;
-    inset: 6px;
-    border-radius: 8px;
-    background: linear-gradient(135deg, rgba(218, 165, 32, 0.12), rgba(255, 215, 0, 0.05));
-    border: 1px solid rgba(218, 165, 32, 0.35);
-    z-index: -1;
-    transition: all 0.2s ease;
-  }
-
   .save-nav-item:active {
     transform: scale(0.95);
-  }
-
-  .save-nav-item:active::before {
-    background: linear-gradient(135deg, rgba(218, 165, 32, 0.25), rgba(255, 215, 0, 0.12));
   }
 
   .save-nav-item.saving {
