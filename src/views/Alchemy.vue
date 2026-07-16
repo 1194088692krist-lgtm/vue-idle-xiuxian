@@ -117,13 +117,17 @@
               </div>
             </div>
             <div class="craft-section">
+              <div class="craft-count-row">
+                <span class="craft-count-label">炼制数量</span>
+                <n-input-number v-model:value="craftCount" :min="1" :max="maxCraftCount" :disabled="maxCraftCount <= 1" style="width: 120px;" />
+              </div>
               <button
                 class="btn btn-primary craft-button"
-                :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe) }"
+                :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe, craftCount) }"
                 @click="craftPill"
               >
                 <span class="btn-icon"><FireOutlined /></span>
-                <span>{{ !checkMaterials(selectedRecipe) ? '材料不足' : '开始炼制' }}</span>
+                <span>{{ !checkMaterials(selectedRecipe, craftCount) ? '材料不足' : (craftCount > 1 ? `批量炼制 ×${craftCount}` : '开始炼制') }}</span>
               </button>
             </div>
           </template>
@@ -307,9 +311,10 @@
                     <button
                       class="btn-info"
                       :class="{ active: reforgeMode === 'single' }"
+                      :disabled="Object.keys(cleanAffixStats).length === 0"
                       @click="reforgeMode = 'single'"
                     >
-                      单条洗练
+                      {{ Object.keys(cleanAffixStats).length === 0 ? '无可用词条' : '单条洗练' }}
                     </button>
                   </div>
                 </div>
@@ -317,9 +322,10 @@
                 <template v-if="reforgeMode === 'single'">
                   <div class="section forge-actions-section">
                     <h3 class="section-title">选择词条</h3>
-                    <div class="stat-select">
+                    <div v-if="Object.keys(cleanAffixStats).length === 0" class="empty-state">该装备无可洗练词条</div>
+                    <div v-else class="stat-select">
                       <button
-                        v-for="(val, key) in selectedForgeEquip.stats"
+                        v-for="(val, key) in cleanAffixStats"
                         :key="key"
                         class="stat-btn"
                         :class="{ active: selectedReforgeStat === key }"
@@ -596,6 +602,7 @@
 
   const activeTab = ref('pill')
   const selectedRecipe = ref(null)
+  const craftCount = ref(1)
   const selectedRebirthMember = ref(null)
   const showRebirthConfirm = ref(false)
 
@@ -614,6 +621,19 @@
   const forgePage = ref(1)
   const forgePageSize = 10
 
+  const BASE_STATS = ['attack', 'health', 'defense', 'speed']
+
+  const cleanAffixStats = computed(() => {
+    if (!selectedForgeEquip.value || !selectedForgeEquip.value.stats) return {}
+    const stats = {}
+    Object.entries(selectedForgeEquip.value.stats).forEach(([key, val]) => {
+      if (!BASE_STATS.includes(key)) {
+        stats[key] = val
+      }
+    })
+    return stats
+  })
+
   const unlockedRecipes = computed(() => {
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
   })
@@ -622,13 +642,22 @@
     selectedRecipe.value = recipe
   }
 
-  const checkMaterials = recipe => {
+  const checkMaterials = (recipe, count = 1) => {
     if (!recipe) return false
     return recipe.materials.every(material => {
-      const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
-      return count >= material.count
+      const owned = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
+      return owned >= material.count * count
     })
   }
+
+  const maxCraftCount = computed(() => {
+    if (!selectedRecipe.value) return 1
+    const maxCounts = selectedRecipe.value.materials.map(material => {
+      const owned = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
+      return Math.floor(owned / material.count) || 0
+    })
+    return Math.max(1, Math.min(...maxCounts))
+  })
 
   const getMaterialStatus = material => {
     const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
@@ -722,9 +751,12 @@
 
   const craftPill = () => {
     if (!selectedRecipe.value) return
-    const result = playerStore.craftPill(selectedRecipe.value.id)
+    const count = Math.min(Math.max(1, craftCount.value || 1), maxCraftCount.value)
+    const result = playerStore.craftPill(selectedRecipe.value.id, count)
     if (result.success) {
-      logRef.value?.addLog('success', '炼制成功！')
+      const successCount = result.successCount || 1
+      window.$message?.success(`获得 ${selectedRecipe.value.name}${successCount > 1 ? ` ×${successCount}` : ''}`)
+      logRef.value?.addLog('success', result.message)
       const btn = document.querySelector('.craft-button')
       if (btn) {
         btn.classList.add('success-animation')
@@ -907,6 +939,10 @@
     selectedForgeEquip.value = equip
     selectedReforgeStat.value = null
     reforgeResult.value = null
+    // 若新装备无可用词条，自动切回全部洗练
+    if (reforgeMode.value === 'single' && Object.keys(cleanAffixStats.value).length === 0) {
+      reforgeMode.value = 'all'
+    }
   }
 
   const toggleDisassembleSelect = (equipId) => {
@@ -998,7 +1034,10 @@
   const canReforge = (equip) => {
     if (!equip) return false
     if (playerStore.refinementStones < reforgeConfig.costPerAttempt) return false
-    if (reforgeMode.value === 'single' && !selectedReforgeStat.value) return false
+    if (reforgeMode.value === 'single') {
+      if (Object.keys(cleanAffixStats.value).length === 0) return false
+      if (!selectedReforgeStat.value) return false
+    }
     return true
   }
 
@@ -1372,6 +1411,18 @@
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  .craft-count-row {
+    display: flex;
+    align-items: center;
+    gap: 12px;
+    margin-bottom: 12px;
+  }
+
+  .craft-count-label {
+    font-size: 14px;
+    color: #aaa;
   }
 
   .btn {

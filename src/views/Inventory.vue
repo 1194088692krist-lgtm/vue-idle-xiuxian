@@ -179,36 +179,7 @@
           </div>
           <div v-else class="empty-state">暂无丹药</div>
         </div>
-        <!-- 丹方 -->
-        <div v-if="activeTab === 'formulas'" class="tab-pane">
-          <div v-if="allFormulas.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="formula in allFormulas" :key="formula.id" class="simple-card">
-              <div class="card-header">
-                <span>{{ formula.name }}</span>
-                <span class="tag-group">
-                  <span class="simple-tag" :class="formula.isComplete ? 'success' : 'warning'">
-                    {{ formula.isComplete ? '完整' : '残缺' }}
-                  </span>
-                  <span class="simple-tag info">{{ pillGrades[formula.grade].name }}</span>
-                  <span class="simple-tag warning">{{ pillTypes[formula.type].name }}</span>
-                </span>
-              </div>
-              <div class="card-body">
-                <p>{{ formula.description }}</p>
-                <div v-if="!formula.isComplete" class="progress-line">
-                  <div
-                    class="progress-fill"
-                    :style="{ width: ((formula.fragments / formula.fragmentsNeeded) * 100) + '%' }"
-                  ></div>
-                </div>
-                <p v-if="!formula.isComplete" class="progress-text">
-                  收集进度: {{ formula.fragments }}/{{ formula.fragmentsNeeded }}
-                </p>
-              </div>
-            </div>
-          </div>
-          <div v-else class="empty-state">暂无丹方</div>
-        </div>
+
         <!-- 灵宠 -->
         <div v-if="activeTab === 'pets'" class="tab-pane">
           <div class="pet-actions">
@@ -969,7 +940,17 @@
     if (!selectedPill.value) return
     const result = playerStore.consumePill(selectedPill.value.id, member.id)
     if (result.success) {
-      message.success(result.message)
+      if (result.changes && result.changes.length > 0) {
+        result.changes.forEach(change => {
+          if (change.isGlobal) {
+            window.$message?.success(`全队${change.stat} +${change.delta}${change.unit || ''}`)
+          } else {
+            window.$message?.success(`${member.name} ${change.stat} +${change.delta}${change.unit || ''}`)
+          }
+        })
+      } else {
+        message.success(result.message || '服用成功')
+      }
       showPillConsumeModal.value = false
       selectedPill.value = null
     } else {
@@ -983,7 +964,6 @@
     { name: 'materials', label: '素材' },
     { name: 'equipment', label: '装备' },
     { name: 'pills', label: '丹药' },
-    { name: 'formulas', label: '丹方' },
     { name: 'pets', label: '灵宠' }
   ]
 
@@ -1498,51 +1478,7 @@
     return Object.values(groups)
   })
 
-  // 计算丹方分组
-  const groupedFormulas = computed(() => {
-    // 从pillRecipes中获取完整丹方
-    const complete = playerStore.pillRecipes
-      .map(recipeId => {
-        const recipe = pillRecipes.find(r => r.id === recipeId)
-        return recipe
-          ? {
-              id: recipe.id,
-              name: recipe.name,
-              description: recipe.description,
-              grade: recipe.grade,
-              type: recipe.type,
-              isComplete: true
-            }
-          : null
-      })
-      .filter(Boolean)
 
-    // 从pillFragments中获取残缺丹方
-    const incomplete = Object.entries(playerStore.pillFragments)
-      .map(([recipeId, fragments]) => {
-        const recipe = pillRecipes.find(r => r.id === recipeId)
-        return recipe
-          ? {
-              id: recipe.id,
-              name: recipe.name,
-              description: recipe.description,
-              grade: recipe.grade,
-              type: recipe.type,
-              isComplete: false,
-              fragments,
-              fragmentsNeeded: recipe.fragmentsNeeded
-            }
-          : null
-      })
-      .filter(Boolean)
-
-    return { complete, incomplete }
-  })
-
-  // 合并完整与残缺丹方
-  const allFormulas = computed(() => {
-    return [...groupedFormulas.value.complete, ...groupedFormulas.value.incomplete]
-  })
 
   // 使用物品
   const useItem = item => {
@@ -1876,7 +1812,7 @@
     max-height: calc(100vh - 50px);
   }
 
-  /* 装备详情弹窗：直接铺满屏幕，底部预留空白条方便点击返回 */
+  /* 装备详情弹窗：移动端铺满屏幕，桌面端居中缩小 */
   .simple-modal.equipment-detail-modal {
     padding: 0;
     align-items: flex-start;
@@ -1889,6 +1825,23 @@
     max-height: calc(100vh - 80px);
     border-radius: 0;
     padding: 16px 16px 24px;
+  }
+
+  @media (min-width: 769px) {
+    .simple-modal.equipment-detail-modal {
+      padding: 20px;
+      align-items: center;
+      justify-content: center;
+    }
+
+    .equipment-detail-modal .equipment-detail-content {
+      width: 60vw;
+      max-width: 900px;
+      height: 80vh;
+      max-height: 80vh;
+      border-radius: 14px;
+      padding: 18px 20px 24px;
+    }
   }
 
   .modal-header {

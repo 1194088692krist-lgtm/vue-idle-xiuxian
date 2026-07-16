@@ -1633,37 +1633,68 @@ export const usePlayerStore = defineStore('player', {
       }
       this.queueSave()
     },
-    // 炼制丹药
-    craftPill(recipeId) {
+    // 炼制丹药（支持批量）
+    craftPill(recipeId, count = 1) {
       const recipe = pillRecipes.find(r => r.id === recipeId)
       if (!recipe || !this.pillRecipes.includes(recipeId)) {
         return { success: false, message: '未掌握丹方' }
       }
+      if (count < 1) {
+        return { success: false, message: '炼制数量至少为1' }
+      }
       const fragments = this.pillFragments[recipeId] || 0
-      const result = tryCreatePill(recipe, this.materials, this, fragments, this.luck * this.alchemyRate)
-      if (result.success) {
-        // 消耗材料（按 kind+id 精确扣减）
-        recipe.materials.forEach(material => {
-          const kind = material.kind || 'herb'
-          const mid = material.id || material.herb
-          let remaining = material.count
-          for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
-            if (this.materials[i].kind === kind && this.materials[i].id === mid) {
-              this.materials.splice(i, 1)
-              remaining--
-            }
-          }
-        })
-        // 创建丹药并加入持有
-        if (!this.ownedPills[recipeId]) {
-          this.ownedPills[recipeId] = { count: 0, craftedAt: Date.now() }
+      // 检查材料是否足够 N 倍
+      for (const material of recipe.materials) {
+        const kind = material.kind || 'herb'
+        const mid = material.id || material.herb
+        const have = this.materials.filter(m => m.kind === kind && m.id === mid).length
+        if (have < material.count * count) {
+          return { success: false, message: '材料不足' }
         }
-        this.ownedPills[recipeId].count++
-        this.ownedPills[recipeId].craftedAt = Date.now()
-        this.pillsCrafted++
+      }
+      let successCount = 0
+      let failCount = 0
+      for (let n = 0; n < count; n++) {
+        const result = tryCreatePill(recipe, this.materials, this, fragments, this.luck * this.alchemyRate)
+        if (result.success) {
+          // 消耗材料（按 kind+id 精确扣减）
+          recipe.materials.forEach(material => {
+            const kind = material.kind || 'herb'
+            const mid = material.id || material.herb
+            let remaining = material.count
+            for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+              if (this.materials[i].kind === kind && this.materials[i].id === mid) {
+                this.materials.splice(i, 1)
+                remaining--
+              }
+            }
+          })
+          // 创建丹药并加入持有
+          if (!this.ownedPills[recipeId]) {
+            this.ownedPills[recipeId] = { count: 0, craftedAt: Date.now() }
+          }
+          this.ownedPills[recipeId].count++
+          this.ownedPills[recipeId].craftedAt = Date.now()
+          this.pillsCrafted++
+          successCount++
+        } else {
+          failCount++
+        }
+      }
+      if (successCount > 0) {
         this.queueSave()
       }
-      return result
+      if (count === 1) {
+        return successCount > 0
+          ? { success: true, message: '炼制成功' }
+          : { success: false, message: '炼制失败' }
+      }
+      return {
+        success: successCount > 0,
+        message: successCount > 0 ? `批量炼制完成，成功 ${successCount} 颗，失败 ${failCount} 颗` : '批量炼制全部失败',
+        successCount,
+        failCount
+      }
     },
     // 使用丹药（与上方 usePill 统一逻辑）
     useItem(item) {
@@ -1698,6 +1729,8 @@ export const usePlayerStore = defineStore('player', {
       const effect = calculatePillEffect(recipe, this.level)
       const now = Date.now()
       const expiresAt = now + (baseEffect.duration || 0) * 1000
+      const changes = []
+      const statNameMap = { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }
 
       const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain', 'combatBoost', 'allAttributes']
       const memberTypes = ['permanentStat', 'effortGain', 'healBattle', 'cleanse', 'autoHeal', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
@@ -1719,6 +1752,23 @@ export const usePlayerStore = defineStore('player', {
             endTime: expiresAt
           })
         }
+        const globalStatMap = {
+          spiritStoneRate: '灵石获取',
+          cultivationRate: '修炼速度',
+          dropRate: '掉落加成',
+          expGain: '修为获取',
+          combatBoost: '战斗属性',
+          allAttributes: '全属性'
+        }
+        const pct = Math.round(effect.value * 100)
+        changes.push({
+          stat: globalStatMap[baseEffect.type] || baseEffect.type,
+          old: 0,
+          new: pct,
+          delta: pct,
+          isGlobal: true,
+          unit: '%'
+        })
       } else if (memberTypes.includes(baseEffect.type)) {
         if (!memberId) {
           window.$message?.error('该丹药需要指定服用角色')
@@ -1745,7 +1795,11 @@ export const usePlayerStore = defineStore('player', {
             const val = Math.round(effect.value)
             if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
             if (member.permanentBonuses[stat] !== undefined) member.permanentBonuses[stat] += val
-            if (member.baseStats && member.baseStats[stat] !== undefined) member.baseStats[stat] += val
+            const oldBase = member.baseStats?.[stat] || 0
+            if (member.baseStats && member.baseStats[stat] !== undefined) {
+              member.baseStats[stat] += val
+              changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + val, delta: val })
+            }
             break
           }
           case 'effortGain': {
@@ -1767,28 +1821,50 @@ export const usePlayerStore = defineStore('player', {
               return { success: false, message: '努力值没有提升' }
             }
             member.effortValue = Math.round(newValue)
+            changes.push({ stat: '努力值', old: Math.round(oldValue), new: Math.round(newValue), delta: actualGain })
+            // 同步提升 baseStats
+            if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+            const stats = ['attack', 'health', 'defense', 'speed']
+            stats.forEach(statKey => {
+              const oldStat = member.baseStats[statKey] || 0
+              const bonus = Math.round(oldStat * 0.005 * actualGain)
+              if (bonus > 0) {
+                member.baseStats[statKey] = oldStat + bonus
+                changes.push({ stat: statNameMap[statKey], old: oldStat, new: oldStat + bonus, delta: bonus })
+              }
+            })
             break
           }
           case 'healBattle':
           case 'cleanse':
+            // 进入战斗丹药队列，由战斗界面消耗
             this.battlePills.push({
               ...effect,
               uid: `${effect.type}_${now}_${Math.floor(Math.random() * 1e6)}`,
               used: false
             })
             break
-          case 'breakthroughRate':
+          case 'breakthroughRate': {
+            const oldVal = member.breakthroughBonus || 0
             if (!member.breakthroughBonus) member.breakthroughBonus = 0
             member.breakthroughBonus = Math.min(0.9, member.breakthroughBonus + effect.value)
+            changes.push({ stat: '突破成功率', old: Math.round(oldVal * 100), new: Math.round(member.breakthroughBonus * 100), delta: Math.round(effect.value * 100), unit: '%' })
             break
-          case 'enhanceRate':
+          }
+          case 'enhanceRate': {
+            const oldVal = member.enhanceBonus || 0
             if (!member.enhanceBonus) member.enhanceBonus = 0
             member.enhanceBonus = Math.min(0.9, member.enhanceBonus + effect.value)
+            changes.push({ stat: '强化成功率', old: Math.round(oldVal * 100), new: Math.round(member.enhanceBonus * 100), delta: Math.round(effect.value * 100), unit: '%' })
             break
-          case 'reforgeSafe':
+          }
+          case 'reforgeSafe': {
+            const oldVal = member.reforgeSafeCharges || 0
             if (!member.reforgeSafeCharges) member.reforgeSafeCharges = 0
             member.reforgeSafeCharges += Math.max(1, Math.round(effect.value))
+            changes.push({ stat: '洗练保底', old: oldVal, new: member.reforgeSafeCharges, delta: Math.max(1, Math.round(effect.value)) })
             break
+          }
           case 'autoHeal':
             // 仅存入 member.activePills，由战斗系统后续读取
             break
@@ -1811,9 +1887,7 @@ export const usePlayerStore = defineStore('player', {
       this.pillsConsumed++
       this.queueSave()
 
-      const msg = `服用${recipe.name}成功`
-      window.$message?.success(msg)
-      return { success: true, message: msg }
+      return { success: true, message: `服用${recipe.name}成功`, changes }
     },
     // 添加装备到背包
     addEquipment(equipment) {

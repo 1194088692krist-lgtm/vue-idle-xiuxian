@@ -242,9 +242,23 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
   if (playerReforgeStones < reforgeConfig.costPerAttempt) {
     return { success: false, message: '洗练石不足' }
   }
-  const oldStats = { ...equipment.stats }
   const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
   const rarity = equipment.rarity || 'common'
+
+  // 清理非法/废弃属性：移除不在可洗练池中的属性，移除值为 0 的百分比词条
+  const cleanedStats = {}
+  Object.entries(equipment.stats).forEach(([stat, value]) => {
+    if (BASE_STATS.includes(stat)) {
+      cleanedStats[stat] = value
+      return
+    }
+    if (!availableStats.includes(stat)) return
+    if (PERCENT_STATS.includes(stat) && (!value || value === 0 || Number.isNaN(value))) return
+    cleanedStats[stat] = value
+  })
+  equipment.stats = cleanedStats
+
+  const oldStats = { ...equipment.stats }
 
   // 分离基础属性与可洗练词条；基础属性不得洗练
   const baseStats = {}
