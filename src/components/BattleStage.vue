@@ -364,19 +364,30 @@ function showEvent(e) {
   }
 }
 
+// 每个动作（攻击/buff/回复/技能/战场情况）的播放时长：1 秒/动作，节奏紧凑且不频闪
+const ACTION_DELAY = 1000
+// 播放锁：防止上一回合动画未播完时下一回合重叠调用导致人物抖动
+let isPlayingRound = false
+
 // 播放某一回合的所有事件（实时反馈）
 async function playLiveRound(roundNum) {
-  const cs = props.encounter?.combatStats || {}
-  const events = []
-  for (const pid of Object.keys(cs)) {
-    const details = cs[pid]?.roundDetails || []
-    for (const d of details) if (d.round === roundNum) events.push(d)
-  }
-  // 玩家先手、敌人后手，顺序更自然
-  events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
-  for (const e of events) {
-    showEvent(e)
-    await delay(240)
+  if (isPlayingRound) return // 上一回合仍在播放，跳过本次（避免动画堆叠抖动）
+  isPlayingRound = true
+  try {
+    const cs = props.encounter?.combatStats || {}
+    const events = []
+    for (const pid of Object.keys(cs)) {
+      const details = cs[pid]?.roundDetails || []
+      for (const d of details) if (d.round === roundNum) events.push(d)
+    }
+    // 玩家先手、敌人后手，顺序更自然
+    events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
+    for (const e of events) {
+      showEvent(e)
+      await delay(ACTION_DELAY)
+    }
+  } finally {
+    isPlayingRound = false
   }
 }
 

@@ -406,11 +406,12 @@ const activePillBuffList = computed(() => {
   })
 })
 
-// 在线每场遭遇间隔：4 秒（缩短空白期，配合回合内动画节奏）
-const ENCOUNTER_INTERVAL = 4000
-// 回合内动画延时：让 BattleStage 播完当前回合的攻击/受击动画再进入下一回合，
-// 避免回合切换太快导致动画堆叠跳动；与 BattleStage.playLiveRound 的事件延时(240ms)配合
-const ROUND_ANIM_DELAY = 900
+// 在线每场遭遇间隔：2.5 秒（怪物死亡后寻怪2-3秒再进入下次战斗，节奏紧凑）
+const ENCOUNTER_INTERVAL = 2500
+// 回合内动画延时：等待 BattleStage 播完当前回合的所有动作（攻击/buff/回复/技能/战场情况），
+// 每动作 1 秒(ACTION_DELAY)，3玩家队伍约 3-4 动作/回合，故等待约 3.5 秒让动画播完再进入下一回合，
+// 避免回合切换太快导致人物抖动频闪
+const ROUND_ANIM_DELAY = 3500
 
 let _store = null
 function store() {
