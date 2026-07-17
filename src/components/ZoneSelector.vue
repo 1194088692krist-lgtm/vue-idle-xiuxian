@@ -989,7 +989,7 @@ onMounted(() => {
   }
 })
 onUnmounted(() => {
-  if (userScrollTimer) clearTimeout(userScrollTimer)
+  // userScrollTimer 历史遗留引用已移除，此处保留 onUnmounted 钩子占位，避免未来需要清理资源时遗漏
 })
 </script>
 
