@@ -2426,7 +2426,6 @@ async function runIdleEncounter() {
     idleDiag.value.lastError = '[' + new Date().toLocaleTimeString() + '] ' + errMsg + '\n' + errStack
     idleDiag.value.errorCount++
     idleDiag.value.lastStage = '异常:' + errMsg
-    console.error('[挂机诊断] 单次遭遇结算异常，已跳过本次并继续：', err, '\n堆栈:', errStack)
     if (idleEncounterErrorCount < 3) {
       addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + errMsg)
       idleEncounterErrorCount++
@@ -2609,7 +2608,6 @@ function runOfflineEncounter(zone, diff, count) {
 function startIdleTimers() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
-  console.log('[挂机诊断] startIdleTimers 启动定时器, 间隔=', ENCOUNTER_INTERVAL, 'ms')
   idleInterval = setInterval(() => { runIdleEncounter() }, ENCOUNTER_INTERVAL)
   idleTimer = setInterval(() => {
     // 守卫：仅当挂机真正进行中且存档状态一致时才推进/结束，避免状态不一致时误触发 finishIdle
@@ -2627,11 +2625,9 @@ function startIdleTimers() {
 
 function startIdle(durationMinutes) {
   const s = store()
-  console.log('[挂机诊断] startIdle 调用, duration=', durationMinutes, 'selectedZone=', selectedZone.value?.id, 'difficulty=', selectedDifficultyKey.value, 'spiritStones=', s.spiritStones)
-  if (!selectedZone.value) { console.log('[挂机诊断] startIdle 失败: selectedZone 为空'); return }
+  if (!selectedZone.value) return
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
-  console.log('[挂机诊断] startIdle diff=', diff?.key, 'spiritCost=', diff?.spiritCost, 'playerStones=', s.spiritStones)
-  if (s.spiritStones < diff.spiritCost) { console.log('[挂机诊断] startIdle 失败: 灵石不足'); return }
+  if (s.spiritStones < diff.spiritCost) return
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterErrorCount = 0
