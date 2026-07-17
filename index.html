@@ -7,6 +7,9 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, minimum-scale=1.0, viewport-fit=cover" />
     <link rel="icon" href="public/favicon.ico" />
     <title>凡人修仙</title>
+    <!-- 预加载立绘清单：浏览器解析 HTML 时立即并发拉取，避免等待 JS 加载后才发起请求 -->
+    <link rel="preload" href="portraits/manifest.json" as="fetch" crossorigin="anonymous" />
+    <link rel="preload" href="monsters/manifest.json" as="fetch" crossorigin="anonymous" />
   </head>
 
   <body>

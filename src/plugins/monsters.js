@@ -1,7 +1,8 @@
 // 怪物头像与立绘系统
 // 与人物系统相同的架构：public/monsters/ 目录存放资源，manifest.json 管理映射
 
-const MONSTER_ASSETS_BASE = '/monsters/'
+// 使用 BASE_URL（与角色立绘一致），保证 GitHub Pages 子路径部署也能正确解析
+const MONSTER_ASSETS_BASE = (import.meta.env.BASE_URL || './') + 'monsters/'
 
 // 怪物名称到资源文件名的安全映射（去除特殊字符）
 function safeFileName(name) {
@@ -15,7 +16,7 @@ let manifestPromise = null
 async function loadMonsterManifest() {
   if (monsterManifest) return monsterManifest
   if (manifestPromise) return manifestPromise
-  manifestPromise = fetch(`${MONSTER_ASSETS_BASE}manifest.json`)
+  manifestPromise = fetch(`${MONSTER_ASSETS_BASE}manifest.json`, { cache: 'force-cache' })
     .then(r => r.ok ? r.json() : {})
     .then(data => {
       monsterManifest = data

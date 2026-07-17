@@ -1,35 +1,114 @@
 {
-  "野猪精": { "thumbnail": "zone_forest_boar_thumb.jpg", "full": "zone_forest_boar_portrait.jpg" },
-  "山匪": { "thumbnail": "zone_forest_bandit_thumb.jpg", "full": "zone_forest_bandit_portrait.jpg" },
-  "野狼": { "thumbnail": "zone_forest_wolf_thumb.jpg", "full": "zone_forest_wolf_portrait.jpg" },
-  "狼王": { "thumbnail": "zone_forest_wolfking_thumb.jpg", "full": "zone_forest_wolfking_portrait.jpg" },
-  "山匪头目": { "thumbnail": "zone_forest_bandit_chief_thumb.jpg", "full": "zone_forest_bandit_chief_portrait.jpg" },
-
-  "猛虎": { "thumbnail": "zone_misty_tiger_thumb.jpg", "full": "zone_misty_tiger_portrait.jpg" },
-  "骷髅兵": { "thumbnail": "zone_misty_skeleton_thumb.jpg", "full": "zone_misty_skeleton_portrait.jpg" },
-  "毒蛇": { "thumbnail": "zone_misty_viper_thumb.jpg", "full": "zone_misty_viper_portrait.jpg" },
-  "迷雾虎王": { "thumbnail": "zone_misty_tigerking_thumb.jpg", "full": "zone_misty_tigerking_portrait.jpg" },
-  "骷髅将军": { "thumbnail": "zone_misty_skeleton_general_thumb.jpg", "full": "zone_misty_skeleton_general_portrait.jpg" },
-
-  "妖狼": { "thumbnail": "zone_phoenix_demon_wolf_thumb.jpg", "full": "zone_phoenix_demon_wolf_portrait.jpg" },
-  "焰魔": { "thumbnail": "zone_phoenix_fire_demon_thumb.jpg", "full": "zone_phoenix_fire_demon_portrait.jpg" },
-  "焰魔领主": { "thumbnail": "zone_phoenix_fire_lord_thumb.jpg", "full": "zone_phoenix_fire_lord_portrait.jpg" },
-  "火凤凰": { "thumbnail": "zone_phoenix_fire_phoenix_thumb.jpg", "full": "zone_phoenix_fire_phoenix_portrait.jpg" },
-
-  "僵尸王": { "thumbnail": "zone_abyss_zombie_king_thumb.jpg", "full": "zone_abyss_zombie_king_portrait.jpg" },
-  "血魔": { "thumbnail": "zone_abyss_blood_demon_thumb.jpg", "full": "zone_abyss_blood_demon_portrait.jpg" },
-  "深渊蛟龙": { "thumbnail": "zone_abyss_flood_dragon_thumb.jpg", "full": "zone_abyss_flood_dragon_portrait.jpg" },
-  "血魔大帝": { "thumbnail": "zone_abyss_blood_emperor_thumb.jpg", "full": "zone_abyss_blood_emperor_portrait.jpg" },
-
-  "噬魂鬼": { "thumbnail": "zone_ghost_soul_eater_thumb.jpg", "full": "zone_ghost_soul_eater_portrait.jpg" },
-  "噬魂鬼王": { "thumbnail": "zone_ghost_soul_king_thumb.jpg", "full": "zone_ghost_soul_king_portrait.jpg" },
-  "白骨魔尊": { "thumbnail": "zone_ghost_bone_lord_thumb.jpg", "full": "zone_ghost_bone_lord_portrait.jpg" },
-
-  "冰凰": { "thumbnail": "zone_ice_ice_phoenix_thumb.jpg", "full": "zone_ice_ice_phoenix_portrait.jpg" },
-  "冰封古魔": { "thumbnail": "zone_ice_ancient_ice_demon_thumb.jpg", "full": "zone_ice_ancient_ice_demon_portrait.jpg" },
-  "远古妖龙": { "thumbnail": "ancient_dragon_thumb.jpg", "full": "ancient_dragon_portrait.jpg" },
-  "仙墟守护者": { "thumbnail": "zone_ruin_celestial_guard_thumb.jpg", "full": "zone_ruin_celestial_guard_portrait.jpg" },
-  "堕落仙君": { "thumbnail": "zone_ruin_fallen_immortal_thumb.jpg", "full": "zone_ruin_fallen_immortal_portrait.jpg" },
-  "混沌主宰": { "thumbnail": "zone_chaos_overlord_thumb.jpg", "full": "zone_chaos_overlord_portrait.jpg" },
-  "天道化身": { "thumbnail": "zone_chaos_dao_avatar_thumb.jpg", "full": "zone_chaos_dao_avatar_portrait.jpg" }
+  "野猪精": {
+    "thumbnail": "zone_forest_boar_portrait_thumb.webp",
+    "full": "zone_forest_boar_portrait.jpg"
+  },
+  "山匪": {
+    "thumbnail": "zone_forest_bandit_portrait_thumb.webp",
+    "full": "zone_forest_bandit_portrait.jpg"
+  },
+  "野狼": {
+    "thumbnail": "zone_forest_wolf_portrait_thumb.webp",
+    "full": "zone_forest_wolf_portrait.jpg"
+  },
+  "狼王": {
+    "thumbnail": "zone_forest_wolfking_portrait_thumb.webp",
+    "full": "zone_forest_wolfking_portrait.jpg"
+  },
+  "山匪头目": {
+    "thumbnail": "zone_forest_bandit_chief_portrait_thumb.webp",
+    "full": "zone_forest_bandit_chief_portrait.jpg"
+  },
+  "猛虎": {
+    "thumbnail": "zone_misty_tiger_portrait_thumb.webp",
+    "full": "zone_misty_tiger_portrait.jpg"
+  },
+  "骷髅兵": {
+    "thumbnail": "zone_misty_skeleton_portrait_thumb.webp",
+    "full": "zone_misty_skeleton_portrait.jpg"
+  },
+  "毒蛇": {
+    "thumbnail": "zone_misty_viper_portrait_thumb.webp",
+    "full": "zone_misty_viper_portrait.jpg"
+  },
+  "迷雾虎王": {
+    "thumbnail": "zone_misty_tigerking_portrait_thumb.webp",
+    "full": "zone_misty_tigerking_portrait.jpg"
+  },
+  "骷髅将军": {
+    "thumbnail": "zone_misty_skeleton_general_portrait_thumb.webp",
+    "full": "zone_misty_skeleton_general_portrait.jpg"
+  },
+  "妖狼": {
+    "thumbnail": "zone_phoenix_demon_wolf_portrait_thumb.webp",
+    "full": "zone_phoenix_demon_wolf_portrait.jpg"
+  },
+  "焰魔": {
+    "thumbnail": "zone_phoenix_fire_demon_portrait_thumb.webp",
+    "full": "zone_phoenix_fire_demon_portrait.jpg"
+  },
+  "焰魔领主": {
+    "thumbnail": "zone_phoenix_fire_lord_portrait_thumb.webp",
+    "full": "zone_phoenix_fire_lord_portrait.jpg"
+  },
+  "火凤凰": {
+    "thumbnail": "zone_phoenix_fire_phoenix_portrait_thumb.webp",
+    "full": "zone_phoenix_fire_phoenix_portrait.jpg"
+  },
+  "僵尸王": {
+    "thumbnail": "zone_abyss_zombie_king_portrait_thumb.webp",
+    "full": "zone_abyss_zombie_king_portrait.jpg"
+  },
+  "血魔": {
+    "thumbnail": "zone_abyss_blood_demon_portrait_thumb.webp",
+    "full": "zone_abyss_blood_demon_portrait.jpg"
+  },
+  "深渊蛟龙": {
+    "thumbnail": "zone_abyss_flood_dragon_portrait_thumb.webp",
+    "full": "zone_abyss_flood_dragon_portrait.jpg"
+  },
+  "血魔大帝": {
+    "thumbnail": "zone_abyss_blood_emperor_portrait_thumb.webp",
+    "full": "zone_abyss_blood_emperor_portrait.jpg"
+  },
+  "噬魂鬼": {
+    "thumbnail": "zone_ghost_soul_eater_portrait_thumb.webp",
+    "full": "zone_ghost_soul_eater_portrait.jpg"
+  },
+  "噬魂鬼王": {
+    "thumbnail": "zone_ghost_soul_king_portrait_thumb.webp",
+    "full": "zone_ghost_soul_king_portrait.jpg"
+  },
+  "白骨魔尊": {
+    "thumbnail": "zone_ghost_bone_lord_portrait_thumb.webp",
+    "full": "zone_ghost_bone_lord_portrait.jpg"
+  },
+  "冰凰": {
+    "thumbnail": "zone_ice_ice_phoenix_portrait_thumb.webp",
+    "full": "zone_ice_ice_phoenix_portrait.jpg"
+  },
+  "冰封古魔": {
+    "thumbnail": "zone_ice_ancient_ice_demon_portrait_thumb.webp",
+    "full": "zone_ice_ancient_ice_demon_portrait.jpg"
+  },
+  "远古妖龙": {
+    "thumbnail": "ancient_dragon_portrait_thumb.webp",
+    "full": "ancient_dragon_portrait.jpg"
+  },
+  "仙墟守护者": {
+    "thumbnail": "zone_ruin_celestial_guard_portrait_thumb.webp",
+    "full": "zone_ruin_celestial_guard_portrait.jpg"
+  },
+  "堕落仙君": {
+    "thumbnail": "zone_ruin_fallen_immortal_portrait_thumb.webp",
+    "full": "zone_ruin_fallen_immortal_portrait.jpg"
+  },
+  "混沌主宰": {
+    "thumbnail": "zone_chaos_overlord_portrait_thumb.webp",
+    "full": "zone_chaos_overlord_portrait.jpg"
+  },
+  "天道化身": {
+    "thumbnail": "zone_chaos_dao_avatar_portrait_thumb.webp",
+    "full": "zone_chaos_dao_avatar_portrait.jpg"
+  }
 }

@@ -9,9 +9,10 @@
   },
   "scripts": {
     "gen:portraits": "node scripts/gen-portraits-manifest.mjs",
-    "predev": "node scripts/gen-portraits-manifest.mjs",
+    "gen:monsters": "node scripts/gen-monsters-manifest.mjs",
+    "predev": "node scripts/gen-portraits-manifest.mjs && node scripts/gen-monsters-manifest.mjs",
     "dev": "vite --open --port 2025",
-    "prebuild": "node scripts/gen-portraits-manifest.mjs",
+    "prebuild": "node scripts/gen-portraits-manifest.mjs && node scripts/gen-monsters-manifest.mjs",
     "build": "vite build",
     "preview": "vite preview --open --port 2026",
     "gen:guide": "python3 scripts/gen_guide.py",
