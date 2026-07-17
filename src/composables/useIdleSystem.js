@@ -455,6 +455,7 @@ function getPillBuffMultiplier(type) {
 
 let idleInterval = null
 let idleTimer = null
+let visibilityHandler = null // 页面可见性监听器引用（息屏/切后台返回时补算挂机进度）
 let isRunning = false // 重入锁
 let idleEncounterErrorCount = 0 // 挂机遭遇异常日志去重计数（避免刷屏）
 let isFinishingIdle = false // 挂机待结束标志：全队力竭后延迟结束期间置 true，阻止定时器再次触发遭遇
@@ -2615,6 +2616,16 @@ function startIdleTimers() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = setInterval(() => { runIdleEncounter() }, ENCOUNTER_INTERVAL)
+  // 监听页面可见性：移动端息屏/切后台时 setInterval 会被浏览器节流导致挂机停滞，
+  // 亮屏返回时补算漏掉的遭遇，使挂机进度在息屏后依然推进。
+  if (!visibilityHandler) {
+    visibilityHandler = () => {
+      if (document.visibilityState === 'visible') {
+        catchUpMissedEncounters({ forceFinish: false })
+      }
+    }
+    document.addEventListener('visibilitychange', visibilityHandler)
+  }
   idleTimer = setInterval(() => {
     // 守卫：仅当挂机真正进行中且存档状态一致时才推进/结束，避免状态不一致时误触发 finishIdle
     if (!isIdling.value || !store().idleExploration.isActive) return
@@ -2815,6 +2826,11 @@ function finishIdle() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
+  // 注销页面可见性监听，避免挂机结束后残留监听触发补算
+  if (visibilityHandler) {
+    document.removeEventListener('visibilitychange', visibilityHandler)
+    visibilityHandler = null
+  }
   isFinishingIdle = false // 清除待结束标志
   idleSessionId++ // 递增会话 ID，让残留的 runIdleEncounter 循环检测到变化并立即退出，避免清空后又被覆盖
   // 清理实时战斗舞台，避免停止挂机后 BattleStage 仍渲染旧战斗
@@ -2878,26 +2894,51 @@ function finishIdle() {
 }
 
 function processOfflineIdle() {
+  // 启动恢复时统一走补算流程并强制收尾（原行为：离线期间按概率结算后直接出结算页）
+  catchUpMissedEncounters({ forceFinish: true })
+}
+
+// 补算漏掉的遭遇：移动端息屏/切后台期间 setInterval 被浏览器节流，导致 runIdleEncounter 未触发，
+// 遭遇数与奖励落后于墙钟。页面恢复可见时调用本函数，用轻量的 runOfflineEncounter（概率结算）补齐。
+// forceFinish=true 时无论时长是否到都收尾（用于启动恢复）；否则仅当墙钟耗尽才收尾，继续实时挂机。
+function catchUpMissedEncounters({ forceFinish = false } = {}) {
   const s = store()
   const idleState = s.idleExploration
   if (!idleState || !idleState.isActive) return
+  // 挂机正在收尾时跳过，避免与 finishIdle 竞争
+  if (isFinishingIdle) return
   const zone = getZoneById(idleState.zoneId)
   if (!zone) { s.stopIdleExploration(); return }
   const diff = getZoneDifficulty(zone, idleState.difficultyKey)
+  if (!diff) return
   const now = Date.now()
   const elapsed = now - idleState.startTime
   const totalDuration = idleState.duration
   const expected = Math.floor(elapsed / ENCOUNTER_INTERVAL)
   const missed = Math.max(0, expected - idleState.encounterCount)
   if (missed > 0) {
-    logs.value.push({ type: 'info', text: `⏳ 离线期间完成了 ${missed} 次探索，正在结算……`, time: new Date().toLocaleTimeString() })
-    for (let i = 0; i < missed; i++) {
-      runOfflineEncounter(zone, diff, idleState.encounterCount + i + 1)
+    // 上限保护：避免一次性补算过多卡死 UI（例如挂机数小时后返回）
+    const MAX_CATCHUP = 500
+    const toCatch = Math.min(missed, MAX_CATCHUP)
+    const tip = missed > toCatch
+      ? `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，补算最近 ${toCatch} 场……`
+      : `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，正在补算……`
+    logs.value.push({ type: 'info', text: tip, time: new Date().toLocaleTimeString() })
+    const baseCount = idleState.encounterCount
+    for (let i = 0; i < toCatch; i++) {
+      runOfflineEncounter(zone, diff, baseCount + i + 1)
     }
-    // 离线补算结算后立即同步落盘，防止补算收益丢失
+    // 同步本地计数与持久化状态，使后续实时遭遇从正确序号继续
+    const newCount = baseCount + toCatch
+    idleEncounterCount.value = newCount
+    s.updateIdleExploration({ encounterCount: newCount, lastEncounterTime: Date.now() })
+    // 补算收益立即落盘，防止丢失
     s.saveData()
   }
-  finishIdle()
+  // 时间耗尽或强制结束 → 收尾；否则继续实时挂机
+  if (forceFinish || elapsed >= totalDuration) {
+    finishIdle()
+  }
 }
 
 // App.vue 常驻初始化：恢复挂机状态并启动推进
