@@ -1,14 +1,14 @@
 <template>
-  <div v-if="playback && playback.rounds.length" class="battle-stage" ref="stageRef">
+  <div v-if="encounter && encounter.players && encounter.players.length && encounter.enemy" class="battle-stage" ref="stageRef">
     <!-- 暴击屏幕震动层 -->
     <div v-if="screenShake" class="screen-shake" :class="screenShake"></div>
 
     <!-- 顶部回合信息 -->
     <div class="stage-header">
-      <span class="round-badge">第 {{ currentRoundNum }}/{{ totalRounds }} 回合</span>
+      <span class="round-badge">第 {{ encounter.round || 0 }} 回合</span>
       <span v-if="effectBadge" class="effect-badge" :class="effectBadge.cls">{{ effectBadge.text }}</span>
-      <span v-if="!isPlaying && playback.victory === false" class="result-badge defeat">败北</span>
-      <span v-else-if="!isPlaying && playback.victory" class="result-badge victory">胜利</span>
+      <span v-if="!encounter.inProgress && encounter.enemy.currentHealth <= 0" class="result-badge victory">胜利</span>
+      <span v-else-if="!encounter.inProgress" class="result-badge defeat">败北</span>
     </div>
 
     <!-- 战斗舞台 -->
@@ -16,7 +16,7 @@
       <!-- 左侧：队伍成员 -->
       <div class="team-side">
         <div
-          v-for="m in playback.members"
+          v-for="m in encounter.players"
           :key="m.memberId"
           class="fighter member"
           :class="getMemberClasses(m.memberId)"
@@ -42,7 +42,7 @@
             <div class="hp-bar">
               <div class="hp-fill" :style="{ width: memberHpPct(m) + '%', background: hpBarColor(memberHpPct(m)) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(memberHPs[m.memberId] ?? m.hp) }}/{{ m.maxHP }}</div>
+            <div class="hp-text">{{ Math.round(m.currentHealth) }}/{{ m.stats.maxHealth }}</div>
           </div>
         </div>
       </div>
@@ -58,18 +58,18 @@
           <div class="avatar-wrap">
             <div
               class="fighter-avatar enemy-avatar"
-              :class="{ 'clickable-portrait': isImageUrl(playback.enemy?.avatar) }"
+              :class="{ 'clickable-portrait': isImageUrl(encounter.enemy?.avatar) }"
               @click="openMonsterPortrait"
             >
               <img
-                v-if="isImageUrl(playback.enemy?.avatar)"
-                :src="playback.enemy.avatar"
+                v-if="isImageUrl(encounter.enemy?.avatar)"
+                :src="encounter.enemy.avatar"
                 class="enemy-avatar-img"
-                :alt="playback.enemy?.name"
+                :alt="encounter.enemy?.name"
               />
               <span v-else class="enemy-emoji">{{ enemyEmoji }}</span>
             </div>
-            <span class="tier-badge" :class="'tier-' + (playback.enemy?.tier || 'normal')">{{ tierText }}</span>
+            <span class="tier-badge" :class="'tier-' + (encounter.enemy?.tier || 'normal')">{{ tierText }}</span>
             <div v-if="stunTarget === 'enemy'" class="stun-stars">💫</div>
             <div v-if="frozenTarget === 'enemy'" class="frozen-overlay"></div>
             <div v-if="burningTargets.includes('enemy')" class="burn-overlay"></div>
@@ -84,11 +84,11 @@
             <div v-if="comboShadowEnemy" class="combo-shadow"></div>
           </div>
           <div class="fighter-info">
-            <div class="fighter-name">{{ playback.enemy?.name }}</div>
+            <div class="fighter-name">{{ encounter.enemy?.name }}</div>
             <div class="hp-bar">
               <div class="hp-fill enemy-hp" :style="{ width: enemyHpPct + '%', background: hpBarColor(enemyHpPct) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(enemyHP) }}/{{ playback.enemy?.maxHealth || 0 }}</div>
+            <div class="hp-text">{{ Math.round(encounter.enemy.currentHealth) }}/{{ encounter.enemy.stats.maxHealth || 0 }}</div>
           </div>
         </div>
       </div>
@@ -117,7 +117,7 @@
             v-for="(log, idx) in battleLogDisplay"
             :key="log.id"
             class="battle-log-item"
-            :class="[log.type, { 'is-fading': idx === 0 && battleLog.length > 3 }]"
+            :class="[log.type, { 'is-fading': idx === 0 && (props.encounter?.combatLog?.length || 0) > 3 }]"
           >
           <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" />
           <span class="battle-log-text">{{ log.text }}</span>
@@ -172,15 +172,10 @@
 import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 
 const props = defineProps({
-  playback: { type: Object, default: null }
+  encounter: { type: Object, default: null }
 })
 
 const stageRef = ref(null)
-
-// 播放状态
-const roundIndex = ref(0)
-const isPlaying = ref(false)
-let timer = null
 
 // 动画状态
 const activeAttacker = ref('')
@@ -202,15 +197,10 @@ const comboShadowEnemy = ref(false)
 const vampireChain = reactive({ show: false })
 const dodgeGhost = reactive({ show: false, avatar: '', name: '', style: {} })
 
-// 血量
-const memberHPs = reactive({})
-const enemyHP = ref(0)
-
 // 掉落动画
 const dropOrb = reactive({ show: false, rarity: '', emoji: '' })
 
 // 日志
-const battleLog = reactive([])
 const showFullLog = ref(false)
 
 // 怪物立绘弹窗
@@ -219,7 +209,7 @@ const monsterPortraitUrl = ref('')
 const monsterPortraitName = ref('')
 
 function openMonsterPortrait() {
-  const enemy = props.playback?.enemy
+  const enemy = props.encounter?.enemy
   if (!enemy) return
   const portrait = enemy.portrait || enemy.avatar
   if (portrait && (portrait.startsWith('http') || portrait.startsWith('/'))) {
@@ -233,72 +223,46 @@ function isImageUrl(str) {
   return str && (str.startsWith('http') || str.startsWith('/'))
 }
 
-const totalRounds = computed(() => props.playback?.rounds?.length || 0)
-const currentRoundNum = computed(() => Math.min(roundIndex.value, totalRounds.value))
 const enemyHpPct = computed(() => {
-  const max = props.playback?.enemy?.maxHealth || 1
-  return Math.max(0, Math.min(100, (enemyHP.value / max) * 100))
+  const e = props.encounter?.enemy
+  if (!e || !e.stats) return 0
+  return Math.max(0, Math.min(100, (e.currentHealth / (e.stats.maxHealth || 1)) * 100))
 })
 
-// 实时显示：最多3条，旧的渐入透明
+// 实时显示：最多3条，来自 encounter.combatLog 字符串数组
+function logType(text) {
+  if (text.startsWith('💚')) return 'vampire'
+  if (text.startsWith('⚔️') || text.startsWith('🔥')) return 'combat'
+  if (text.startsWith('💨')) return 'dodge'
+  if (text.startsWith('✨')) return 'crit'
+  if (text.startsWith('🛡️')) return 'shield'
+  if (text.startsWith('💥')) return 'counter'
+  return 'combat'
+}
 const battleLogDisplay = computed(() => {
-  const list = battleLog.slice(-3)
-  return list
+  const log = props.encounter?.combatLog || []
+  return log.slice(-3).map((t, i) => ({ id: (props.encounter?.round || 0) + '-' + i, type: logType(t), text: t }))
 })
 
-const fullBattleLog = computed(() => [...battleLog])
+const fullBattleLog = computed(() => (props.encounter?.combatLog || []).map(t => ({ type: logType(t), text: t })))
 
 const enemyEmoji = computed(() => {
-  const tier = props.playback?.enemy?.tier
+  const tier = props.encounter?.enemy?.tier
   if (tier === 'boss') return '👹'
   if (tier === 'elite') return '👺'
   return '🐺'
 })
 const tierText = computed(() => {
-  const t = props.playback?.enemy?.tier
+  const t = props.encounter?.enemy?.tier
   if (t === 'boss') return 'BOSS'
   if (t === 'elite') return '精英'
   return '普通'
 })
 
-watch(
-  () => props.playback?.id,
-  (newId) => {
-    if (newId) startPlayback()
-  }
-)
+// ============ 实时战斗：监听 currentEncounter 的回合推进，播放最新一回合 ============
+function delay(ms) { return new Promise(r => setTimeout(r, ms)) }
 
-function startPlayback() {
-  stopPlayback()
-  const pb = props.playback
-  if (!pb || !pb.rounds || !pb.rounds.length) return
-
-  for (const m of pb.members) {
-    memberHPs[m.memberId] = m.maxHP
-  }
-  enemyHP.value = pb.enemy?.maxHealth || 100
-
-  roundIndex.value = 0
-  isPlaying.value = true
-  effectBadge.value = null
-  clearFloaters()
-  battleLog.splice(0, battleLog.length)
-  addBattleLog('header', `【${pb.enemy?.name}】战斗开始！`)
-
-  const stepDelay = Math.max(350, Math.min(700, 3000 / pb.rounds.length))
-  timer = setInterval(() => {
-    if (roundIndex.value >= pb.rounds.length) {
-      finishPlayback()
-      return
-    }
-    playRound(pb.rounds[roundIndex.value], pb)
-    roundIndex.value++
-  }, stepDelay)
-}
-
-function playRound(r, pb) {
-  clearFloaters()
-  effectBadge.value = null
+function clearTransient() {
   activeAttacker.value = ''
   activeDefender.value = ''
   hurtLevel.value = ''
@@ -313,156 +277,8 @@ function playRound(r, pb) {
   screenShake.value = ''
   vampireChain.show = false
   dodgeGhost.show = false
-
-  const isPlayerAtk = r.isPlayerAttack
-  const attackerId = isPlayerAtk ? r.memberId : 'enemy'
-  const defenderId = isPlayerAtk ? 'enemy' : ('member-' + r.memberId)
-  const attackerName = isPlayerAtk ? r.memberName : pb.enemy?.name
-  const defenderName = isPlayerAtk ? pb.enemy?.name : r.memberName
-
-  activeAttacker.value = attackerId
-  activeDefender.value = defenderId
-
-  // 连击残影
-  if (r.isCombo) {
-    if (isPlayerAtk) comboShadows.push(r.memberId)
-    else comboShadowEnemy.value = true
-  }
-
-  // 闪避
-  if (r.isDodged) {
-    const avatar = isPlayerAtk ? null : getMemberAvatar(r.memberId)
-    const name = isPlayerAtk ? pb.enemy?.name : r.memberName
-    showDodgeGhost(defenderId, avatar, name)
-    floaters[isPlayerAtk ? 'enemy' : ('m-' + r.memberId)] = { text: '闪避', cls: 'dodge' }
-    effectBadge.value = { text: '闪避！', cls: 'badge-dodge' }
-    addBattleLog('dodge', `${defenderName} 身形一晃，闪开了 ${attackerName} 的攻击`)
-    return
-  }
-
-  // 伤害判定
-  if (r.damage > 0) {
-    if (isPlayerAtk) {
-      enemyHP.value = Math.max(0, enemyHP.value - r.damage)
-      floaters['enemy'] = { text: r.damage, cls: r.isCrit ? 'crit' : (r.isCounter ? 'counter' : 'normal') }
-    } else {
-      memberHPs[r.memberId] = Math.max(0, memberHPs[r.memberId] - r.damage)
-      floaters['m-' + r.memberId] = { text: r.damage, cls: r.isCrit ? 'crit' : (r.isCounter ? 'counter' : 'normal') }
-    }
-
-    // 冰冻/灼烧/流血/中毒状态模拟：根据战斗文案池中原有的特殊描写
-    if (isPlayerAtk && r.isCrit && Math.random() < 0.35) {
-      const roll = Math.random()
-      if (roll < 0.25) burningTargets.push('enemy')
-      else if (roll < 0.5) frozenTarget.value = 'enemy'
-      else if (roll < 0.75) bleedingTargets.push('enemy')
-      else poisonTargets.push('enemy')
-    }
-    // 敌人重击我方时低概率触发流血
-    if (!isPlayerAtk && r.damage > 0 && Math.random() < 0.15) {
-      bleedingTargets.push('member-' + r.memberId)
-    }
-
-    const targetMax = isPlayerAtk ? (pb.enemy?.maxHealth || 100) : (r.defenderMaxHP || r.attackerMaxHP || 100)
-    const ratio = r.damage / targetMax
-    if (ratio > 0.25 || r.isCrit) hurtLevel.value = 'strong'
-    else if (ratio > 0.1) hurtLevel.value = 'medium'
-    else hurtLevel.value = 'mild'
-  }
-
-  // 暴击
-  if (r.isCrit) {
-    effectBadge.value = { text: '暴击！', cls: 'badge-crit' }
-    screenShake.value = 'shake-strong'
-    setTimeout(() => { if (screenShake.value === 'shake-strong') screenShake.value = '' }, 500)
-    addBattleLog('crit', `${attackerName} 触发暴击，对 ${defenderName} 造成 ${r.damage} 点伤害！`)
-  }
-  // 连击
-  if (r.isCombo) {
-    effectBadge.value = effectBadge.value || { text: '连击！', cls: 'badge-combo' }
-    if (!r.isCrit) addBattleLog('combo', `${attackerName} 连击命中，对 ${defenderName} 造成 ${r.damage} 点伤害`)
-  }
-  // 眩晕
-  if (r.isStun) {
-    stunTarget.value = isPlayerAtk ? 'enemy' : ('member-' + r.memberId)
-    shockedTarget.value = stunTarget.value // 眩晕伴随感电
-    if (!effectBadge.value) effectBadge.value = { text: '眩晕！', cls: 'badge-stun' }
-    addBattleLog('stun', `${defenderName} 被 ${attackerName} 眩晕！`)
-  }
-  // 吸血
-  if (r.isVampire && isPlayerAtk) {
-    const heal = Math.round(r.damage * 0.3)
-    if (heal > 0) {
-      memberHPs[r.memberId] = Math.min(r.attackerMaxHP, (memberHPs[r.memberId] || 0) + heal)
-      floaters['m-' + r.memberId] = { text: '+' + heal, cls: 'vampire' }
-      healingTargets.push('member-' + r.memberId)
-      showVampireChain()
-      if (!effectBadge.value) effectBadge.value = { text: '吸血', cls: 'badge-vampire' }
-      addBattleLog('vampire', `${attackerName} 吸血恢复 ${heal} 点气血`)
-    }
-  }
-  // 护盾：我方受到低伤害时概率触发护盾格挡
-  if (!isPlayerAtk && r.damage > 0 && !r.isCrit) {
-    const ratio = r.damage / (r.defenderMaxHP || r.attackerMaxHP || 100)
-    if (ratio < 0.06 && Math.random() < 0.25) {
-      shieldTarget.value = 'member-' + r.memberId
-      if (!effectBadge.value) effectBadge.value = { text: '护盾', cls: 'badge-shield' }
-      addBattleLog('shield', `${defenderName} 的护盾格挡了部分伤害`)
-    }
-  }
-  // 反击
-  if (r.isCounter) {
-    if (!effectBadge.value) effectBadge.value = { text: '反击！', cls: 'badge-counter' }
-    addBattleLog('counter', `${attackerName} 抓住破绽反击，造成 ${r.damage} 点伤害`)
-  }
-
-  if (!r.isCrit && !r.isCombo && !r.isStun && !r.isVampire && !r.isCounter) {
-    addBattleLog('combat', `${attackerName} 对 ${defenderName} 造成 ${r.damage} 点伤害`)
-  }
-}
-
-function finishPlayback() {
-  stopPlayback()
-  const pb = props.playback
-  if (pb) {
-    for (const m of pb.members) {
-      memberHPs[m.memberId] = m.hp
-    }
-    enemyHP.value = pb.enemy?.currentHealth || 0
-  }
-
-  if (pb?.victory) {
-    addBattleLog('victory', `战斗胜利！${pb.enemy?.name} 已阵亡`)
-    if (pb.rewards?.length) triggerDropOrb(pb.rewards)
-  } else {
-    addBattleLog('defeat', '战斗失败，队伍气力耗尽')
-  }
-}
-
-function addBattleLog(type, text) {
-  const member = props.playback?.members[0]
-  battleLog.push({
-    id: Date.now() + '_' + Math.random().toString(36).slice(2),
-    type,
-    text,
-    avatar: type === 'victory' ? null : (member ? member.avatar : null)
-  })
-  if (battleLog.length > 200) battleLog.shift()
-}
-
-function showDodgeGhost(targetId, avatar, name) {
-  const isMember = targetId.startsWith('member-')
-  dodgeGhost.avatar = avatar
-  dodgeGhost.name = name
-  dodgeGhost.show = true
-  nextTick(() => {
-    // 根据目标位置设置虚影样式（简化：始终从中心偏移）
-    dodgeGhost.style = {
-      left: isMember ? '18%' : '72%',
-      top: '35%'
-    }
-    setTimeout(() => { dodgeGhost.show = false }, 400)
-  })
+  for (const k in floaters) delete floaters[k]
+  effectBadge.value = null
 }
 
 function showVampireChain() {
@@ -470,44 +286,113 @@ function showVampireChain() {
   setTimeout(() => { vampireChain.show = false }, 500)
 }
 
-function triggerDropOrb(rewards) {
-  const rarityOrder = ['common', 'uncommon', 'rare', 'epic', 'legendary', 'mythic']
-  let best = null
-  let bestTier = -1
-  for (const r of rewards) {
-    if (r.type === 'equipment' || r.type === 'pet') {
-      const tier = rarityOrder.indexOf(r.rarity)
-      if (tier > bestTier) {
-        bestTier = tier
-        best = r
-      }
+const roundWatched = ref(0)
+
+function memberIdByName(name) {
+  const p = props.encounter?.players?.find(x => x.name === name)
+  return p ? (p.memberId || p.name) : name
+}
+
+// 渲染单条战斗事件（实时血量由模板直接绑定 encounter 实体，无需手动扣血）
+function showEvent(e) {
+  clearTransient()
+  const enemyName = props.encounter?.enemy?.name
+  const atkIsPlayer = e.attacker !== enemyName
+  const defIsPlayer = e.defender !== enemyName
+  const atkMemberId = atkIsPlayer ? memberIdByName(e.attacker) : null
+  const defMemberId = defIsPlayer ? memberIdByName(e.defender) : null
+  // activeAttacker 用原始 memberId（与 getMemberClasses 比较）；defenderId/overlay 用 'member-' 前缀
+  const attackerId = atkIsPlayer ? atkMemberId : 'enemy'
+  const defenderId = defIsPlayer ? ('member-' + defMemberId) : 'enemy'
+  activeAttacker.value = attackerId
+  activeDefender.value = defenderId
+
+  if (e.isCombo) {
+    if (e.isPlayerAttack) comboShadows.push(memberIdByName(e.attacker))
+    else comboShadowEnemy.value = true
+  }
+  if (e.isDodged) {
+    floaters[defenderId === 'enemy' ? 'enemy' : 'm-' + memberIdByName(e.defender)] = { text: '闪避', cls: 'dodge' }
+    effectBadge.value = { text: '闪避！', cls: 'badge-dodge' }
+    return
+  }
+  if (e.damage > 0) {
+    floaters[defenderId === 'enemy' ? 'enemy' : 'm-' + memberIdByName(e.defender)] = { text: e.damage, cls: e.isCrit ? 'crit' : (e.isCounter ? 'counter' : 'normal') }
+    const targetMax = e.defenderMaxHP || e.attackerMaxHP || 100
+    const ratio = targetMax > 0 ? e.damage / targetMax : 0
+    if (e.isCrit || ratio > 0.25) hurtLevel.value = 'strong'
+    else if (ratio > 0.1) hurtLevel.value = 'medium'
+    else hurtLevel.value = 'mild'
+    // 暴击低概率触发状态特效（与旧表现一致）
+    if (e.isPlayerAttack && e.isCrit && Math.random() < 0.35) {
+      const roll = Math.random()
+      if (roll < 0.25) burningTargets.push(defenderId)
+      else if (roll < 0.5) frozenTarget.value = defenderId
+      else if (roll < 0.75) bleedingTargets.push(defenderId)
+      else poisonTargets.push(defenderId)
     }
   }
-  if (!best) return
-
-  const rarityEmoji = { common: '📦', uncommon: '✨', rare: '💎', epic: '🔮', legendary: '🌟', mythic: '🔥' }
-  dropOrb.show = true
-  dropOrb.rarity = best.rarity || 'common'
-  dropOrb.emoji = rarityEmoji[best.rarity] || '📦'
-  setTimeout(() => { dropOrb.show = false }, 2000)
-}
-
-function stopPlayback() {
-  if (timer) {
-    clearInterval(timer)
-    timer = null
+  if (e.isCrit) {
+    effectBadge.value = { text: '暴击！', cls: 'badge-crit' }
+    screenShake.value = 'shake-strong'
+    setTimeout(() => { if (screenShake.value === 'shake-strong') screenShake.value = '' }, 500)
   }
-  isPlaying.value = false
+  if (e.isCombo) effectBadge.value = effectBadge.value || { text: '连击！', cls: 'badge-combo' }
+  if (e.isStun) {
+    stunTarget.value = defenderId
+    shockedTarget.value = defenderId
+    if (!effectBadge.value) effectBadge.value = { text: '眩晕！', cls: 'badge-stun' }
+  }
+  if (e.isVampire && e.isPlayerAttack) {
+    const heal = Math.round(e.damage * 0.3)
+    if (heal > 0) {
+      floaters['m-' + atkMemberId] = { text: '+' + heal, cls: 'vampire' }
+      healingTargets.push('member-' + atkMemberId)
+      showVampireChain()
+      if (!effectBadge.value) effectBadge.value = { text: '吸血', cls: 'badge-vampire' }
+    }
+  }
+  if (!e.isPlayerAttack && e.damage > 0 && !e.isCrit) {
+    const ratio = (e.defenderMaxHP || 100) > 0 ? e.damage / (e.defenderMaxHP || 100) : 0
+    if (ratio < 0.06 && Math.random() < 0.25) {
+      shieldTarget.value = defenderId
+      if (!effectBadge.value) effectBadge.value = { text: '护盾', cls: 'badge-shield' }
+    }
+  }
+  if (e.isCounter) {
+    if (!effectBadge.value) effectBadge.value = { text: '反击！', cls: 'badge-counter' }
+  }
 }
 
-function clearFloaters() {
-  for (const k in floaters) delete floaters[k]
+// 播放某一回合的所有事件（实时反馈）
+async function playLiveRound(roundNum) {
+  const cs = props.encounter?.combatStats || {}
+  const events = []
+  for (const pid of Object.keys(cs)) {
+    const details = cs[pid]?.roundDetails || []
+    for (const d of details) if (d.round === roundNum) events.push(d)
+  }
+  // 玩家先手、敌人后手，顺序更自然
+  events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
+  for (const e of events) {
+    showEvent(e)
+    await delay(240)
+  }
 }
 
-function getMemberAvatar(memberId) {
-  const m = props.playback?.members.find(x => x.memberId === memberId)
-  return m ? m.avatar : null
-}
+// 监听遭遇对象变化（新的一场战斗）：重置瞬态动画
+watch(() => props.encounter, (nc) => {
+  clearTransient()
+  roundWatched.value = nc ? (nc.round || 0) : 0
+}, { immediate: true })
+
+// 监听回合推进：先结算、再实时反馈本回合结果
+watch(() => props.encounter?.round, (newRound) => {
+  if (!newRound || !props.encounter || !props.encounter.inProgress) return
+  if (newRound === roundWatched.value) return
+  roundWatched.value = newRound
+  playLiveRound(newRound)
+})
 
 function getMemberClasses(memberId) {
   const classes = []
@@ -515,8 +400,8 @@ function getMemberClasses(memberId) {
   if (activeDefender.value === 'member-' + memberId) {
     classes.push('hurt', 'hurt-' + hurtLevel.value)
   }
-  const hp = memberHPs[memberId]
-  if (hp !== undefined && hp <= 0) classes.push('dead')
+  const p = props.encounter?.players?.find(x => (x.memberId || x.name) === memberId)
+  if (p && p.currentHealth <= 0) classes.push('dead')
   return classes.join(' ')
 }
 
@@ -526,13 +411,13 @@ function getEnemyClasses() {
   if (activeDefender.value === 'enemy') {
     classes.push('hurt', 'hurt-' + hurtLevel.value)
   }
-  if (enemyHP.value <= 0) classes.push('dead')
+  if (props.encounter?.enemy && props.encounter.enemy.currentHealth <= 0) classes.push('dead')
   return classes.join(' ')
 }
 
 function memberHpPct(m) {
-  const hp = memberHPs[m.memberId] ?? m.hp
-  return Math.max(0, Math.min(100, (hp / m.maxHP) * 100))
+  if (!m || !m.stats) return 0
+  return Math.max(0, Math.min(100, (m.currentHealth / (m.stats.maxHealth || 1)) * 100))
 }
 
 function hpBarColor(pct) {
@@ -542,7 +427,7 @@ function hpBarColor(pct) {
 }
 
 onUnmounted(() => {
-  stopPlayback()
+  clearTransient()
 })
 </script>
 
