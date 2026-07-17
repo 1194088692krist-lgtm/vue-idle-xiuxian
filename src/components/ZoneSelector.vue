@@ -283,13 +283,14 @@
               <span class="dash-label">💚 治疗</span>
               <span class="dash-value" style="color:#4caf50">+{{ idleDashboard.roleEffects.healAmount }}</span>
             </div>
-            <div class="dash-item" v-if="idleDashboard.roleEffects.shieldAmount > 0">
-              <span class="dash-label">🛡️ 护盾</span>
-              <span class="dash-value" style="color:#2196f3">+{{ idleDashboard.roleEffects.shieldAmount }}</span>
+            <!-- 真实伤害统计：按各场遭遇 combatStats 累加 -->
+            <div class="dash-item" v-if="idleDashboard.totalDamageDealt > 0">
+              <span class="dash-label">⚔️ 总造成伤害</span>
+              <span class="dash-value" style="color:#ff5722">{{ formatNumber(idleDashboard.totalDamageDealt) }}</span>
             </div>
-            <div class="dash-item" v-if="idleDashboard.roleEffects.damageBoost && idleDashboard.roleEffects.damageBoost !== '0%'">
-              <span class="dash-label">⚔️ 攻击加成</span>
-              <span class="dash-value" style="color:#ff5722">+{{ idleDashboard.roleEffects.damageBoost }}</span>
+            <div class="dash-item" v-if="idleDashboard.totalDamageTaken > 0">
+              <span class="dash-label">🩸 总受到伤害</span>
+              <span class="dash-value" style="color:#e53935">{{ formatNumber(idleDashboard.totalDamageTaken) }}</span>
             </div>
           </div>
           <!-- 生效中的小剧场 Buff -->

@@ -33,7 +33,7 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
@@ -2463,6 +2463,14 @@ async function runIdleEncounter() {
         })
       }
 
+      // 累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害」）
+      for (const p of encounter.players) {
+        const cs = encounter.combatStats[p.memberId]
+        if (!cs) continue
+        runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
+        runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
+      }
+
       logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
 
       // 实时战斗模式：currentEncounter 已在 runIdleEncounter 中按回合推进，
@@ -2519,6 +2527,14 @@ async function runIdleEncounter() {
       for (const p of encounter.players) {
         const ms = teamMemberStates.value.find(m => m.memberId === p.memberId)
         if (ms) ms.hp = Math.max(0, Math.round(p.currentHealth))
+      }
+
+      // 僵局同样累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害」）
+      for (const p of encounter.players) {
+        const cs = encounter.combatStats[p.memberId]
+        if (!cs) continue
+        runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
+        runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
       }
 
       s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
@@ -2766,7 +2782,7 @@ function startIdle(durationMinutes) {
   encounterAborted = false
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0 }
   foundEquipment.value = []
   logs.value = []
   currentEncounterSummary.value = null
@@ -2898,7 +2914,7 @@ function initIdle() {
       const probe = createPlayerEntity()
       idlePlayerMaxHP.value = probe.stats.maxHealth
       idlePlayerHP.value = probe.stats.maxHealth
-      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
+      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0 }
       logs.value = []
       startIdleTimers()
       processOfflineIdle()
@@ -2931,6 +2947,9 @@ const idleDashboard = computed(() => {
     encounterCount: idleEncounterCount.value,
     buildRatio: buildRatio.value,
     totalPhantomCrystals: runStats.value.phantomCrystals,
+    // 真实伤害统计（仪表盘「总造成伤害/总受到伤害」，按场累加）
+    totalDamageDealt: runStats.value.totalDamageDealt,
+    totalDamageTaken: runStats.value.totalDamageTaken,
     // 角色定位效果统计
     roleEffects: {
       healAmount: runStats.value.healAmount,
