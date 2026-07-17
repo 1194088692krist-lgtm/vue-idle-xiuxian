@@ -46,10 +46,10 @@
               一键出售
             </button>
           </div>
-          <div v-if="displayEquipmentList.length > pageSize" class="pagination-info">
-            共 {{ filteredEquipmentList.length }} 件装备，当前第 {{ currentEquipmentPage }} 页
+          <div v-if="displayEquipmentAll.length > equipmentPageSize" class="pagination-info">
+            共 {{ displayEquipmentAll.length }} 件装备，当前第 {{ currentEquipmentPage }} 页
             <button class="btn-small" :disabled="currentEquipmentPage <= 1" @click="currentEquipmentPage--">上一页</button>
-            <button class="btn-small" :disabled="currentEquipmentPage * pageSize >= filteredEquipmentList.length" @click="currentEquipmentPage++">下一页</button>
+            <button class="btn-small" :disabled="currentEquipmentPage * equipmentPageSize >= displayEquipmentAll.length" @click="currentEquipmentPage++">下一页</button>
           </div>
           <div v-if="displayEquipmentList.length" class="simple-grid" :class="{ mobile: isMobile }">
             <div
@@ -482,7 +482,7 @@
             class="equip-target-item"
             @click="equipToMember(member)"
           >
-            <img v-if="member.portraitThumbnail" :src="member.portraitThumbnail" class="target-avatar" />
+            <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="target-avatar" loading="lazy" decoding="async" />
             <span class="target-name">{{ member.name }}</span>
             <span class="target-level">Lv.{{ member.level }}</span>
           </div>
@@ -631,7 +631,7 @@
               class="equip-target-item"
               @click="consumePillForMember(member)"
             >
-              <img v-if="member.portraitThumbnail || member.avatar" :src="member.portraitThumbnail || member.avatar" class="target-avatar" />
+              <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="target-avatar" loading="lazy" decoding="async" />
               <span class="target-name">{{ member.name }}</span>
               <span class="target-level">Lv.{{ member.level }}</span>
             </div>
@@ -649,6 +649,7 @@
   import { useMessage } from 'naive-ui'
   import { getStatName, formatStatValue } from '../plugins/stats'
   import { getRealmName } from '../plugins/realm'
+  import { getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
 
@@ -1311,9 +1312,11 @@
     return slot
   }
 
-  // 装备标签页过滤后的列表
-  const displayEquipmentList = computed(() => {
-    let list = playerStore.items.filter(item => {
+  // 装备标签页过滤后的完整列表（未分页）
+  // 使用 Schwartzian transform：预计算评分后再排序，避免每次比较都调用 calculateEquipmentScore，
+  // 将排序时评分计算次数从 O(n log n) 降到 O(n)，对大量装备显著加速。
+  const displayEquipmentAll = computed(() => {
+    const filtered = playerStore.items.filter(item => {
       if (!isEquipmentItem(item)) return false
       if (equipmentFilterCategory.value) {
         const slots = equipmentCategoryMap[equipmentFilterCategory.value]
@@ -1323,11 +1326,19 @@
       return true
     })
     if (equipmentSortedByScore.value) {
-      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+      return filtered
+        .map(item => ({ item, score: calculateEquipmentScore(item) }))
+        .sort((a, b) => b.score - a.score)
+        .map(s => s.item)
     }
-    const start = (currentEquipmentPage.value - 1) * pageSize.value
-    const end = start + pageSize.value
-    return list.slice(start, end)
+    return filtered
+  })
+
+  // 装备标签页当前页（与弹窗 equipmentList 共用 currentEquipmentPage，但统一使用 equipmentPageSize）
+  const displayEquipmentList = computed(() => {
+    const start = (currentEquipmentPage.value - 1) * equipmentPageSize.value
+    const end = start + equipmentPageSize.value
+    return displayEquipmentAll.value.slice(start, end)
   })
 
   // 装备品质选项
@@ -1349,16 +1360,20 @@
     ]
   })
 
-  // 过滤后的装备列表
+  // 过滤后的装备列表（弹窗用）
+  // 同样使用 Schwartzian transform 优化排序
   const filteredEquipmentList = computed(() => {
-    let list = playerStore.items.filter(item => {
+    const list = playerStore.items.filter(item => {
       if (!isEquipmentItem(item)) return false
       if (selectedEquipmentType.value && selectedEquipmentType.value !== 'all' && item.slot !== selectedEquipmentType.value) return false
       if (selectedQuality.value !== 'all' && item.quality !== selectedQuality.value) return false
       return true
     })
     if (equipmentSortedByScore.value) {
-      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+      return list
+        .map(item => ({ item, score: calculateEquipmentScore(item) }))
+        .sort((a, b) => b.score - a.score)
+        .map(s => s.item)
     }
     return list
   })

@@ -22,7 +22,7 @@
           :class="getMemberClasses(m.memberId)"
         >
           <div class="avatar-wrap">
-            <img v-if="m.avatar" :src="m.avatar" class="fighter-avatar" :alt="m.name" />
+            <img v-if="m.avatar" :src="m.avatar" class="fighter-avatar" :alt="m.name" decoding="async" />
             <div v-else class="fighter-avatar placeholder">{{ (m.name || '?')[0] }}</div>
             <div v-if="stunTarget === 'member-' + m.memberId" class="stun-stars">💫</div>
             <div v-if="frozenTarget === 'member-' + m.memberId" class="frozen-overlay"></div>
@@ -66,6 +66,7 @@
                 :src="encounter.enemy.avatar"
                 class="enemy-avatar-img"
                 :alt="encounter.enemy?.name"
+                decoding="async"
               />
               <span v-else class="enemy-emoji">{{ enemyEmoji }}</span>
             </div>
@@ -101,7 +102,7 @@
 
     <!-- 闪避虚影 -->
     <div v-if="dodgeGhost.show" class="dodge-ghost" :style="dodgeGhost.style">
-      <img v-if="dodgeGhost.avatar" :src="dodgeGhost.avatar" class="ghost-avatar" />
+      <img v-if="dodgeGhost.avatar" :src="dodgeGhost.avatar" class="ghost-avatar" decoding="async" />
       <div v-else class="ghost-avatar placeholder">{{ (dodgeGhost.name || '?')[0] }}</div>
     </div>
 
@@ -119,7 +120,7 @@
             class="battle-log-item"
             :class="[log.type, { 'is-fading': idx === 0 && (props.encounter?.combatLog?.length || 0) > 3 }]"
           >
-          <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" />
+          <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" loading="lazy" decoding="async" />
           <span class="battle-log-text">{{ log.text }}</span>
         </div>
         </TransitionGroup>
@@ -143,7 +144,7 @@
           </div>
           <div class="battle-log-modal-body" ref="fullLogBody">
             <div v-for="(log, idx) in fullBattleLog" :key="idx" class="battle-log-item" :class="log.type">
-              <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" />
+              <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" loading="lazy" decoding="async" />
               <span class="battle-log-text">{{ log.text }}</span>
             </div>
           </div>
@@ -160,7 +161,7 @@
             <button class="close-btn" @click="showMonsterPortrait = false">×</button>
           </div>
           <div class="monster-portrait-body">
-            <img :src="monsterPortraitUrl" class="monster-portrait-img" :alt="monsterPortraitName" />
+            <img :src="monsterPortraitUrl" class="monster-portrait-img" :alt="monsterPortraitName" decoding="async" />
           </div>
         </div>
       </div>

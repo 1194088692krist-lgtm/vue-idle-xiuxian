@@ -18,6 +18,8 @@
               :class="{ 'is-loaded': avatarLoaded, 'is-hidden': shouldShowVideo && videoReady }"
               alt="角色立绘"
               draggable="false"
+              decoding="async"
+              fetchpriority="high"
               @load="onAvatarLoad"
               @error="onAvatarError"
             />

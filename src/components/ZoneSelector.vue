@@ -503,7 +503,7 @@
                   @click="toggleMemberInTeam(member.id)"
                 >
                   <div class="sect-avatar" @click.stop="openAvatarViewer(member)">
-                    <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="sect-avatar-img" :alt="member.name" />
+                    <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="sect-avatar-img" :alt="member.name" loading="lazy" decoding="async" />
                     <span v-else>{{ member.name[0] }}</span>
                   </div>
                   <div class="sect-member-info">

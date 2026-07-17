@@ -90,7 +90,7 @@
               @click="showCharacterDetail(result)"
             >
               <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar" :class="result.item.star >= 5 ? 'star-5-glow' : (result.item.star >= 4 ? 'star-4-glow' : '')">
-                <img :src="getCharacterThumbnail(result.item)" :alt="result.item.name" />
+                <img :src="getCharacterThumbnail(result.item)" :alt="result.item.name" loading="lazy" decoding="async" />
               </div>
               <div class="result-type" :style="{ color: getResultColor(result) }">
                 {{ getResultTypeName(result) }}

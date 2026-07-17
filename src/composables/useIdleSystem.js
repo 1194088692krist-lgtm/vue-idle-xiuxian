@@ -2200,6 +2200,10 @@ async function runIdleEncounter() {
   // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
   if (!diff) { idleDiag.value.lastStage = '跳过:diff为空'; idleDiag.value.skipCount++; isRunning = false; return }
   let effectiveZone
+  // 注意：isBossEncounter 必须在 if (!currentEncounter.value.inProgress) 块外声明，
+  // 否则在下方「战斗结束发放奖励」分支引用时会抛 ReferenceError（被 try/catch 静默吞掉），
+  // 导致 currentEncounter.inProgress 永久为 true，后续不再刷怪、不再发奖。
+  let isBossEncounter = false
   try {
     isRunning = true
     effectiveZone = buildEffectiveZone(zone, diff)
@@ -2246,7 +2250,6 @@ async function runIdleEncounter() {
       idleDiag.value.lastStage = '创建新遭遇'
       let enemyData
       let enemy
-      let isBossEncounter = false
       if (inBossPhase && bossAttemptedRound.value !== roundIndex && effectiveZone.bosses && effectiveZone.bosses.length) {
         // ===== 本轮 BOSS 决战窗口：刷新秘境 BOSS（限时 1 分钟，失败则进入下一轮） =====
         isBossEncounter = true
