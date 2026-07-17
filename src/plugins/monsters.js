@@ -53,12 +53,15 @@ export async function getMonsterPortrait(monsterName) {
 
 // 同步版本：获取怪物头像（如果 manifest 已加载）
 export function getMonsterAvatarSync(monsterName, size = 'thumbnail') {
-  if (monsterManifest) {
-    const key = safeFileName(monsterName)
-    const entry = monsterManifest[key]
-    if (entry && entry[size]) {
-      return `${MONSTER_ASSETS_BASE}${entry[size]}`
-    }
+  if (!monsterManifest) {
+    // manifest 尚未就绪：先触发预取（fire-and-forget），下一次调用即可命中真实立绘
+    loadMonsterManifest()
+    return getMonsterEmoji(monsterName)
+  }
+  const key = safeFileName(monsterName)
+  const entry = monsterManifest[key]
+  if (entry && entry[size]) {
+    return `${MONSTER_ASSETS_BASE}${entry[size]}`
   }
   return getMonsterEmoji(monsterName)
 }
@@ -254,3 +257,6 @@ export function getMonsterPromptsByZone(zoneId) {
     portrait: MONSTER_PORTRAIT_PROMPTS[name]?.portrait
   })).filter(item => item.thumbnail && item.portrait)
 }
+
+// 模块加载即预取怪物立绘 manifest，确保同步接口 getMonsterAvatarSync 在战斗开始前已可用
+loadMonsterManifest()
