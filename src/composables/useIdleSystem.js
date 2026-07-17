@@ -2385,64 +2385,11 @@ async function runIdleEncounter() {
 
       logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
 
-<<<<<<< HEAD
-      // 构建战斗回放数据
-      const allRounds = []
-      for (const cr of combatResults) {
-        const cs = cr.combatStats || {}
-        for (const r of (cs.roundDetails || [])) {
-          allRounds.push({
-            round: r.round,
-            attacker: r.attacker,
-            defender: r.defender,
-            damage: r.damage,
-            isCrit: r.isCrit,
-            isCombo: r.isCombo,
-            isDodged: r.isDodged,
-            isVampire: r.isVampire,
-            isStun: r.isStun,
-            isCounter: r.isCounter,
-            attackerHP: r.attackerHP,
-            defenderHP: r.defenderHP,
-            attackerMaxHP: r.attackerMaxHP,
-            defenderMaxHP: r.defenderMaxHP,
-            isPlayerAttack: r.isPlayerAttack,
-            memberId: cr.memberId,
-            memberName: cr.memberName
-          })
-        }
-      }
-      allRounds.sort((a, b) => a.round - b.round)
-      const playbackMembers = teamMemberStates.value.map(ms => {
-        const m = s.sectMembers.find(c => c.id === ms.memberId)
-        return {
-          memberId: ms.memberId,
-          name: ms.name,
-          maxHP: ms.maxHP,
-          hp: ms.hp,
-          avatar: m ? getCharacterThumbnail(m) : null,
-          role: m ? m.role : 'vanguard',
-          star: m ? m.star : 3
-        }
-      })
-      battlePlayback.value = {
-        id: Date.now() + '_' + count,
-        enemy: {
-          ...currentIdleEnemy.value,
-          avatar: getMonsterAvatarSync(currentIdleEnemy.value.name, 'thumbnail'),
-          portrait: getMonsterAvatarSync(currentIdleEnemy.value.name, 'full')
-        },
-        members: playbackMembers,
-        rounds: allRounds,
-        victory,
-        rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
-      }
-      idleDiag.value.lastPlaybackSet = new Date().toLocaleTimeString()
-      idleDiag.value.lastStage = 'battlePlayback已设置(rounds=' + allRounds.length + ')'
-=======
-      // 注意：不再构建 battlePlayback 整场回放（旧“先结算再回放”逻辑已废弃）。
-      // 战斗过程已在 runIdleEncounter 中按回合实时推进，并由 BattleStage 实时渲染 currentEncounter。
->>>>>>> origin/main
+      // 实时战斗模式：currentEncounter 已在 runIdleEncounter 中按回合推进，
+      // BattleStage 直接渲染 currentEncounter（无需整场回放 battlePlayback）。
+      // 这里仅清理 currentEncounter 让下一场遭遇重新开始。
+      idleDiag.value.lastStage = '遭遇结束(victory=' + victory + ')'
+      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
 
       // 实时更新当前结算画面
       currentEncounterSummary.value = {
@@ -3025,12 +2972,8 @@ export function useIdleSystem() {
     idlePlayerMaxHP,
     idlePlayerDefeated,
     currentIdleEnemy,
-<<<<<<< HEAD
-    battlePlayback,
-    idleDiag,
-=======
     currentEncounter,
->>>>>>> origin/main
+    idleDiag,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,

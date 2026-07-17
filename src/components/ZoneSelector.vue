@@ -240,9 +240,6 @@
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
-<<<<<<< HEAD
-        <!-- 战斗可视化舞台 -->
-        <BattleStage v-if="isIdling && battlePlayback" :playback="battlePlayback" />
         <!-- 诊断面板：实时显示挂机遭遇执行状态与异常，便于无控制台定位问题 -->
         <div v-if="isIdling" class="idle-diag-panel">
           <div class="diag-title">🔧 挂机诊断 <span class="diag-toggle" @click="diagCollapsed = !diagCollapsed">{{ diagCollapsed ? '展开' : '收起' }}</span></div>
@@ -256,18 +253,13 @@
             <div class="diag-row"><span class="diag-label">玩家实体数</span><span class="diag-value" :class="{ 'diag-error': idleDiag.lastPlayerCount === 0 }">{{ idleDiag.lastPlayerCount }}</span></div>
             <div class="diag-row"><span class="diag-label">敌人</span><span class="diag-value">{{ idleDiag.lastEnemyName || '—' }}</span></div>
             <div class="diag-row"><span class="diag-label">战斗结果</span><span class="diag-value">{{ idleDiag.lastFinished || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">回放设置</span><span class="diag-value" :class="{ 'diag-warn': !idleDiag.lastPlaybackSet && idleDiag.callCount > 0 }">{{ idleDiag.lastPlaybackSet || '未设置' }}</span></div>
+            <div class="diag-row"><span class="diag-label">战斗进行中</span><span class="diag-value" :class="{ 'diag-warn': !idleDiag.lastPlaybackSet && idleDiag.callCount > 0 }">{{ idleDiag.lastPlaybackSet || '否' }}</span></div>
             <div v-if="idleDiag.lastError" class="diag-error-box">
               <div class="diag-error-title">⚠️ 最近异常（请截图发给开发者）：</div>
               <pre class="diag-error-pre">{{ idleDiag.lastError }}</pre>
             </div>
-            <div v-else-if="idleDiag.callCount > 0 && !idleDiag.lastPlaybackSet" class="diag-hint">
-              💡 提示：遭遇已被调用 {{ idleDiag.callCount }} 次但战斗回放未设置。请检查上方"执行阶段"显示的卡点。
-            </div>
           </div>
         </div>
-=======
->>>>>>> origin/main
         <!-- 挂机仪表盘 -->
         <div v-if="isIdling && idleDashboard" class="idle-dashboard">
           <div class="dashboard-title">📊 挂机仪表盘</div>
@@ -652,12 +644,8 @@ const {
   showTreasureFlash,
   buildEffectiveZone,
   getZoneDifficulty,
-<<<<<<< HEAD
-  battlePlayback,
+  currentEncounter,
   idleDiag
-=======
-  currentEncounter
->>>>>>> origin/main
 } = useIdleSystem()
 
 // 匹配度配色
