@@ -7,7 +7,7 @@ import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
-import { getEffortCap, rebirthCharacter, getEffectiveBaseStats } from '../plugins/characters'
+import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 
@@ -285,7 +285,11 @@ export const usePlayerStore = defineStore('player', {
     sectMembers: [], // 宗门成员列表（最多100人）
     teamMembers: [], // 当前出战队伍（最多3人）
     maxSectSize: 100,
-    maxTeamSize: 3
+    maxTeamSize: 3,
+    // 宗门成员 baseStats 重算版本号：升级到此版本时会按 templateId+level+突破次数
+    // 用新成长公式重算所有成员 baseStats，修复历史「全0 / 回填默认值 / 成长膨胀到3万+」问题。
+    // 每次修改成长公式或重算逻辑时递增此版本号。
+    characterStatsVersion: 0
   }),
   getters: {
     // 待领取礼包数量（驱动顶部铃铛红点）
@@ -569,6 +573,33 @@ export const usePlayerStore = defineStore('player', {
       if (!this.artifactBonuses || typeof this.artifactBonuses !== 'object') this.artifactBonuses = {}
       if (!this.rebirthBonus || typeof this.rebirthBonus !== 'object') this.rebirthBonus = {}
       if (!this.permanentBonuses || typeof this.permanentBonuses !== 'object') this.permanentBonuses = {}
+      // 宗门成员 baseStats 版本化重算：
+      //   - 旧存档 characterStatsVersion < 1：存在「全0 / 被回填为玩家默认值 / 旧公式膨胀到3万+」等问题，
+      //     一律按 templateId + level + 突破次数 用新成长公式重算（洗点）。
+      //   - 之后每次读档只修复异常成员（isMemberBaseStatsAbnormal），不再全量洗点，
+      //     避免清掉玩家通过丹药获得的额外加成。
+      const TARGET_STATS_VERSION = 1
+      if (!this.characterStatsVersion || this.characterStatsVersion < TARGET_STATS_VERSION) {
+        if (Array.isArray(this.sectMembers)) {
+          let fixed = 0
+          this.sectMembers.forEach(m => {
+            if (recalculateMemberBaseStats(m)) fixed++
+          })
+          if (fixed > 0) {
+            console.log(`[characterStats] 版本升级到 v${TARGET_STATS_VERSION}，重算 ${fixed} 个宗门成员 baseStats`)
+          }
+        }
+        this.characterStatsVersion = TARGET_STATS_VERSION
+      } else {
+        // 已是新版存档：仅修复偶发异常（如存档损坏）
+        if (Array.isArray(this.sectMembers)) {
+          this.sectMembers.forEach(m => {
+            if (isMemberBaseStatsAbnormal(m)) {
+              recalculateMemberBaseStats(m)
+            }
+          })
+        }
+      }
       // 从干净基线重算派生属性（装备/套装/灵宠），根治「存档重载后加成重复叠加」
       try {
         this.recomputeAttributes()
@@ -2297,7 +2328,11 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '已突破至最高境界（5/5）' }
       }
       member.breakThrough = (member.breakThrough || 0) + 1
-      // 基础数值 ×1.2（复利）
+      // 突破前防御性校验：baseStats 异常时先重算，避免在 0 值上 ×1.2 仍是 0
+      if (isMemberBaseStatsAbnormal(member)) {
+        recalculateMemberBaseStats(member)
+      }
+      // 基础数值 ×BREAKTHROUGH_MULT（复利，与 recalculateMemberBaseStats 一致）
       if (member.baseStats) {
         member.baseStats.attack = Math.round(member.baseStats.attack * 1.2)
         member.baseStats.health = Math.round(member.baseStats.health * 1.2)
@@ -2451,15 +2486,20 @@ export const usePlayerStore = defineStore('player', {
       if (member.experience < member.maxExperience) {
         return { success: false, message: '经验不足' }
       }
+      // 防御性校验：baseStats 异常（全0/缺失/被回填为玩家默认值）时先按 templateId 重算，
+      // 否则乘法复利会把 0 永久保留，或从 10/100/5/10 低基数成长导致「二十几级仍很低」。
+      if (isMemberBaseStatsAbnormal(member)) {
+        recalculateMemberBaseStats(member)
+      }
       member.level++
       member.experience -= member.maxExperience
       member.maxExperience = calculateLevelExp(member.level)
-      const starConfig = { 3: 1, 4: 1.2, 5: 1.5 }
-      const growth = starConfig[member.star] || 1
-      member.baseStats.attack = Math.round(member.baseStats.attack * (1 + 0.1 * growth))
-      member.baseStats.health = Math.round(member.baseStats.health * (1 + 0.15 * growth))
-      member.baseStats.defense = Math.round(member.baseStats.defense * (1 + 0.1 * growth))
-      member.baseStats.speed = Math.round(member.baseStats.speed * (1 + 0.08 * growth))
+      // 成长公式统一走 GROWTH_RATE × starCfg.growthRate，避免内联硬编码与 characters.js 重复
+      const growth = characterStarConfig[member.star]?.growthRate || 1
+      member.baseStats.attack = Math.round(member.baseStats.attack * (1 + GROWTH_RATE.attack * growth))
+      member.baseStats.health = Math.round(member.baseStats.health * (1 + GROWTH_RATE.health * growth))
+      member.baseStats.defense = Math.round(member.baseStats.defense * (1 + GROWTH_RATE.defense * growth))
+      member.baseStats.speed = Math.round(member.baseStats.speed * (1 + GROWTH_RATE.speed * growth))
       this.queueSave()
       return { success: true, message: `${member.name}升级到${member.level}级！` }
     },
@@ -2524,8 +2564,10 @@ export const usePlayerStore = defineStore('player', {
       }
       if (!member.level) member.level = 1
       if (!member.experience) member.experience = 0
-      if (!member.baseStats || !member.baseStats.attack) {
-        member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+      // baseStats 异常时按 templateId 重算（而非回填玩家默认值 10/100/5/10，
+      // 否则 5 星角色从低基数成长，二十几级仍远低于正常 1 级数值）
+      if (isMemberBaseStatsAbnormal(member)) {
+        recalculateMemberBaseStats(member)
       }
       this.cultivationPool -= numAmount
       member.experience += numAmount
@@ -2575,12 +2617,11 @@ export const usePlayerStore = defineStore('player', {
         member.experience -= requiredExp
         member.level = nextLevel
         member.maxExperience = calculateLevelExp(member.level)
-        const starConfig = { 3: 1, 4: 1.2, 5: 1.5 }
-        const growth = starConfig[member.star] || 1
-        member.baseStats.attack = Math.round(member.baseStats.attack * (1 + 0.1 * growth))
-        member.baseStats.health = Math.round(member.baseStats.health * (1 + 0.15 * growth))
-        member.baseStats.defense = Math.round(member.baseStats.defense * (1 + 0.1 * growth))
-        member.baseStats.speed = Math.round(member.baseStats.speed * (1 + 0.08 * growth))
+        const growth = characterStarConfig[member.star]?.growthRate || 1
+        member.baseStats.attack = Math.round(member.baseStats.attack * (1 + GROWTH_RATE.attack * growth))
+        member.baseStats.health = Math.round(member.baseStats.health * (1 + GROWTH_RATE.health * growth))
+        member.baseStats.defense = Math.round(member.baseStats.defense * (1 + GROWTH_RATE.defense * growth))
+        member.baseStats.speed = Math.round(member.baseStats.speed * (1 + GROWTH_RATE.speed * growth))
         levelsGained++
       }
       this.queueSave()

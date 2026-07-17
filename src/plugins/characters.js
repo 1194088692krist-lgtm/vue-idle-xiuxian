@@ -441,6 +441,97 @@ export function getEffectiveBaseStats(character) {
   }
 }
 
+// ===== 成长公式（统一来源，避免 player.js 内联硬编码与 starConfig.growthRate 重复）=====
+// 每级乘法复利系数（基础值），实际系数 = GROWTH_RATE.X × starCfg.growthRate
+// 调低后：80 级 5 星 attack ≈ 3000、health ≈ 5 万、defense ≈ 700、speed ≈ 1000（满突破再 ×2.49）
+// 原 v1 系数（attack 0.10 / health 0.15 / defense 0.10 / speed 0.08）会导致 80 级 5 星 health 破百万，严重膨胀。
+export const GROWTH_RATE = {
+  attack: 0.025,
+  health: 0.035,
+  defense: 0.025,
+  speed: 0.02
+}
+
+// 突破每次乘法倍率（保持不变，最多 5 次 → ×1.2^5 ≈ 2.49）
+export const BREAKTHROUGH_MULT = 1.2
+
+/**
+ * 按 templateId + 当前 level + 突破次数，用统一成长公式重算成员 baseStats。
+ * 用于：
+ *   1) 修复历史异常存档（baseStats 全 0 / 被回填为玩家默认值 10/100/5/10）
+ *   2) 成长公式调整后对所有存档角色一次性洗点重算
+ * 不修改 level / breakThrough / experience / effortValue / talentValue，仅重算 baseStats。
+ * @param {object} member 宗门成员对象（会被原地修改 baseStats）
+ * @returns {boolean} 是否成功重算（找不到模板/星级配置时返回 false 且不改动）
+ */
+export function recalculateMemberBaseStats(member) {
+  if (!member || !member.templateId) return false
+  const template = characterList.find(c => c.id === member.templateId)
+  if (!template) return false
+  const starCfg = starConfig[template.star]
+  if (!starCfg) return false
+  const starMult = starCfg.multiplier
+  const growth = starCfg.growthRate
+
+  // 1. 重新计算 1 级初始 baseStats（与 generateCharacterById 一致）
+  let baseStats = {
+    attack: Math.round(template.baseStats.attack * starMult),
+    health: Math.round(template.baseStats.health * starMult),
+    defense: Math.round(template.baseStats.defense * starMult),
+    speed: Math.round(template.baseStats.speed * starMult)
+  }
+
+  // 2. 按当前 level 重新跑成长公式（用新 GROWTH_RATE 系数）
+  //    level=1 不成长，level=N 成长 (N-1) 次
+  const levels = Math.max(0, (member.level || 1) - 1)
+  const atkMult = 1 + GROWTH_RATE.attack * growth
+  const hpMult = 1 + GROWTH_RATE.health * growth
+  const defMult = 1 + GROWTH_RATE.defense * growth
+  const spdMult = 1 + GROWTH_RATE.speed * growth
+  for (let i = 0; i < levels; i++) {
+    baseStats.attack = Math.round(baseStats.attack * atkMult)
+    baseStats.health = Math.round(baseStats.health * hpMult)
+    baseStats.defense = Math.round(baseStats.defense * defMult)
+    baseStats.speed = Math.round(baseStats.speed * spdMult)
+  }
+
+  // 3. 应用突破加成（保持乘法 ×BREAKTHROUGH_MULT，与 breakThroughCharacter 一致）
+  const breakThroughCount = Math.max(0, Math.min(5, member.breakThrough || 0))
+  if (breakThroughCount > 0) {
+    const mult = Math.pow(BREAKTHROUGH_MULT, breakThroughCount)
+    baseStats.attack = Math.round(baseStats.attack * mult)
+    baseStats.health = Math.round(baseStats.health * mult)
+    baseStats.defense = Math.round(baseStats.defense * mult)
+    baseStats.speed = Math.round(baseStats.speed * mult)
+  }
+
+  member.baseStats = baseStats
+  // 同步 star 字段（防止旧存档 star 丢失导致 growth 回退到 1）
+  if (!member.star || !starConfig[member.star]) member.star = template.star
+  return true
+}
+
+/**
+ * 检测成员 baseStats 是否异常（需要修复）。
+ * 异常判定：baseStats 缺失、任一项 ≤ 0、或任一项远低于该模板 1 级应有值（说明被回填为玩家默认值）。
+ */
+export function isMemberBaseStatsAbnormal(member) {
+  if (!member) return true
+  const bs = member.baseStats
+  if (!bs || typeof bs !== 'object') return true
+  if (!Number.isFinite(bs.attack) || bs.attack <= 0) return true
+  if (!Number.isFinite(bs.health) || bs.health <= 0) return true
+  if (!Number.isFinite(bs.defense) || bs.defense <= 0) return true
+  if (!Number.isFinite(bs.speed) || bs.speed <= 0) return true
+  // 检测「被回填为玩家默认值 10/100/5/10」：5 星 1 级 attack 应 ≥ 100，若 attack<20 且模板是 4/5 星则异常
+  const template = characterList.find(c => c.id === member.templateId)
+  if (template) {
+    const expectedMinAttack = Math.round(template.baseStats.attack * (starConfig[template.star]?.multiplier || 1))
+    if (bs.attack < expectedMinAttack * 0.5) return true
+  }
+  return false
+}
+
 // 回炉重造：角色升星（3→4, 4→5）
 // 返回新角色（重置为1级，天赋值继承原努力值的10%）
 export function rebirthCharacter(character) {
