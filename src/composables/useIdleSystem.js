@@ -1131,10 +1131,15 @@ function grantReward(effectiveZone, isIdleMode = false) {
   // 掉落加成：小幅提升高品质概率
   const upgradeChance = Math.max(0, (dropBonus - 1) * 0.35)
   const dropRateMult = getPillBuffMultiplier('dropRate')
+  // 挂机模式下，装备/法宝（equipment 槽位含 artifact）与灵宠（pet）获得几率提升 5 倍
+  const IDLE_DROP_BOOST = 5
+  const idleBoost = (rw) => (isIdleMode && (rw.type === 'equipment' || rw.type === 'pet'))
+    ? IDLE_DROP_BOOST
+    : 1
   for (const rw of effectiveZone.rewards) {
     const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
       ? rw.chance
-      : Math.min(1, rw.chance * dropRateMult)
+      : Math.min(1, rw.chance * dropRateMult * idleBoost(rw))
     if (Math.random() < chance) {
       const amount = Array.isArray(rw.amount)
         ? Math.floor(Math.random() * (rw.amount[1] - rw.amount[0] + 1)) + rw.amount[0]
@@ -2095,6 +2100,34 @@ async function executeRound(effectiveZone) {
   return { finished: false }
 }
 
+// 构建挂机仪表盘怪物快照（怪物信息面板数据源：currentIdleEnemy）
+// currentHealth 传入实时血量，便于战斗中逐回合刷新；statusEffects 仅在战斗结束时附带 debuff
+function buildIdleEnemySnapshot(enemy, currentHealth, statusEffects = []) {
+  const maxHealth = Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0)
+  const curHP = Math.round(currentHealth ?? maxHealth)
+  const hpPercent = maxHealth > 0
+    ? Math.max(0, Math.min(100, (curHP / maxHealth) * 100)).toFixed(0) + '%'
+    : '0%'
+  return {
+    name: enemy.name,
+    tier: enemy.tier || 'normal',
+    realm: enemy.realm || '',
+    currentHealth: curHP,
+    maxHealth,
+    hpPercent,
+    dead: curHP <= 0,
+    damage: Math.round(enemy.stats?.damage || 0),
+    defense: Math.round(enemy.stats?.defense || 0),
+    speed: Math.round(enemy.stats?.speed || 0),
+    critRate: enemy.stats?.critRate != null ? (enemy.stats.critRate * 100).toFixed(0) + '%' : '—',
+    effects: statusEffects.map(statusType => ({
+      type: 'debuff',
+      name: statusType === 'stun' ? '眩晕' : '流血',
+      duration: statusType === 'stun' ? 1 : 3
+    }))
+  }
+}
+
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
 async function runIdleEncounter() {
   idleDiag.value.callCount++
@@ -2194,6 +2227,10 @@ async function runIdleEncounter() {
         enemyData
       }
 
+      // 战斗开始即设置挂机仪表盘怪物快照，修复"挂机中怪物信息仪表盘消失"
+      // （此前 currentIdleEnemy 仅在战斗结束才赋值，导致战斗中面板为空/显示上一场残留）
+      currentIdleEnemy.value = buildIdleEnemySnapshot(enemy, enemy.currentHealth)
+
       // 遭遇开始日志
       addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
       const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
@@ -2214,6 +2251,16 @@ async function runIdleEncounter() {
       idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
       idleDiag.value.lastPlaybackSet = '是(回合#' + currentEncounter.value.round + ')'
       roundResult = await executeRound(effectiveZone)
+      // 逐回合刷新仪表盘怪物血量，让挂机中怪物信息面板实时反映 currentEncounter.enemy
+      if (currentIdleEnemy.value) {
+        const liveHP = currentEncounter.value.enemy.currentHealth
+        const liveMax = currentEncounter.value.enemy.stats.maxHealth || 0
+        currentIdleEnemy.value.currentHealth = Math.round(liveHP)
+        currentIdleEnemy.value.hpPercent = liveMax > 0
+          ? Math.max(0, Math.min(100, (liveHP / liveMax) * 100)).toFixed(0) + '%'
+          : '0%'
+        currentIdleEnemy.value.dead = liveHP <= 0
+      }
       // 等待 BattleStage 播完当前回合的攻击/受击动画再进入下一回合，
       // 避免回合切换太快导致动画堆叠跳动
       await new Promise(resolve => setTimeout(resolve, ROUND_ANIM_DELAY))
@@ -2305,28 +2352,8 @@ async function runIdleEncounter() {
         enemyStatusEffects = [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
       }
 
-      // 构建怪物快照
-      const snapMaxHP = Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0)
-      const snapCurHP = Math.round(enemy.currentHealth ?? snapMaxHP)
-      const snapHpPct = snapMaxHP > 0 ? Math.max(0, Math.min(100, (snapCurHP / snapMaxHP) * 100)).toFixed(0) + '%' : '0%'
-      currentIdleEnemy.value = {
-        name: enemy.name,
-        tier: enemy.tier || 'normal',
-        realm: enemy.realm || '',
-        currentHealth: snapCurHP,
-        maxHealth: snapMaxHP,
-        hpPercent: snapHpPct,
-        dead: snapCurHP <= 0,
-        damage: Math.round(enemy.stats?.damage || 0),
-        defense: Math.round(enemy.stats?.defense || 0),
-        speed: Math.round(enemy.stats?.speed || 0),
-        critRate: enemy.stats?.critRate != null ? (enemy.stats.critRate * 100).toFixed(0) + '%' : '—',
-        effects: enemyStatusEffects.map(statusType => ({
-          type: 'debuff',
-          name: statusType === 'stun' ? '眩晕' : '流血',
-          duration: statusType === 'stun' ? 1 : 3
-        }))
-      }
+      // 构建怪物快照（战斗结束时带入 debuff 状态，覆盖战斗中逐回合刷新的快照）
+      currentIdleEnemy.value = buildIdleEnemySnapshot(enemy, enemy.currentHealth, enemyStatusEffects)
 
       // 构建 combatResults（兼容 logEncounter）
       const combatResults = []
@@ -2611,6 +2638,8 @@ function startIdle(durationMinutes) {
     logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，队伍气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
   }
   startIdleTimers()
+  // 立即触发首场遭遇，消除 setInterval 的 10 秒首延迟：点击挂机开始即弹出实时战斗界面
+  runIdleEncounter()
   s.queueSave()
   s.saveToCurrentSlot().catch(err => console.error('挂机开始自动存档失败:', err))
 }
