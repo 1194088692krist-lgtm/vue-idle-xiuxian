@@ -2258,15 +2258,19 @@ async function runIdleEncounter() {
       addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
     }
 
-    // 2. 连续推进回合直到战斗结束（挂机模式下单次遭遇应在一轮内打完，否则 battlePlayback 永远不设置、奖励永远不发放）
+    // 2. 连续推进回合直到战斗结束（挂机模式下单次遭遇应在一轮内打完，否则奖励永远不发放）
     //    最大回合数保护：防止极端情况（如双方闪避/治疗过高）导致死循环
+    //    每回合之间让出一次事件循环，确保 BattleStage 能实时渲染中间状态（避免一气呵成跑完50回合导致战斗界面"过了好久才弹出"）
     const MAX_IDLE_ROUNDS = 50
     let roundResult = { finished: false }
     let roundsExecuted = 0
     while (!roundResult.finished && roundsExecuted < MAX_IDLE_ROUNDS) {
       roundsExecuted++
       idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
+      idleDiag.value.lastPlaybackSet = '是(回合#' + currentEncounter.value.round + ')'
       roundResult = await executeRound(effectiveZone)
+      // 让出事件循环，让 Vue 渲染当前回合的战斗状态
+      await new Promise(resolve => setTimeout(resolve, 0))
     }
     idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted
 
@@ -2758,6 +2762,9 @@ function startIdle(durationMinutes) {
   isIdling.value = true
   idleEncounterErrorCount = 0
   isFinishingIdle = false // 重置待结束标志，避免上次延迟的 finishIdle 影响新挂机
+  // 启动新挂机前清理上一场残留的实时战斗状态，避免 BattleStage 卡在老战斗
+  currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+  currentIdleEnemy.value = null
   idleEncounterCount.value = 0
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
@@ -2791,6 +2798,9 @@ function finishIdle() {
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
   isFinishingIdle = false // 清除待结束标志
+  // 清理实时战斗舞台，避免停止挂机后 BattleStage 仍渲染旧战斗
+  currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+  currentIdleEnemy.value = null
   // 挂机结束时，flush 所有待显示日志
   flushAllPendingLogs()
   const s = store()
@@ -2818,7 +2828,6 @@ function finishIdle() {
   s.saveData()
   s.saveToCurrentSlot().catch(err => console.error('挂机结束自动存档失败:', err))
   isIdling.value = false
-  currentIdleEnemy.value = null
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
   
