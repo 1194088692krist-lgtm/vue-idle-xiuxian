@@ -63,6 +63,11 @@
           <span v-if="loginMode === 'login'">没有账号？<a @click="loginMode = 'register'">立即注册</a></span>
           <span v-else>已有账号？<a @click="loginMode = 'login'">前往登录</a></span>
         </div>
+        <!-- 免登录进入：仅使用本地存档，不进行云同步 -->
+        <button class="btn-guest-entry" @click="enterDevMode">
+          <span class="btn-icon">🎮</span>
+          <span class="btn-text">免登录进入</span>
+        </button>
         <!-- 开发者通道：仅触发后显示，玩家不可见 -->
         <button v-if="showDevEntry" class="btn-dev-entry" @click="enterDevMode">
           <span class="btn-icon">🛠</span>
@@ -1304,6 +1309,38 @@ onMounted(() => {
   margin-top: 14px;
   padding-top: 12px;
   border-top: 1px solid rgba(139, 105, 20, 0.4);
+}
+
+/* ===== 免登录进入按钮 ===== */
+.btn-guest-entry {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 100%;
+  max-width: 300px;
+  margin: 16px auto 0;
+  padding: 12px 20px;
+  border-radius: 4px;
+  font-size: 14px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  background: linear-gradient(135deg, rgba(122, 158, 126, 0.25), rgba(94, 138, 99, 0.18));
+  color: #B8D6BA;
+  border: 1px solid rgba(122, 158, 126, 0.5);
+  letter-spacing: 2px;
+  font-weight: 600;
+}
+
+.btn-guest-entry:hover {
+  color: #F0F8F0;
+  border-color: #8FB88C;
+  background: linear-gradient(135deg, rgba(122, 158, 126, 0.45), rgba(94, 138, 99, 0.35));
+  transform: translateY(-1px);
+}
+
+.btn-guest-entry:active {
+  transform: translateY(0);
 }
 
 /* ===== 开发者通道 ===== */
