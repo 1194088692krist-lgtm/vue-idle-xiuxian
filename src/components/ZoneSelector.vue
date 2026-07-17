@@ -421,11 +421,16 @@
     <!-- 挂机日志区域 -->
     <div v-if="isIdling || lastSummary" class="idle-log-section glass-card">
       <div class="idle-log-header">
-        <h3 class="section-title">{{ isIdling ? '挂机日志（实时）' : '上次挂机日志' }}</h3>
-        <span v-if="lastSummary && !isIdling" class="log-meta">
-          {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 ·
-          {{ lastSummary.encounters }}次探索
-        </span>
+        <div class="idle-log-title-wrap">
+          <h3 class="section-title">{{ isIdling ? '挂机日志（实时）' : '上次挂机日志' }}</h3>
+          <span v-if="lastSummary && !isIdling" class="log-meta">
+            {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 ·
+            {{ lastSummary.encounters }}次探索
+          </span>
+        </div>
+        <button class="log-toggle-btn" @click="toggleIdleLog">
+          {{ idleLogExpanded ? '收起' : '展开' }}
+        </button>
       </div>
       <!-- 宝物高亮弹窗（日志上方） -->
       <transition name="flash">
@@ -439,6 +444,7 @@
           </div>
         </div>
       </transition>
+      <template v-if="idleLogExpanded">
       <div class="idle-log-body" ref="idleLogRef" @scroll.passive="handleScroll">
         <div
           v-for="(log, idx) in displayLogs"
@@ -544,6 +550,7 @@
           </div>
         </div>
       </div>
+      </template>
     </div>
 
     <!-- 队伍选择弹窗 -->
@@ -958,6 +965,13 @@ const idleLogRef = ref(null)
 const userScrolling = ref(false)
 let userScrollTimer = null
 let isProgrammaticScroll = false
+
+// 挂机日志展开/收起：默认收起（用户反馈实时滚动日志干扰），状态持久化到 localStorage
+const idleLogExpanded = ref(localStorage.getItem('idleLogExpanded') === 'true')
+const toggleIdleLog = () => {
+  idleLogExpanded.value = !idleLogExpanded.value
+  localStorage.setItem('idleLogExpanded', idleLogExpanded.value ? 'true' : 'false')
+}
 
 const isAtBottom = () => {
   if (!idleLogRef.value) return true
@@ -1657,6 +1671,24 @@ onUnmounted(() => {
   justify-content: space-between;
   align-items: center;
   margin-bottom: 8px;
+}
+.idle-log-title-wrap {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.log-toggle-btn {
+  padding: 4px 10px;
+  border-radius: 6px;
+  border: 1px solid rgba(218, 165, 32, 0.4);
+  background: rgba(218, 165, 32, 0.15);
+  color: #FFD86B;
+  font-size: 12px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+.log-toggle-btn:hover {
+  background: rgba(218, 165, 32, 0.3);
 }
 .section-title {
   margin: 0;
