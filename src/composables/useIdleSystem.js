@@ -2181,10 +2181,17 @@ async function runIdleEncounter() {
       addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
     }
 
-    // 2. 推进一回合
-    idleDiag.value.lastStage = '执行回合#' + (currentEncounter.value.round + 1)
-    const roundResult = await executeRound(effectiveZone)
-    idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory
+    // 2. 连续推进回合直到战斗结束（挂机模式下单次遭遇应在一轮内打完，否则 battlePlayback 永远不设置、奖励永远不发放）
+    //    最大回合数保护：防止极端情况（如双方闪避/治疗过高）导致死循环
+    const MAX_IDLE_ROUNDS = 50
+    let roundResult = { finished: false }
+    let roundsExecuted = 0
+    while (!roundResult.finished && roundsExecuted < MAX_IDLE_ROUNDS) {
+      roundsExecuted++
+      idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
+      roundResult = await executeRound(effectiveZone)
+    }
+    idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted
 
     // 3. 如果战斗结束，发放奖励/惩罚，重置 currentEncounter
     if (roundResult.finished) {
@@ -2383,13 +2390,9 @@ async function runIdleEncounter() {
         return
       }
     } else {
-      // 战斗未结束，播报回合状态
+      // 战斗未结束（达到最大回合数仍未分出胜负，视为僵局）
       const encounter = currentEncounter.value
-      addLog('combat', `—— 第 ${encounter.round} 回合 ——`)
-      for (const logEntry of encounter.combatLog.slice(-15)) {
-        if (typeof logEntry === 'string') addLog('combat', logEntry)
-        else if (logEntry && logEntry.text) addLog(logEntry.type || 'combat', logEntry.text)
-      }
+      addLog('combat', `—— 第 ${encounter.round} 回合（已达最大回合数，本场僵局收场）——`)
       // 播报战场状态
       for (const p of encounter.players) {
         const hpPct = p.stats.maxHealth > 0 ? Math.round((p.currentHealth / p.stats.maxHealth) * 100) : 0
@@ -2398,6 +2401,14 @@ async function runIdleEncounter() {
       const e = encounter.enemy
       const eHpPct = e.stats.maxHealth > 0 ? Math.round((e.currentHealth / e.stats.maxHealth) * 100) : 0
       addLog('combat', `${e.name}: ${Math.round(e.currentHealth)}/${e.stats.maxHealth} (${eHpPct}%)`)
+
+      // 僵局收场：重置 currentEncounter，让下次遭遇重新开始，避免同一场战斗永远卡住
+      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+      // 同步玩家血量到 teamMemberStates
+      for (const p of encounter.players) {
+        const ms = teamMemberStates.value.find(m => m.memberId === p.memberId)
+        if (ms) ms.hp = Math.max(0, Math.round(p.currentHealth))
+      }
 
       s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
       s.queueSave()
