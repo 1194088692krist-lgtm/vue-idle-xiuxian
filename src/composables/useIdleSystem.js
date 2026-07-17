@@ -773,6 +773,19 @@ const PET_RARITY_WEIGHTS = {
   mortal: 500, spiritual: 80, mystic: 6, celestial: 0.45, divine: 0.075
 }
 
+// Boss 奖励倍率：数量型奖励 Boss 是普怪的 10 倍（仅放大产出数量，不触碰爆率 chance）
+const BOSS_REWARD_MULT = 10
+// Boss 品质权重：列表中最高稀有度档权重 ×10（其余档不变），使高稀有度/高评分物品
+// 获取期望 ≈ 普怪 10 倍；爆率 chance 全程不变，仅命中后的品质分布向高档倾斜。
+function bossRarityWeights(rarityList, baseWeights) {
+  const w = {}
+  const maxIdx = rarityList.length - 1
+  rarityList.forEach((r, i) => {
+    w[r] = (baseWeights[r] || 1) * (i === maxIdx ? BOSS_REWARD_MULT : 1)
+  })
+  return w
+}
+
 // 从 rarity 数组中按权重随机选择品质（而非等概率）
 function pickRarityByWeight(rarityList, weightMap) {
   if (!rarityList || rarityList.length === 0) return 'common'
@@ -1132,7 +1145,7 @@ function grantCombatDrops(enemy, zoneId = null) {
   return drops
 }
 
-function grantReward(effectiveZone, isIdleMode = false) {
+function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   const s = store()
   const rewards = []
   const dropBonus = effectiveZone.dropBonus || 1
@@ -1145,6 +1158,9 @@ function grantReward(effectiveZone, isIdleMode = false) {
   const idleBoost = (rw) => (isIdleMode && (rw.type === 'equipment' || rw.type === 'pet'))
     ? IDLE_DROP_BOOST
     : 1
+  // Boss 奖励区分：数量型（灵石/修为/材料/结晶/碎片）Boss 是普怪的 10 倍；
+  // 装备/灵宠在品质上显著区分（最高稀有度权重 ×10 + 升档概率提升），均不突破现有爆率 chance。
+  const BOSS_STACKABLE = ['spirit_stone', 'cultivation', 'herb', 'ore', 'liquid', 'phantom_crystal', 'pet_fragment']
   for (const rw of effectiveZone.rewards) {
     const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
       ? rw.chance
@@ -1153,7 +1169,9 @@ function grantReward(effectiveZone, isIdleMode = false) {
       const amount = Array.isArray(rw.amount)
         ? Math.floor(Math.random() * (rw.amount[1] - rw.amount[0] + 1)) + rw.amount[0]
         : rw.amount || 1
-      const multiplied = Math.floor(amount * effectiveZone.rewardMultiplier)
+      // Boss：数量型奖励 ×10（仅放大产出数量，不触碰爆率 chance）
+      const bossAmountMult = (isBoss && BOSS_STACKABLE.includes(rw.type)) ? BOSS_REWARD_MULT : 1
+      const multiplied = Math.floor(amount * bossAmountMult * effectiveZone.rewardMultiplier)
       if (rw.type === 'spirit_stone') {
         const final = Math.floor(multiplied * getPillBuffMultiplier('spiritStoneRate'))
         s.spiritStones += final
@@ -1182,8 +1200,12 @@ function grantReward(effectiveZone, isIdleMode = false) {
         runStats.value.cultivation += final
         rewards.push({ type: 'cultivation', amount: final, name: '修为' })
       } else if (rw.type === 'equipment') {
-        let rarity = pickRarityByWeight(rw.rarity, EQUIP_RARITY_WEIGHTS)
-        if (Math.random() < upgradeChance) {
+        // Boss：最高稀有度档权重 ×10，且升档概率更高，显著区分品质
+        let rarity = pickRarityByWeight(rw.rarity, isBoss ? bossRarityWeights(rw.rarity, EQUIP_RARITY_WEIGHTS) : EQUIP_RARITY_WEIGHTS)
+        // Boss 仅靠「最高稀有度权重 ×10」实现约 10 倍区分，不再额外升档（避免叠加超额）；
+        // 普怪沿用 upgradeChance 小幅升档。两者爆率 chance 均不变。
+        const upChance = isBoss ? 0 : upgradeChance
+        if (Math.random() < upChance) {
           const idx = rw.rarity.indexOf(rarity)
           if (idx >= 0 && idx < rw.rarity.length - 1) rarity = rw.rarity[idx + 1]
         }
@@ -1193,8 +1215,9 @@ function grantReward(effectiveZone, isIdleMode = false) {
         const info = rarityInfo[rarity] || rarityInfo.common
         rewards.push({ type: 'equipment', name: equip.name, rarity, info, item: equip })
       } else if (rw.type === 'pet') {
-        let rarity = pickRarityByWeight(rw.rarity, PET_RARITY_WEIGHTS)
-        if (Math.random() < upgradeChance) {
+        let rarity = pickRarityByWeight(rw.rarity, isBoss ? bossRarityWeights(rw.rarity, PET_RARITY_WEIGHTS) : PET_RARITY_WEIGHTS)
+        const upChance = isBoss ? 0 : upgradeChance
+        if (Math.random() < upChance) {
           const idx = rw.rarity.indexOf(rarity)
           if (idx >= 0 && idx < rw.rarity.length - 1) rarity = rw.rarity[idx + 1]
         }
@@ -1211,14 +1234,16 @@ function grantReward(effectiveZone, isIdleMode = false) {
   const diff = effectiveZone.difficulty || 1
   const scale = effectiveZone.enemyScale || 1
   const crystalBase = Math.floor(1 + diff * 0.6 + scale * 1.2)
-  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4)))
+  const crystalMult = isBoss ? BOSS_REWARD_MULT : 1
+  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4) * crystalMult))
   s.phantomCrystals += crystalAmount
   runStats.value.phantomCrystals += crystalAmount
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
   
   // 升星碎片：难度3以上有概率掉落，难度越高概率越大
   if (diff >= 3 && Math.random() < (diff - 2) * 0.15) {
-    const fragmentAmount = Math.floor(1 + Math.random() * diff)
+    const fragMult = isBoss ? BOSS_REWARD_MULT : 1
+    const fragmentAmount = Math.floor((1 + Math.random() * diff) * fragMult)
     s.petFragments += fragmentAmount
     rewards.push({ type: 'pet_fragment', amount: fragmentAmount, name: '升星碎片' })
   }
@@ -2336,7 +2361,7 @@ async function runIdleEncounter() {
       if (bossSpawned.value && victory) bossDefeated.value = true
 
       if (victory) {
-        rewards = grantReward(effectiveZone, true)
+        rewards = grantReward(effectiveZone, true, isBossEncounter)
         s.dungeonTotalKills++; s.explorationCount++
         const recoverRatio = Math.max(0.3, 0.8 - effectiveZone.difficulty * 0.06)
         const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
