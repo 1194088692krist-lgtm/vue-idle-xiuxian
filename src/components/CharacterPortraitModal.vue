@@ -25,20 +25,30 @@
                  视频源直接挂在 <video :src> 上（比 <source> 子元素可靠：
                  <video v-if> + 动态 <source :src> 存在资源选择竞态，
                  可能导致视频拿到空源而触发 error 静默回退静态图）。
-                 loadeddata 事件首帧就绪即触发，比 canplay 快 -->
+                 关键修复：
+                 1) autoplay 原生属性——静音视频由浏览器原生自动播放，
+                    不依赖 JS play() 的时序/手势上下文，最稳；
+                 2) 同时监听 loadeddata 与 canplay，尽早显示并播放；
+                 3) 加载失败时带缓存破坏参数重试一次，应对偶发网络/解码失败。 -->
             <video
               v-if="shouldShowVideo"
+              :key="videoReloadKey"
               ref="videoEl"
               class="char-portrait-video"
               :class="{ 'is-visible': videoReady }"
-              :src="videoSrc"
+              :src="effectiveVideoSrc"
               :poster="avatar || undefined"
+              autoplay
               preload="metadata"
               muted
               loop
               playsinline
               webkit-playsinline
+              @loadstart="onVideoLoadStart"
+              @loadedmetadata="onVideoMeta"
               @loadeddata="onVideoReady"
+              @canplay="onVideoReady"
+              @playing="onVideoPlaying"
               @error="onVideoError"
             ></video>
           </div>
@@ -67,11 +77,18 @@ const videoEl = ref(null)
 const imgEl = ref(null)
 const videoReady = ref(false)
 const avatarLoaded = ref(false)
+// 重试计数与重载 key：首次加载偶发失败时，破坏缓存后重新加载一次
+const videoErrorRetries = ref(0)
+const videoReloadKey = ref(0)
 
 const avatar = computed(() => (props.character ? getCharacterAvatar(props.character) : null))
 const videoSrc = computed(() => (props.character ? getCharacterVideo(props.character) : null))
+// 含重试缓存破坏参数的有效视频源
+const effectiveVideoSrc = computed(() =>
+  videoSrc.value ? (videoErrorRetries.value > 0 ? `${videoSrc.value}?r=${videoErrorRetries.value}` : videoSrc.value) : null
+)
 // 同时满足：动态效果开启 + 该角色配置了视频
-const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!videoSrc.value)
+const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!effectiveVideoSrc.value)
 
 // 静态图加载完成回调
 const onAvatarLoad = () => {
@@ -81,25 +98,53 @@ const onAvatarError = () => {
   avatarLoaded.value = false
 }
 
+// 触发播放：优先依赖 autoplay 原生属性；此函数为兜底（已缓存/竞态场景）。
+// 若 play() 被自动播放策略拦截，延迟一小段后重试一次（部分浏览器首播需短暂延迟）。
 const tryPlay = () => {
   const v = videoEl.value
   if (!v) return
   const p = v.play()
-  if (p && p.catch) p.catch(() => { /* 自动播放被拦截时静默忽略，仍显示静态图 */ })
+  if (p && p.catch) {
+    p.catch(() => {
+      setTimeout(() => {
+        const vv = videoEl.value
+        if (vv) {
+          const pp = vv.play()
+          if (pp && pp.catch) pp.catch(() => { /* 仍被拦截则保持静态立绘 */ })
+        }
+      }, 300)
+    })
+  }
 }
 
-// loadeddata：首帧已解码就绪，立即显示并播放（比 canplay 快）
+// loadeddata / canplay：首帧已解码就绪，立即显示并播放
 const onVideoReady = () => {
   videoReady.value = true
   tryPlay()
 }
+// playing：浏览器已开始播放，确保显示视频
+const onVideoPlaying = () => {
+  videoReady.value = true
+}
+const onVideoLoadStart = () => {
+  if (import.meta.env.DEV) console.debug('[立绘视频] loadstart', effectiveVideoSrc.value)
+}
+const onVideoMeta = () => {
+  if (import.meta.env.DEV) console.debug('[立绘视频] loadedmetadata', effectiveVideoSrc.value)
+}
 
 const onVideoError = (e) => {
-  // 视频加载失败：保持静态立绘显示，但打印真实错误便于排查（如源无法解码/404）
+  // 视频加载失败：打印真实错误便于排查（如源无法解码/404/网络中断）
   const v = videoEl.value
   const errDetail = v && v.error ? `code=${v.error.code} mediaError=${['','MEDIA_ERR_ABORTED','MEDIA_ERR_NETWORK','MEDIA_ERR_DECODE','MEDIA_ERR_SRC_NOT_SUPPORTED'][v.error.code] || '未知'}` : ''
-  console.warn('[立绘视频] 加载失败，回退静态立绘：', videoSrc.value, errDetail, e)
+  console.warn('[立绘视频] 加载失败，回退静态立绘：', effectiveVideoSrc.value, errDetail, e)
   videoReady.value = false
+  // 偶发失败自愈：带缓存破坏参数重试一次（最多 1 次），避免永久卡在静态图
+  if (videoErrorRetries.value < 1) {
+    videoErrorRetries.value++
+    videoReloadKey.value++
+    nextTick(() => requestAnimationFrame(tryPlay))
+  }
 }
 
 // 组件挂载后立即尝试播放（处理视频已缓存、loadeddata 不再触发的情况）
@@ -115,10 +160,13 @@ onMounted(() => {
 
 // 切换角色 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
 watch(
-  () => [props.character, shouldShowVideo.value, videoSrc.value],
+  () => [props.character, shouldShowVideo.value, effectiveVideoSrc.value],
   () => {
     videoReady.value = false
     avatarLoaded.value = false
+    // 切换目标时清零重试状态，避免把上一次的重试参数带到新视频
+    videoErrorRetries.value = 0
+    videoReloadKey.value = 0
     if (shouldShowVideo.value) {
       // 等待 video 元素渲染后再尝试播放
       nextTick(() => requestAnimationFrame(tryPlay))
