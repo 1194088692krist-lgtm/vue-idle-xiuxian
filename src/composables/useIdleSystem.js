@@ -35,6 +35,7 @@ const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
+const battlePlayback = ref(null)   // 战斗回放数据：每场遭遇后设置，驱动 BattleStage 组件播放动画
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
 
@@ -1776,6 +1777,57 @@ async function runIdleEncounter() {
     }))
 
     logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
+
+    // 构建战斗回放数据：合并所有队员的逐回合数据，驱动 BattleStage 动画
+    const allRounds = []
+    for (const cr of combatResults) {
+      const cs = cr.combatStats || {}
+      for (const r of (cs.roundDetails || [])) {
+        allRounds.push({
+          round: r.round,
+          attacker: r.attacker,
+          defender: r.defender,
+          damage: r.damage,
+          isCrit: r.isCrit,
+          isCombo: r.isCombo,
+          isDodged: r.isDodged,
+          isVampire: r.isVampire,
+          isStun: r.isStun,
+          isCounter: r.isCounter,
+          attackerHP: r.attackerHP,
+          defenderHP: r.defenderHP,
+          attackerMaxHP: r.attackerMaxHP,
+          defenderMaxHP: r.defenderMaxHP,
+          isPlayerAttack: r.isPlayerAttack,
+          memberId: cr.memberId,
+          memberName: cr.memberName
+        })
+      }
+    }
+    // 按 round 排序，形成"队员轮番攻击"的视觉序列
+    allRounds.sort((a, b) => a.round - b.round)
+    // 队员头像信息
+    const playbackMembers = teamMemberStates.value.map(ms => {
+      const m = s.sectMembers.find(c => c.id === ms.memberId)
+      return {
+        memberId: ms.memberId,
+        name: ms.name,
+        maxHP: ms.maxHP,
+        hp: ms.hp,
+        avatar: m ? getCharacterThumbnail(m) : null,
+        role: m ? m.role : 'vanguard',
+        star: m ? m.star : 3
+      }
+    })
+    battlePlayback.value = {
+      id: Date.now() + '_' + count,
+      enemy: { ...currentIdleEnemy.value },
+      members: playbackMembers,
+      rounds: allRounds,
+      victory,
+      rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
+    }
+
     // 实时更新当前结算画面
     currentEncounterSummary.value = {
       count,
@@ -2218,6 +2270,7 @@ function finishIdle() {
   s.saveToCurrentSlot().catch(err => console.error('挂机结束自动存档失败:', err))
   isIdling.value = false
   currentIdleEnemy.value = null
+  battlePlayback.value = null
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
   
@@ -2371,6 +2424,7 @@ export function useIdleSystem() {
     idlePlayerMaxHP,
     idlePlayerDefeated,
     currentIdleEnemy,
+    battlePlayback,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,

@@ -278,6 +278,8 @@
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
+        <!-- 战斗可视化舞台 -->
+        <BattleStage v-if="isIdling && battlePlayback" :playback="battlePlayback" />
         <!-- 挂机仪表盘 -->
         <div v-if="isIdling && idleDashboard" class="idle-dashboard">
           <div class="dashboard-title">📊 挂机仪表盘</div>
@@ -661,6 +663,7 @@ import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getPillsByZone } from '../plugins/pills'
+import BattleStage from './BattleStage.vue'
 
 // 装备槽位中文映射（结算栏装备展示用）
 const SLOT_NAME_MAP = {
@@ -711,7 +714,8 @@ const {
   grantReward,
   showTreasureFlash,
   buildEffectiveZone,
-  getZoneDifficulty
+  getZoneDifficulty,
+  battlePlayback
 } = useIdleSystem()
 
 // 匹配度配色
