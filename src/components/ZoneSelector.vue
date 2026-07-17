@@ -188,60 +188,22 @@
         <span class="pill-names">{{ getZonePillNames(selectedZone.id) }}</span>
       </div>
 
-      <!-- 战斗动画区域 -->
-      <div v-if="combatState.inCombat && combatState.combatManager" class="combat-area">
-        <div class="combat-round">
-          第 {{ combatState.combatManager.round }} / {{ combatState.combatManager.maxRounds }} 回合
-        </div>
-        <div class="combat-scene">
-          <div class="combatant player" :class="{ attack: animState.playerAttack, hurt: animState.playerHurt }">
-            <div class="combatant-name">{{ combatState.combatManager.player.name }}</div>
-            <div class="combatant-avatar player-avatar">
-              {{ combatState.combatManager.player.name[0] }}
-            </div>
-            <div class="hp-bar">
-              <div
-                class="hp-fill"
-                :style="{ width: (combatState.combatManager.player.currentHealth / combatState.combatManager.player.stats.maxHealth) * 100 + '%' }"
-              ></div>
-            </div>
-            <div class="hp-text">
-              {{ Math.ceil(combatState.combatManager.player.currentHealth) }} /
-              {{ combatState.combatManager.player.stats.maxHealth }}
-            </div>
-          </div>
-          <div class="vs-text">VS</div>
-          <div class="combatant enemy" :class="{ attack: animState.enemyAttack, hurt: animState.enemyHurt }">
-            <div class="combatant-name">{{ combatState.combatManager.enemy.name }}</div>
-            <div class="combatant-avatar enemy-avatar">
-              {{ combatState.combatManager.enemy.name[0] }}
-            </div>
-            <div class="hp-bar">
-              <div
-                class="hp-fill enemy-hp"
-                :style="{ width: (combatState.combatManager.enemy.currentHealth / combatState.combatManager.enemy.stats.maxHealth) * 100 + '%' }"
-              ></div>
-            </div>
-            <div class="hp-text">
-              {{ Math.ceil(combatState.combatManager.enemy.currentHealth) }} /
-              {{ combatState.combatManager.enemy.stats.maxHealth }}
-            </div>
-          </div>
-        </div>
-        <!-- 战斗丹药快捷栏 -->
-        <div v-if="playerStore.battlePills.length" class="battle-pills">
-          <span class="battle-pills-label">战斗丹药:</span>
-          <button
-            v-for="p in playerStore.battlePills"
-            :key="p.uid"
-            class="battle-pill-btn"
-            :class="p.type"
-            @click="useBattlePill(p)"
-          >
-            {{ p.type === 'healBattle' ? '疗伤丹' : '解厄丹' }}
-          </button>
-        </div>
+      <!-- 战斗丹药快捷栏（实时战斗中显示） -->
+      <div v-if="currentEncounter && currentEncounter.inProgress && playerStore.battlePills.length" class="battle-pills">
+        <span class="battle-pills-label">战斗丹药:</span>
+        <button
+          v-for="p in playerStore.battlePills"
+          :key="p.uid"
+          class="battle-pill-btn"
+          :class="p.type"
+          @click="useBattlePill(p)"
+        >
+          {{ p.type === 'healBattle' ? '疗伤丹' : '解厄丹' }}
+        </button>
       </div>
+
+      <!-- 实时战斗舞台（挂机与手动探索共用，实时渲染 currentEncounter） -->
+      <BattleStage v-if="currentEncounter && currentEncounter.inProgress" :encounter="currentEncounter" />
 
       <!-- 挂机探索区域（开始探索/气血条 已并入挂机面板，简化交互） -->
       <div v-if="!combatState.inCombat" class="idle-section">
@@ -278,6 +240,7 @@
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
+<<<<<<< HEAD
         <!-- 战斗可视化舞台 -->
         <BattleStage v-if="isIdling && battlePlayback" :playback="battlePlayback" />
         <!-- 诊断面板：实时显示挂机遭遇执行状态与异常，便于无控制台定位问题 -->
@@ -303,6 +266,8 @@
             </div>
           </div>
         </div>
+=======
+>>>>>>> origin/main
         <!-- 挂机仪表盘 -->
         <div v-if="isIdling && idleDashboard" class="idle-dashboard">
           <div class="dashboard-title">📊 挂机仪表盘</div>
@@ -682,13 +647,17 @@ const {
   setDifficulty,
   startIdle,
   stopIdle,
-  runExploreCombat,
+  runManualBattle,
   grantReward,
   showTreasureFlash,
   buildEffectiveZone,
   getZoneDifficulty,
+<<<<<<< HEAD
   battlePlayback,
   idleDiag
+=======
+  currentEncounter
+>>>>>>> origin/main
 } = useIdleSystem()
 
 // 匹配度配色
@@ -914,7 +883,7 @@ const idleStoneEstimate = computed(() =>
   currentDifficulty.value ? currentDifficulty.value.spiritCost * idleEncounterEstimate.value : 0
 )
 
-// 手动探索（战斗有动画）
+// 手动探索（实时战斗：逐回合结算并实时反馈，状态跨场保留）
 const startExplore = async () => {
   if (!selectedZone.value || combatState.value.inCombat || isIdling.value) return
   playerStore.regenerateSpirit()
@@ -922,7 +891,8 @@ const startExplore = async () => {
   playerStore.queueSave()
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
   const effectiveZone = buildEffectiveZone(selectedZone.value, diff)
-  const result = await runExploreCombat(effectiveZone, 0, false)
+  // runManualBattle 内部已实时推进战斗并写回角色血量，这里只负责发放奖励
+  const result = await runManualBattle(effectiveZone)
   if (result.victory) {
     const rewards = grantReward(effectiveZone, false)
     if (result.drops && result.drops.length) {
@@ -940,19 +910,20 @@ const startExplore = async () => {
   combatState.value = { inCombat: false, combatManager: null }
 }
 
-// 战斗丹药
+// 战斗丹药（实时战斗：作用于 currentEncounter 中的存活队员实体）
 const useBattlePill = (pill) => {
-  if (!combatState.value.combatManager) return
-  const player = combatState.value.combatManager.player
+  const enc = currentEncounter.value
+  if (!enc || !enc.inProgress || !enc.players || !enc.players.length) return
+  const target = enc.players.find(p => p.currentHealth > 0) || enc.players[0]
   const consumed = playerStore.consumeBattlePill(pill.uid)
   if (!consumed) return
   if (consumed.type === 'healBattle') {
-    const amount = Math.round(player.stats.maxHealth * (consumed.value || 0.3))
-    player.heal(amount)
+    const amount = Math.round(target.stats.maxHealth * (consumed.value || 0.3))
+    target.heal(amount)
   } else if (consumed.type === 'cleanse') {
-    const amount = Math.round(player.stats.maxHealth * 0.15)
-    player.heal(amount)
-    if (Array.isArray(player.effects)) player.effects = []
+    const amount = Math.round(target.stats.maxHealth * 0.15)
+    target.heal(amount)
+    if (Array.isArray(target.effects)) target.effects = []
   }
 }
 

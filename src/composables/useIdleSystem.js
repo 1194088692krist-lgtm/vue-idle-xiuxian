@@ -37,6 +37,7 @@ const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
+<<<<<<< HEAD
 const battlePlayback = ref(null)   // 战斗回放数据：每场遭遇后设置，驱动 BattleStage 组件播放动画
 // 诊断面板状态：实时显示 runIdleEncounter 的执行轨迹与捕获的异常，便于玩家无控制台时定位问题
 const idleDiag = ref({
@@ -54,6 +55,8 @@ const idleDiag = ref({
   lastFinished: '',       // 最近一次战斗结果
   lastPlaybackSet: ''     // 最近一次 battlePlayback 设置时间
 })
+=======
+>>>>>>> origin/main
 const currentEncounter = ref({
   enemy: null,           // 当前怪物 CombatEntity
   players: [],           // 当前参战玩家 CombatEntity[]
@@ -1264,6 +1267,78 @@ async function runSingleCombat(playerEntity, enemy, isIdleMode = false) {
   return { victory: false, manager, enemy }
 }
 
+// ============ 手动「探索」实时战斗（替代旧 runExploreCombat 的整场预结算） ============
+// 复用挂机同款逐回合实时引擎（executeRound + currentEncounter）：
+// 每回合结算后立即反映到 currentEncounter（BattleStage 实时渲染血量/日志），
+// 战斗结束自动写回 teamMemberStates，从而让角色 HP/状态跨场保留，不再每场满血重建。
+const MANUAL_ROUND_INTERVAL = 750 // 手动战斗每回合间隔(ms)，实时反馈节奏
+async function runManualBattle(effectiveZone) {
+  const s = store()
+  ensureTeamMemberStates()
+
+  // 全队阵亡保护（ensureTeamMemberStates 已复活）仍为空则无法出战
+  if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
+    return { victory: false, enemy: null, finished: true }
+  }
+
+  const enemyData = generateZoneEnemy(effectiveZone, 1, selectedDifficultyKey.value)
+  const enemy = enemyData.mainEnemy
+  enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
+  enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
+
+  const playerEntities = []
+  for (const ms of teamMemberStates.value) {
+    if (ms.hp <= 0) continue
+    const member = s.sectMembers.find(m => m.id === ms.memberId)
+    if (!member) continue
+    const entity = createMemberCombatEntity(member)
+    // 继承上一次战斗后的剩余血量（跨场保留）
+    entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
+    entity.memberId = ms.memberId
+    entity.role = member.role || 'vanguard'
+    entity.avatar = getCharacterThumbnail(member)
+    playerEntities.push(entity)
+  }
+  if (playerEntities.length === 0) {
+    return { victory: false, enemy: null, finished: true }
+  }
+
+  currentEncounter.value = {
+    enemy,
+    players: playerEntities,
+    round: 0,
+    inProgress: true,
+    combatLog: [],
+    combatStats: {},
+    manager: null,
+    enemyData
+  }
+  combatState.value = { inCombat: true, combatManager: null }
+
+  let guard = 0
+  let victory = false
+  while (guard < 400) {
+    guard++
+    const r = await executeRound(effectiveZone)
+    if (r.finished) {
+      victory = r.victory
+      break
+    }
+    // 实时节奏：每回合停顿，让 BattleStage 实时反馈本回合结果
+    await sleep(MANUAL_ROUND_INTERVAL)
+  }
+
+  combatState.value = { inCombat: false, combatManager: null }
+  // 怪物掉落（仅胜利时）
+  let drops = []
+  if (victory && enemy) drops = grantCombatDrops(enemy, effectiveZone.id)
+  // 保留最终画面短暂时间，让 BattleStage 展示胜负结果与最终血量，再收尾重置
+  currentEncounter.value = { ...currentEncounter.value, inProgress: false }
+  await sleep(1600)
+  currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+  return { victory, enemy, finished: true, drops }
+}
+
 async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = false, difficultyKey = 'xiongxian') {
   const playerEntity = createPlayerEntity()
   const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
@@ -2141,7 +2216,12 @@ async function runIdleEncounter() {
       idleDiag.value.lastStage = '创建新遭遇'
       const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
       const enemy = enemyData.mainEnemy
+<<<<<<< HEAD
       idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+=======
+      enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
+      enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
+>>>>>>> origin/main
 
       // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
       const playerEntities = []
@@ -2153,6 +2233,7 @@ async function runIdleEncounter() {
         entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
         entity.memberId = ms.memberId
         entity.role = member.role || 'vanguard'
+        entity.avatar = getCharacterThumbnail(member)
         playerEntities.push(entity)
       }
       idleDiag.value.lastPlayerCount = playerEntities.length
@@ -2310,6 +2391,7 @@ async function runIdleEncounter() {
 
       logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
 
+<<<<<<< HEAD
       // 构建战斗回放数据
       const allRounds = []
       for (const cr of combatResults) {
@@ -2363,6 +2445,10 @@ async function runIdleEncounter() {
       }
       idleDiag.value.lastPlaybackSet = new Date().toLocaleTimeString()
       idleDiag.value.lastStage = 'battlePlayback已设置(rounds=' + allRounds.length + ')'
+=======
+      // 注意：不再构建 battlePlayback 整场回放（旧“先结算再回放”逻辑已废弃）。
+      // 战斗过程已在 runIdleEncounter 中按回合实时推进，并由 BattleStage 实时渲染 currentEncounter。
+>>>>>>> origin/main
 
       // 实时更新当前结算画面
       currentEncounterSummary.value = {
@@ -2623,6 +2709,105 @@ function startIdleTimers() {
   }, 1000)
 }
 
+// 由队伍成员构建单条战斗状态（含天赋/装备/灵宠加成）
+// 抽离出来，供 startIdle（每次挂机重置为满血）与 ensureTeamMemberStates（跨场保留血量）共用
+function buildTeamMemberState(member, s) {
+  const baseStats = member.baseStats || {}
+  const talentStats = member.talentStats || {}
+
+  const calcFinalStat = (key, baseValue) => {
+    const talentVal = talentStats[key] || 0
+    if (['attack', 'health', 'defense', 'speed'].includes(key)) {
+      return Math.floor(baseValue * (1 + talentVal))
+    }
+    return baseValue + talentVal
+  }
+
+  let finalHealth = calcFinalStat('health', baseStats.health || 0)
+  let finalAttack = calcFinalStat('attack', baseStats.attack || 0)
+  let finalDefense = calcFinalStat('defense', baseStats.defense || 0)
+  let finalSpeed = calcFinalStat('speed', baseStats.speed || 0)
+
+  const equipBonus = {}
+  const artifacts = member.equippedArtifacts || {}
+  Object.values(artifacts).forEach(eq => {
+    if (!eq) return
+    if (eq.stats) {
+      Object.entries(eq.stats).forEach(([k, v]) => {
+        equipBonus[k] = (equipBonus[k] || 0) + v
+      })
+    }
+    if (eq.affixes) {
+      eq.affixes.forEach(a => {
+        if (a.valueType === 'percent') {
+          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
+        } else if (a.stat) {
+          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
+        }
+      })
+    }
+  })
+
+  const applyEquipBonus = (key, baseVal) => {
+    const flat = equipBonus[key] || 0
+    const pct = equipBonus['__pct_' + key] || 0
+    return (baseVal + flat) * (1 + pct)
+  }
+
+  finalHealth = Math.floor(applyEquipBonus('health', finalHealth))
+  finalAttack = Math.floor(applyEquipBonus('attack', finalAttack))
+  finalDefense = Math.floor(applyEquipBonus('defense', finalDefense))
+  finalSpeed = Math.floor(applyEquipBonus('speed', finalSpeed))
+
+  const pet = member.equippedPet
+  if (pet && pet.combatAttributes) {
+    const pca = pet.combatAttributes
+    finalHealth += pca.health || 0
+    finalAttack += pca.attack || 0
+    finalDefense += pca.defense || 0
+    finalSpeed += pca.speed || 0
+  }
+
+  // 确保角色有技能（兼容旧存档）
+  let memberSkills = member.skills
+  if (!memberSkills || memberSkills.length === 0) {
+    memberSkills = getInitialSkills(member.role)
+    member.skills = memberSkills
+  }
+
+  return {
+    memberId: member.id,
+    name: member.name,
+    role: member.role || 'vanguard',
+    hp: finalHealth,
+    maxHP: finalHealth,
+    maxHealth: finalHealth,
+    attack: finalAttack,
+    damage: finalAttack,
+    defense: finalDefense,
+    speed: finalSpeed,
+    skills: memberSkills,
+    buildStrength: s.getCharacterBuildStrength(member)
+  }
+}
+
+// 确保 teamMemberStates 已初始化（仅在为空时）。
+// 用于手动「探索」等未走 startIdle 的路径：保留上一次战斗后的剩余血量/状态，
+// 避免每次探索都满血重建（即用户要求的“角色状态保留到下一回合/下一场”）。
+// 若全队阵亡（上一场团灭），则整体复活至满血，避免软锁无法再次出战。
+function ensureTeamMemberStates() {
+  const s = store()
+  if (teamMemberStates.value && teamMemberStates.value.length > 0) {
+    // 已初始化：若全队阵亡，整体复活至满血，防止无法再次出战
+    if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
+      teamMemberStates.value = teamMemberStates.value.map(ms => ({ ...ms, hp: ms.maxHP }))
+    }
+    return
+  }
+  const team = s.getTeamMembersDetail()
+  teamMemberStates.value = team.map(member => buildTeamMemberState(member, s))
+}
+
 function startIdle(durationMinutes) {
   const s = store()
   if (!selectedZone.value) return
@@ -2641,85 +2826,8 @@ function startIdle(durationMinutes) {
   sessionMaterials.value = {}
 
   const team = s.getTeamMembersDetail()
-  teamMemberStates.value = team.map(member => {
-    const baseStats = member.baseStats || {}
-    const talentStats = member.talentStats || {}
-
-    const calcFinalStat = (key, baseValue) => {
-      const talentVal = talentStats[key] || 0
-      if (['attack', 'health', 'defense', 'speed'].includes(key)) {
-        return Math.floor(baseValue * (1 + talentVal))
-      }
-      return baseValue + talentVal
-    }
-
-    let finalHealth = calcFinalStat('health', baseStats.health || 0)
-    let finalAttack = calcFinalStat('attack', baseStats.attack || 0)
-    let finalDefense = calcFinalStat('defense', baseStats.defense || 0)
-    let finalSpeed = calcFinalStat('speed', baseStats.speed || 0)
-
-    const equipBonus = {}
-    const artifacts = member.equippedArtifacts || {}
-    Object.values(artifacts).forEach(eq => {
-      if (!eq) return
-      if (eq.stats) {
-        Object.entries(eq.stats).forEach(([k, v]) => {
-          equipBonus[k] = (equipBonus[k] || 0) + v
-        })
-      }
-      if (eq.affixes) {
-        eq.affixes.forEach(a => {
-          if (a.valueType === 'percent') {
-            equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
-          } else if (a.stat) {
-            equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
-          }
-        })
-      }
-    })
-
-    const applyEquipBonus = (key, baseVal) => {
-      const flat = equipBonus[key] || 0
-      const pct = equipBonus['__pct_' + key] || 0
-      return (baseVal + flat) * (1 + pct)
-    }
-
-    finalHealth = Math.floor(applyEquipBonus('health', finalHealth))
-    finalAttack = Math.floor(applyEquipBonus('attack', finalAttack))
-    finalDefense = Math.floor(applyEquipBonus('defense', finalDefense))
-    finalSpeed = Math.floor(applyEquipBonus('speed', finalSpeed))
-
-    const pet = member.equippedPet
-    if (pet && pet.combatAttributes) {
-      const pca = pet.combatAttributes
-      finalHealth += pca.health || 0
-      finalAttack += pca.attack || 0
-      finalDefense += pca.defense || 0
-      finalSpeed += pca.speed || 0
-    }
-
-    // 确保角色有技能（兼容旧存档）
-    let memberSkills = member.skills
-    if (!memberSkills || memberSkills.length === 0) {
-      memberSkills = getInitialSkills(member.role)
-      member.skills = memberSkills
-    }
-
-    return {
-      memberId: member.id,
-      name: member.name,
-      role: member.role || 'vanguard',
-      hp: finalHealth,
-      maxHP: finalHealth,
-      maxHealth: finalHealth,
-      attack: finalAttack,
-      damage: finalAttack,
-      defense: finalDefense,
-      speed: finalSpeed,
-      skills: memberSkills,
-      buildStrength: s.getCharacterBuildStrength(member)
-    }
-  })
+  // 每次开始挂机都重置为满血（新的一轮挂机 = 全新队伍状态）
+  teamMemberStates.value = team.map(member => buildTeamMemberState(member, s))
   
   logs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
   logs.value.push({ type: 'info', text: `🚀 出战阵容：${team.map(m => m.name).join('、') || '无成员'}`, time: new Date().toLocaleTimeString() })
@@ -2770,7 +2878,6 @@ function finishIdle() {
   s.saveToCurrentSlot().catch(err => console.error('挂机结束自动存档失败:', err))
   isIdling.value = false
   currentIdleEnemy.value = null
-  battlePlayback.value = null
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
   
@@ -2924,8 +3031,12 @@ export function useIdleSystem() {
     idlePlayerMaxHP,
     idlePlayerDefeated,
     currentIdleEnemy,
+<<<<<<< HEAD
     battlePlayback,
     idleDiag,
+=======
+    currentEncounter,
+>>>>>>> origin/main
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,
@@ -2941,6 +3052,7 @@ export function useIdleSystem() {
     stopIdle,
     initIdle,
     runExploreCombat,
+    runManualBattle,
     grantReward,
     showTreasureFlash,
     hideTreasureFlash,
