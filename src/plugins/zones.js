@@ -12,17 +12,18 @@ export const DIFFICULTY_TEMPLATES = [
 ]
 
 // 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
-// 量级与各区自有掉落装备的满装 Build 强度一致：低区弱、高区强，形成平滑梯度
+// 依据各区域 boss 实际强度（HP/ATK/DEF）反推：100% 匹配 = 能在约5回合内打败凶险档 boss 并扛住其攻击
+// 量级与 BUILD_TIERS 阶梯对应：phoenix_cave≈入门、ghost_wasteland≈强力、immortal_ruins≈顶级、chaos_realm≈极限
 // 玩家挂机的“成功/提前失败”即以「自身 Build 强度 ÷ 推荐 Build」为判定基准
 const ZONE_BUILD_BASE = {
-  forest_edge: 3000,
-  misty_valley: 12000,
-  phoenix_cave: 55000,
-  dragon_abyss: 100000,
-  ghost_wasteland: 400000,
-  ice_palace: 800000,
-  immortal_ruins: 2000000,
-  chaos_realm: 7000000
+  forest_edge: 7000,       // boss HP≈1000/ATK≈120，新手起步
+  misty_valley: 28000,     // boss HP≈4500/ATK≈280，初阶装备
+  phoenix_cave: 85000,     // boss HP≈14000/ATK≈1650，≈入门级满装
+  dragon_abyss: 200000,    // boss HP≈33000/ATK≈3000，中阶装备
+  ghost_wasteland: 800000, // boss HP≈140000/ATK≈12000，≈强力级
+  ice_palace: 1500000,     // boss HP≈240000/ATK≈28000，强力到顶级之间
+  immortal_ruins: 3500000, // boss HP≈600000/ATK≈70000，≈顶级
+  chaos_realm: 13000000    // boss HP≈2200000/ATK≈250000，顶级到极限之间
 }
 
 // Build 强度参考阶梯（区间）：极品中的极品过于稀有，故给玩家一个“可达成的上限”参考

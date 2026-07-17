@@ -437,6 +437,7 @@ let idleTimer = null
 let isRunning = false // 重入锁
 let idleEncounterErrorCount = 0 // 挂机遭遇异常日志去重计数（避免刷屏）
 let isFinishingIdle = false // 挂机待结束标志：全队力竭后延迟结束期间置 true，阻止定时器再次触发遭遇
+let idleSessionId = 0 // 挂机会话 ID：每次 startIdle 递增，runIdleEncounter 捕获并校验，确保新挂机能中断上一场残留的遭遇循环
 
 // ============ 生动日志文案库（修仙风） ============
 // 通用场景（无专属描写时回退）
@@ -2184,6 +2185,7 @@ async function runIdleEncounter() {
   }
   if (isRunning) { idleDiag.value.lastStage = '跳过:isRunning重入锁'; idleDiag.value.skipCount++; return }
   isRunning = true
+  const mySessionId = idleSessionId // 捕获当前挂机会话 ID，用于循环中校验是否已被新挂机中断
   const s = store()
   const zone = selectedZone.value
   const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
@@ -2261,10 +2263,11 @@ async function runIdleEncounter() {
     // 2. 连续推进回合直到战斗结束（挂机模式下单次遭遇应在一轮内打完，否则奖励永远不发放）
     //    最大回合数保护：防止极端情况（如双方闪避/治疗过高）导致死循环
     //    每回合之间让出一次事件循环，确保 BattleStage 能实时渲染中间状态（避免一气呵成跑完50回合导致战斗界面"过了好久才弹出"）
+    //    循环条件检查 isIdling/isFinishingIdle：停止挂机或全队力竭待结束时立即中断，避免战斗界面不终止
     const MAX_IDLE_ROUNDS = 50
     let roundResult = { finished: false }
     let roundsExecuted = 0
-    while (!roundResult.finished && roundsExecuted < MAX_IDLE_ROUNDS) {
+    while (isIdling.value && !isFinishingIdle && mySessionId === idleSessionId && !roundResult.finished && roundsExecuted < MAX_IDLE_ROUNDS) {
       roundsExecuted++
       idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
       idleDiag.value.lastPlaybackSet = '是(回合#' + currentEncounter.value.round + ')'
@@ -2273,6 +2276,14 @@ async function runIdleEncounter() {
       await new Promise(resolve => setTimeout(resolve, 0))
     }
     idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted
+
+    // 挂机被停止（isIdling=false）、全队力竭待结束（isFinishingIdle=true）、或新挂机已启动（sessionId 变化）时，
+    // 不做本场结算直接退出。finishIdle 会负责清理 currentEncounter 与生成挂机总结，避免读取已被清空的 currentEncounter。
+    if (!isIdling.value || isFinishingIdle || mySessionId !== idleSessionId) {
+      isRunning = false
+      idleDiag.value.lastStage = '中断退出(isIdling=' + isIdling.value + ',isFinishingIdle=' + isFinishingIdle + ',sessionChanged=' + (mySessionId !== idleSessionId) + ')'
+      return
+    }
 
     // 3. 如果战斗结束，发放奖励/惩罚，重置 currentEncounter
     if (roundResult.finished) {
@@ -2761,9 +2772,11 @@ function startIdle(durationMinutes) {
   isIdling.value = true
   idleEncounterErrorCount = 0
   isFinishingIdle = false // 重置待结束标志，避免上次延迟的 finishIdle 影响新挂机
+  idleSessionId++ // 递增会话 ID，让上一场残留的 runIdleEncounter 循环检测到变化并立即退出
   // 启动新挂机前清理上一场残留的实时战斗状态，避免 BattleStage 卡在老战斗
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
+  isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
