@@ -59,6 +59,13 @@
             <span class="btn-text">{{ authBusy && loginMode === 'register' ? '注册中…' : '注 册' }}</span>
           </button>
         </div>
+
+        <!-- 免登录（调试）：跳过账号验证直接进入游戏，仅本地存档，用于后期调试 -->
+        <button class="btn-dev-entry" @click="enterDevMode">
+          <span class="btn-icon">🚪</span>
+          <span class="btn-text">免登录（调试）</span>
+        </button>
+
         <div class="auth-hint">
           <span v-if="loginMode === 'login'">没有账号？<a @click="loginMode = 'register'">立即注册</a></span>
           <span v-else>已有账号？<a @click="loginMode = 'login'">前往登录</a></span>
