@@ -22,13 +22,16 @@
               @error="onAvatarError"
             />
             <!-- 动态视频：加载完成后淡入覆盖并自动播放。
-                 用 <source> 标签让浏览器快速决策 codec，loadeddata 事件首帧就绪即触发，
-                 比 canplay（需缓冲足够数据）快很多 -->
+                 视频源直接挂在 <video :src> 上（比 <source> 子元素可靠：
+                 <video v-if> + 动态 <source :src> 存在资源选择竞态，
+                 可能导致视频拿到空源而触发 error 静默回退静态图）。
+                 loadeddata 事件首帧就绪即触发，比 canplay 快 -->
             <video
               v-if="shouldShowVideo"
               ref="videoEl"
               class="char-portrait-video"
               :class="{ 'is-visible': videoReady }"
+              :src="videoSrc"
               :poster="avatar || undefined"
               preload="auto"
               muted
@@ -37,9 +40,7 @@
               webkit-playsinline
               @loadeddata="onVideoReady"
               @error="onVideoError"
-            >
-              <source :src="videoSrc" type="video/mp4" />
-            </video>
+            ></video>
           </div>
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
@@ -93,8 +94,11 @@ const onVideoReady = () => {
   tryPlay()
 }
 
-const onVideoError = () => {
-  // 视频加载失败：保持静态立绘显示，不报错
+const onVideoError = (e) => {
+  // 视频加载失败：保持静态立绘显示，但打印真实错误便于排查（如源无法解码/404）
+  const v = videoEl.value
+  const errDetail = v && v.error ? `code=${v.error.code} mediaError=${['','MEDIA_ERR_ABORTED','MEDIA_ERR_NETWORK','MEDIA_ERR_DECODE','MEDIA_ERR_SRC_NOT_SUPPORTED'][v.error.code] || '未知'}` : ''
+  console.warn('[立绘视频] 加载失败，回退静态立绘：', videoSrc.value, errDetail, e)
   videoReady.value = false
 }
 
