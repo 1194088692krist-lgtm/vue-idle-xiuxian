@@ -377,7 +377,9 @@ const playerBuildStrength = computed(() => {
   const s = store()
   const team = s.getTeamMembersDetail()
   if (team.length === 0) return s.buildStrength
-  return team.reduce((sum, member) => sum + s.getCharacterBuildStrength(member), 0)
+  // 与宗府页「队伍总战力」口径一致：先求三人 Build 之和，再乘宗派共鸣战力加成
+  // （getTeamTotalBuild 内部已封装 base * getResonanceBuildMultiplier）
+  return s.getTeamTotalBuild()
 })
 // 当前地图/难度推荐的 Build 强度（挂机能否成功的基础属性）
 const currentRecommendedBuild = computed(() => {
