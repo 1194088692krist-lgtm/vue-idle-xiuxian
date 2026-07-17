@@ -170,10 +170,14 @@
 
 <script setup>
 import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
+import { useIdleSystem } from '../composables/useIdleSystem.js'
 
 const props = defineProps({
   encounter: { type: Object, default: null }
 })
+
+// 完整战斗日志累积源：挂机时跨所有遭遇，从挂机开始累积到当前（非当前回合）
+const { idleCombatLog } = useIdleSystem()
 
 const stageRef = ref(null)
 
@@ -231,6 +235,7 @@ const enemyHpPct = computed(() => {
 
 // 实时显示：最多3条，来自 encounter.combatLog 字符串数组
 function logType(text) {
+  if (text.startsWith('——')) return 'separator'
   if (text.startsWith('💚')) return 'vampire'
   if (text.startsWith('⚔️') || text.startsWith('🔥')) return 'combat'
   if (text.startsWith('💨')) return 'dodge'
@@ -244,7 +249,14 @@ const battleLogDisplay = computed(() => {
   return log.slice(-3).map((t, i) => ({ id: (props.encounter?.round || 0) + '-' + i, type: logType(t), text: t }))
 })
 
-const fullBattleLog = computed(() => (props.encounter?.combatLog || []).map(t => ({ type: logType(t), text: t })))
+// 完整日志弹窗数据源：
+// - 挂机中：使用 idleCombatLog（本次挂机开始至当前、跨所有遭遇的累积战斗日志）
+// - 手动战斗/无挂机：回退到当前 encounter.combatLog（即本场战斗日志）
+const fullBattleLog = computed(() => {
+  const session = idleCombatLog.value || []
+  const source = session.length ? session : (props.encounter?.combatLog || [])
+  return source.map(t => ({ type: logType(t), text: t }))
+})
 
 const enemyEmoji = computed(() => {
   const tier = props.encounter?.enemy?.tier
@@ -1114,6 +1126,15 @@ onUnmounted(() => {
 .battle-log-item.shield { color: #fde047; background: rgba(234, 179, 8, 0.1); }
 .battle-log-item.victory { color: #4ade80; font-weight: 700; }
 .battle-log-item.defeat { color: #f87171; font-weight: 700; }
+/* 完整战斗日志中的「场次分隔符」样式，便于按遭遇区分 */
+.battle-log-item.separator {
+  color: #fbbf24;
+  background: rgba(251, 191, 36, 0.08);
+  border-left: 3px solid rgba(251, 191, 36, 0.5);
+  font-weight: 600;
+  letter-spacing: 0.02em;
+  margin: 8px 0 4px;
+}
 
 /* 日志列表过渡动画 */
 .log-fade-enter-active,

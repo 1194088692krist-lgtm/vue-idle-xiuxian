@@ -64,6 +64,9 @@ const currentEncounter = ref({
   manager: null,         // CombatManager 实例
   enemyData: null        // 额外敌人信息
 })
+// 本次挂机「完整战斗日志」累积源：跨所有遭遇（每场战斗）的战斗日志文本，
+// 从挂机开始持续累积到当前，供 BattleStage「查看完整日志」弹窗展示（而非仅当前回合）。
+const idleCombatLog = ref([])
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
 
@@ -2233,6 +2236,9 @@ async function runIdleEncounter() {
       // （此前 currentIdleEnemy 仅在战斗结束才赋值，导致战斗中面板为空/显示上一场残留）
       currentIdleEnemy.value = buildIdleEnemySnapshot(enemy, enemy.currentHealth)
 
+      // 在完整战斗日志中插入本场遭遇分隔符，便于「查看完整日志」按场次区分
+      idleCombatLog.value.push(`—— 第 ${count} 次探索 · ${zone.name}·${diff.label} ——`)
+
       // 遭遇开始日志
       addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
       const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
@@ -2248,11 +2254,19 @@ async function runIdleEncounter() {
     const MAX_IDLE_ROUNDS = 50
     let roundResult = { finished: false }
     let roundsExecuted = 0
+    // 追踪已同步到完整战斗日志的行数，确保逐回合增量追加（含进行中的当前场）
+    let combatLogSynced = currentEncounter.value.combatLog.length
     while (isIdling.value && !isFinishingIdle && mySessionId === idleSessionId && !roundResult.finished && roundsExecuted < MAX_IDLE_ROUNDS) {
       roundsExecuted++
       idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
       idleDiag.value.lastPlaybackSet = '是(回合#' + currentEncounter.value.round + ')'
       roundResult = await executeRound(effectiveZone)
+      // 将本回合新增的战斗日志增量追加到「完整战斗日志」累积源（实时覆盖进行中的当前场）
+      const cl = currentEncounter.value.combatLog
+      if (cl.length > combatLogSynced) {
+        for (let i = combatLogSynced; i < cl.length; i++) idleCombatLog.value.push(cl[i])
+        combatLogSynced = cl.length
+      }
       // 逐回合刷新仪表盘怪物血量，让挂机中怪物信息面板实时反映 currentEncounter.enemy
       if (currentIdleEnemy.value) {
         const liveHP = currentEncounter.value.enemy.currentHealth
@@ -2618,6 +2632,7 @@ function startIdle(durationMinutes) {
   // 启动新挂机前清理上一场残留的实时战斗状态，避免 BattleStage 卡在老战斗
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
+  idleCombatLog.value = [] // 重置完整战斗日志累积源，从本次挂机开始重新累积
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
@@ -2658,6 +2673,7 @@ function finishIdle() {
   // 清理实时战斗舞台，避免停止挂机后 BattleStage 仍渲染旧战斗
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
+  idleCombatLog.value = [] // 清空完整战斗日志累积源
   // 挂机结束时，flush 所有待显示日志
   flushAllPendingLogs()
   const s = store()
@@ -2839,6 +2855,7 @@ export function useIdleSystem() {
     idlePlayerDefeated,
     currentIdleEnemy,
     currentEncounter,
+    idleCombatLog,
     idleDiag,
     // Build 强度 / 血条
     playerBuildStrength,
