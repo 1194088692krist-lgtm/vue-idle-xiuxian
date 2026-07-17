@@ -181,11 +181,14 @@ export async function loadSharedPortraits() {
   const base = import.meta.env.BASE_URL || './'
 
   // 1. 立即用静态回退填充 sharedPortraitMap，头像立绘立即可见（不阻塞游戏加载）
+  //    同时按命名规则预填 thumbnail 字段（thumbnails/char_XXX_thumb.webp），
+  //    避免列表场景先加载全尺寸 JPG、manifest 回来后又切换到 webp 的双重加载问题。
+  //    webp 缩略图体积远小于 JPG，可显著加快列表首屏渲染。
   characterList.forEach(c => {
     if (!sharedPortraitMap[c.id]) {
       sharedPortraitMap[c.id] = {
         full: `${base}portraits/${c.id}.jpg`,
-        thumbnail: null
+        thumbnail: `${base}portraits/thumbnails/${c.id}_thumb.webp`
       }
     }
   })

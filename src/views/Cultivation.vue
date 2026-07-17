@@ -73,7 +73,7 @@
       <div class="char-header">
         <div class="char-avatar-container">
           <div class="char-avatar" :class="selectedMember?.star >= 5 ? 'star-5' : (selectedMember?.star >= 4 ? 'star-4' : '')" @click="openPortrait">
-            <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterThumbnail(selectedMember)" />
+            <img v-if="getCharacterAvatar(selectedMember)" :src="getCharacterThumbnail(selectedMember)" loading="lazy" decoding="async" />
             <span v-else>{{ selectedMember.name?.[0] || '仙' }}</span>
           </div>
           <span class="char-avatar-hint">点击查看立绘</span>
@@ -233,7 +233,7 @@
         </div>
         <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
           <div class="bench-avatar" @click="openMemberPortrait(m)" title="点击查看立绘">
-            <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" />
+            <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" loading="lazy" decoding="async" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
@@ -258,7 +258,7 @@
       <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
         <div class="char-detail-header">
           <div class="char-avatar large" :class="detailMember?.star >= 5 ? 'star-5' : (detailMember?.star >= 4 ? 'star-4' : '')" @click="openDetailPortrait" title="点击查看立绘">
-            <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterThumbnail(detailMember)" />
+            <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterThumbnail(detailMember)" loading="lazy" decoding="async" />
             <span v-else>{{ detailMember.name?.[0] || '仙' }}</span>
             <span class="char-avatar-hint">点击查看立绘</span>
           </div>

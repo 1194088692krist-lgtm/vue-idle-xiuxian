@@ -95,7 +95,7 @@
             class="team-member-card"
           >
             <div class="member-avatar" @click.stop="openAvatarViewer(member)">
-              <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="member-avatar-img" :alt="member.name" />
+              <img v-if="getCharacterAvatar(member)" :src="getCharacterThumbnail(member)" class="member-avatar-img" :alt="member.name" loading="lazy" decoding="async" />
               <span v-else>{{ member.name[0] }}</span>
               <div class="member-stars">
                 <span v-for="i in member.star" :key="i" class="star">★</span>
