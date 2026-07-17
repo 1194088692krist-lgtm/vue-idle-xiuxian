@@ -1132,8 +1132,9 @@ function grantReward(effectiveZone, isIdleMode = false) {
   // 掉落加成：小幅提升高品质概率
   const upgradeChance = Math.max(0, (dropBonus - 1) * 0.35)
   const dropRateMult = getPillBuffMultiplier('dropRate')
-  // 挂机模式下，装备/法宝（equipment 槽位含 artifact）与灵宠（pet）获得几率提升 5 倍
-  const IDLE_DROP_BOOST = 5
+  // 挂机模式下，装备/法宝（equipment 槽位含 artifact）与灵宠（pet）获得几率提升 2.5 倍
+  // （原 5 倍，用户反馈过于激进，在最新数值基础上降低 2 倍 → 5 / 2 = 2.5）
+  const IDLE_DROP_BOOST = 2.5
   const idleBoost = (rw) => (isIdleMode && (rw.type === 'equipment' || rw.type === 'pet'))
     ? IDLE_DROP_BOOST
     : 1

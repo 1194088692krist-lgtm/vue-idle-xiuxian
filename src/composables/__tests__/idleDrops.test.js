@@ -49,10 +49,10 @@ describe('挂机掉落：装备/法宝/灵宠几率提升 5 倍', () => {
 
   beforeEach(() => {
     // 固定 Math.random = 0.5：
-    //   - 非挂机装备/灵宠有效几率 = 0.2*1 = 0.2 < 0.5 ⇒ 不掉
-    //   - 挂机装备/灵宠有效几率 = min(1, 0.2*1*5) = 1.0  > 0.5 ⇒ 必掉
+    //   - 非挂机装备/灵宠有效几率 = 0.2*1 = 0.2 < 0.4 ⇒ 不掉
+    //   - 挂机装备/灵宠有效几率 = min(1, 0.2*1*2.5) = 0.5  > 0.4 ⇒ 必掉
     // 该值跨越了两种模式阈值，可确定性区分，不受 dropRate buff（=1）影响。
-    randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.5)
+    randomSpy = vi.spyOn(Math, 'random').mockReturnValue(0.4)
   })
 
   afterEach(() => {
@@ -67,7 +67,7 @@ describe('挂机掉落：装备/法宝/灵宠几率提升 5 倍', () => {
     expect(rewards.some(r => r.type === 'spirit_stone')).toBe(true)
   })
 
-  it('挂机模式：装备/灵宠获得几率提升 5 倍（chance 0.2 → 有效 1.0，必掉）', () => {
+  it('挂机模式：装备/灵宠获得几率提升 2.5 倍（chance 0.2 → 有效 0.5，必掉）', () => {
     const rewards = grantReward(makeZone(), true)
     expect(rewards.some(r => r.type === 'equipment')).toBe(true)
     expect(rewards.some(r => r.type === 'pet')).toBe(true)
