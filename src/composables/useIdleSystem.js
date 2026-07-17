@@ -2137,8 +2137,20 @@ async function runIdleEncounter() {
     const ratio = buildRatio.value
     idleDiag.value.lastStage = '遭遇#' + count + '开始(team=' + teamMemberStates.value.length + ',ratio=' + ratio.toFixed(2) + ')'
 
+    // 停止挂机或新挂机已启动时立即退出，避免清空 currentEncounter 后又被创建新遭遇覆盖
+    if (!isIdling.value || isFinishingIdle || mySessionId !== idleSessionId) {
+      isRunning = false
+      idleDiag.value.lastStage = '遭遇前中断退出(isIdling=' + isIdling.value + ',sessionChanged=' + (mySessionId !== idleSessionId) + ')'
+      return
+    }
+
     // 1. 如果当前没有进行中的遭遇，初始化新遭遇
     if (!currentEncounter.value.inProgress) {
+      // 二次校验：进入创建分支前再次确认挂机仍活跃（防止 finishIdle 在此期间清空了 currentEncounter）
+      if (!isIdling.value || isFinishingIdle || mySessionId !== idleSessionId) {
+        isRunning = false
+        return
+      }
       idleDiag.value.lastStage = '创建新遭遇'
       const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
       const enemy = enemyData.mainEnemy
@@ -2607,6 +2619,7 @@ function finishIdle() {
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
   isFinishingIdle = false // 清除待结束标志
+  idleSessionId++ // 递增会话 ID，让残留的 runIdleEncounter 循环检测到变化并立即退出，避免清空后又被覆盖
   // 清理实时战斗舞台，避免停止挂机后 BattleStage 仍渲染旧战斗
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
