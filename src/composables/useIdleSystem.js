@@ -2847,6 +2847,8 @@ function finishIdle() {
     totalEquipment: runStats.value.equipment,
     totalPhantomCrystals: runStats.value.phantomCrystals,
     totalExp: runStats.value.exp,
+    totalDamageDealt: runStats.value.totalDamageDealt,
+    totalDamageTaken: runStats.value.totalDamageTaken,
     defeated: allDead,
     bossResult: (bossRoundsCleared.value > 0 || bossRoundsFailed.value > 0)
       ? { cleared: bossRoundsCleared.value, failed: bossRoundsFailed.value }

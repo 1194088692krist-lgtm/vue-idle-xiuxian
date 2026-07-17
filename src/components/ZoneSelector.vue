@@ -429,6 +429,14 @@
           <span class="summary-label">获得装备</span>
           <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
         </div>
+        <div class="summary-item">
+          <span class="summary-label">总造成伤害</span>
+          <span class="summary-value" style="color:#ff5722">{{ formatNumber(lastSummary.totalDamageDealt || 0) }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">总受到伤害</span>
+          <span class="summary-value" style="color:#e53935">{{ formatNumber(lastSummary.totalDamageTaken || 0) }}</span>
+        </div>
       </div>
 
       <!-- 获得素材汇总 -->
