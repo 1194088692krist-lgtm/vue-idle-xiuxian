@@ -52,7 +52,7 @@ export const zones = [
         name: '狼王',
         description: '青萝林的霸主，统领狼群横行霸道',
         traits: ['速度快', '群体攻击'],
-        stats: { attack: 12, health: 124, defense: 4, speed: 15 },
+        stats: { attack: 100, health: 800, defense: 30, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [30, 75] },
           { type: 'equipment', chance: 0.1, rarity: ['common', 'uncommon'], slot: 'artifact' },
@@ -65,7 +65,7 @@ export const zones = [
         name: '山匪头目',
         description: '盘踞山林的悍匪首领，刀法凌厉',
         traits: ['高攻击', '暴击率高'],
-        stats: { attack: 19, health: 112, defense: 6, speed: 10 },
+        stats: { attack: 120, health: 1000, defense: 20, speed: 12 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [45, 90] },
           { type: 'equipment', chance: 0.1167, rarity: ['common', 'uncommon'], slot: 'hands' },
@@ -80,7 +80,7 @@ export const zones = [
       { type: 'cultivation', chance: 0.3, amount: [25, 75] },
       { type: 'equipment', chance: 0.06, rarity: ['common', 'uncommon'], name: '装备' }
     ],
-    recommendedStats: { attack: 8, health: 80 }
+    recommendedStats: { attack: 30, health: 100 }
   },
   {
     id: 'misty_valley',
@@ -100,7 +100,7 @@ export const zones = [
         name: '迷雾虎王',
         description: '迷雾中潜伏的兽王，一击致命',
         traits: ['高爆发', '隐蔽攻击'],
-        stats: { attack: 31, health: 248, defense: 11, speed: 18 },
+        stats: { attack: 360, health: 3000, defense: 90, speed: 20 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [75, 180] },
           { type: 'equipment', chance: 0.1, rarity: ['uncommon', 'rare'], slot: 'body' },
@@ -113,7 +113,7 @@ export const zones = [
         name: '骷髅将军',
         description: '远古战场遗留的亡灵将军，刀枪不入',
         traits: ['高防御', '召唤骷髅'],
-        stats: { attack: 22, health: 372, defense: 21, speed: 8 },
+        stats: { attack: 280, health: 4500, defense: 180, speed: 10 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [90, 225] },
           { type: 'equipment', chance: 0.0833, rarity: ['uncommon', 'rare'], slot: 'shoulder' },
@@ -128,7 +128,7 @@ export const zones = [
       { type: 'cultivation', chance: 0.25, amount: [125, 375] },
       { type: 'equipment', chance: 0.0733, rarity: ['uncommon', 'rare'], name: '装备' }
     ],
-    recommendedStats: { attack: 25, health: 200 }
+    recommendedStats: { attack: 120, health: 360 }
   },
   {
     id: 'phoenix_cave',
@@ -148,7 +148,7 @@ export const zones = [
         name: '焰魔领主',
         description: '凤凰窟的火焰主宰，浑身燃烧着无尽业火',
         traits: ['火焰伤害', '灼烧效果'],
-        stats: { attack: 50, health: 496, defense: 18, speed: 12 },
+        stats: { attack: 1650, health: 14000, defense: 350, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [150, 375] },
           { type: 'equipment', chance: 0.1167, rarity: ['rare', 'epic'], slot: 'artifact' },
@@ -161,7 +161,7 @@ export const zones = [
         name: '火凤凰',
         description: '涅槃重生的神鸟，虽非真凤却也威震一方',
         traits: ['范围攻击', '复活一次'],
-        stats: { attack: 37, health: 372, defense: 14, speed: 25 },
+        stats: { attack: 1200, health: 11000, defense: 280, speed: 28 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [180, 450] },
           { type: 'equipment', chance: 0.1167, rarity: ['rare', 'epic'], slot: 'ring1' },
@@ -177,7 +177,7 @@ export const zones = [
       { type: 'equipment', chance: 0.0833, rarity: ['rare', 'epic'], name: '装备' },
       { type: 'pet', chance: 0.0133, rarity: ['spiritual', 'mystic'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 50, health: 400 }
+    recommendedStats: { attack: 550, health: 1650 }
   },
   {
     id: 'dragon_abyss',
@@ -197,7 +197,7 @@ export const zones = [
         name: '深渊蛟龙',
         description: '龙渊深处的蛟龙，传承了远古真龙的血脉',
         traits: ['龙威震慑', '水属性攻击'],
-        stats: { attack: 93, health: 930, defense: 35, speed: 20 },
+        stats: { attack: 3000, health: 25000, defense: 700, speed: 22 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [300, 750] },
           { type: 'equipment', chance: 0.1333, rarity: ['epic', 'legendary'], slot: 'necklace' },
@@ -210,7 +210,7 @@ export const zones = [
         name: '血魔大帝',
         description: '吸食万千生灵精血而成的恐怖存在',
         traits: ['吸血', '腐蚀攻击'],
-        stats: { attack: 74, health: 1240, defense: 25, speed: 15 },
+        stats: { attack: 2400, health: 33000, defense: 500, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [375, 900] },
           { type: 'equipment', chance: 0.1167, rarity: ['rare', 'epic'], slot: 'wrist' },
@@ -226,7 +226,7 @@ export const zones = [
       { type: 'equipment', chance: 0.0933, rarity: ['epic', 'legendary'], name: '装备' },
       { type: 'pet', chance: 0.0167, rarity: ['mystic', 'celestial'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 100, health: 800 }
+    recommendedStats: { attack: 1000, health: 3000 }
   },
   {
     id: 'ghost_wasteland',
@@ -246,7 +246,7 @@ export const zones = [
         name: '噬魂鬼王',
         description: '鬼荒原的统治者，以吞噬生灵魂魄为生',
         traits: ['灵魂攻击', '恐惧效果'],
-        stats: { attack: 124, health: 1860, defense: 42, speed: 18 },
+        stats: { attack: 12000, health: 100000, defense: 2800, speed: 20 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [600, 1500] },
           { type: 'equipment', chance: 0.1333, rarity: ['epic', 'legendary'], slot: 'head' },
@@ -259,7 +259,7 @@ export const zones = [
         name: '白骨魔尊',
         description: '由无尽白骨堆砌而成的恐怖存在，不死不灭',
         traits: ['分身', '再生'],
-        stats: { attack: 112, health: 2480, defense: 56, speed: 12 },
+        stats: { attack: 10000, health: 140000, defense: 4000, speed: 15 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [750, 1800] },
           { type: 'equipment', chance: 0.1167, rarity: ['epic', 'legendary'], slot: 'body' },
@@ -275,7 +275,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1, rarity: ['epic', 'legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.02, rarity: ['mystic', 'celestial'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 150, health: 1500 }
+    recommendedStats: { attack: 4000, health: 12000 }
   },
   {
     id: 'ice_palace',
@@ -295,7 +295,7 @@ export const zones = [
         name: '冰凰',
         description: '镇守冰雪宫的上古神兽，一身冰系神通出神入化',
         traits: ['冰冻', '冰系AOE'],
-        stats: { attack: 217, health: 3100, defense: 70, speed: 22 },
+        stats: { attack: 24000, health: 200000, defense: 5600, speed: 25 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1200, 3000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'feet' },
@@ -308,7 +308,7 @@ export const zones = [
         name: '冰封古魔',
         description: '被封印万年的上古魔修，实力深不可测',
         traits: ['时间减速', '封印技能'],
-        stats: { attack: 248, health: 3720, defense: 84, speed: 15 },
+        stats: { attack: 28000, health: 240000, defense: 6800, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1500, 3750] },
           { type: 'equipment', chance: 0.1167, rarity: ['legendary', 'mythic'], slot: 'belt' },
@@ -324,7 +324,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.02, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 300, health: 3000 }
+    recommendedStats: { attack: 8000, health: 24000 }
   },
   {
     id: 'immortal_ruins',
@@ -344,7 +344,7 @@ export const zones = [
         name: '仙墟守护者',
         description: '上古仙人留下的守护者，拥有仙人之威',
         traits: ['仙术攻击', '领域压制'],
-        stats: { attack: 372, health: 6200, defense: 126, speed: 25 },
+        stats: { attack: 60000, health: 500000, defense: 14000, speed: 28 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [2250, 6000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'artifact' },
@@ -357,7 +357,7 @@ export const zones = [
         name: '堕落仙君',
         description: '曾经的仙人，堕入魔道后更加强大',
         traits: ['魔仙双修', '变身'],
-        stats: { attack: 434, health: 7440, defense: 140, speed: 20 },
+        stats: { attack: 70000, health: 600000, defense: 16000, speed: 22 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [3000, 7500] },
           { type: 'equipment', chance: 0.1333, rarity: ['legendary', 'mythic'], slot: 'ring2' },
@@ -373,7 +373,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1067, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.0167, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 600, health: 6000 }
+    recommendedStats: { attack: 20000, health: 60000 }
   },
   {
     id: 'chaos_realm',
@@ -393,7 +393,7 @@ export const zones = [
         name: '混沌主宰',
         description: '混沌界的至高存在，一念可生灭万物',
         traits: ['法则扭曲', '全属性攻击'],
-        stats: { attack: 744, health: 12400, defense: 210, speed: 30 },
+        stats: { attack: 210000, health: 1800000, defense: 50000, speed: 32 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'artifact' },
@@ -406,7 +406,7 @@ export const zones = [
         name: '天道化身',
         description: '天道在混沌中的投影，代表着至高法则',
         traits: ['因果律', '无法闪避'],
-        stats: { attack: 930, health: 15500, defense: 245, speed: 35 },
+        stats: { attack: 250000, health: 2200000, defense: 60000, speed: 38 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [7500, 22500] },
           { type: 'equipment', chance: 0.1333, rarity: ['mythic'], slot: 'artifact' },
@@ -422,7 +422,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1167, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.02, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 1000, health: 10000 }
+    recommendedStats: { attack: 70000, health: 210000 }
   }
 ]
 
