@@ -231,13 +231,25 @@
           开始挂机（{{ selectedDuration }}分钟 · 约 {{ idleEncounterEstimate }} 场 · {{ idleStoneEstimate }} 灵石）
         </button>
         <!-- 挂机进行中 -->
-        <div v-if="isIdling" class="idle-running">
+        <div v-if="isIdling" class="idle-running" :class="{ 'in-boss-phase': bossSpawned }">
           <div class="idle-status">
             <div class="idle-timer">{{ idleTimeRemaining }}</div>
             <div class="idle-progress-bar">
               <div class="idle-progress-fill" :style="{ width: idleProgress + '%' }"></div>
             </div>
             <div class="idle-count">已完成 {{ idleEncounterCount }} 次探索</div>
+            <!-- BOSS 决战阶段提示（核心玩法：最后 1/5 时间击杀 BOSS） -->
+            <div v-if="bossSpawned" class="boss-phase-banner" :class="{ 'boss-slain': bossDefeated }">
+              <div class="bp-icon">👑</div>
+              <div class="bp-body">
+                <div class="bp-title">{{ bossDefeated ? '✅ 已击杀 BOSS · 挂机收尾中' : '⚔️ BOSS 决战 · 核心挑战' }}</div>
+                <div class="bp-sub">
+                  <template v-if="bossDefeated">本次秘境通关成功，等待挂机收尾…</template>
+                  <template v-else>在剩余 <b class="bp-time">{{ idleTimeRemaining }}</b> 内击杀 BOSS 即通关本秘境</template>
+                </div>
+              </div>
+              <div v-if="!bossDefeated" class="bp-countdown">{{ idleTimeRemaining }}</div>
+            </div>
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
@@ -302,10 +314,10 @@
             </div>
           </div>
           <!-- 秘境怪物属性面板（无血条，统一在 BattleStage 显示） -->
-          <div v-if="idleDashboard.enemy" class="dash-enemy no-hp">
+          <div v-if="idleDashboard.enemy" class="dash-enemy no-hp" :class="{ 'boss-emphasis': idleDashboard.enemy.tier === 'boss' }">
             <div class="dash-enemy-title">
               <span class="dash-enemy-emoji">👹</span>
-              <span>秘境怪物信息</span>
+              <span>{{ idleDashboard.enemy.tier === 'boss' ? '👑 秘境 BOSS · 击杀即通关' : '秘境怪物信息' }}</span>
               <span class="enemy-tier-badge" :class="'tier-' + idleDashboard.enemy.tier">{{ { boss: 'BOSS', elite: '精英', normal: '普通' }[idleDashboard.enemy.tier] || '普通' }}</span>
             </div>
             <div class="dash-enemy-name">
@@ -626,7 +638,9 @@ const {
   buildEffectiveZone,
   getZoneDifficulty,
   currentEncounter,
-  idleDiag
+  idleDiag,
+  bossSpawned,
+  bossDefeated
 } = useIdleSystem()
 
 // 匹配度配色
@@ -1496,6 +1510,64 @@ onUnmounted(() => {
 .idle-count {
   font-size: 13px;
   color: #C9C4BA;
+}
+
+/* BOSS 决战阶段提示（核心玩法：最后 1/5 时间击杀 BOSS） */
+.in-boss-phase .idle-progress-fill {
+  background: linear-gradient(90deg, #B8860B, #FFD700);
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.6);
+}
+.boss-phase-banner {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-top: 10px;
+  padding: 10px 12px;
+  border-radius: 10px;
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.22), rgba(196, 77, 77, 0.22));
+  border: 1px solid rgba(255, 215, 0, 0.55);
+  box-shadow: 0 0 16px rgba(255, 215, 0, 0.18);
+  animation: bossPulse 1.6s ease-in-out infinite;
+}
+.boss-phase-banner.boss-slain {
+  background: linear-gradient(135deg, rgba(46, 125, 50, 0.22), rgba(102, 187, 106, 0.22));
+  border-color: rgba(102, 187, 106, 0.6);
+  box-shadow: 0 0 16px rgba(102, 187, 106, 0.2);
+  animation: none;
+}
+@keyframes bossPulse {
+  0%, 100% { box-shadow: 0 0 12px rgba(255, 215, 0, 0.15); }
+  50% { box-shadow: 0 0 22px rgba(255, 215, 0, 0.45); }
+}
+.bp-icon {
+  font-size: 26px;
+  line-height: 1;
+}
+.bp-body { flex: 1; text-align: left; }
+.bp-title {
+  font-size: 14px;
+  font-weight: bold;
+  color: #FFD86B;
+}
+.boss-phase-banner.boss-slain .bp-title { color: #8FE08F; }
+.bp-sub {
+  font-size: 12px;
+  color: #EADFC9;
+  margin-top: 2px;
+}
+.bp-time {
+  color: #FFD700;
+  font-family: monospace;
+  font-size: 13px;
+}
+.bp-countdown {
+  font-size: 20px;
+  font-weight: bold;
+  color: #FFD700;
+  font-family: monospace;
+  background: rgba(0, 0, 0, 0.35);
+  padding: 4px 8px;
+  border-radius: 6px;
 }
 
 /* 挂机血条 */
@@ -2846,6 +2918,11 @@ onUnmounted(() => {
 .enemy-tier-badge.tier-boss { background: rgba(196, 77, 77, 0.25); color: #FF8A8A; border: 1px solid rgba(196, 77, 77, 0.5); }
 .enemy-tier-badge.tier-elite { background: rgba(122, 90, 160, 0.25); color: #C9A0E8; border: 1px solid rgba(122, 90, 160, 0.5); }
 .enemy-tier-badge.tier-normal { background: rgba(122, 158, 126, 0.25); color: #B6D4B8; border: 1px solid rgba(122, 158, 126, 0.5); }
+.dash-enemy.boss-emphasis {
+  border: 1px solid rgba(255, 215, 0, 0.6) !important;
+  box-shadow: 0 0 18px rgba(255, 215, 0, 0.25) !important;
+  background: linear-gradient(135deg, rgba(184, 134, 11, 0.16), rgba(196, 77, 77, 0.12)) !important;
+}
 .dash-enemy-name {
   font-size: 14px;
   font-weight: bold;
