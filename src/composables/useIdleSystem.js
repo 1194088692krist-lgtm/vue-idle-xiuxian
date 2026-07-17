@@ -38,6 +38,22 @@ const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
 const battlePlayback = ref(null)   // 战斗回放数据：每场遭遇后设置，驱动 BattleStage 组件播放动画
+// 诊断面板状态：实时显示 runIdleEncounter 的执行轨迹与捕获的异常，便于玩家无控制台时定位问题
+const idleDiag = ref({
+  lastCall: '',           // 最近一次 runIdleEncounter 触发时间戳
+  lastStage: '',          // 最近执行到的阶段
+  lastError: '',          // 最近一次异常的完整信息（含堆栈）
+  errorCount: 0,          // 累计异常次数
+  callCount: 0,           // runIdleEncounter 被调用次数
+  skipCount: 0,           // 因各种条件被跳过的次数
+  isRunningStuck: false,  // isRunning 是否卡住
+  lastZone: '',           // 最近一次的 zone id
+  lastDiff: '',           // 最近一次的 difficulty key
+  lastPlayerCount: 0,     // 最近一次创建的玩家实体数
+  lastEnemyName: '',      // 最近一次的敌人名称
+  lastFinished: '',       // 最近一次战斗结果
+  lastPlaybackSet: ''     // 最近一次 battlePlayback 设置时间
+})
 const currentEncounter = ref({
   enemy: null,           // 当前怪物 CombatEntity
   players: [],           // 当前参战玩家 CombatEntity[]
@@ -2077,8 +2093,11 @@ async function executeRound(effectiveZone) {
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
 async function runIdleEncounter() {
-  console.log('[挂机诊断] runIdleEncounter 被调用, isIdling=', isIdling.value, 'isRunning=', isRunning)
-  if (!isIdling.value) return
+  idleDiag.value.callCount++
+  idleDiag.value.lastCall = new Date().toLocaleTimeString()
+  idleDiag.value.lastStage = '入口'
+  idleDiag.value.isRunningStuck = isRunning
+  if (!isIdling.value) { idleDiag.value.lastStage = '跳过:isIdling=false'; idleDiag.value.skipCount++; return }
   // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
   // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
   if (!selectedZone.value) {
@@ -2087,20 +2106,22 @@ async function runIdleEncounter() {
       const z = getZoneById(saved.zoneId)
       if (z) selectedZone.value = z
     }
-    if (!selectedZone.value) { console.log('[挂机诊断] selectedZone 为空，返回'); return }
+    if (!selectedZone.value) { idleDiag.value.lastStage = '跳过:selectedZone为空'; idleDiag.value.skipCount++; return }
   }
-  if (isRunning) { console.log('[挂机诊断] isRunning=true，重入锁触发，返回'); return }
+  if (isRunning) { idleDiag.value.lastStage = '跳过:isRunning重入锁'; idleDiag.value.skipCount++; return }
   isRunning = true
   const s = store()
   const zone = selectedZone.value
   const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
   // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
-  if (!diff) { console.log('[挂机诊断] diff 为空，返回'); isRunning = false; return }
+  if (!diff) { idleDiag.value.lastStage = '跳过:diff为空'; idleDiag.value.skipCount++; isRunning = false; return }
   let effectiveZone
   try {
     isRunning = true
     effectiveZone = buildEffectiveZone(zone, diff)
-    console.log('[挂机诊断] effectiveZone 构建完成, zone=', zone.id, 'diff=', diff.key, 'enemyScale=', effectiveZone.enemyScale, 'recAtk=', effectiveZone.recommendedStats?.attack, 'recHp=', effectiveZone.recommendedStats?.health)
+    idleDiag.value.lastZone = zone.id
+    idleDiag.value.lastDiff = diff.key
+    idleDiag.value.lastStage = 'effectiveZone已构建'
     s.regenerateSpirit()
     if (s.spiritStones < diff.spiritCost) {
       addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
@@ -2111,31 +2132,31 @@ async function runIdleEncounter() {
     idleEncounterCount.value++
     const count = idleEncounterCount.value
     const ratio = buildRatio.value
-    console.log('[挂机诊断] 遭遇 #' + count + ' 开始, 灵石=', s.spiritStones, 'buildRatio=', ratio, 'teamMembers=', teamMemberStates.value.length)
+    idleDiag.value.lastStage = '遭遇#' + count + '开始(team=' + teamMemberStates.value.length + ',ratio=' + ratio.toFixed(2) + ')'
 
     // 1. 如果当前没有进行中的遭遇，初始化新遭遇
     if (!currentEncounter.value.inProgress) {
-      console.log('[挂机诊断] 创建新遭遇, currentEncounter.inProgress=', currentEncounter.value.inProgress)
+      idleDiag.value.lastStage = '创建新遭遇'
       const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
       const enemy = enemyData.mainEnemy
-      console.log('[挂机诊断] 敌人生成完成, name=', enemy.name, 'tier=', enemy.tier, 'HP=', enemy.stats.maxHealth, 'ATK=', enemy.stats.damage)
+      idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
 
       // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
       const playerEntities = []
       for (const ms of teamMemberStates.value) {
-        if (ms.hp <= 0) { console.log('[挂机诊断] 跳过死亡成员:', ms.name); continue }
+        if (ms.hp <= 0) { continue }
         const member = s.sectMembers.find(m => m.id === ms.memberId)
-        if (!member) { console.log('[挂机诊断] 找不到成员:', ms.name, ms.memberId); continue }
+        if (!member) { continue }
         const entity = createMemberCombatEntity(member)
         entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
         entity.memberId = ms.memberId
         entity.role = member.role || 'vanguard'
         playerEntities.push(entity)
-        console.log('[挂机诊断] 玩家实体创建: ', entity.name, 'HP=', entity.stats.maxHealth, 'ATK=', entity.stats.damage)
       }
+      idleDiag.value.lastPlayerCount = playerEntities.length
 
       if (playerEntities.length === 0) {
-        console.log('[挂机诊断] playerEntities 为空！teamMemberStates=', teamMemberStates.value.length, 'sectMembers=', s.sectMembers?.length)
+        idleDiag.value.lastStage = '终止:playerEntities=0(队伍为空或全灭)'
         addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
         finishIdle()
         return
@@ -2161,9 +2182,9 @@ async function runIdleEncounter() {
     }
 
     // 2. 推进一回合
-    console.log('[挂机诊断] 调用 executeRound, encounter.round=', currentEncounter.value.round, 'enemyHP=', currentEncounter.value.enemy?.currentHealth)
+    idleDiag.value.lastStage = '执行回合#' + (currentEncounter.value.round + 1)
     const roundResult = await executeRound(effectiveZone)
-    console.log('[挂机诊断] executeRound 返回, finished=', roundResult.finished, 'victory=', roundResult.victory)
+    idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory
 
     // 3. 如果战斗结束，发放奖励/惩罚，重置 currentEncounter
     if (roundResult.finished) {
@@ -2331,7 +2352,8 @@ async function runIdleEncounter() {
         victory,
         rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
       }
-      console.log('[挂机诊断] battlePlayback 已设置! rounds=', allRounds.length, 'victory=', victory, 'rewards=', rewards.length, 'members=', playbackMembers.length)
+      idleDiag.value.lastPlaybackSet = new Date().toLocaleTimeString()
+      idleDiag.value.lastStage = 'battlePlayback已设置(rounds=' + allRounds.length + ')'
 
       // 实时更新当前结算画面
       currentEncounterSummary.value = {
@@ -2381,17 +2403,21 @@ async function runIdleEncounter() {
       s.queueSave()
     }
   } catch (err) {
-    // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
-    // 注意：完整异常输出到 console.error，便于定位“实时战斗界面偶发不弹”的根因
-    //（日志模块已移除，仅靠 addLog 会静默丢失异常）
-    console.error('[挂机诊断] 单次遭遇结算异常，已跳过本次并继续：', err, '\n堆栈:', err?.stack)
+    // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机
+    // 完整异常信息写入 idleDiag.lastError，供页面诊断面板展示
+    const errMsg = err && err.message ? err.message : String(err)
+    const errStack = err && err.stack ? err.stack : '(无堆栈)'
+    idleDiag.value.lastError = '[' + new Date().toLocaleTimeString() + '] ' + errMsg + '\n' + errStack
+    idleDiag.value.errorCount++
+    idleDiag.value.lastStage = '异常:' + errMsg
+    console.error('[挂机诊断] 单次遭遇结算异常，已跳过本次并继续：', err, '\n堆栈:', errStack)
     if (idleEncounterErrorCount < 3) {
-      addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
+      addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + errMsg)
       idleEncounterErrorCount++
     }
   } finally {
     isRunning = false
-    console.log('[挂机诊断] runIdleEncounter 结束, isRunning 重置为 false')
+    idleDiag.value.isRunningStuck = false
   }
 }
 
@@ -2885,6 +2911,7 @@ export function useIdleSystem() {
     idlePlayerDefeated,
     currentIdleEnemy,
     battlePlayback,
+    idleDiag,
     // Build 强度 / 血条
     playerBuildStrength,
     currentRecommendedBuild,

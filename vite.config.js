@@ -14,7 +14,16 @@ export default defineConfig({
   server: {
     host: '0.0.0.0',
     port: 2025,
-    allowedHosts: true
+    allowedHosts: true,
+    watch: {
+      ignored: [
+        '**/.pnpm-store/**',
+        '**/node_modules/**',
+        '**/.git/**',
+        '**/docs/**',
+        '**/public/**'
+      ]
+    }
   },
   build: {
     outDir: 'docs',

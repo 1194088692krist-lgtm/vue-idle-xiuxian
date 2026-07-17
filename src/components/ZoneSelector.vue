@@ -280,6 +280,29 @@
         </div>
         <!-- 战斗可视化舞台 -->
         <BattleStage v-if="isIdling && battlePlayback" :playback="battlePlayback" />
+        <!-- 诊断面板：实时显示挂机遭遇执行状态与异常，便于无控制台定位问题 -->
+        <div v-if="isIdling" class="idle-diag-panel">
+          <div class="diag-title">🔧 挂机诊断 <span class="diag-toggle" @click="diagCollapsed = !diagCollapsed">{{ diagCollapsed ? '展开' : '收起' }}</span></div>
+          <div v-if="!diagCollapsed" class="diag-body">
+            <div class="diag-row"><span class="diag-label">调用次数</span><span class="diag-value">{{ idleDiag.callCount }}</span></div>
+            <div class="diag-row"><span class="diag-label">跳过次数</span><span class="diag-value" :class="{ 'diag-warn': idleDiag.skipCount > 0 }">{{ idleDiag.skipCount }}</span></div>
+            <div class="diag-row"><span class="diag-label">异常次数</span><span class="diag-value" :class="{ 'diag-error': idleDiag.errorCount > 0 }">{{ idleDiag.errorCount }}</span></div>
+            <div class="diag-row"><span class="diag-label">最近调用</span><span class="diag-value">{{ idleDiag.lastCall || '—' }}</span></div>
+            <div class="diag-row"><span class="diag-label">执行阶段</span><span class="diag-value" :class="{ 'diag-warn': idleDiag.lastStage && idleDiag.lastStage.startsWith('异常'), 'diag-error': idleDiag.lastStage && idleDiag.lastStage.startsWith('终止') }">{{ idleDiag.lastStage || '—' }}</span></div>
+            <div class="diag-row"><span class="diag-label">区域/难度</span><span class="diag-value">{{ idleDiag.lastZone || '—' }} / {{ idleDiag.lastDiff || '—' }}</span></div>
+            <div class="diag-row"><span class="diag-label">玩家实体数</span><span class="diag-value" :class="{ 'diag-error': idleDiag.lastPlayerCount === 0 }">{{ idleDiag.lastPlayerCount }}</span></div>
+            <div class="diag-row"><span class="diag-label">敌人</span><span class="diag-value">{{ idleDiag.lastEnemyName || '—' }}</span></div>
+            <div class="diag-row"><span class="diag-label">战斗结果</span><span class="diag-value">{{ idleDiag.lastFinished || '—' }}</span></div>
+            <div class="diag-row"><span class="diag-label">回放设置</span><span class="diag-value" :class="{ 'diag-warn': !idleDiag.lastPlaybackSet && idleDiag.callCount > 0 }">{{ idleDiag.lastPlaybackSet || '未设置' }}</span></div>
+            <div v-if="idleDiag.lastError" class="diag-error-box">
+              <div class="diag-error-title">⚠️ 最近异常（请截图发给开发者）：</div>
+              <pre class="diag-error-pre">{{ idleDiag.lastError }}</pre>
+            </div>
+            <div v-else-if="idleDiag.callCount > 0 && !idleDiag.lastPlaybackSet" class="diag-hint">
+              💡 提示：遭遇已被调用 {{ idleDiag.callCount }} 次但战斗回放未设置。请检查上方"执行阶段"显示的卡点。
+            </div>
+          </div>
+        </div>
         <!-- 挂机仪表盘 -->
         <div v-if="isIdling && idleDashboard" class="idle-dashboard">
           <div class="dashboard-title">📊 挂机仪表盘</div>
@@ -664,7 +687,8 @@ const {
   showTreasureFlash,
   buildEffectiveZone,
   getZoneDifficulty,
-  battlePlayback
+  battlePlayback,
+  idleDiag
 } = useIdleSystem()
 
 // 匹配度配色
@@ -684,6 +708,8 @@ const matchText = computed(() => {
 // 全屏立绘查看器
 const showAvatarViewer = ref(false)
 const avatarViewerMember = ref(null)
+// 诊断面板折叠状态
+const diagCollapsed = ref(false)
 const openAvatarViewer = (member) => {
   if (!member || !getCharacterAvatar(member)) return
   avatarViewerMember.value = member
@@ -2533,6 +2559,82 @@ onUnmounted(() => {
   padding: 2px 6px;
   background: rgba(255, 165, 0, 0.1);
   border-radius: 4px;
+}
+
+/* 挂机诊断面板 */
+.idle-diag-panel {
+  margin-top: 12px;
+  padding: 10px 12px;
+  background: rgba(0, 0, 0, 0.4);
+  border: 1px solid rgba(255, 180, 0, 0.4);
+  border-radius: 8px;
+  font-size: 12px;
+}
+.diag-title {
+  color: #FFB400;
+  font-weight: 600;
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+}
+.diag-toggle {
+  color: #8FB88C;
+  cursor: pointer;
+  font-size: 11px;
+  font-weight: 400;
+}
+.diag-body {
+  margin-top: 8px;
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+}
+.diag-row {
+  display: flex;
+  gap: 8px;
+  align-items: baseline;
+}
+.diag-label {
+  color: #8B8376;
+  min-width: 80px;
+  flex-shrink: 0;
+}
+.diag-value {
+  color: #D8D0C0;
+  word-break: break-all;
+}
+.diag-warn { color: #FFB400 !important; }
+.diag-error { color: #FF5252 !important; font-weight: 600; }
+.diag-error-box {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255, 82, 82, 0.15);
+  border: 1px solid rgba(255, 82, 82, 0.5);
+  border-radius: 4px;
+}
+.diag-error-title {
+  color: #FF5252;
+  font-weight: 600;
+  margin-bottom: 4px;
+}
+.diag-error-pre {
+  color: #FFCDD2;
+  white-space: pre-wrap;
+  word-break: break-all;
+  font-family: monospace;
+  font-size: 11px;
+  line-height: 1.4;
+  margin: 0;
+  max-height: 200px;
+  overflow-y: auto;
+}
+.diag-hint {
+  margin-top: 8px;
+  padding: 8px;
+  background: rgba(255, 180, 0, 0.12);
+  border: 1px solid rgba(255, 180, 0, 0.4);
+  border-radius: 4px;
+  color: #FFB400;
 }
 
 /* 挂机仪表盘 */
