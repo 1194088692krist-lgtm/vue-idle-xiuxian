@@ -67,6 +67,10 @@ const currentEncounter = ref({
 // 本次挂机「完整战斗日志」累积源：跨所有遭遇（每场战斗）的战斗日志文本，
 // 从挂机开始持续累积到当前，供 BattleStage「查看完整日志」弹窗展示（而非仅当前回合）。
 const idleCombatLog = ref([])
+// BOSS 阶段控制：前 4/5 刷小怪，最后 1/5 刷新秘境 BOSS（核心玩法：考验最后 1/5 能否击杀 BOSS）
+const BOSS_PHASE_RATIO = 0.8
+const bossSpawned = ref(false)       // 本次挂机是否已刷新 BOSS（保证只刷一次，刷后不再出小怪）
+const bossDefeated = ref(false)      // BOSS 是否被击杀（用于结算「是否通过核心挑战」）
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
 
@@ -2178,6 +2182,15 @@ async function runIdleEncounter() {
     const ratio = buildRatio.value
     idleDiag.value.lastStage = '遭遇#' + count + '开始(team=' + teamMemberStates.value.length + ',ratio=' + ratio.toFixed(2) + ')'
 
+    // 计算挂机时间进度，判定是否进入 BOSS 阶段（前 4/5 刷小怪，最后 1/5 刷新 BOSS）
+    const ie = s.idleExploration
+    const idleDuration = (ie && ie.duration) || 1
+    const idleRemaining = s.getIdleRemainingTime()
+    const elapsedFrac = idleDuration > 0
+      ? Math.max(0, Math.min(1, (idleDuration - idleRemaining) / idleDuration))
+      : 1
+    const inBossPhase = elapsedFrac >= BOSS_PHASE_RATIO
+
     // 停止挂机或新挂机已启动时立即退出，避免清空 currentEncounter 后又被创建新遭遇覆盖
     if (!isIdling.value || isFinishingIdle || mySessionId !== idleSessionId) {
       isRunning = false
@@ -2193,9 +2206,29 @@ async function runIdleEncounter() {
         return
       }
       idleDiag.value.lastStage = '创建新遭遇'
-      const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
-      const enemy = enemyData.mainEnemy
-      idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+      let enemyData
+      let enemy
+      let isBossEncounter = false
+      if (inBossPhase && !bossSpawned.value && effectiveZone.bosses && effectiveZone.bosses.length) {
+        // ===== BOSS 阶段：刷新秘境 BOSS 作为收尾决战 =====
+        isBossEncounter = true
+        bossSpawned.value = true
+        const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+        enemy = createBossEnemy(bossData, effectiveZone)
+        enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
+        idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+        addLog('header', `👑【${zone.name}·${diff.label}】BOSS 来袭：${enemy.name}！最后 ${Math.round((1 - BOSS_PHASE_RATIO) * 100)}% 时间能否击杀，在此一战！`)
+        // 在完整战斗日志中插入 BOSS 分隔符，便于「查看完整日志」按场次区分
+        idleCombatLog.value.push(`—— BOSS · ${enemy.name} ——`)
+      } else {
+        if (inBossPhase && !bossSpawned.value) {
+          // 到达 4/5 但本秘境无 BOSS 配置：退化为普通遭遇继续刷（极少见，避免卡死）
+          idleDiag.value.lastStage = 'BOSS阶段但无boss配置，退化为普通遭遇'
+        }
+        enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
+        enemy = enemyData.mainEnemy
+        idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+      }
       enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
       enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
 
@@ -2236,15 +2269,15 @@ async function runIdleEncounter() {
       // （此前 currentIdleEnemy 仅在战斗结束才赋值，导致战斗中面板为空/显示上一场残留）
       currentIdleEnemy.value = buildIdleEnemySnapshot(enemy, enemy.currentHealth)
 
-      // 在完整战斗日志中插入本场遭遇分隔符，便于「查看完整日志」按场次区分
-      idleCombatLog.value.push(`—— 第 ${count} 次探索 · ${zone.name}·${diff.label} ——`)
-
-      // 遭遇开始日志
-      addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
-      const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
-      addLog('scene', pick(scenePool))
-      const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
-      addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
+      // 普通遭遇：插入场次分隔符与开场叙事日志（BOSS 场已在上面单独处理）
+      if (!isBossEncounter) {
+        idleCombatLog.value.push(`—— 第 ${count} 次探索 · ${zone.name}·${diff.label} ——`)
+        addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
+        const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
+        addLog('scene', pick(scenePool))
+        const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
+        addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
+      }
     }
 
     // 2. 连续推进回合直到战斗结束（挂机模式下单次遭遇应在一轮内打完，否则奖励永远不发放）
@@ -2299,6 +2332,8 @@ async function runIdleEncounter() {
       let rewards = []
       let loss = 0
       let roleEffects = []
+      // BOSS 被击杀：标记通过核心挑战（用于结算「最后 1/5 能否击杀 BOSS」）
+      if (bossSpawned.value && victory) bossDefeated.value = true
 
       if (victory) {
         rewards = grantReward(effectiveZone, true)
@@ -2445,6 +2480,15 @@ async function runIdleEncounter() {
       s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
       s.queueSave()
     }
+
+    // BOSS 遭遇为收尾决战：无论胜负，展示结果数秒后结束挂机
+    // （核心玩法：最后 1/5 时间能否击杀该图 BOSS；胜则通过，负/超时则挑战失败）
+    if (bossSpawned.value) {
+      idleDiag.value.lastStage = bossDefeated.value ? 'BOSS击杀·挂机结束(胜利)' : 'BOSS未击杀·挂机结束'
+      isFinishingIdle = true
+      setTimeout(() => { finishIdle() }, 4000)
+      return
+    }
   } catch (err) {
     // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机
     // 完整异常信息写入 idleDiag.lastError，供页面诊断面板展示
@@ -2516,7 +2560,16 @@ function startIdleTimers() {
     const min = Math.floor(remaining / 60000)
     const sec = Math.floor((remaining % 60000) / 1000)
     idleTimeRemaining.value = `${min}:${String(sec).padStart(2, '0')}`
-    if (remaining <= 0) finishIdle()
+    // 进入 BOSS 阶段（最后 1/5）立即刷新秘境 BOSS（核心玩法），避免等 10 秒定时才有首场
+    const frac = total > 0 ? Math.max(0, Math.min(1, elapsed / total)) : 1
+    if (frac >= BOSS_PHASE_RATIO && !bossSpawned.value) runIdleEncounter()
+    if (remaining <= 0) {
+      // 时间耗尽仍未击杀 BOSS：核心挑战失败
+      if (bossSpawned.value && !bossDefeated.value) {
+        addLog('warning', `⏳ 时间耗尽，未能在限定时间内击杀 BOSS【${currentEncounter.value.enemy?.name || '秘境BOSS'}】——本次挑战失败。`)
+      }
+      finishIdle()
+    }
   }, 1000)
 }
 
@@ -2633,6 +2686,8 @@ function startIdle(durationMinutes) {
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
   idleCombatLog.value = [] // 重置完整战斗日志累积源，从本次挂机开始重新累积
+  bossSpawned.value = false // 重置 BOSS 阶段标记，本次挂机重新进入 farm 阶段
+  bossDefeated.value = false
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
@@ -2674,6 +2729,8 @@ function finishIdle() {
   currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
   currentIdleEnemy.value = null
   idleCombatLog.value = [] // 清空完整战斗日志累积源
+  bossSpawned.value = false // 复位 BOSS 阶段标记
+  bossDefeated.value = false
   // 挂机结束时，flush 所有待显示日志
   flushAllPendingLogs()
   const s = store()
@@ -2692,6 +2749,7 @@ function finishIdle() {
     totalPhantomCrystals: runStats.value.phantomCrystals,
     totalExp: runStats.value.exp,
     defeated: allDead,
+    bossResult: bossSpawned.value ? (bossDefeated.value ? 'slain' : 'timeout') : null,
     logs: [...logs.value],
     equipmentList: [...foundEquipment.value],
     materialSummary: buildMaterialSummary(),
@@ -2856,6 +2914,8 @@ export function useIdleSystem() {
     currentIdleEnemy,
     currentEncounter,
     idleCombatLog,
+    bossSpawned,
+    bossDefeated,
     idleDiag,
     // Build 强度 / 血条
     playerBuildStrength,
