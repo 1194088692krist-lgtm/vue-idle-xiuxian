@@ -1229,43 +1229,8 @@ function grantReward(effectiveZone, isIdleMode = false) {
 
 const sleep = (ms) => new Promise(r => setTimeout(r, ms))
 
-async function runSingleCombat(playerEntity, enemy, isIdleMode = false) {
-  const manager = new CombatManager(playerEntity, enemy)
-  manager.start()
-  if (!isIdleMode) {
-    combatState.value = { inCombat: true, combatManager: manager }
-  }
-  let safetyGuard = 0
-  while (manager.state === 'in_progress' && safetyGuard < 200) {
-    safetyGuard++
-    const result = manager.executeTurn()
-    if (!isIdleMode && result) {
-      if (result.results && result.results.length > 0) {
-        const firstAttack = result.results[0]
-        if (firstAttack.attacker === playerEntity.name) {
-          animState.value.playerAttack = true; animState.value.enemyHurt = true
-          await sleep(400)
-          animState.value.playerAttack = false; animState.value.enemyHurt = false
-        } else {
-          animState.value.enemyAttack = true; animState.value.playerHurt = true
-          await sleep(400)
-          animState.value.enemyAttack = false; animState.value.playerHurt = false
-        }
-      }
-      if (!combatState.value.inCombat) break
-      await sleep(300)
-    }
-    if (!result) break
-    if (result.state === 'victory') {
-      return { victory: true, manager, enemy }
-    } else if (result.state === 'defeat') {
-      return { victory: false, manager, enemy }
-    }
-  }
-  return { victory: false, manager, enemy }
-}
 
-// ============ 手动「探索」实时战斗（替代旧 runExploreCombat 的整场预结算） ============
+// ============ 手动「探索」实时战斗（逐回合实时引擎，HP 跨场保留） ============
 // 复用挂机同款逐回合实时引擎（executeRound + currentEncounter）：
 // 每回合结算后立即反映到 currentEncounter（BattleStage 实时渲染血量/日志），
 // 战斗结束自动写回 teamMemberStates，从而让角色 HP/状态跨场保留，不再每场满血重建。
@@ -1337,44 +1302,6 @@ async function runManualBattle(effectiveZone) {
   return { victory, enemy, finished: true, drops }
 }
 
-async function runExploreCombat(effectiveZone, encounterCount, isIdleMode = false, difficultyKey = 'xiongxian') {
-  const playerEntity = createPlayerEntity()
-  const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
-  const allDrops = []
-  
-  if (enemyData.hasBoss && enemyData.allBosses.length > 1) {
-    let finalVictory = true
-    let lastManager = null
-    let lastEnemy = null
-    
-    for (let i = 0; i < enemyData.allBosses.length; i++) {
-      const boss = enemyData.allBosses[i]
-      const result = await runSingleCombat(playerEntity, boss, isIdleMode)
-      lastManager = result.manager
-      lastEnemy = result.enemy
-      
-      if (!result.victory) {
-        finalVictory = false
-        break
-      }
-      
-      const drops = grantCombatDrops(boss, effectiveZone.id)
-      allDrops.push(...drops)
-    }
-    
-    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses }
-  }
-  
-  const mainEnemy = enemyData.mainEnemy
-  const result = await runSingleCombat(playerEntity, mainEnemy, isIdleMode)
-  
-  if (result.victory) {
-    const drops = grantCombatDrops(mainEnemy, effectiveZone.id)
-    return { ...result, drops, allBosses: enemyData.allBosses }
-  }
-  
-  return { ...result, drops: allDrops, allBosses: enemyData.allBosses }
-}
 
 // ============ 宝物高亮弹窗 ============
 let flashTimer = null
@@ -2477,136 +2404,6 @@ async function runIdleEncounter() {
   }
 }
 
-async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false, difficultyKey = 'xiongxian') {
-  const s = store()
-  const member = s.sectMembers.find(m => m.id === memberState.memberId)
-  if (!member) {
-    return { victory: false, enemy: null }
-  }
-  
-  const resonancedStats = buildMemberCombatStats(member)
-  const playerEntity = new CombatEntity(member.name, member.level, resonancedStats, member.schoolName)
-  const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
-  const allDrops = []
-  
-  const combatStats = {
-    playerDamage: 0,
-    playerHeal: 0,
-    playerTookDamage: 0,
-    enemyDamage: 0,
-    rounds: 0,
-    critCount: 0,
-    comboCount: 0,
-    dodgeCount: 0,
-    counterCount: 0,
-    stunCount: 0,
-    vampireCount: 0,
-    playerMaxHP: 0,
-    enemyMaxHP: 0,
-    playerFinalHP: 0,
-    enemyFinalHP: 0,
-    roundDetails: []
-  }
-  
-  const collectTurnResults = (results) => {
-    if (!results) return
-    for (const r of results) {
-      const isPlayerAttacker = r.attacker === playerEntity.name
-      if (isPlayerAttacker) {
-        combatStats.playerDamage += r.damage
-        if (r.isCrit) combatStats.critCount++
-        if (r.isCombo) combatStats.comboCount++
-        if (r.isVampire) combatStats.vampireCount++
-        if (r.isStun) combatStats.stunCount++
-      } else {
-        combatStats.enemyDamage += r.damage
-        combatStats.playerTookDamage += r.damage
-        if (r.isCounter) combatStats.counterCount++
-      }
-      if (r.isDodged) combatStats.dodgeCount++
-      
-      // 记录每回合详情（限制数量避免内存膨胀）
-      if (combatStats.roundDetails.length < 20) {
-        combatStats.roundDetails.push({
-        round: combatStats.rounds,
-        attacker: r.attacker,
-        defender: r.defender,
-        damage: Math.round(r.damage),
-        isCrit: r.isCrit || false,
-        isCombo: r.isCombo || false,
-        isDodged: r.isDodged || false,
-        isVampire: r.isVampire || false,
-        isStun: r.isStun || false,
-        isCounter: r.isCounter || false,
-        attackerHP: r.attackerHP || 0,
-        defenderHP: r.defenderHP || 0,
-        attackerMaxHP: r.attackerMaxHP || 0,
-        defenderMaxHP: r.defenderMaxHP || 0,
-        isPlayerAttack: isPlayerAttacker
-      })
-      }
-    }
-  }
-  
-  if (enemyData.hasBoss && enemyData.allBosses.length > 1) {
-    let finalVictory = true
-    let lastManager = null
-    let lastEnemy = null
-    
-    for (let i = 0; i < enemyData.allBosses.length; i++) {
-      const boss = enemyData.allBosses[i]
-      const manager = new CombatManager(playerEntity, boss)
-      manager.start()
-      
-      let safetyGuard = 0
-      let combatResult = null
-      while (manager.state === 'in_progress' && safetyGuard < 200) {
-        safetyGuard++
-        const result = manager.executeTurn()
-        combatStats.rounds++
-        collectTurnResults(result?.results)
-        if (!result) break
-        if (result.state === 'victory' || result.state === 'defeat') {
-          combatResult = result
-          break
-        }
-      }
-      
-      lastManager = manager
-      lastEnemy = boss
-      
-      if (!combatResult || combatResult.state !== 'victory') {
-        finalVictory = false
-        break
-      }
-      
-      const drops = grantCombatDrops(boss, effectiveZone.id)
-      allDrops.push(...drops)
-    }
-    
-    return { victory: finalVictory, manager: lastManager, enemy: lastEnemy || enemyData.mainEnemy, drops: allDrops, allBosses: enemyData.allBosses, combatStats }
-  }
-  
-  const mainEnemy = enemyData.mainEnemy
-  const manager = new CombatManager(playerEntity, mainEnemy)
-  manager.start()
-  
-  let safetyGuard = 0
-  while (manager.state === 'in_progress' && safetyGuard < 200) {
-    safetyGuard++
-    const result = manager.executeTurn()
-    combatStats.rounds++
-    collectTurnResults(result?.results)
-    if (!result) break
-    if (result.state === 'victory') {
-      const drops = grantCombatDrops(mainEnemy, effectiveZone.id)
-      return { victory: true, manager, enemy: mainEnemy, drops, allBosses: enemyData.allBosses, combatStats }
-    } else if (result.state === 'defeat') {
-      return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses, combatStats }
-    }
-  }
-  return { victory: false, manager, enemy: mainEnemy, allBosses: enemyData.allBosses, combatStats }
-}
 
 // ============ 离线补算（轻量结算，避免卡顿） ============
 function runOfflineEncounter(zone, diff, count) {
@@ -3009,8 +2806,8 @@ export function useIdleSystem() {
     startIdle,
     stopIdle,
     initIdle,
-    runExploreCombat,
     runManualBattle,
+    executeRound,
     grantReward,
     showTreasureFlash,
     hideTreasureFlash,
