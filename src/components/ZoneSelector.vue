@@ -340,33 +340,18 @@
               <span class="pill-buff-remaining">剩{{ buff.remainingText }}</span>
             </div>
           </div>
-          <!-- 队伍气血 -->
-          <div v-if="idleDashboard.teamHP.length" class="dash-team">
-            <div class="dash-team-title">🏥 队伍状态</div>
-            <div v-for="m in idleDashboard.teamHP" :key="m.name" class="dash-team-member">
-              <span class="team-name">{{ m.name }}</span>
-              <div class="team-hp-bar">
-                <div class="team-hp-fill" :class="{ 'hp-low': parseInt(m.hpPercent) <= 30 }" :style="{ width: m.hpPercent }"></div>
-              </div>
-              <span class="team-hp-text">{{ m.hpPercent }}</span>
-            </div>
-          </div>
-          <!-- 秘境怪物状态（位于队伍信息下方） -->
-          <div v-if="idleDashboard.enemy" class="dash-enemy">
+          <!-- 秘境怪物属性面板（无血条，统一在 BattleStage 显示） -->
+          <div v-if="idleDashboard.enemy" class="dash-enemy no-hp">
             <div class="dash-enemy-title">
               <span class="dash-enemy-emoji">👹</span>
-              <span>秘境怪物状态</span>
+              <span>秘境怪物信息</span>
               <span class="enemy-tier-badge" :class="'tier-' + idleDashboard.enemy.tier">{{ { boss: 'BOSS', elite: '精英', normal: '普通' }[idleDashboard.enemy.tier] || '普通' }}</span>
             </div>
             <div class="dash-enemy-name">
               {{ idleDashboard.enemy.name }}
               <span v-if="idleDashboard.enemy.realm" class="enemy-realm">{{ idleDashboard.enemy.realm }}</span>
             </div>
-            <div class="enemy-hp-bar">
-              <div class="enemy-hp-fill" :style="{ width: idleDashboard.enemy.hpPercent }"></div>
-              <span class="enemy-hp-text">{{ idleDashboard.enemy.currentHealth }} / {{ idleDashboard.enemy.maxHealth }} · {{ idleDashboard.enemy.hpPercent }}<template v-if="idleDashboard.enemy.dead"> · 已阵亡</template></span>
-            </div>
-            <div class="enemy-stats-grid">
+            <div class="enemy-stats-grid compact">
               <div class="enemy-stat"><span class="es-label">攻击</span><span class="es-value">{{ idleDashboard.enemy.damage }}</span></div>
               <div class="enemy-stat"><span class="es-label">防御</span><span class="es-value">{{ idleDashboard.enemy.defense }}</span></div>
               <div class="enemy-stat"><span class="es-label">速度</span><span class="es-value">{{ idleDashboard.enemy.speed }}</span></div>

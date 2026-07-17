@@ -33,7 +33,7 @@
               :class="{ 'is-visible': videoReady }"
               :src="videoSrc"
               :poster="avatar || undefined"
-              preload="auto"
+              preload="metadata"
               muted
               loop
               playsinline
