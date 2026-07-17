@@ -629,7 +629,7 @@
           await playerStore.pullFromCloud()
           message.success('已从云端下载')
         } catch (e) {
-          message.error('下载失败：' + (e.message || e))
+          message.error(e.message || '下载失败：拉取云端存档失败')
         } finally {
           authBusy.value = false
         }

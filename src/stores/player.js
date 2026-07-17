@@ -640,32 +640,59 @@ export const usePlayerStore = defineStore('player', {
     },
     // ===== 云存档同步 / 迁移 =====
     // 取云端全部槽位：返回 { slot: { data, updated_at } }
+    // 失败时抛出带明确原因的 Error（不再吞成 null，便于定位是 401/5xx/网络）
+    // 对 5xx / 网络等可重试错误自动重试一次（缓解 Cloudflare Functions / D1 冷启动瞬时失败）
     async fetchCloudSaves() {
       const auth = useAuthStore()
-      if (!auth.isLoggedIn) return null
-      try {
-        const r = await fetch('/api/save', { headers: { ...auth.authHeaders() } })
-        const data = await r.json().catch(() => ({}))
-        if (!r.ok || !data.ok) return null
-        const map = {}
-        for (const s of data.saves || []) map[s.slot] = { data: s.data, updated_at: s.updated_at }
-        return map
-      } catch {
-        return null
+      if (!auth.isLoggedIn) throw new Error('请先登录后再拉取云端存档')
+      // 开发者模式仅用本地存档、无真实账号 token，不支持云同步
+      if (auth.devMode && !auth.token) throw new Error('开发者模式仅使用本地存档，不支持云同步')
+      let lastErr = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 300))
+        try {
+          const r = await fetch('/api/save', { headers: { ...auth.authHeaders() } })
+          let data = {}
+          try { data = await r.json() } catch { /* 响应体非 JSON（如网关错误页）*/ }
+          if (r.ok && data.ok) {
+            const map = {}
+            for (const s of data.saves || []) map[s.slot] = { data: s.data, updated_at: s.updated_at }
+            return map
+          }
+          const reason = data.error || ('HTTP ' + r.status)
+          // 4xx（含 401 鉴权失败）不重试，直接抛出明确原因
+          if (r.status >= 400 && r.status < 500) {
+            throw new Error(`拉取云端存档失败：${reason}`)
+          }
+          // 5xx 等可重试错误：记录后进入下一次重试
+          lastErr = new Error(`拉取云端存档失败：${reason}`)
+        } catch (e) {
+          // 已在上方明确抛出的 4xx 错误，原样向上抛
+          if (e && e.message && e.message.startsWith('拉取云端存档失败')) throw e
+          lastErr = new Error('拉取云端存档失败：网络请求异常（' + (e && e.message ? e.message : '无法连接服务器') + '）')
+        }
       }
+      throw lastErr || new Error('拉取云端存档失败')
     },
-    // 上传单槽到云端
+    // 上传单槽到云端；返回是否成功（调用方据此如实上报，避免假成功）
     async pushSlotToCloud(slot, encryptedBlob, updatedAt) {
       const auth = useAuthStore()
-      if (!auth.isLoggedIn) return
+      if (!auth.isLoggedIn) return false
       try {
-        await fetch('/api/save', {
+        const r = await fetch('/api/save', {
           method: 'POST',
           headers: { 'content-type': 'application/json', ...auth.authHeaders() },
           body: JSON.stringify({ slot, data: encryptedBlob, updated_at: updatedAt })
         })
+        if (!r.ok) {
+          const data = await r.json().catch(() => ({}))
+          console.warn('云同步上传失败', r.status, data.error || '')
+          return false
+        }
+        return true
       } catch (e) {
         console.warn('云同步上传失败', e)
+        return false
       }
     },
     // 从密文 blob 提取基础信息（用于分支③对比弹窗）
@@ -680,8 +707,8 @@ export const usePlayerStore = defineStore('player', {
       if (!auth.isLoggedIn) throw new Error('请先登录')
       this.cloudSyncStatus = '下载中…'
       try {
+        // fetchCloudSaves 失败时已抛出带原因的 Error，这里不再重复判断
         const cloud = await this.fetchCloudSaves()
-        if (!cloud) throw new Error('拉取云端存档失败')
         let count = 0
         const slots = [0, 1, 2, 3, 4, 5]
         for (const slot of slots) {
@@ -715,14 +742,16 @@ export const usePlayerStore = defineStore('player', {
       if (!auth.isLoggedIn) return
       this.cloudSyncStatus = '同步中…'
       try {
+        let okAll = true
         const blob = await GameDB.getData('playerData')
-        if (blob) await this.pushSlotToCloud(0, blob, Date.now())
+        if (blob) okAll = (await this.pushSlotToCloud(0, blob, Date.now())) && okAll
         const slot = this.currentSlot || this.autoSaveSlot
         if (slot) {
           const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
-          if (slotBlob) await this.pushSlotToCloud(slot, slotBlob, Date.now())
+          if (slotBlob) okAll = (await this.pushSlotToCloud(slot, slotBlob, Date.now())) && okAll
         }
-        this.cloudSyncStatus = '已同步到云端'
+        // 如实上报：任一槽位上传失败则标记为失败，不再假成功
+        this.cloudSyncStatus = okAll ? '已同步到云端' : '云同步失败'
       } catch (e) {
         this.cloudSyncStatus = '云同步失败'
         console.warn(e)
@@ -734,8 +763,8 @@ export const usePlayerStore = defineStore('player', {
     async migrate({ interactive = false } = {}) {
       const auth = useAuthStore()
       if (!auth.isLoggedIn) throw new Error('请先登录')
+      // fetchCloudSaves 失败时已抛出带原因的 Error
       const cloud = await this.fetchCloudSaves()
-      if (!cloud) throw new Error('拉取云端存档失败')
 
       const slots = [0, 1, 2, 3, 4, 5]
       const conflicts = []
