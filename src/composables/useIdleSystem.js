@@ -2356,6 +2356,9 @@ async function runIdleEncounter() {
     }
   } catch (err) {
     // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
+    // 注意：完整异常输出到 console.error，便于定位“实时战斗界面偶发不弹”的根因
+    //（日志模块已移除，仅靠 addLog 会静默丢失异常）
+    console.error('[挂机] 单次遭遇结算异常，已跳过本次并继续：', err)
     if (idleEncounterErrorCount < 3) {
       addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
       idleEncounterErrorCount++
