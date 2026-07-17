@@ -1930,8 +1930,8 @@ onUnmounted(() => {
   position: relative;
   padding: 16px;
   border-radius: 12px;
-  background: rgba(0, 0, 0, 0.2);
-  border: 1px solid rgba(255, 255, 255, 0.08);
+  background: var(--color-bg-card);
+  border: 1px solid rgba(255, 255, 255, 0.12);
   margin-top: 16px;
 }
 .idle-summary-header {
@@ -1949,7 +1949,8 @@ onUnmounted(() => {
 }
 .idle-summary-meta {
   font-size: 12px;
-  color: #C9C4BA;
+  color: #E8E2D5;
+  font-weight: 500;
 }
 
 /* 挂机统计 */
@@ -1967,13 +1968,14 @@ onUnmounted(() => {
 .summary-label {
   display: block;
   font-size: 10px;
-  color: #C9C4BA;
+  color: #E8E2D5;
 }
 .summary-value {
   display: block;
   font-size: 14px;
   font-weight: bold;
-  color: #fff;
+  color: #ffffff;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.35);
 }
 .summary-value.green { color: #66BB6A; }
 .summary-value.red { color: #EF5350; }
@@ -2444,18 +2446,18 @@ onUnmounted(() => {
 .equipment-detail-section {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.55);
   border-radius: 10px;
-  border: 1px solid rgba(218, 165, 32, 0.2);
+  border: 1px solid rgba(218, 165, 32, 0.25);
 }
 
 /* 素材汇总区域 */
 .material-detail-section {
   margin-top: 16px;
   padding: 12px;
-  background: rgba(0, 0, 0, 0.25);
+  background: rgba(0, 0, 0, 0.55);
   border-radius: 10px;
-  border: 1px solid rgba(122, 158, 126, 0.3);
+  border: 1px solid rgba(122, 158, 126, 0.35);
 }
 
 .material-detail-header {
@@ -2465,7 +2467,7 @@ onUnmounted(() => {
 .material-detail-title {
   font-size: 14px;
   font-weight: bold;
-  color: #7A9E7E;
+  color: #9AC89A;
 }
 
 .material-detail-list {
@@ -2479,8 +2481,8 @@ onUnmounted(() => {
   align-items: center;
   gap: 6px;
   padding: 6px 10px;
-  background: rgba(122, 158, 126, 0.12);
-  border: 1px solid rgba(122, 158, 126, 0.25);
+  background: rgba(122, 158, 126, 0.18);
+  border: 1px solid rgba(122, 158, 126, 0.35);
   border-radius: 8px;
   font-size: 13px;
 }
@@ -2518,7 +2520,7 @@ onUnmounted(() => {
 
 .equipment-detail-item {
   padding: 10px;
-  background: rgba(255, 255, 255, 0.03);
+  background: rgba(255, 255, 255, 0.05);
   border-radius: 8px;
   border-left: 3px solid;
 }
@@ -2539,7 +2541,7 @@ onUnmounted(() => {
 
 .eq-type {
   font-size: 11px;
-  color: #C9C4BA;
+  color: #E8E2D5;
   margin-bottom: 6px;
 }
 
@@ -2552,9 +2554,9 @@ onUnmounted(() => {
 
 .eq-stat {
   font-size: 12px;
-  color: #F5DEB3;
+  color: #FFE8C4;
   padding: 2px 6px;
-  background: rgba(0, 0, 0, 0.3);
+  background: rgba(0, 0, 0, 0.45);
   border-radius: 4px;
 }
 
@@ -3139,6 +3141,19 @@ html:not(.dark) .idle-hp-warn {
 html:not(.dark) .material-detail-section {
   background: rgba(60, 59, 57, 0.85);
   border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .equipment-detail-section {
+  background: rgba(60, 59, 57, 0.85);
+  border-color: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .equipment-detail-item {
+  background: rgba(255, 255, 255, 0.08);
+}
+html:not(.dark) .equipment-detail-title {
+  color: #FFD86B;
+}
+html:not(.dark) .eq-type {
+  color: #E8E2D5;
 }
 html:not(.dark) .material-detail-title {
   color: #FFD86B;
