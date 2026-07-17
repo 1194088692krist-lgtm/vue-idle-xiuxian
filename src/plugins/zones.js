@@ -52,7 +52,7 @@ export const zones = [
         name: '狼王',
         description: '青萝林的霸主，统领狼群横行霸道',
         traits: ['速度快', '群体攻击'],
-        stats: { attack: 100, health: 800, defense: 30, speed: 18 },
+        stats: { attack: 25, health: 300, defense: 8, speed: 18 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [30, 75] },
           { type: 'equipment', chance: 0.1, rarity: ['common', 'uncommon'], slot: 'artifact' },
@@ -65,7 +65,7 @@ export const zones = [
         name: '山匪头目',
         description: '盘踞山林的悍匪首领，刀法凌厉',
         traits: ['高攻击', '暴击率高'],
-        stats: { attack: 120, health: 1000, defense: 20, speed: 12 },
+        stats: { attack: 30, health: 350, defense: 6, speed: 12 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [45, 90] },
           { type: 'equipment', chance: 0.1167, rarity: ['common', 'uncommon'], slot: 'hands' },
@@ -100,7 +100,7 @@ export const zones = [
         name: '迷雾虎王',
         description: '迷雾中潜伏的兽王，一击致命',
         traits: ['高爆发', '隐蔽攻击'],
-        stats: { attack: 360, health: 3000, defense: 90, speed: 20 },
+        stats: { attack: 100, health: 1100, defense: 30, speed: 20 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [75, 180] },
           { type: 'equipment', chance: 0.1, rarity: ['uncommon', 'rare'], slot: 'body' },
