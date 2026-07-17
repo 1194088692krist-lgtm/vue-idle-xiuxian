@@ -241,26 +241,6 @@
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
         </div>
-        <!-- 诊断面板：实时显示挂机遭遇执行状态与异常，便于无控制台定位问题 -->
-        <div v-if="isIdling" class="idle-diag-panel">
-          <div class="diag-title">🔧 挂机诊断 <span class="diag-toggle" @click="diagCollapsed = !diagCollapsed">{{ diagCollapsed ? '展开' : '收起' }}</span></div>
-          <div v-if="!diagCollapsed" class="diag-body">
-            <div class="diag-row"><span class="diag-label">调用次数</span><span class="diag-value">{{ idleDiag.callCount }}</span></div>
-            <div class="diag-row"><span class="diag-label">跳过次数</span><span class="diag-value" :class="{ 'diag-warn': idleDiag.skipCount > 0 }">{{ idleDiag.skipCount }}</span></div>
-            <div class="diag-row"><span class="diag-label">异常次数</span><span class="diag-value" :class="{ 'diag-error': idleDiag.errorCount > 0 }">{{ idleDiag.errorCount }}</span></div>
-            <div class="diag-row"><span class="diag-label">最近调用</span><span class="diag-value">{{ idleDiag.lastCall || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">执行阶段</span><span class="diag-value" :class="{ 'diag-warn': idleDiag.lastStage && idleDiag.lastStage.startsWith('异常'), 'diag-error': idleDiag.lastStage && idleDiag.lastStage.startsWith('终止') }">{{ idleDiag.lastStage || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">区域/难度</span><span class="diag-value">{{ idleDiag.lastZone || '—' }} / {{ idleDiag.lastDiff || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">玩家实体数</span><span class="diag-value" :class="{ 'diag-error': idleDiag.lastPlayerCount === 0 }">{{ idleDiag.lastPlayerCount }}</span></div>
-            <div class="diag-row"><span class="diag-label">敌人</span><span class="diag-value">{{ idleDiag.lastEnemyName || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">战斗结果</span><span class="diag-value">{{ idleDiag.lastFinished || '—' }}</span></div>
-            <div class="diag-row"><span class="diag-label">战斗进行中</span><span class="diag-value" :class="{ 'diag-warn': !idleDiag.lastPlaybackSet && idleDiag.callCount > 0 }">{{ idleDiag.lastPlaybackSet || '否' }}</span></div>
-            <div v-if="idleDiag.lastError" class="diag-error-box">
-              <div class="diag-error-title">⚠️ 最近异常（请截图发给开发者）：</div>
-              <pre class="diag-error-pre">{{ idleDiag.lastError }}</pre>
-            </div>
-          </div>
-        </div>
         <!-- 挂机仪表盘 -->
         <div v-if="isIdling && idleDashboard" class="idle-dashboard">
           <div class="dashboard-title">📊 挂机仪表盘</div>

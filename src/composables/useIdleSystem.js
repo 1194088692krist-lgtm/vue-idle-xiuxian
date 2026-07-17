@@ -406,8 +406,11 @@ const activePillBuffList = computed(() => {
   })
 })
 
-// 在线每场遭遇间隔：10 秒（每回合）
-const ENCOUNTER_INTERVAL = 10000
+// 在线每场遭遇间隔：4 秒（缩短空白期，配合回合内动画节奏）
+const ENCOUNTER_INTERVAL = 4000
+// 回合内动画延时：让 BattleStage 播完当前回合的攻击/受击动画再进入下一回合，
+// 避免回合切换太快导致动画堆叠跳动；与 BattleStage.playLiveRound 的事件延时(240ms)配合
+const ROUND_ANIM_DELAY = 900
 
 let _store = null
 function store() {
@@ -2211,8 +2214,9 @@ async function runIdleEncounter() {
       idleDiag.value.lastStage = '执行回合#' + currentEncounter.value.round + '(本轮第' + roundsExecuted + '次)'
       idleDiag.value.lastPlaybackSet = '是(回合#' + currentEncounter.value.round + ')'
       roundResult = await executeRound(effectiveZone)
-      // 让出事件循环，让 Vue 渲染当前回合的战斗状态
-      await new Promise(resolve => setTimeout(resolve, 0))
+      // 等待 BattleStage 播完当前回合的攻击/受击动画再进入下一回合，
+      // 避免回合切换太快导致动画堆叠跳动
+      await new Promise(resolve => setTimeout(resolve, ROUND_ANIM_DELAY))
     }
     idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted
 
