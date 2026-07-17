@@ -141,7 +141,7 @@
             <span>完整战斗日志</span>
             <button class="close-btn" @click="showFullLog = false">×</button>
           </div>
-          <div class="battle-log-modal-body">
+          <div class="battle-log-modal-body" ref="fullLogBody">
             <div v-for="(log, idx) in fullBattleLog" :key="idx" class="battle-log-item" :class="log.type">
               <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" />
               <span class="battle-log-text">{{ log.text }}</span>
@@ -257,6 +257,17 @@ const fullBattleLog = computed(() => {
   const source = session.length ? session : (props.encounter?.combatLog || [])
   return source.map(t => ({ type: logType(t), text: t }))
 })
+
+// 完整日志弹窗自动滚动到底部：打开瞬间定位到最新一条，新日志到达时保持贴底
+const fullLogBody = ref(null)
+function scrollFullLogToBottom() {
+  nextTick(() => {
+    const el = fullLogBody.value
+    if (el) el.scrollTop = el.scrollHeight
+  })
+}
+watch(() => showFullLog.value, (v) => { if (v) scrollFullLogToBottom() })
+watch(() => fullBattleLog.value.length, () => { if (showFullLog.value) scrollFullLogToBottom() })
 
 const enemyEmoji = computed(() => {
   const tier = props.encounter?.enemy?.tier
@@ -1225,6 +1236,13 @@ onUnmounted(() => {
   font-size: 12px;
   white-space: normal;
   text-overflow: initial;
+}
+/* 修复：弹窗内日志文本需完整换行展示，覆盖基础样式的 nowrap + 省略号截断 */
+.battle-log-modal-body .battle-log-text {
+  white-space: normal;
+  overflow: visible;
+  text-overflow: clip;
+  word-break: break-word;
 }
 
 /* 怪物头像样式 */

@@ -17,8 +17,8 @@ vi.mock('../../stores/player', () => {
       baseAttributes: { attack: 100, health: 100, defense: 50, speed: 30 },
       spiritStones: 999999,
       cultivationPool: 1000,
-      // 关键：duration=100000，剩余=10000 ⇒ 已过 90% ⇒ 进入 BOSS 阶段
-      idleExploration: { isActive: true, zoneId: 'z', duration: 100000, startTime: Date.now() },
+      // 关键：duration=300000（5 分钟=1 轮），剩余=10000 ⇒ 已过 290s ⇒ 落入本轮 BOSS 窗口（第 240s 起）
+      idleExploration: { isActive: true, zoneId: 'z', duration: 300000, startTime: Date.now() },
       items: [], itemsFound: 0, phantomCrystals: 0, petFragments: 0, pillRecipes: [], pillBuffs: [],
       getActivePillEffects: () => [],
       regenerateSpirit: vi.fn(),
@@ -56,7 +56,7 @@ import { useIdleSystem } from '../useIdleSystem.js'
 const idle = useIdleSystem()
 const { startIdle, stopIdle, setSelectedZone, currentEncounter, bossSpawned, idleCombatLog } = idle
 
-describe('挂机 BOSS 阶段：最后 1/5 刷新秘境 BOSS（核心玩法）', () => {
+describe('挂机 BOSS 调度：按轮后段刷新限时 BOSS（核心玩法）', () => {
   beforeEach(() => {
     setSelectedZone(bossZone)
   })
@@ -66,8 +66,8 @@ describe('挂机 BOSS 阶段：最后 1/5 刷新秘境 BOSS（核心玩法）', 
     try { stopIdle() } catch (e) { /* 忽略清理异常 */ }
   })
 
-  it('进入 BOSS 阶段（已过 90%）时刷新秘境 BOSS，且只刷一次', () => {
-    // startIdle 同步触发首场遭遇；因已过 90%，runIdleEncounter 直接进入 BOSS 阶段
+  it('进入本轮 BOSS 窗口（已过 4 分钟）时刷新秘境 BOSS，且只刷一次', () => {
+    // startIdle 同步触发首场遭遇；因 elapsed=290s 落入本轮 BOSS 窗口（第 240s 起），runIdleEncounter 直接刷新 BOSS
     startIdle(5)
 
     // 已刷新 BOSS

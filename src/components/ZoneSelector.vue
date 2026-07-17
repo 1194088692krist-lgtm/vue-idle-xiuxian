@@ -239,16 +239,13 @@
             </div>
             <div class="idle-count">已完成 {{ idleEncounterCount }} 次探索</div>
             <!-- BOSS 决战阶段提示（核心玩法：最后 1/5 时间击杀 BOSS） -->
-            <div v-if="bossSpawned" class="boss-phase-banner" :class="{ 'boss-slain': bossDefeated }">
+            <div v-if="bossSpawned" class="boss-phase-banner">
               <div class="bp-icon">👑</div>
               <div class="bp-body">
-                <div class="bp-title">{{ bossDefeated ? '✅ 已击杀 BOSS · 挂机收尾中' : '⚔️ BOSS 决战 · 核心挑战' }}</div>
-                <div class="bp-sub">
-                  <template v-if="bossDefeated">本次秘境通关成功，等待挂机收尾…</template>
-                  <template v-else>在剩余 <b class="bp-time">{{ idleTimeRemaining }}</b> 内击杀 BOSS 即通关本秘境</template>
-                </div>
+                <div class="bp-title">⚔️ 第 {{ bossSpawnRound + 1 }} 轮 BOSS 决战 · 限时击杀</div>
+                <div class="bp-sub">在剩余 <b class="bp-time">{{ bossTimeRemaining || '1:00' }}</b> 内击杀 BOSS，否则本轮挑战失败、强制进入下一轮</div>
               </div>
-              <div v-if="!bossDefeated" class="bp-countdown">{{ idleTimeRemaining }}</div>
+              <div class="bp-countdown">{{ bossTimeRemaining || '1:00' }}</div>
             </div>
           </div>
           <button class="btn btn-danger" @click="stopIdle">停止挂机</button>
@@ -317,7 +314,7 @@
           <div v-if="idleDashboard.enemy" class="dash-enemy no-hp" :class="{ 'boss-emphasis': idleDashboard.enemy.tier === 'boss' }">
             <div class="dash-enemy-title">
               <span class="dash-enemy-emoji">👹</span>
-              <span>{{ idleDashboard.enemy.tier === 'boss' ? '👑 秘境 BOSS · 击杀即通关' : '秘境怪物信息' }}</span>
+              <span>{{ idleDashboard.enemy.tier === 'boss' ? '👑 限时 BOSS 决战 · 击杀即过本轮' : '秘境怪物信息' }}</span>
               <span class="enemy-tier-badge" :class="'tier-' + idleDashboard.enemy.tier">{{ { boss: 'BOSS', elite: '精英', normal: '普通' }[idleDashboard.enemy.tier] || '普通' }}</span>
             </div>
             <div class="dash-enemy-name">
@@ -640,7 +637,9 @@ const {
   currentEncounter,
   idleDiag,
   bossSpawned,
-  bossDefeated
+  bossDefeated,
+  bossSpawnRound,
+  bossTimeRemaining
 } = useIdleSystem()
 
 // 匹配度配色
