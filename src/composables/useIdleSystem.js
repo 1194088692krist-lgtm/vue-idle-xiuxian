@@ -2077,6 +2077,7 @@ async function executeRound(effectiveZone) {
 
 // ============ 挂机单次遭遇（在线，完整战斗模拟） ============
 async function runIdleEncounter() {
+  console.log('[挂机诊断] runIdleEncounter 被调用, isIdling=', isIdling.value, 'isRunning=', isRunning)
   if (!isIdling.value) return
   // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
   // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
@@ -2086,19 +2087,20 @@ async function runIdleEncounter() {
       const z = getZoneById(saved.zoneId)
       if (z) selectedZone.value = z
     }
-    if (!selectedZone.value) return
+    if (!selectedZone.value) { console.log('[挂机诊断] selectedZone 为空，返回'); return }
   }
-  if (isRunning) return
+  if (isRunning) { console.log('[挂机诊断] isRunning=true，重入锁触发，返回'); return }
   isRunning = true
   const s = store()
   const zone = selectedZone.value
   const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
   // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
-  if (!diff) { isRunning = false; return }
+  if (!diff) { console.log('[挂机诊断] diff 为空，返回'); isRunning = false; return }
   let effectiveZone
   try {
     isRunning = true
     effectiveZone = buildEffectiveZone(zone, diff)
+    console.log('[挂机诊断] effectiveZone 构建完成, zone=', zone.id, 'diff=', diff.key, 'enemyScale=', effectiveZone.enemyScale, 'recAtk=', effectiveZone.recommendedStats?.attack, 'recHp=', effectiveZone.recommendedStats?.health)
     s.regenerateSpirit()
     if (s.spiritStones < diff.spiritCost) {
       addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
@@ -2109,26 +2111,31 @@ async function runIdleEncounter() {
     idleEncounterCount.value++
     const count = idleEncounterCount.value
     const ratio = buildRatio.value
+    console.log('[挂机诊断] 遭遇 #' + count + ' 开始, 灵石=', s.spiritStones, 'buildRatio=', ratio, 'teamMembers=', teamMemberStates.value.length)
 
     // 1. 如果当前没有进行中的遭遇，初始化新遭遇
     if (!currentEncounter.value.inProgress) {
+      console.log('[挂机诊断] 创建新遭遇, currentEncounter.inProgress=', currentEncounter.value.inProgress)
       const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
       const enemy = enemyData.mainEnemy
+      console.log('[挂机诊断] 敌人生成完成, name=', enemy.name, 'tier=', enemy.tier, 'HP=', enemy.stats.maxHealth, 'ATK=', enemy.stats.damage)
 
       // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
       const playerEntities = []
       for (const ms of teamMemberStates.value) {
-        if (ms.hp <= 0) continue
+        if (ms.hp <= 0) { console.log('[挂机诊断] 跳过死亡成员:', ms.name); continue }
         const member = s.sectMembers.find(m => m.id === ms.memberId)
-        if (!member) continue
+        if (!member) { console.log('[挂机诊断] 找不到成员:', ms.name, ms.memberId); continue }
         const entity = createMemberCombatEntity(member)
         entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
         entity.memberId = ms.memberId
         entity.role = member.role || 'vanguard'
         playerEntities.push(entity)
+        console.log('[挂机诊断] 玩家实体创建: ', entity.name, 'HP=', entity.stats.maxHealth, 'ATK=', entity.stats.damage)
       }
 
       if (playerEntities.length === 0) {
+        console.log('[挂机诊断] playerEntities 为空！teamMemberStates=', teamMemberStates.value.length, 'sectMembers=', s.sectMembers?.length)
         addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
         finishIdle()
         return
@@ -2154,7 +2161,9 @@ async function runIdleEncounter() {
     }
 
     // 2. 推进一回合
+    console.log('[挂机诊断] 调用 executeRound, encounter.round=', currentEncounter.value.round, 'enemyHP=', currentEncounter.value.enemy?.currentHealth)
     const roundResult = await executeRound(effectiveZone)
+    console.log('[挂机诊断] executeRound 返回, finished=', roundResult.finished, 'victory=', roundResult.victory)
 
     // 3. 如果战斗结束，发放奖励/惩罚，重置 currentEncounter
     if (roundResult.finished) {
@@ -2322,6 +2331,7 @@ async function runIdleEncounter() {
         victory,
         rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
       }
+      console.log('[挂机诊断] battlePlayback 已设置! rounds=', allRounds.length, 'victory=', victory, 'rewards=', rewards.length, 'members=', playbackMembers.length)
 
       // 实时更新当前结算画面
       currentEncounterSummary.value = {
@@ -2374,13 +2384,14 @@ async function runIdleEncounter() {
     // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
     // 注意：完整异常输出到 console.error，便于定位“实时战斗界面偶发不弹”的根因
     //（日志模块已移除，仅靠 addLog 会静默丢失异常）
-    console.error('[挂机] 单次遭遇结算异常，已跳过本次并继续：', err)
+    console.error('[挂机诊断] 单次遭遇结算异常，已跳过本次并继续：', err, '\n堆栈:', err?.stack)
     if (idleEncounterErrorCount < 3) {
       addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
       idleEncounterErrorCount++
     }
   } finally {
     isRunning = false
+    console.log('[挂机诊断] runIdleEncounter 结束, isRunning 重置为 false')
   }
 }
 
@@ -2556,6 +2567,7 @@ function runOfflineEncounter(zone, diff, count) {
 function startIdleTimers() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
+  console.log('[挂机诊断] startIdleTimers 启动定时器, 间隔=', ENCOUNTER_INTERVAL, 'ms')
   idleInterval = setInterval(() => { runIdleEncounter() }, ENCOUNTER_INTERVAL)
   idleTimer = setInterval(() => {
     // 守卫：仅当挂机真正进行中且存档状态一致时才推进/结束，避免状态不一致时误触发 finishIdle
@@ -2573,9 +2585,11 @@ function startIdleTimers() {
 
 function startIdle(durationMinutes) {
   const s = store()
-  if (!selectedZone.value) return
+  console.log('[挂机诊断] startIdle 调用, duration=', durationMinutes, 'selectedZone=', selectedZone.value?.id, 'difficulty=', selectedDifficultyKey.value, 'spiritStones=', s.spiritStones)
+  if (!selectedZone.value) { console.log('[挂机诊断] startIdle 失败: selectedZone 为空'); return }
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
-  if (s.spiritStones < diff.spiritCost) return
+  console.log('[挂机诊断] startIdle diff=', diff?.key, 'spiritCost=', diff?.spiritCost, 'playerStones=', s.spiritStones)
+  if (s.spiritStones < diff.spiritCost) { console.log('[挂机诊断] startIdle 失败: 灵石不足'); return }
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterErrorCount = 0
