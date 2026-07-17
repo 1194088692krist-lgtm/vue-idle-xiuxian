@@ -2645,17 +2645,28 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: '头像更新成功' }
     },
-    // 给角色装备灵宠
+    // 给角色装备灵宠（排他：同一灵宠按 uid/id 同时只能被一个角色装备）
     equipCharacterPet(memberId, pet) {
       const member = this.sectMembers.find(m => m.id === memberId)
       if (!member) return { success: false, message: '成员不存在' }
-      // 卸下旧灵宠（归还到 items）
+      if (!pet || pet.type !== 'pet') return { success: false, message: '目标不是灵宠' }
+      const petKey = (p) => p && (p.uid || p.id)
+      const targetKey = petKey(pet)
+      // 排他性：若该灵宠已被其他角色装备，先从其他角色卸下（不回背包，避免同一灵宠被两个角色同时持有）
+      this.sectMembers.forEach(m => {
+        if (m.id !== memberId && m.equippedPet && (petKey(m.equippedPet) === targetKey || m.equippedPet === pet)) {
+          m.equippedPet = null
+        }
+      })
+      // 卸下当前角色旧灵宠（归还背包）
       if (member.equippedPet) {
         this.items.push(member.equippedPet)
       }
-      // 从 items 中移除该灵宠
-      const petIndex = this.items.findIndex(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')
-      if (petIndex !== -1) this.items.splice(petIndex, 1)
+      // 从背包移除该灵宠（按 uid/id 精确匹配，清除历史上可能重复的同 id 条目）
+      let petIndex
+      while ((petIndex = this.items.findIndex(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')) !== -1) {
+        this.items.splice(petIndex, 1)
+      }
       member.equippedPet = pet
       this.queueSave()
       return { success: true, message: `${pet.name} 已装备给 ${member.name}` }

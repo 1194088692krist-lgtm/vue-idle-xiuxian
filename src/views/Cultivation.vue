@@ -604,7 +604,12 @@ const availableItemsForSlot = computed(() => {
 })
 
 const availablePets = computed(() => {
-  return (playerStore.items || []).filter(item => item.type === 'pet')
+  // 排除已被任意角色装备的灵宠，确保同一灵宠不会被其他角色在界面上选中装备
+  const equipped = new Set()
+  ;(playerStore.sectMembers || []).forEach(m => {
+    if (m.equippedPet) equipped.add(m.equippedPet.uid || m.equippedPet.id)
+  })
+  return (playerStore.items || []).filter(item => item.type === 'pet' && !equipped.has(item.uid || item.id))
 })
 
 // 角色属性计算系统
