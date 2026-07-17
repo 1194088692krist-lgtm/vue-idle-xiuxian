@@ -1,13 +1,15 @@
 import { ref, computed } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
-import { CombatManager, CombatEntity, CombatType } from '../plugins/combat'
+import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugins/combat'
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
+import { getInitialSkills } from '../plugins/skills'
+import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
@@ -36,6 +38,16 @@ const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
 const battlePlayback = ref(null)   // 战斗回放数据：每场遭遇后设置，驱动 BattleStage 组件播放动画
+const currentEncounter = ref({
+  enemy: null,           // 当前怪物 CombatEntity
+  players: [],           // 当前参战玩家 CombatEntity[]
+  round: 0,              // 当前回合计数
+  inProgress: false,     // 是否进行中
+  combatLog: [],         // 本回合战斗日志
+  combatStats: {},       // memberId -> 战斗统计
+  manager: null,         // CombatManager 实例
+  enemyData: null        // 额外敌人信息
+})
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
 
@@ -378,8 +390,8 @@ const activePillBuffList = computed(() => {
   })
 })
 
-// 在线每场遭遇间隔：15 秒
-const ENCOUNTER_INTERVAL = 15000
+// 在线每场遭遇间隔：10 秒（每回合）
+const ENCOUNTER_INTERVAL = 10000
 
 let _store = null
 function store() {
@@ -1598,283 +1610,14 @@ function triggerSkit(team) {
   addLog('skit', `📊 获得「${buff.name}」效果：${buffTypeName}${buff.value > 0 ? '+' : ''}${formatBuffPercent(buff.value)}，持续 ${buff.duration} 场`)
 }
 
-// ============ 挂机单次遭遇（在线，完整战斗模拟） ============
-async function runIdleEncounter() {
-  if (!isIdling.value) return
-  // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
-  // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
-  if (!selectedZone.value) {
-    const saved = store().idleExploration
-    if (saved && saved.zoneId) {
-      const z = getZoneById(saved.zoneId)
-      if (z) selectedZone.value = z
-    }
-    if (!selectedZone.value) return
-  }
-  if (isRunning) return
-  isRunning = true
-  const s = store()
-  const zone = selectedZone.value
-  const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
-  // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
-  if (!diff) return
-  // 注意：isRunning 必须在 try 内赋值，确保任何异常都能在 finally 中重置，
-  // 否则重入锁会永久卡在 true，导致后续所有遭遇被跳过（表现为「挂机静默死掉」）
-  let effectiveZone
-  try {
-    isRunning = true
-    effectiveZone = buildEffectiveZone(zone, diff)
-    s.regenerateSpirit()
-    if (s.spiritStones < diff.spiritCost) {
-      addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
-      stopIdle()
-      return
-    }
-    s.spiritStones -= diff.spiritCost
-    idleEncounterCount.value++
-    const count = idleEncounterCount.value
-    const ratio = buildRatio.value
-    const underBuilt = Math.max(0, 1 - ratio)
-    
-    let allDead = true
-    let aliveCount = 0
-    const teamResults = []
-    
-    for (const memberState of teamMemberStates.value) {
-      if (memberState.hp <= 0) continue
-      allDead = false
-      aliveCount++
-      
-      const memberRatio = memberState.buildStrength / (currentRecommendedBuild.value / teamMemberStates.value.length)
-      const memberUnderBuilt = Math.max(0, 1 - memberRatio)
-      
-      const result = await runExploreCombatForMember(effectiveZone, count, memberState, true, selectedDifficultyKey.value)
-      teamResults.push({ member: memberState, result })
-      
-      if (result.victory) {
-        const maxHP = memberState.maxHP
-        const scrape = Math.round(maxHP * (0.05 + 0.15 * memberUnderBuilt))
-        memberState.hp = Math.min(maxHP, memberState.hp + Math.round(maxHP * 0.10) - scrape)
-      } else {
-        const maxHP = memberState.maxHP
-        const hurt = Math.round(maxHP * (0.30 + 0.40 * memberUnderBuilt))
-        memberState.hp -= hurt
-        memberState.hp = Math.max(0, memberState.hp)
-      }
-    }
-    
-    const victory = teamResults.some(r => r.result.victory)
-    let rewards = []
-    let loss = 0
-    let roleEffects = []
-    
-    if (victory) {
-      rewards = grantReward(effectiveZone, true)
-      s.dungeonTotalKills++; s.explorationCount++
-      const recoverRatio = Math.max(0.3, 0.8 - effectiveZone.difficulty * 0.06)
-      const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
-      s.spiritStones += recovered
-      runStats.value.spiritStones += recovered
-      const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5) * getPillBuffMultiplier('cultivationRate'))
-      s.cultivate(cultBonus)
-      runStats.value.cultivation += cultBonus
-      if (count % 20 === 0 && Math.random() < 0.5) {
-        const fortunePool = [getRandomHerb({ difficulty: 9 }), getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 }), getRandomSpecial()].filter(Boolean)
-        const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
-        if (fp) { s.gainMaterial(fp); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + fp.name, material: fp }) }
-      }
-      runStats.value.victories++
-      const expGain = Math.round(10 * effectiveZone.difficulty)
-      runStats.value.exp += expGain
-      teamMemberStates.value.forEach(ms => {
-        if (ms.hp > 0) {
-          s.addCharacterExperience(ms.memberId, expGain)
-        }
-      })
-      
-      rewards.forEach(r => {
-        if (r.type === 'equipment') {
-          r.item._pickedAt = Date.now()
-          foundEquipment.value.push(r.item)
-        }
-      })
-      // 累计本次挂机获得的各类素材
-      accumulateMaterials(rewards)
-      
-      // 触发角色定位特殊效果
-      for (const memberState of teamMemberStates.value) {
-        if (memberState.hp <= 0) continue
-        const member = s.sectMembers.find(m => m.id === memberState.memberId)
-        if (!member) continue
-        const role = member.role || 'vanguard'
-        const roleEffect = ROLE_EFFECTS[role]
-        if (roleEffect) {
-          const effectResult = roleEffect.effect(memberState, teamMemberStates.value)
-          if (effectResult) {
-            roleEffects.push({ ...effectResult, memberName: member.name })
-            // 更新统计数据
-            if (effectResult.type === 'heal') {
-              runStats.value.healAmount += effectResult.value
-            } else if (effectResult.type === 'shield') {
-              runStats.value.shieldAmount += effectResult.value
-            } else if (effectResult.type === 'damage_boost' || effectResult.type === 'attack_buff') {
-              runStats.value.damageBoost++
-            } else if (effectResult.type === 'damage_over_time') {
-              runStats.value.buffCount++
-            }
-          }
-        }
-      }
-    } else {
-      loss = Math.floor(s.cultivationPool * 0.05)
-      s.cultivationPool = Math.max(0, s.cultivationPool - loss)
-      s.dungeonDeathCount++
-      runStats.value.defeats++
-    }
-    
-    const firstResult = teamResults[0]
-    const enemyData = firstResult?.result?.enemy ? { mainEnemy: firstResult.result.enemy, allBosses: firstResult.result.allBosses || [] } : generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
-    const enemy = enemyData.mainEnemy
-
-    // 计算本次遭遇附加在怪物身上的状态效果（与日志、仪表盘怪物面板同步）
-    let enemyStatusEffects = []
-    if (victory) {
-      const possibleStatus = ['stun', 'bleed']
-      const statusCount = 1 + Math.floor(Math.random() * 2)
-      enemyStatusEffects = [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
-    }
-
-    // 构建怪物快照：展示战斗结算后的真实剩余血量（随结算真实下降），并补上百分比
-    const snapMaxHP = Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0)
-    const snapCurHP = Math.round(enemy.currentHealth ?? snapMaxHP)
-    const snapHpPct = snapMaxHP > 0 ? Math.max(0, Math.min(100, (snapCurHP / snapMaxHP) * 100)).toFixed(0) + '%' : '0%'
-    currentIdleEnemy.value = {
-      name: enemy.name,
-      tier: enemy.tier || 'normal',
-      realm: enemy.realm || '',
-      currentHealth: snapCurHP,
-      maxHealth: snapMaxHP,
-      hpPercent: snapHpPct,
-      dead: snapCurHP <= 0,
-      damage: Math.round(enemy.stats?.damage || 0),
-      defense: Math.round(enemy.stats?.defense || 0),
-      speed: Math.round(enemy.stats?.speed || 0),
-      critRate: enemy.stats?.critRate != null ? (enemy.stats.critRate * 100).toFixed(0) + '%' : '—',
-      effects: enemyStatusEffects.map(statusType => ({
-        type: 'debuff',
-        name: statusType === 'stun' ? '眩晕' : '流血',
-        duration: statusType === 'stun' ? 1 : 3
-      }))
-    }
-
-    // 收集所有成员的战斗结果数据
-    const combatResults = teamResults.map(tr => ({
-      memberId: tr.member.memberId,
-      memberName: tr.member.name,
-      victory: tr.result.victory,
-      combatStats: tr.result.combatStats || {},
-      enemy: tr.result.enemy
-    }))
-
-    logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
-
-    // 构建战斗回放数据：合并所有队员的逐回合数据，驱动 BattleStage 动画
-    const allRounds = []
-    for (const cr of combatResults) {
-      const cs = cr.combatStats || {}
-      for (const r of (cs.roundDetails || [])) {
-        allRounds.push({
-          round: r.round,
-          attacker: r.attacker,
-          defender: r.defender,
-          damage: r.damage,
-          isCrit: r.isCrit,
-          isCombo: r.isCombo,
-          isDodged: r.isDodged,
-          isVampire: r.isVampire,
-          isStun: r.isStun,
-          isCounter: r.isCounter,
-          attackerHP: r.attackerHP,
-          defenderHP: r.defenderHP,
-          attackerMaxHP: r.attackerMaxHP,
-          defenderMaxHP: r.defenderMaxHP,
-          isPlayerAttack: r.isPlayerAttack,
-          memberId: cr.memberId,
-          memberName: cr.memberName
-        })
-      }
-    }
-    // 按 round 排序，形成"队员轮番攻击"的视觉序列
-    allRounds.sort((a, b) => a.round - b.round)
-    // 队员头像信息
-    const playbackMembers = teamMemberStates.value.map(ms => {
-      const m = s.sectMembers.find(c => c.id === ms.memberId)
-      return {
-        memberId: ms.memberId,
-        name: ms.name,
-        maxHP: ms.maxHP,
-        hp: ms.hp,
-        avatar: m ? getCharacterThumbnail(m) : null,
-        role: m ? m.role : 'vanguard',
-        star: m ? m.star : 3
-      }
-    })
-    battlePlayback.value = {
-      id: Date.now() + '_' + count,
-      enemy: { ...currentIdleEnemy.value },
-      members: playbackMembers,
-      rounds: allRounds,
-      victory,
-      rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
-    }
-
-    // 实时更新当前结算画面
-    currentEncounterSummary.value = {
-      count,
-      victory,
-      enemyName: enemy.name,
-      enemyTier: enemy.tier,
-      rewards: rewards.map(r => ({ type: r.type, name: r.name, amount: r.amount, rarity: r.rarity, info: r.info })),
-      loss,
-      teamStates: teamMemberStates.value.map(ms => ({ name: ms.name, hp: ms.hp, maxHP: ms.maxHP })),
-      buffs: [...idleBuffs.value]
-    }
-    // 衰减 buff 剩余场次
-    idleBuffs.value.forEach(b => b.remaining--)
-    idleBuffs.value = idleBuffs.value.filter(b => b.remaining > 0)
-    s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
-    s.queueSave()
-    idleEncounterErrorCount = 0
-    
-    if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
-      addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
-      finishIdle()
-      return
-    }
-  } catch (err) {
-    // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
-    if (idleEncounterErrorCount < 3) {
-      addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
-      idleEncounterErrorCount++
-    }
-  } finally {
-    isRunning = false
-  }
-}
-
-async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false, difficultyKey = 'xiongxian') {
-  const s = store()
-  const member = s.sectMembers.find(m => m.id === memberState.memberId)
-  if (!member) {
-    return { victory: false, enemy: null }
-  }
-  
+// 根据 sectMembers 中的成员数据，计算完整的战斗属性
+function buildMemberCombatStats(member) {
   const baseStats = member.baseStats || {}
   const combatAttrs = member.combatAttributes || {}
   const combatResist = member.combatResistance || {}
   const specialAttrs = member.specialAttributes || {}
   const talentStats = member.talentStats || {}
-  
+
   const calcFinalStat = (key, baseValue) => {
     const talentVal = talentStats[key] || 0
     if (['attack', 'health', 'defense', 'speed'].includes(key)) {
@@ -1882,12 +1625,12 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     }
     return baseValue + talentVal
   }
-  
+
   let finalHealth = calcFinalStat('health', baseStats.health || 0)
   let finalDamage = calcFinalStat('attack', baseStats.attack || 0)
   let finalDefense = calcFinalStat('defense', baseStats.defense || 0)
   let finalSpeed = calcFinalStat('speed', baseStats.speed || 0)
-  
+
   const equipBonus = {}
   const artifacts = member.equippedArtifacts || {}
   Object.values(artifacts).forEach(eq => {
@@ -1907,18 +1650,18 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
       })
     }
   })
-  
+
   const applyEquipBonus = (key, baseVal) => {
     const flat = equipBonus[key] || 0
     const pct = equipBonus['__pct_' + key] || 0
     return (baseVal + flat) * (1 + pct)
   }
-  
+
   finalHealth = Math.floor(applyEquipBonus('health', finalHealth))
   finalDamage = Math.floor(applyEquipBonus('attack', finalDamage))
   finalDefense = Math.floor(applyEquipBonus('defense', finalDefense))
   finalSpeed = Math.floor(applyEquipBonus('speed', finalSpeed))
-  
+
   const pet = member.equippedPet
   if (pet && pet.combatAttributes) {
     const pca = pet.combatAttributes
@@ -1927,7 +1670,7 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     finalDefense += pca.defense || 0
     finalSpeed += pca.speed || 0
   }
-  
+
   const stats = {
     health: finalHealth,
     maxHealth: finalHealth,
@@ -1954,12 +1697,682 @@ async function runExploreCombatForMember(effectiveZone, encounterCount, memberSt
     combatBoost: calcFinalStat('combatBoost', specialAttrs.combatBoost || 0) + (equipBonus.combatBoost || 0) + (pet?.combatAttributes?.combatBoost || 0),
     resistanceBoost: calcFinalStat('resistanceBoost', specialAttrs.resistanceBoost || 0) + (equipBonus.resistanceBoost || 0) + (pet?.combatAttributes?.resistanceBoost || 0)
   }
-  
+
   // 应用宗派共鸣加成（基于当前出战队伍）
+  const s = store()
   const team = s.getTeamMembersDetail()
   const resonanceEffects = getAllResonanceEffects(team)
-  const resonancedStats = applyResonanceToCombatStats(stats, resonanceEffects)
+  return applyResonanceToCombatStats(stats, resonanceEffects)
+}
 
+function createMemberCombatEntity(member) {
+  const stats = buildMemberCombatStats(member)
+  return new CombatEntity(member.name, member.level, stats, member.schoolName)
+}
+
+// 职业AI行为选择（基于角色真实技能）
+function chooseMemberAction(memberState, teamStates, enemy) {
+  const role = memberState.role || 'vanguard'
+  const hpPercent = memberState.hp / (memberState.maxHP || memberState.maxHealth || 1)
+  const activeSkills = (memberState.skills || []).filter(s => s.type === 'active')
+
+  // 辅助函数：从技能效果中提取数值
+  const getSkillEffectValue = (skill, key, fallback) => {
+    if (!skill || !skill.effect) return fallback
+    return skill.effect[key] !== undefined ? skill.effect[key] : fallback
+  }
+
+  switch (role) {
+    case 'vanguard': {
+      // 血量<30%时，查找是否有攻击/Buff类技能可用
+      if (hpPercent < 0.3) {
+        const buffSkill = activeSkills.find(s => s.category === 'buff')
+        if (buffSkill) {
+          const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
+          const value = getSkillEffectValue(buffSkill, 'value', 0.2)
+          const duration = getSkillEffectValue(buffSkill, 'duration', 2)
+          return { type: 'buff', target: memberState, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
+        }
+        const damageSkill = activeSkills.find(s => s.category === 'damage')
+        if (damageSkill) {
+          return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+        }
+      }
+      // 查找伤害技能
+      const damageSkill = activeSkills.find(s => s.category === 'damage')
+      if (damageSkill) {
+        return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+      }
+      return { type: 'attack' }
+    }
+    case 'blade': {
+      // 优先使用伤害技能，尤其是高倍率的
+      const damageSkills = activeSkills.filter(s => s.category === 'damage')
+      if (damageSkills.length > 0) {
+        // 优先选择倍率最高的
+        damageSkills.sort((a, b) => (b.effect?.damagePercent || 0) - (a.effect?.damagePercent || 0))
+        return { type: 'skill_attack', skill: damageSkills[0], skillName: damageSkills[0].name }
+      }
+      return { type: 'attack' }
+    }
+    case 'herb': {
+      // 有队友HP<50%则优先治疗
+      const wounded = teamStates.filter(t => t.hp > 0 && t.hp / (t.maxHP || t.maxHealth || 1) < 0.5)
+      if (wounded.length > 0) {
+        wounded.sort((a, b) => (a.hp / (a.maxHP || a.maxHealth || 1)) - (b.hp / (b.maxHP || b.maxHealth || 1)))
+        const target = wounded[0]
+        // 查找治疗技能
+        const healSkill = activeSkills.find(s => s.category === 'heal')
+        if (healSkill) {
+          const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
+          const isTeam = getSkillEffectValue(healSkill, 'target', 'single') === 'team'
+          const healAmount = isTeam
+            ? Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
+            : Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
+          return { type: 'heal', target: isTeam ? null : target, value: Math.max(1, healAmount), skillName: healSkill.name, isTeam }
+        }
+        // 没有治疗技能则使用基础治疗
+        const healAmount = Math.floor((memberState.maxHP || memberState.maxHealth || 0) * 0.15)
+        return { type: 'heal', target, value: Math.max(1, healAmount) }
+      }
+      // 没有伤员时，查找Buff技能
+      const buffSkill = activeSkills.find(s => s.category === 'buff')
+      if (buffSkill) {
+        const target = teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState
+        const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
+        const value = getSkillEffectValue(buffSkill, 'value', 0.1)
+        const duration = getSkillEffectValue(buffSkill, 'duration', 3)
+        return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
+      }
+      // 既没有治疗也没有Buff，尝试攻击
+      const damageSkill = activeSkills.find(s => s.category === 'damage')
+      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+      return { type: 'attack' }
+    }
+    case 'shield': {
+      // 有队友血量危急时，优先使用护盾/防御技能
+      const weakAlly = teamStates.find(t => t.memberId !== memberState.memberId && t.hp > 0 && t.hp / (t.maxHP || 1) < 0.4)
+      if (weakAlly) {
+        const shieldSkill = activeSkills.find(s => s.category === 'shield')
+        if (shieldSkill) {
+          return { type: 'defend', target: weakAlly, value: Math.floor((memberState.defense || 0) * 0.5), duration: 2, skillName: shieldSkill.name }
+        }
+        const buffSkill = activeSkills.find(s => s.category === 'buff')
+        if (buffSkill && Math.random() < 0.5) {
+          return { type: 'buff', target: weakAlly, buffType: 'defense_up', value: 0.15, duration: 2, skillName: buffSkill.name }
+        }
+      }
+      // 查找嘲讽/控制技能
+      const controlSkill = activeSkills.find(s => s.category === 'control')
+      if (controlSkill && Math.random() < 0.3) {
+        return { type: 'skill_attack', skill: controlSkill, skillName: controlSkill.name }
+      }
+      // 否则攻击
+      const damageSkill = activeSkills.find(s => s.category === 'damage')
+      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+      return { type: 'attack' }
+    }
+    case 'tactician': {
+      // 掌阵优先释放增益Buff
+      memberState._tacticianCooldown = (memberState._tacticianCooldown || 0) - 1
+      if (memberState._tacticianCooldown > 0) {
+        const damageSkill = activeSkills.find(s => s.category === 'damage')
+        if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+        return { type: 'attack' }
+      }
+      const buffSkill = activeSkills.find(s => s.category === 'buff')
+      if (buffSkill) {
+        memberState._tacticianCooldown = 3
+        const target = teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState
+        const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
+        const value = getSkillEffectValue(buffSkill, 'value', 0.15)
+        const duration = getSkillEffectValue(buffSkill, 'duration', 3)
+        return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
+      }
+      const damageSkill = activeSkills.find(s => s.category === 'damage')
+      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
+      return { type: 'attack' }
+    }
+    default:
+      return { type: 'attack' }
+  }
+}
+
+// 执行一回合战斗（用于挂机遭遇）
+async function executeRound(effectiveZone) {
+  const encounter = currentEncounter.value
+  if (!encounter.inProgress) return { finished: false }
+
+  const players = encounter.players
+  const enemy = encounter.enemy
+  encounter.round++
+  const roundLog = []
+
+  // 初始化每个玩家的 combatStats（如果还没有）
+  for (const p of players) {
+    if (!encounter.combatStats[p.memberId]) {
+      encounter.combatStats[p.memberId] = {
+        playerDamage: 0,
+        playerHeal: 0,
+        playerTookDamage: 0,
+        enemyDamage: 0,
+        rounds: 0,
+        critCount: 0,
+        comboCount: 0,
+        dodgeCount: 0,
+        counterCount: 0,
+        stunCount: 0,
+        vampireCount: 0,
+        playerMaxHP: p.stats.maxHealth,
+        enemyMaxHP: enemy.stats.maxHealth,
+        playerFinalHP: 0,
+        enemyFinalHP: 0,
+        roundDetails: []
+      }
+    }
+  }
+
+  // 1. 结算正面效果（减少 buff duration、触发光环）
+  for (const p of players) {
+    if (p.currentHealth > 0) {
+      p.applyBuffs()
+      p.tickDebuffs()
+    }
+  }
+  if (enemy.currentHealth > 0) {
+    enemy.applyBuffs()
+    enemy.tickDebuffs()
+  }
+
+  // 2. 玩家行动：每个存活角色按职业AI选择行为
+  const attackingPlayers = []
+  const s = store()
+  for (const p of players) {
+    if (p.currentHealth <= 0) continue
+    const memberState = teamMemberStates.value.find(ms => ms.memberId === p.memberId)
+    if (!memberState) continue
+    const action = chooseMemberAction(memberState, teamMemberStates.value, enemy)
+
+    if (action.type === 'attack') {
+      attackingPlayers.push(p)
+    } else if (action.type === 'skill_attack') {
+      // 技能攻击：临时应用技能倍率
+      const skill = action.skill
+      const damagePercent = skill?.effect?.damagePercent || 1.0
+      p._originalDamage = p.stats.damage
+      p.stats.damage = Math.floor(p.stats.damage * damagePercent)
+      p._skillName = action.skillName
+      attackingPlayers.push(p)
+    } else if (action.type === 'heal') {
+      if (action.isTeam) {
+        for (const pl of players) {
+          if (pl.currentHealth > 0) {
+            const healed = pl.heal(action.value)
+            const cs = encounter.combatStats[p.memberId]
+            if (cs) cs.playerHeal += healed
+          }
+        }
+        roundLog.push(`💚 ${p.name}施展${action.skillName || '治疗'}，全队恢复${Math.floor(action.value)}点气血`)
+      } else {
+        const targetEntity = players.find(pl => pl.name === action.target?.name) || p
+        const healed = targetEntity.heal(action.value)
+        const cs = encounter.combatStats[p.memberId]
+        if (cs) cs.playerHeal += healed
+        roundLog.push(`💚 ${p.name}施展${action.skillName || '治疗'}，为${targetEntity.name}恢复${Math.floor(healed)}点气血`)
+      }
+    } else if (action.type === 'buff') {
+      const targetEntity = players.find(pl => pl.name === action.target?.name) || p
+      targetEntity.addBuff({ type: action.buffType, value: action.value, duration: action.duration, source: p.name })
+      roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，${targetEntity.name}获得${action.buffType}（持续${action.duration}回合）`)
+    } else if (action.type === 'defend') {
+      const targetEntity = players.find(pl => pl.name === action.target?.name) || p
+      targetEntity.addBuff({ type: 'defense_up', value: action.value, duration: action.duration, source: p.name })
+      roundLog.push(`🛡️ ${p.name}施展${action.skillName || '防御'}，为${targetEntity.name}展开防御姿态，防御提升`)
+    }
+  }
+
+  // 3. 怪物行动 + 玩家攻击：executeTurn 按速度排序处理所有攻击者
+  if (!encounter.manager) {
+    encounter.manager = new CombatManager(null, null)
+    encounter.manager.start()
+  }
+  const turnResult = encounter.manager.executeTurn(attackingPlayers, enemy)
+
+  // 收集 executeTurn 结果到 combatStats 和 roundLog
+  if (turnResult && turnResult.results) {
+    for (const r of turnResult.results) {
+      const attackerPlayer = players.find(pl => pl.name === r.attacker)
+      const defenderPlayer = players.find(pl => pl.name === r.defender)
+      const isPlayerAttacker = !!attackerPlayer
+
+      // 更新 combatStats
+      if (isPlayerAttacker && attackerPlayer) {
+        const cs = encounter.combatStats[attackerPlayer.memberId]
+        if (cs) {
+          cs.playerDamage += r.damage
+          cs.rounds = encounter.round
+          if (r.isCrit) cs.critCount++
+          if (r.isCombo) cs.comboCount++
+          if (r.isVampire) cs.vampireCount++
+          if (r.isStun) cs.stunCount++
+        }
+      } else if (defenderPlayer) {
+        const cs = encounter.combatStats[defenderPlayer.memberId]
+        if (cs) {
+          cs.playerTookDamage += r.damage
+          cs.enemyDamage += r.damage
+          if (r.isCounter) cs.counterCount++
+        }
+      }
+      if (r.isDodged) {
+        const cs = encounter.combatStats[attackerPlayer?.memberId || defenderPlayer?.memberId]
+        if (cs) cs.dodgeCount++
+      }
+
+      // 记录 roundDetails
+      for (const pid of Object.keys(encounter.combatStats)) {
+        const cs = encounter.combatStats[pid]
+        if (cs.roundDetails.length < 30) {
+          cs.roundDetails.push({
+            round: encounter.round,
+            attacker: r.attacker,
+            defender: r.defender,
+            damage: Math.round(r.damage),
+            isCrit: r.isCrit || false,
+            isCombo: r.isCombo || false,
+            isDodged: r.isDodged || false,
+            isVampire: r.isVampire || false,
+            isStun: r.isStun || false,
+            isCounter: r.isCounter || false,
+            attackerHP: r.attackerHP || 0,
+            defenderHP: r.defenderHP || 0,
+            attackerMaxHP: r.attackerMaxHP || 0,
+            defenderMaxHP: r.defenderMaxHP || 0,
+            isPlayerAttack: isPlayerAttacker
+          })
+        }
+      }
+
+      // 战斗日志文本
+      const skillName = isPlayerAttacker && attackerPlayer?._skillName
+      if (r.isDodged) {
+        roundLog.push(`💨 ${r.attacker}${skillName ? '施展「' + skillName + '」' : '攻击'}${r.defender}被闪避`)
+      } else {
+        let txt = skillName
+          ? `🔥 ${r.attacker}施展「${skillName}」对${r.defender}造成${Math.floor(r.damage)}点伤害`
+          : `⚔️ ${r.attacker}对${r.defender}造成${Math.floor(r.damage)}点伤害`
+        if (r.isCrit) txt += ' [暴击]'
+        if (r.isCombo) txt += ' [连击]'
+        if (r.isVampire) txt += ' [吸血]'
+        if (r.isStun) txt += ' [眩晕]'
+        if (r.isCounter) txt += ' [反击]'
+        roundLog.push(txt)
+      }
+    }
+  }
+
+  // 恢复被技能修改的伤害值
+  for (const p of attackingPlayers) {
+    if (p._originalDamage !== undefined) {
+      p.stats.damage = p._originalDamage
+      delete p._originalDamage
+      delete p._skillName
+    }
+  }
+
+  // 4. 结算负面效果（DoT伤害）
+  for (const p of players) {
+    if (p.currentHealth <= 0) continue
+    const dotDmg = p.tickDebuffs()
+    if (dotDmg > 0) {
+      roundLog.push(`🔥 ${p.name}受到${dotDmg}点持续伤害`)
+      const cs = encounter.combatStats[p.memberId]
+      if (cs) cs.playerTookDamage += dotDmg
+    }
+  }
+  const enemyDot = enemy.tickDebuffs()
+  if (enemyDot > 0) {
+    roundLog.push(`🔥 ${enemy.name}受到${enemyDot}点持续伤害`)
+  }
+
+  // 5. 播报战场状态
+  encounter.combatLog.push(...roundLog)
+
+  // 检查战斗是否结束
+  const battleStatus = isBattleOver(players, enemy)
+  if (battleStatus.over) {
+    // 同步血量回 teamMemberStates
+    for (const p of players) {
+      const ms = teamMemberStates.value.find(m => m.memberId === p.memberId)
+      if (ms) {
+        ms.hp = Math.max(0, Math.round(p.currentHealth))
+      }
+      const cs = encounter.combatStats[p.memberId]
+      if (cs) {
+        cs.playerFinalHP = Math.round(p.currentHealth)
+        cs.enemyFinalHP = Math.round(enemy.currentHealth)
+      }
+    }
+    return { finished: true, victory: battleStatus.victory }
+  }
+
+  return { finished: false }
+}
+
+// ============ 挂机单次遭遇（在线，完整战斗模拟） ============
+async function runIdleEncounter() {
+  if (!isIdling.value) return
+  // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
+  // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
+  if (!selectedZone.value) {
+    const saved = store().idleExploration
+    if (saved && saved.zoneId) {
+      const z = getZoneById(saved.zoneId)
+      if (z) selectedZone.value = z
+    }
+    if (!selectedZone.value) return
+  }
+  if (isRunning) return
+  isRunning = true
+  const s = store()
+  const zone = selectedZone.value
+  const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
+  // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
+  if (!diff) { isRunning = false; return }
+  let effectiveZone
+  try {
+    isRunning = true
+    effectiveZone = buildEffectiveZone(zone, diff)
+    s.regenerateSpirit()
+    if (s.spiritStones < diff.spiritCost) {
+      addLog('warning', '灵石不足，挂机探索暂停，恢复灵石后可继续。')
+      stopIdle()
+      return
+    }
+    s.spiritStones -= diff.spiritCost
+    idleEncounterCount.value++
+    const count = idleEncounterCount.value
+    const ratio = buildRatio.value
+
+    // 1. 如果当前没有进行中的遭遇，初始化新遭遇
+    if (!currentEncounter.value.inProgress) {
+      const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
+      const enemy = enemyData.mainEnemy
+
+      // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
+      const playerEntities = []
+      for (const ms of teamMemberStates.value) {
+        if (ms.hp <= 0) continue
+        const member = s.sectMembers.find(m => m.id === ms.memberId)
+        if (!member) continue
+        const entity = createMemberCombatEntity(member)
+        entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
+        entity.memberId = ms.memberId
+        entity.role = member.role || 'vanguard'
+        playerEntities.push(entity)
+      }
+
+      if (playerEntities.length === 0) {
+        addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
+        finishIdle()
+        return
+      }
+
+      currentEncounter.value = {
+        enemy,
+        players: playerEntities,
+        round: 0,
+        inProgress: true,
+        combatLog: [],
+        combatStats: {},
+        manager: null,
+        enemyData
+      }
+
+      // 遭遇开始日志
+      addLog('header', `【${zone.name}·${diff.label}】第 ${count} 次探索`)
+      const scenePool = (ZONE_SCENES[zone.id] && ZONE_SCENES[zone.id].length) ? ZONE_SCENES[zone.id] : SCENES
+      addLog('scene', pick(scenePool))
+      const appearPool = ENEMY_APPEAR[enemy.tier] || ENEMY_APPEAR.normal
+      addLog('enemy-' + enemy.tier, pick(appearPool)(enemy.name))
+    }
+
+    // 2. 推进一回合
+    const roundResult = await executeRound(effectiveZone)
+
+    // 3. 如果战斗结束，发放奖励/惩罚，重置 currentEncounter
+    if (roundResult.finished) {
+      const victory = roundResult.victory
+      const encounter = currentEncounter.value
+      const enemy = encounter.enemy
+      let rewards = []
+      let loss = 0
+      let roleEffects = []
+
+      if (victory) {
+        rewards = grantReward(effectiveZone, true)
+        s.dungeonTotalKills++; s.explorationCount++
+        const recoverRatio = Math.max(0.3, 0.8 - effectiveZone.difficulty * 0.06)
+        const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
+        s.spiritStones += recovered
+        runStats.value.spiritStones += recovered
+        const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5) * getPillBuffMultiplier('cultivationRate'))
+        s.cultivate(cultBonus)
+        runStats.value.cultivation += cultBonus
+        if (count % 20 === 0 && Math.random() < 0.5) {
+          const fortunePool = [getRandomHerb({ difficulty: 9 }), getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 }), getRandomSpecial()].filter(Boolean)
+          const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
+          if (fp) { s.gainMaterial(fp); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + fp.name, material: fp }) }
+        }
+        runStats.value.victories++
+        const expGain = Math.round(10 * effectiveZone.difficulty)
+        runStats.value.exp += expGain
+        teamMemberStates.value.forEach(ms => {
+          if (ms.hp > 0) s.addCharacterExperience(ms.memberId, expGain)
+        })
+        rewards.forEach(r => {
+          if (r.type === 'equipment') {
+            r.item._pickedAt = Date.now()
+            foundEquipment.value.push(r.item)
+          }
+        })
+        accumulateMaterials(rewards)
+
+        // 战斗掉落
+        const drops = grantCombatDrops(enemy, effectiveZone.id)
+        for (const d of drops) {
+          rewards.push({ type: d.type, name: d.name, amount: 1, ...d })
+        }
+
+        // 触发角色定位特殊效果
+        for (const ms of teamMemberStates.value) {
+          if (ms.hp <= 0) continue
+          const member = s.sectMembers.find(m => m.id === ms.memberId)
+          if (!member) continue
+          const role = member.role || 'vanguard'
+          const roleEffect = ROLE_EFFECTS[role]
+          if (roleEffect) {
+            const effectResult = roleEffect.effect(ms, teamMemberStates.value)
+            if (effectResult) {
+              roleEffects.push({ ...effectResult, memberName: member.name })
+              if (effectResult.type === 'heal') runStats.value.healAmount += effectResult.value
+              else if (effectResult.type === 'shield') runStats.value.shieldAmount += effectResult.value
+              else if (effectResult.type === 'damage_boost' || effectResult.type === 'attack_buff') runStats.value.damageBoost++
+              else if (effectResult.type === 'damage_over_time') runStats.value.buffCount++
+            }
+          }
+        }
+      } else {
+        loss = Math.floor(s.cultivationPool * 0.05)
+        s.cultivationPool = Math.max(0, s.cultivationPool - loss)
+        s.dungeonDeathCount++
+        runStats.value.defeats++
+      }
+
+      // 怪物状态效果
+      let enemyStatusEffects = []
+      if (victory) {
+        const possibleStatus = ['stun', 'bleed']
+        const statusCount = 1 + Math.floor(Math.random() * 2)
+        enemyStatusEffects = [...possibleStatus].sort(() => Math.random() - 0.5).slice(0, statusCount)
+      }
+
+      // 构建怪物快照
+      const snapMaxHP = Math.round(enemy.stats?.maxHealth || enemy.maxHealth || 0)
+      const snapCurHP = Math.round(enemy.currentHealth ?? snapMaxHP)
+      const snapHpPct = snapMaxHP > 0 ? Math.max(0, Math.min(100, (snapCurHP / snapMaxHP) * 100)).toFixed(0) + '%' : '0%'
+      currentIdleEnemy.value = {
+        name: enemy.name,
+        tier: enemy.tier || 'normal',
+        realm: enemy.realm || '',
+        currentHealth: snapCurHP,
+        maxHealth: snapMaxHP,
+        hpPercent: snapHpPct,
+        dead: snapCurHP <= 0,
+        damage: Math.round(enemy.stats?.damage || 0),
+        defense: Math.round(enemy.stats?.defense || 0),
+        speed: Math.round(enemy.stats?.speed || 0),
+        critRate: enemy.stats?.critRate != null ? (enemy.stats.critRate * 100).toFixed(0) + '%' : '—',
+        effects: enemyStatusEffects.map(statusType => ({
+          type: 'debuff',
+          name: statusType === 'stun' ? '眩晕' : '流血',
+          duration: statusType === 'stun' ? 1 : 3
+        }))
+      }
+
+      // 构建 combatResults（兼容 logEncounter）
+      const combatResults = []
+      for (const p of encounter.players) {
+        const cs = encounter.combatStats[p.memberId] || {}
+        combatResults.push({
+          memberId: p.memberId,
+          memberName: p.name,
+          victory,
+          combatStats: cs,
+          enemy
+        })
+      }
+
+      logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
+
+      // 构建战斗回放数据
+      const allRounds = []
+      for (const cr of combatResults) {
+        const cs = cr.combatStats || {}
+        for (const r of (cs.roundDetails || [])) {
+          allRounds.push({
+            round: r.round,
+            attacker: r.attacker,
+            defender: r.defender,
+            damage: r.damage,
+            isCrit: r.isCrit,
+            isCombo: r.isCombo,
+            isDodged: r.isDodged,
+            isVampire: r.isVampire,
+            isStun: r.isStun,
+            isCounter: r.isCounter,
+            attackerHP: r.attackerHP,
+            defenderHP: r.defenderHP,
+            attackerMaxHP: r.attackerMaxHP,
+            defenderMaxHP: r.defenderMaxHP,
+            isPlayerAttack: r.isPlayerAttack,
+            memberId: cr.memberId,
+            memberName: cr.memberName
+          })
+        }
+      }
+      allRounds.sort((a, b) => a.round - b.round)
+      const playbackMembers = teamMemberStates.value.map(ms => {
+        const m = s.sectMembers.find(c => c.id === ms.memberId)
+        return {
+          memberId: ms.memberId,
+          name: ms.name,
+          maxHP: ms.maxHP,
+          hp: ms.hp,
+          avatar: m ? getCharacterThumbnail(m) : null,
+          role: m ? m.role : 'vanguard',
+          star: m ? m.star : 3
+        }
+      })
+      battlePlayback.value = {
+        id: Date.now() + '_' + count,
+        enemy: {
+          ...currentIdleEnemy.value,
+          avatar: getMonsterAvatarSync(currentIdleEnemy.value.name, 'thumbnail'),
+          portrait: getMonsterAvatarSync(currentIdleEnemy.value.name, 'full')
+        },
+        members: playbackMembers,
+        rounds: allRounds,
+        victory,
+        rewards: rewards.map(r => ({ type: r.type, name: r.name, rarity: r.rarity, amount: r.amount }))
+      }
+
+      // 实时更新当前结算画面
+      currentEncounterSummary.value = {
+        count,
+        victory,
+        enemyName: enemy.name,
+        enemyTier: enemy.tier,
+        rewards: rewards.map(r => ({ type: r.type, name: r.name, amount: r.amount, rarity: r.rarity, info: r.info })),
+        loss,
+        teamStates: teamMemberStates.value.map(ms => ({ name: ms.name, hp: ms.hp, maxHP: ms.maxHP })),
+        buffs: [...idleBuffs.value]
+      }
+
+      // 衰减 buff 剩余场次
+      idleBuffs.value.forEach(b => b.remaining--)
+      idleBuffs.value = idleBuffs.value.filter(b => b.remaining > 0)
+      s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
+      s.queueSave()
+      idleEncounterErrorCount = 0
+
+      // 重置 currentEncounter
+      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+
+      if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
+        addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
+        finishIdle()
+        return
+      }
+    } else {
+      // 战斗未结束，播报回合状态
+      const encounter = currentEncounter.value
+      addLog('combat', `—— 第 ${encounter.round} 回合 ——`)
+      for (const logEntry of encounter.combatLog.slice(-15)) {
+        if (typeof logEntry === 'string') addLog('combat', logEntry)
+        else if (logEntry && logEntry.text) addLog(logEntry.type || 'combat', logEntry.text)
+      }
+      // 播报战场状态
+      for (const p of encounter.players) {
+        const hpPct = p.stats.maxHealth > 0 ? Math.round((p.currentHealth / p.stats.maxHealth) * 100) : 0
+        addLog('combat', `${p.name}: ${Math.round(p.currentHealth)}/${p.stats.maxHealth} (${hpPct}%)`)
+      }
+      const e = encounter.enemy
+      const eHpPct = e.stats.maxHealth > 0 ? Math.round((e.currentHealth / e.stats.maxHealth) * 100) : 0
+      addLog('combat', `${e.name}: ${Math.round(e.currentHealth)}/${e.stats.maxHealth} (${eHpPct}%)`)
+
+      s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
+      s.queueSave()
+    }
+  } catch (err) {
+    // 单次遭遇异常只跳过本次，不卡死重入锁、不终止挂机；最多记录 3 次避免刷屏
+    if (idleEncounterErrorCount < 3) {
+      addLog('warning', '挂机遭遇结算异常，已跳过本次并继续：' + (err && err.message ? err.message : String(err)))
+      idleEncounterErrorCount++
+    }
+  } finally {
+    isRunning = false
+  }
+}
+
+async function runExploreCombatForMember(effectiveZone, encounterCount, memberState, isIdleMode = false, difficultyKey = 'xiongxian') {
+  const s = store()
+  const member = s.sectMembers.find(m => m.id === memberState.memberId)
+  if (!member) {
+    return { victory: false, enemy: null }
+  }
+  
+  const resonancedStats = buildMemberCombatStats(member)
   const playerEntity = new CombatEntity(member.name, member.level, resonancedStats, member.schoolName)
   const enemyData = generateZoneEnemy(effectiveZone, encounterCount, difficultyKey)
   const allDrops = []
@@ -2208,9 +2621,17 @@ function startIdle(durationMinutes) {
       finalSpeed += pca.speed || 0
     }
 
+    // 确保角色有技能（兼容旧存档）
+    let memberSkills = member.skills
+    if (!memberSkills || memberSkills.length === 0) {
+      memberSkills = getInitialSkills(member.role)
+      member.skills = memberSkills
+    }
+
     return {
       memberId: member.id,
       name: member.name,
+      role: member.role || 'vanguard',
       hp: finalHealth,
       maxHP: finalHealth,
       maxHealth: finalHealth,
@@ -2218,6 +2639,7 @@ function startIdle(durationMinutes) {
       damage: finalAttack,
       defense: finalDefense,
       speed: finalSpeed,
+      skills: memberSkills,
       buildStrength: s.getCharacterBuildStrength(member)
     }
   })

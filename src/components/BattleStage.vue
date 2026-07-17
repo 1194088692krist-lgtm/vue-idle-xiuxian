@@ -56,8 +56,18 @@
       <div class="enemy-side">
         <div class="fighter enemy" :class="getEnemyClasses()">
           <div class="avatar-wrap">
-            <div class="fighter-avatar enemy-avatar">
-              <span class="enemy-emoji">{{ enemyEmoji }}</span>
+            <div
+              class="fighter-avatar enemy-avatar"
+              :class="{ 'clickable-portrait': isImageUrl(playback.enemy?.avatar) }"
+              @click="openMonsterPortrait"
+            >
+              <img
+                v-if="isImageUrl(playback.enemy?.avatar)"
+                :src="playback.enemy.avatar"
+                class="enemy-avatar-img"
+                :alt="playback.enemy?.name"
+              />
+              <span v-else class="enemy-emoji">{{ enemyEmoji }}</span>
             </div>
             <span class="tier-badge" :class="'tier-' + (playback.enemy?.tier || 'normal')">{{ tierText }}</span>
             <div v-if="stunTarget === 'enemy'" class="stun-stars">💫</div>
@@ -140,6 +150,21 @@
         </div>
       </div>
     </teleport>
+
+    <!-- 怪物立绘弹窗 -->
+    <teleport to="body">
+      <div v-if="showMonsterPortrait" class="monster-portrait-modal" @click.self="showMonsterPortrait = false">
+        <div class="monster-portrait-content">
+          <div class="modal-header">
+            <span>{{ monsterPortraitName }}</span>
+            <button class="close-btn" @click="showMonsterPortrait = false">×</button>
+          </div>
+          <div class="monster-portrait-body">
+            <img :src="monsterPortraitUrl" class="monster-portrait-img" :alt="monsterPortraitName" />
+          </div>
+        </div>
+      </div>
+    </teleport>
   </div>
 </template>
 
@@ -187,6 +212,26 @@ const dropOrb = reactive({ show: false, rarity: '', emoji: '' })
 // 日志
 const battleLog = reactive([])
 const showFullLog = ref(false)
+
+// 怪物立绘弹窗
+const showMonsterPortrait = ref(false)
+const monsterPortraitUrl = ref('')
+const monsterPortraitName = ref('')
+
+function openMonsterPortrait() {
+  const enemy = props.playback?.enemy
+  if (!enemy) return
+  const portrait = enemy.portrait || enemy.avatar
+  if (portrait && (portrait.startsWith('http') || portrait.startsWith('/'))) {
+    monsterPortraitUrl.value = portrait
+    monsterPortraitName.value = enemy.name || '怪物'
+    showMonsterPortrait.value = true
+  }
+}
+
+function isImageUrl(str) {
+  return str && (str.startsWith('http') || str.startsWith('/'))
+}
 
 const totalRounds = computed(() => props.playback?.rounds?.length || 0)
 const currentRoundNum = computed(() => Math.min(roundIndex.value, totalRounds.value))
@@ -1263,6 +1308,68 @@ onUnmounted(() => {
   font-size: 12px;
   white-space: normal;
   text-overflow: initial;
+}
+
+/* 怪物头像样式 */
+.enemy-avatar.clickable-portrait {
+  cursor: pointer;
+  transition: transform 0.2s, box-shadow 0.2s;
+}
+.enemy-avatar.clickable-portrait:hover {
+  transform: scale(1.08);
+  box-shadow: 0 0 12px rgba(255, 107, 107, 0.5);
+}
+.enemy-avatar-img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+  border-radius: 50%;
+}
+
+/* 怪物立绘弹窗 */
+.monster-portrait-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.8);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 2000;
+  padding: 20px;
+}
+.monster-portrait-content {
+  width: 90%;
+  max-width: 700px;
+  max-height: 90vh;
+  background: linear-gradient(135deg, rgba(30, 20, 40, 0.98), rgba(15, 10, 25, 0.98));
+  border: 1px solid rgba(139, 92, 246, 0.3);
+  border-radius: 12px;
+  overflow: hidden;
+  display: flex;
+  flex-direction: column;
+}
+.monster-portrait-content .modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(139, 92, 246, 0.2);
+  font-weight: 600;
+  font-size: 16px;
+  color: #e0e0e0;
+}
+.monster-portrait-body {
+  padding: 16px;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 200px;
+}
+.monster-portrait-img {
+  max-width: 100%;
+  max-height: 70vh;
+  border-radius: 8px;
+  object-fit: contain;
 }
 
 /* 掉落光球 */
