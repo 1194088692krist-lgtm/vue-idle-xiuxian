@@ -436,6 +436,7 @@ let idleInterval = null
 let idleTimer = null
 let isRunning = false // 重入锁
 let idleEncounterErrorCount = 0 // 挂机遭遇异常日志去重计数（避免刷屏）
+let isFinishingIdle = false // 挂机待结束标志：全队力竭后延迟结束期间置 true，阻止定时器再次触发遭遇
 
 // ============ 生动日志文案库（修仙风） ============
 // 通用场景（无专属描写时回退）
@@ -2098,6 +2099,7 @@ async function runIdleEncounter() {
   idleDiag.value.lastStage = '入口'
   idleDiag.value.isRunningStuck = isRunning
   if (!isIdling.value) { idleDiag.value.lastStage = '跳过:isIdling=false'; idleDiag.value.skipCount++; return }
+  if (isFinishingIdle) { idleDiag.value.lastStage = '跳过:待结束中'; idleDiag.value.skipCount++; return }
   // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
   // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
   if (!selectedZone.value) {
@@ -2386,7 +2388,10 @@ async function runIdleEncounter() {
 
       if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
         addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
-        finishIdle()
+        // 延迟结束挂机：先让 battlePlayback 播放失败动画（finishIdle 会清空 battlePlayback），
+        // 否则玩家会看到"直接结算"而看不到战斗失败画面
+        isFinishingIdle = true
+        setTimeout(() => { finishIdle() }, 4000)
         return
       }
     } else {
@@ -2630,6 +2635,7 @@ function startIdle(durationMinutes) {
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
   isIdling.value = true
   idleEncounterErrorCount = 0
+  isFinishingIdle = false // 重置待结束标志，避免上次延迟的 finishIdle 影响新挂机
   idleEncounterCount.value = 0
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0 }
   foundEquipment.value = []
@@ -2739,6 +2745,7 @@ function finishIdle() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
+  isFinishingIdle = false // 清除待结束标志
   // 挂机结束时，flush 所有待显示日志
   flushAllPendingLogs()
   const s = store()
