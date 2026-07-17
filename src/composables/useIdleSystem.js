@@ -2390,10 +2390,11 @@ async function runIdleEncounter() {
       logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
 
       // 实时战斗模式：currentEncounter 已在 runIdleEncounter 中按回合推进，
-      // BattleStage 直接渲染 currentEncounter（无需整场回放 battlePlayback）。
-      // 这里仅清理 currentEncounter 让下一场遭遇重新开始。
+      // BattleStage 直接渲染 currentEncounter。战斗结束后仅置 inProgress=false，
+      // 保留 enemy/players 让 BattleStage 显示胜利/败北 badge，直到下一场遭遇或停止挂机。
       idleDiag.value.lastStage = '遭遇结束(victory=' + victory + ')'
-      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+      idleDiag.value.lastPlaybackSet = ''
+      currentEncounter.value = { ...currentEncounter.value, inProgress: false }
 
       // 实时更新当前结算画面
       currentEncounterSummary.value = {
@@ -2414,12 +2415,9 @@ async function runIdleEncounter() {
       s.queueSave()
       idleEncounterErrorCount = 0
 
-      // 重置 currentEncounter
-      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
-
       if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
         addLog('defeat', `💀 全队力竭！你的队伍 Build 强度（${Math.round(playerBuildStrength.value)}）不足以撑过【${zone.name}·${diff.label}】（推荐 ${Math.round(currentRecommendedBuild.value)}），挂机被迫提前终止。`)
-        // 延迟结束挂机：先让 battlePlayback 播放失败动画（finishIdle 会清空 battlePlayback），
+        // 延迟结束挂机：先让 BattleStage 显示败北动画（finishIdle 会清空 currentEncounter），
         // 否则玩家会看到"直接结算"而看不到战斗失败画面
         isFinishingIdle = true
         setTimeout(() => { finishIdle() }, 4000)
@@ -2438,8 +2436,9 @@ async function runIdleEncounter() {
       const eHpPct = e.stats.maxHealth > 0 ? Math.round((e.currentHealth / e.stats.maxHealth) * 100) : 0
       addLog('combat', `${e.name}: ${Math.round(e.currentHealth)}/${e.stats.maxHealth} (${eHpPct}%)`)
 
-      // 僵局收场：重置 currentEncounter，让下次遭遇重新开始，避免同一场战斗永远卡住
-      currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+      // 僵局收场：仅置 inProgress=false，保留 enemy/players 让 BattleStage 显示当前状态，
+      // 下次遭遇开始时会重新创建 currentEncounter
+      currentEncounter.value = { ...currentEncounter.value, inProgress: false }
       // 同步玩家血量到 teamMemberStates
       for (const p of encounter.players) {
         const ms = teamMemberStates.value.find(m => m.memberId === p.memberId)

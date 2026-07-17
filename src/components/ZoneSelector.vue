@@ -203,7 +203,8 @@
       </div>
 
       <!-- 实时战斗舞台（挂机与手动探索共用，实时渲染 currentEncounter） -->
-      <BattleStage v-if="currentEncounter && currentEncounter.inProgress" :encounter="currentEncounter" />
+      <!-- 战斗结束后保留显示胜利/败北 badge，直到下一场遭遇或停止挂机 -->
+      <BattleStage v-if="currentEncounter && currentEncounter.enemy && currentEncounter.players && currentEncounter.players.length" :encounter="currentEncounter" />
 
       <!-- 挂机探索区域（开始探索/气血条 已并入挂机面板，简化交互） -->
       <div v-if="!combatState.inCombat" class="idle-section">
