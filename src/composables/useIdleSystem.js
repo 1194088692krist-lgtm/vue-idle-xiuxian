@@ -37,7 +37,6 @@ const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
-<<<<<<< HEAD
 const battlePlayback = ref(null)   // 战斗回放数据：每场遭遇后设置，驱动 BattleStage 组件播放动画
 // 诊断面板状态：实时显示 runIdleEncounter 的执行轨迹与捕获的异常，便于玩家无控制台时定位问题
 const idleDiag = ref({
@@ -55,8 +54,6 @@ const idleDiag = ref({
   lastFinished: '',       // 最近一次战斗结果
   lastPlaybackSet: ''     // 最近一次 battlePlayback 设置时间
 })
-=======
->>>>>>> origin/main
 const currentEncounter = ref({
   enemy: null,           // 当前怪物 CombatEntity
   players: [],           // 当前参战玩家 CombatEntity[]
@@ -2216,12 +2213,9 @@ async function runIdleEncounter() {
       idleDiag.value.lastStage = '创建新遭遇'
       const enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
       const enemy = enemyData.mainEnemy
-<<<<<<< HEAD
       idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
-=======
       enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
       enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
->>>>>>> origin/main
 
       // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
       const playerEntities = []
