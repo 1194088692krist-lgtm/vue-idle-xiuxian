@@ -419,6 +419,99 @@
       </div>
     </div>
 
+    <!-- 挂机结算栏 -->
+    <div v-if="lastSummary && !isIdling" class="idle-summary-section glass-card">
+      <div class="idle-summary-header">
+        <h3 class="section-title">挂机结算</h3>
+        <span class="idle-summary-meta">
+          {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 · {{ lastSummary.encounters }}次探索
+        </span>
+      </div>
+
+      <!-- 挂机统计 -->
+      <div class="idle-summary">
+        <div class="summary-item">
+          <span class="summary-label">总探索</span>
+          <span class="summary-value">{{ lastSummary.encounters }}次</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">胜利</span>
+          <span class="summary-value green">{{ lastSummary.victories }}次</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">失败</span>
+          <span class="summary-value red">{{ lastSummary.defeats }}次</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">获得灵石</span>
+          <span class="summary-value gold">{{ lastSummary.totalStones }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">获得幻灵结晶</span>
+          <span class="summary-value" style="color:#9370db">{{ lastSummary.totalPhantomCrystals || 0 }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">获得修为</span>
+          <span class="summary-value">{{ lastSummary.totalCultivation }}</span>
+        </div>
+        <div class="summary-item">
+          <span class="summary-label">获得装备</span>
+          <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
+        </div>
+      </div>
+
+      <!-- 获得素材汇总 -->
+      <div v-if="lastSummary.materialSummary && lastSummary.materialSummary.length" class="material-detail-section">
+        <div class="material-detail-header">
+          <span class="material-detail-title">📦 获得素材</span>
+        </div>
+        <div class="material-detail-list">
+          <div
+            v-for="m in lastSummary.materialSummary"
+            :key="m.type"
+            class="material-detail-item"
+          >
+            <img v-if="m.icon" :src="m.icon" class="material-icon" :alt="m.name" />
+            <span class="material-name">{{ m.name }}</span>
+            <span class="material-amount">×{{ formatNumber(m.amount) }}</span>
+          </div>
+        </div>
+      </div>
+
+      <!-- 获得装备详情 -->
+      <div v-if="lastSummary.equipmentList && lastSummary.equipmentList.length > 0" class="equipment-detail-section">
+        <div class="equipment-detail-header">
+          <span class="equipment-detail-title">🎁 获得装备详情</span>
+        </div>
+        <div class="equipment-detail-list">
+          <div
+            v-for="(eq, index) in lastSummary.equipmentList"
+            :key="index"
+            class="equipment-detail-item"
+            :style="{ borderColor: eq.qualityInfo?.color || '#888' }"
+            @click="openBattleRewardEquipDetail(eq)"
+          >
+            <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
+              {{ eq.name }}
+              <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
+              <span class="eq-score">评分 {{ getEquipScore(eq) }}</span>
+            </div>
+            <div class="eq-type">{{ getEquipSlotName(eq) }}</div>
+            <div class="eq-stats">
+              <span v-for="(value, key) in (eq.mainAttributes || eq.stats || {})" :key="key" class="eq-stat">
+                {{ getStatName(key) }} +{{ formatStatValue(key, value) }}
+              </span>
+            </div>
+            <div v-if="eq.affixes && eq.affixes.length > 0" class="eq-affixes">
+              <span v-for="(affix, idx) in eq.affixes" :key="idx" class="eq-affix">
+                {{ affix.name }}
+              </span>
+            </div>
+            <div class="eq-click-hint">点击查看详情</div>
+          </div>
+        </div>
+      </div>
+    </div>
 
     <!-- 队伍选择弹窗 -->
     <Teleport to="body">
@@ -550,6 +643,7 @@ const {
   idleEncounterCount,
   idleProgress,
   idleTimeRemaining,
+  lastSummary,
   combatState,
   animState,
   canStartIdle,
@@ -1792,6 +1886,33 @@ onUnmounted(() => {
   border-top: 1px dashed rgba(255, 255, 255, 0.15);
   font-family: 'Segoe UI', 'Noto Sans SC', 'PingFang SC', 'Microsoft YaHei', Consolas, Menlo, monospace, 'Apple Color Emoji', 'Segoe UI Emoji', 'Noto Color Emoji';
   letter-spacing: 0.3px;
+}
+
+/* 挂机结算栏 */
+.idle-summary-section {
+  position: relative;
+  padding: 16px;
+  border-radius: 12px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(255, 255, 255, 0.08);
+  margin-top: 16px;
+}
+.idle-summary-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 8px;
+  flex-wrap: wrap;
+  margin-bottom: 6px;
+}
+.idle-summary-header .section-title {
+  margin: 0;
+  font-size: 15px;
+  color: #DAA520;
+}
+.idle-summary-meta {
+  font-size: 12px;
+  color: #C9C4BA;
 }
 
 /* 挂机统计 */
