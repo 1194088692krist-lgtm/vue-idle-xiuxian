@@ -372,6 +372,7 @@
                 v-for="eq in idleDashboard.recentEquipment"
                 :key="eq.id + '_' + eq.time"
                 class="dash-equipment-item"
+                :class="getDashEqEffect(eq.rarity)"
                 :style="{ borderColor: eq.color, color: eq.color }"
                 @click="showDashEquipment(eq)"
               >
@@ -418,140 +419,6 @@
       </div>
     </div>
 
-    <!-- 挂机日志区域 -->
-    <div v-if="isIdling || lastSummary" class="idle-log-section glass-card">
-      <div class="idle-log-header">
-        <div class="idle-log-title-wrap">
-          <h3 class="section-title">{{ isIdling ? '挂机日志（实时）' : '上次挂机日志' }}</h3>
-          <span v-if="lastSummary && !isIdling" class="log-meta">
-            {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 ·
-            {{ lastSummary.encounters }}次探索
-          </span>
-        </div>
-        <button class="log-toggle-btn" @click="toggleIdleLog">
-          {{ idleLogExpanded ? '收起' : '展开' }}
-        </button>
-      </div>
-      <!-- 宝物高亮弹窗（日志上方） -->
-      <transition name="flash">
-        <div v-if="treasureFlash.show" class="treasure-flash" :class="treasureFlash.tier" :style="{ '--flash-color': treasureFlash.color || '#FFD700' }">
-          <button class="btn btn-close btn-warning" @click.stop="hideTreasureFlash" style="position: absolute; top: 8px; right: 8px; padding: 2px 8px; font-size: 12px;">×</button>
-          <div class="flash-content" @click="hideTreasureFlash">
-            <img v-if="treasureFlash.iconImage" :src="treasureFlash.iconImage" class="flash-icon-img" :alt="treasureFlash.title" />
-            <div v-else class="flash-icon">{{ treasureFlash.icon }}</div>
-            <div class="flash-title">{{ treasureFlash.title }}</div>
-            <div class="flash-desc">{{ treasureFlash.desc }}</div>
-          </div>
-        </div>
-      </transition>
-      <template v-if="idleLogExpanded">
-      <div class="idle-log-body" ref="idleLogRef" @scroll.passive="handleScroll">
-        <div
-          v-for="(log, idx) in displayLogs"
-          :key="idx"
-          class="log-line"
-          :class="log.type"
-        >
-          <img v-if="log.avatar" :src="log.avatar" class="log-avatar" alt="" />
-          <div class="log-content">
-            <div class="log-text">
-              <template v-if="log.parts">
-                <span v-for="(part, idx) in log.parts" :key="idx">
-                  <img v-if="part.icon" :src="part.icon" class="log-inline-icon" :alt="part.text" />
-                  {{ part.text || '' }}
-                </span>
-              </template>
-              <template v-else>{{ log.text }}</template>
-            </div>
-            <div v-if="log.detail" class="log-detail">{{ log.detail }}</div>
-          </div>
-        </div>
-      </div>
-      <!-- 挂机统计 -->
-      <div v-if="lastSummary && !isIdling" class="idle-summary">
-        <div class="summary-item">
-          <span class="summary-label">总探索</span>
-          <span class="summary-value">{{ lastSummary.encounters }}次</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">胜利</span>
-          <span class="summary-value green">{{ lastSummary.victories }}次</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">失败</span>
-          <span class="summary-value red">{{ lastSummary.defeats }}次</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">获得灵石</span>
-          <span class="summary-value gold">{{ lastSummary.totalStones }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">获得幻灵结晶</span>
-          <span class="summary-value" style="color:#9370db">{{ lastSummary.totalPhantomCrystals || 0 }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">获得修为</span>
-          <span class="summary-value">{{ lastSummary.totalCultivation }}</span>
-        </div>
-        <div class="summary-item">
-          <span class="summary-label">获得装备</span>
-          <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
-        </div>
-      </div>
-
-      <!-- 获得素材汇总 -->
-      <div v-if="lastSummary && !isIdling && lastSummary.materialSummary && lastSummary.materialSummary.length" class="material-detail-section">
-        <div class="material-detail-header">
-          <span class="material-detail-title">📦 获得素材</span>
-        </div>
-        <div class="material-detail-list">
-          <div
-            v-for="m in lastSummary.materialSummary"
-            :key="m.type"
-            class="material-detail-item"
-          >
-            <img v-if="m.icon" :src="m.icon" class="material-icon" :alt="m.name" />
-            <span class="material-name">{{ m.name }}</span>
-            <span class="material-amount">×{{ formatNumber(m.amount) }}</span>
-          </div>
-        </div>
-      </div>
-
-      <!-- 获得装备详情 -->
-      <div v-if="lastSummary && !isIdling && lastSummary.equipmentList && lastSummary.equipmentList.length > 0" class="equipment-detail-section">
-        <div class="equipment-detail-header">
-          <span class="equipment-detail-title">🎁 获得装备详情</span>
-        </div>
-        <div class="equipment-detail-list">
-          <div
-            v-for="(eq, index) in lastSummary.equipmentList"
-            :key="index"
-            class="equipment-detail-item"
-            :style="{ borderColor: eq.qualityInfo?.color || '#888' }"
-            @click="openBattleRewardEquipDetail(eq)"
-          >
-            <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
-              {{ eq.name }}
-              <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
-              <span class="eq-score">评分 {{ getEquipScore(eq) }}</span>
-            </div>
-            <div class="eq-type">{{ getEquipSlotName(eq) }}</div>
-            <div class="eq-stats">
-              <span v-for="(value, key) in (eq.mainAttributes || eq.stats || {})" :key="key" class="eq-stat">
-                {{ getStatName(key) }} +{{ formatStatValue(key, value) }}
-              </span>
-            </div>
-            <div v-if="eq.affixes && eq.affixes.length > 0" class="eq-affixes">
-              <span v-for="(affix, idx) in eq.affixes" :key="idx" class="eq-affix">
-                {{ affix.name }}
-              </span>
-            </div>
-            <div class="eq-click-hint">点击查看详情</div>
-          </div>
-        </div>
-      </div>
-      </template>
-    </div>
 
     <!-- 队伍选择弹窗 -->
     <Teleport to="body">
@@ -680,15 +547,11 @@ const {
   selectedZone,
   selectedDifficultyKey,
   isIdling,
-  displayLogs,
   idleEncounterCount,
   idleProgress,
   idleTimeRemaining,
-  lastSummary,
   combatState,
   animState,
-  treasureFlash,
-  hideTreasureFlash,
   canStartIdle,
   playerBuildStrength,
   currentRecommendedBuild,
@@ -772,6 +635,19 @@ const showDashEquipment = (eq) => {
   dashEqDetail.value = eq
   showDashEqModal.value = true
 }
+
+// 最近获得装备：按稀有度映射发光/渐变流光特效档位（稀有及以上保留宝物高亮提示）
+const DASH_EQ_EFFECT = {
+  rare: 'is-rare',
+  epic: 'is-epic',
+  legendary: 'is-legendary',
+  mythic: 'is-mythic',
+  spiritual: 'is-rare',
+  mystic: 'is-epic',
+  celestial: 'is-legendary',
+  divine: 'is-mythic'
+}
+const getDashEqEffect = (rarity) => DASH_EQ_EFFECT[rarity] || ''
 
 // 队伍选择相关
 const showTeamModal = ref(false)
@@ -960,55 +836,6 @@ const useBattlePill = (pill) => {
   }
 }
 
-// 智能滚动：用户手动滚动时不强制回到底部
-const idleLogRef = ref(null)
-const userScrolling = ref(false)
-let userScrollTimer = null
-let isProgrammaticScroll = false
-
-// 挂机日志展开/收起：默认收起（用户反馈实时滚动日志干扰），状态持久化到 localStorage
-const idleLogExpanded = ref(localStorage.getItem('idleLogExpanded') === 'true')
-const toggleIdleLog = () => {
-  idleLogExpanded.value = !idleLogExpanded.value
-  localStorage.setItem('idleLogExpanded', idleLogExpanded.value ? 'true' : 'false')
-}
-
-const isAtBottom = () => {
-  if (!idleLogRef.value) return true
-  const el = idleLogRef.value
-  return el.scrollTop + el.clientHeight >= el.scrollHeight - 20
-}
-
-const handleScroll = () => {
-  // 忽略由代码触发的滚动（避免程序滚动到底部时把 userScrolling 误清）
-  if (isProgrammaticScroll) return
-  if (!isAtBottom()) {
-    userScrolling.value = true
-    if (userScrollTimer) clearTimeout(userScrollTimer)
-    userScrollTimer = setTimeout(() => {
-      userScrolling.value = false
-    }, 5000)
-  } else {
-    userScrolling.value = false
-    if (userScrollTimer) clearTimeout(userScrollTimer)
-  }
-}
-
-// 日志变化时：仅在用户未回看时自动滚动到底部（flush: 'post' 确保 DOM 已更新）
-watch(
-  () => displayLogs.value.length,
-  () => {
-    if (idleLogRef.value && !userScrolling.value) {
-      isProgrammaticScroll = true
-      idleLogRef.value.scrollTop = idleLogRef.value.scrollHeight
-      // 程序滚动后立即恢复标志，允许后续用户滚动事件被处理
-      requestAnimationFrame(() => {
-        isProgrammaticScroll = false
-      })
-    }
-  },
-  { flush: 'post' }
-)
 
 // 战斗奖励装备详情弹窗
 const battleRewardEqDetail = ref(null)
@@ -2768,6 +2595,42 @@ onUnmounted(() => {
 }
 .dash-equipment-item:hover {
   opacity: 0.8;
+}
+/* 最近获得装备：稀有及以上 发光文本框 + 渐变流光文字（保留宝物高亮特效） */
+.dash-equipment-item.is-rare,
+.dash-equipment-item.is-epic,
+.dash-equipment-item.is-legendary,
+.dash-equipment-item.is-mythic {
+  border-width: 1.5px;
+}
+.dash-equipment-item.is-rare {
+  box-shadow: 0 0 8px rgba(68, 136, 255, 0.45);
+  animation: logIn 0.35s ease;
+}
+.dash-equipment-item.is-epic {
+  box-shadow: 0 0 8px rgba(170, 68, 255, 0.5);
+  animation: logIn 0.35s ease, epicGlowLoop 1.4s ease-in-out infinite;
+}
+.dash-equipment-item.is-legendary {
+  box-shadow: 0 0 10px rgba(255, 215, 0, 0.55);
+  animation: logIn 0.35s ease, legendaryGlowLoop 1.8s ease-in-out infinite, dropPulse 2.6s ease-in-out infinite;
+}
+.dash-equipment-item.is-mythic {
+  box-shadow: 0 0 12px rgba(255, 69, 0, 0.6);
+  animation: logIn 0.35s ease, mythicGlowLoop 1.5s ease-in-out infinite, dropPulse 2s ease-in-out infinite;
+}
+/* 稀有及以上：名称渐变滚动流光 */
+.dash-equipment-item.is-rare .eq-name,
+.dash-equipment-item.is-epic .eq-name,
+.dash-equipment-item.is-legendary .eq-name,
+.dash-equipment-item.is-mythic .eq-name {
+  display: inline-block;
+  background: linear-gradient(100deg, currentColor 20%, #ffffff 50%, currentColor 80%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: dropShimmer 3s linear infinite;
 }
 .eq-emoji {
   font-size: 16px;
