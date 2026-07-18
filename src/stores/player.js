@@ -1653,6 +1653,27 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: `成功使用 ${amount} 个妖兽核兑换 ${crystals} 幻灵结晶` }
     },
+    // 消耗 BOSS 挑战券（按 id 删除指定数量，从后往前删避免索引错位）
+    consumeBossTicket(ticketId, count) {
+      if (!ticketId || !count || count <= 0) {
+        return { success: false, message: '消耗参数无效' }
+      }
+      if (!Array.isArray(this.materials)) this.materials = []
+      const ticketIndices = []
+      for (let i = 0; i < this.materials.length; i++) {
+        if (this.materials[i].kind === 'boss_ticket' && this.materials[i].id === ticketId) {
+          ticketIndices.push(i)
+        }
+      }
+      if (ticketIndices.length < count) {
+        return { success: false, message: `挑战券不足，需要 ${count} 张，当前 ${ticketIndices.length} 张` }
+      }
+      for (let i = 0; i < count; i++) {
+        this.materials.splice(ticketIndices[ticketIndices.length - 1 - i], 1)
+      }
+      this.queueSave()
+      return { success: true, message: `消耗 ${count} 张挑战券` }
+    },
     // 统计某种素材的数量（按 kind+id）
     countMaterial(kind, id) {
       if (!Array.isArray(this.materials)) return 0

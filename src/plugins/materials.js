@@ -8,7 +8,8 @@ export const MATERIAL_KINDS = {
   liquid: { name: '灵液', color: '#3aa0c0' },
   core: { name: '妖丹', color: '#c0392b' },
   special: { name: '至宝', color: '#FFD700' },
-  boss_material: { name: 'BOSS素材', color: '#FF4500' }
+  boss_material: { name: 'BOSS素材', color: '#FF4500' },
+  boss_ticket: { name: '挑战券', color: '#FF8C00' }
 }
 
 // 矿料（zoneMin: 该秘境最低难度才可能出现；chance: 相对权重）

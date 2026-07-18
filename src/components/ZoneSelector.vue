@@ -20,6 +20,9 @@
       >
         {{ f.label }}
       </div>
+      <button class="boss-challenge-btn" @click="showBossChallengePanel = true">
+        👑 BOSS 挑战
+      </button>
     </div>
 
     <!-- 区域网格 -->
@@ -278,6 +281,16 @@
               <span class="dash-label">装备</span>
               <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
             </div>
+            <!-- BOSS 挑战券获得统计（击杀 BOSS 时按 30% 掉落 1~2 张） -->
+            <div class="dash-item" v-if="idleDashboard.totalBossTickets > 0">
+              <span class="dash-label">🎟️ 挑战券</span>
+              <span class="dash-value" style="color:#FF8C00">+{{ idleDashboard.totalBossTickets }}</span>
+            </div>
+            <!-- BOSS 素材获得统计 -->
+            <div class="dash-item" v-if="idleDashboard.totalBossMaterials > 0">
+              <span class="dash-label">👹 BOSS素材</span>
+              <span class="dash-value" style="color:#FF4500">+{{ idleDashboard.totalBossMaterials }}</span>
+            </div>
             <!-- 角色定位效果统计 -->
             <div class="dash-item" v-if="idleDashboard.roleEffects.healAmount > 0">
               <span class="dash-label">💚 治疗</span>
@@ -428,6 +441,14 @@
         <div class="summary-item">
           <span class="summary-label">获得装备</span>
           <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
+        </div>
+        <div class="summary-item" v-if="lastSummary.totalBossTickets > 0">
+          <span class="summary-label">🎟️ 挑战券</span>
+          <span class="summary-value" style="color:#FF8C00">+{{ lastSummary.totalBossTickets }}</span>
+        </div>
+        <div class="summary-item" v-if="lastSummary.totalBossMaterials > 0">
+          <span class="summary-label">👹 BOSS素材</span>
+          <span class="summary-value" style="color:#FF4500">+{{ lastSummary.totalBossMaterials }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">总造成伤害</span>
@@ -581,6 +602,140 @@
         <div class="avatar-fullscreen-hint">点击任意位置关闭</div>
       </div>
     </Teleport>
+
+    <!-- BOSS 挑战面板 -->
+    <Teleport to="body">
+      <div v-if="showBossChallengePanel" class="boss-challenge-overlay" @click.self="closeBossChallengePanel">
+        <div class="boss-challenge-modal" @click.stop>
+          <div class="boss-challenge-header">
+            <h3>👑 BOSS 挑战</h3>
+            <button class="modal-close" @click="closeBossChallengePanel">✕</button>
+          </div>
+          <div class="boss-challenge-body">
+            <!-- 当前 Build 提示 -->
+            <div class="boss-challenge-build-info">
+              <span>当前 Build 强度：{{ formatNumber(playerBuildStrength) }}</span>
+              <span class="boss-challenge-tip">挑战需消耗对应 BOSS 专属挑战券（挂机该秘境击杀 BOSS 时 ~30% 概率掉落 1~2 张）</span>
+            </div>
+
+            <!-- BOSS 选择网格（按秘境分组） -->
+            <div v-if="!selectedBossTarget" class="boss-groups">
+              <div v-for="group in bossChallengeGroups" :key="group.zoneId" class="boss-group">
+                <div class="boss-group-title">
+                  <span class="boss-group-name">{{ group.zoneName }}</span>
+                  <span class="boss-group-badge" :style="{ backgroundColor: group.zoneDifficultyColor }">{{ group.zoneDifficultyLabel }}</span>
+                </div>
+                <div class="boss-cards-row">
+                  <div
+                    v-for="boss in group.bosses"
+                    :key="boss.bossId"
+                    class="boss-target-card"
+                    :class="{ disabled: boss.ticketCount <= 0 }"
+                    @click="boss.ticketCount > 0 ? selectBossTarget(group.zoneId, boss) : null"
+                  >
+                    <div class="boss-target-name">{{ boss.name }}</div>
+                    <div class="boss-target-stats">
+                      <span>攻 {{ formatNumber(boss.stats?.attack || 0) }}</span>
+                      <span>血 {{ formatNumber(boss.stats?.health || 0) }}</span>
+                    </div>
+                    <div class="boss-target-ticket" :class="{ none: boss.ticketCount <= 0 }">
+                      🎟️ {{ boss.ticketName }} ×{{ boss.ticketCount }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <!-- BOSS 挑战确认/执行面板 -->
+            <div v-else class="boss-challenge-confirm">
+              <button class="btn-back" @click="selectedBossTarget = null">← 返回选择</button>
+              <div class="boss-confirm-info">
+                <div class="boss-confirm-name">
+                  {{ selectedBossTarget.boss?.name || '' }}
+                  <span class="boss-confirm-zone">（{{ zones.find(z => z.id === selectedBossTarget.zoneId)?.name }}）</span>
+                </div>
+                <div class="boss-confirm-desc">{{ selectedBossTarget.boss?.description }}</div>
+                <div class="boss-confirm-stats">
+                  <span>攻击：{{ formatNumber(selectedBossTarget.boss?.stats?.attack || 0) }}</span>
+                  <span>生命：{{ formatNumber(selectedBossTarget.boss?.stats?.health || 0) }}</span>
+                  <span>防御：{{ formatNumber(selectedBossTarget.boss?.stats?.defense || 0) }}</span>
+                  <span>速度：{{ formatNumber(selectedBossTarget.boss?.stats?.speed || 0) }}</span>
+                </div>
+                <div class="boss-confirm-traits" v-if="selectedBossTarget.boss?.traits?.length">
+                  <span v-for="t in selectedBossTarget.boss.traits" :key="t" class="boss-trait-tag">{{ t }}</span>
+                </div>
+                <div class="boss-confirm-meta">
+                  <div class="meta-row">
+                    <span class="meta-label">🎟️ 挑战券</span>
+                    <span class="meta-value" :style="{ color: selectedBossTicketCount > 0 ? '#FF8C00' : '#EF5350' }">
+                      {{ selectedBossTarget.boss?.name }}挑战券 ×{{ selectedBossTicketCount }}
+                    </span>
+                  </div>
+                  <div class="meta-row">
+                    <span class="meta-label">⚔️ 预估胜率</span>
+                    <span class="meta-value" :style="{ color: selectedBossWinChance >= 50 ? '#66BB6A' : '#EF5350' }">{{ selectedBossWinChance }}%</span>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 挑战次数选择 -->
+              <div class="boss-count-selector">
+                <label class="count-label">挑战次数：</label>
+                <div class="count-options">
+                  <button
+                    v-for="opt in BOSS_CHALLENGE_COUNT_OPTIONS"
+                    :key="opt"
+                    class="count-opt"
+                    :class="{ active: bossChallengeCount === opt }"
+                    @click="bossChallengeCount = opt"
+                  >{{ opt }} 次</button>
+                </div>
+                <input
+                  type="number"
+                  class="count-input"
+                  v-model.number="bossChallengeCount"
+                  min="1"
+                  :max="selectedBossTicketCount"
+                  step="1"
+                />
+                <button class="count-max-btn" @click="bossChallengeCount = selectedBossTicketCount">全部</button>
+              </div>
+
+              <!-- 挑战按钮 -->
+              <button
+                class="btn-execute-challenge"
+                :disabled="selectedBossTicketCount <= 0 || bossChallengeCount <= 0"
+                @click="executeBossChallenge"
+              >
+                ⚔️ 挑战 {{ selectedBossTarget.boss?.name }} ×{{ Math.max(1, Math.floor(bossChallengeCount) || 1) }}
+                （消耗 {{ Math.min(Math.max(1, Math.floor(bossChallengeCount) || 1), selectedBossTicketCount) }} 张挑战券）
+              </button>
+
+              <!-- 挑战结果展示 -->
+              <div v-if="bossChallengeResult && bossChallengeResult.success && bossChallengeResult.bossId === selectedBossTarget.bossId" class="boss-challenge-result">
+                <div class="result-summary">
+                  <span class="result-victory">✅ 胜利 {{ bossChallengeResult.victories }}</span>
+                  <span class="result-defeat">❌ 失败 {{ bossChallengeResult.defeats }}</span>
+                </div>
+                <div v-if="bossChallengeDropSummary.length" class="result-drops">
+                  <div class="result-drops-title">📦 本次获得</div>
+                  <div class="result-drops-list">
+                    <div v-for="d in bossChallengeDropSummary" :key="d.type" class="result-drop-item">
+                      <span class="drop-name">{{ d.name }}</span>
+                      <span class="drop-amount">×{{ d.amount }}</span>
+                    </div>
+                  </div>
+                </div>
+              </div>
+              <!-- 挑战失败提示（券不足等） -->
+              <div v-else-if="bossChallengeResult && !bossChallengeResult.success && bossChallengeResult.bossId === selectedBossTarget.bossId" class="boss-challenge-error">
+                ⚠️ {{ bossChallengeResult.message }}
+              </div>
+            </div>
+          </div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -594,6 +749,7 @@ import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getPillsByZone } from '../plugins/pills'
+import { BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
 import BattleStage from './BattleStage.vue'
 
 // 装备槽位中文映射（结算栏装备展示用）
@@ -648,7 +804,10 @@ const {
   bossSpawned,
   bossDefeated,
   bossSpawnRound,
-  bossTimeRemaining
+  bossTimeRemaining,
+  // BOSS 挑战系统
+  bossChallengeResult,
+  runBossChallenge
 } = useIdleSystem()
 
 // 匹配度配色
@@ -679,6 +838,92 @@ const closeAvatarViewer = () => {
   showAvatarViewer.value = false
   avatarViewerMember.value = null
 }
+
+// ============ BOSS 挑战系统 ============
+// BOSS 挑战面板显隐
+const showBossChallengePanel = ref(false)
+// 当前选中的 BOSS（{ zoneId, bossId, boss }）
+const selectedBossTarget = ref(null)
+// 当前选择的挑战次数
+const bossChallengeCount = ref(1)
+// 预设挑战次数选项
+const BOSS_CHALLENGE_COUNT_OPTIONS = [1, 5, 10, 20]
+// 展开的 BOSS 挑战面板：按秘境分组列出所有 16 个 BOSS
+const bossChallengeGroups = computed(() => {
+  return zones.map(zone => ({
+    zoneId: zone.id,
+    zoneName: zone.name,
+    zoneDifficulty: zone.difficulty,
+    zoneDifficultyLabel: zone.difficultyLabel,
+    zoneDifficultyColor: zone.difficultyColor,
+    bosses: (zone.bosses || []).map(boss => {
+      const ticketDef = getBossTicketByBossId(zone.id, boss.id)
+      const ticketCount = ticketDef ? playerStore.countMaterial('boss_ticket', ticketDef.id) : 0
+      return {
+        zoneId: zone.id,
+        bossId: boss.id,
+        name: boss.name,
+        description: boss.description,
+        stats: boss.stats,
+        traits: boss.traits || [],
+        ticketId: ticketDef?.id || null,
+        ticketName: ticketDef?.name || '挑战券',
+        ticketCount
+      }
+    })
+  }))
+})
+// 当前选中 BOSS 的挑战券数量（响应式，会随玩家素材库变化）
+const selectedBossTicketCount = computed(() => {
+  if (!selectedBossTarget.value) return 0
+  const ticketDef = getBossTicketByBossId(selectedBossTarget.value.zoneId, selectedBossTarget.value.bossId)
+  if (!ticketDef) return 0
+  return playerStore.countMaterial('boss_ticket', ticketDef.id)
+})
+// 当前选中 BOSS 的胜率预测（基于 Build 与 BOSS 推荐 Build 比例）
+const selectedBossWinChance = computed(() => {
+  if (!selectedBossTarget.value) return 0
+  const zone = zones.find(z => z.id === selectedBossTarget.value.zoneId)
+  if (!zone) return 0
+  const diff = (zone.difficulties || []).find(d => d.key === 'xiongxian') || zone.difficulties?.[2]
+  if (!diff) return 0
+  const match = String(selectedBossTarget.value.bossId || '').match(/_(\d+)$/)
+  const idx = match ? Math.max(0, parseInt(match[1], 10) - 1) : 0
+  const bossBuild = Math.max(1, Math.floor((diff.recommendedBuild || 1) * (1 + idx * 0.15)))
+  const ratio = (playerStore.buildStrength || 1) / bossBuild
+  const chance = Math.min(0.97, Math.max(0.05, 0.5 + (ratio - 1) * 0.4))
+  return Math.round(chance * 100)
+})
+// 选择挑战目标 BOSS
+const selectBossTarget = (zoneId, boss) => {
+  selectedBossTarget.value = { zoneId, bossId: boss.id, boss }
+  bossChallengeCount.value = 1
+}
+// 关闭 BOSS 挑战面板
+const closeBossChallengePanel = () => {
+  showBossChallengePanel.value = false
+  selectedBossTarget.value = null
+}
+// 执行 BOSS 挑战
+const executeBossChallenge = () => {
+  if (!selectedBossTarget.value) return
+  const count = Math.max(1, Math.floor(bossChallengeCount.value) || 1)
+  runBossChallenge(selectedBossTarget.value.zoneId, selectedBossTarget.value.bossId, count)
+}
+// 挑战结果汇总展示用：按 type 聚合 drops
+const bossChallengeDropSummary = computed(() => {
+  const r = bossChallengeResult.value
+  if (!r || !r.drops || !r.drops.length) return []
+  const map = {}
+  for (const d of r.drops) {
+    const key = d.type || d.kind || d.id
+    if (!map[key]) {
+      map[key] = { type: key, name: d.name, amount: 0 }
+    }
+    map[key].amount += (d.amount || 1)
+  }
+  return Object.values(map)
+})
 
 // 血条百分比
 const idleHpPercent = computed(() => {
@@ -3390,5 +3635,516 @@ html:not(.dark) .equip-select-modal .attr-col-label {
 }
 html:not(.dark) .equip-select-modal .attr-col-final {
   color: #FFD86B;
+}
+
+/* ============ BOSS 挑战系统 ============ */
+.boss-challenge-btn {
+  margin-left: auto;
+  padding: 6px 14px;
+  background: linear-gradient(135deg, #FF8C00 0%, #FF4500 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 18px;
+  cursor: pointer;
+  font-size: 13px;
+  font-weight: 600;
+  white-space: nowrap;
+  box-shadow: 0 2px 8px rgba(255, 69, 0, 0.35);
+  transition: transform 0.15s ease, box-shadow 0.15s ease;
+}
+.boss-challenge-btn:hover {
+  transform: translateY(-1px);
+  box-shadow: 0 4px 12px rgba(255, 69, 0, 0.5);
+}
+
+.boss-challenge-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.7);
+  backdrop-filter: blur(4px);
+  z-index: 1000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.boss-challenge-modal {
+  width: min(680px, 96vw);
+  max-height: 90vh;
+  background: linear-gradient(180deg, #2a1a0e 0%, #1a1308 100%);
+  border: 1px solid rgba(255, 140, 0, 0.4);
+  border-radius: 14px;
+  box-shadow: 0 12px 40px rgba(255, 69, 0, 0.35);
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.boss-challenge-header {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 14px 18px;
+  border-bottom: 1px solid rgba(255, 140, 0, 0.25);
+  background: linear-gradient(90deg, rgba(255, 140, 0, 0.18) 0%, rgba(255, 69, 0, 0.05) 100%);
+}
+.boss-challenge-header h3 {
+  margin: 0;
+  color: #FFB347;
+  font-size: 18px;
+  font-weight: 700;
+}
+.boss-challenge-header .modal-close {
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  width: 28px;
+  height: 28px;
+  border-radius: 50%;
+  cursor: pointer;
+  font-size: 14px;
+  line-height: 1;
+}
+.boss-challenge-header .modal-close:hover {
+  background: rgba(255, 82, 82, 0.3);
+}
+.boss-challenge-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 14px 18px;
+  color: #E8DCC4;
+}
+.boss-challenge-build-info {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255, 140, 0, 0.08);
+  border: 1px solid rgba(255, 140, 0, 0.25);
+  border-radius: 8px;
+  margin-bottom: 14px;
+  font-size: 13px;
+}
+.boss-challenge-build-info > span:first-child {
+  color: #FFB347;
+  font-weight: 600;
+}
+.boss-challenge-tip {
+  color: #B8A88A;
+  font-size: 12px;
+}
+
+.boss-groups {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.boss-group {
+  border: 1px solid rgba(255, 140, 0, 0.2);
+  border-radius: 8px;
+  overflow: hidden;
+}
+.boss-group-title {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 8px 12px;
+  background: rgba(255, 140, 0, 0.1);
+  border-bottom: 1px solid rgba(255, 140, 0, 0.2);
+}
+.boss-group-name {
+  font-weight: 600;
+  color: #FFB347;
+  font-size: 14px;
+}
+.boss-group-badge {
+  padding: 2px 8px;
+  border-radius: 10px;
+  color: #fff;
+  font-size: 11px;
+  font-weight: 600;
+}
+.boss-cards-row {
+  display: grid;
+  grid-template-columns: repeat(2, 1fr);
+  gap: 8px;
+  padding: 10px;
+}
+.boss-target-card {
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.15s ease;
+}
+.boss-target-card:hover {
+  background: rgba(255, 140, 0, 0.12);
+  border-color: rgba(255, 140, 0, 0.4);
+  transform: translateY(-1px);
+}
+.boss-target-card.disabled {
+  opacity: 0.45;
+  cursor: not-allowed;
+}
+.boss-target-card.disabled:hover {
+  background: rgba(255, 255, 255, 0.04);
+  border-color: rgba(255, 255, 255, 0.1);
+  transform: none;
+}
+.boss-target-name {
+  font-weight: 600;
+  color: #FFD86B;
+  font-size: 14px;
+  margin-bottom: 4px;
+}
+.boss-target-stats {
+  display: flex;
+  gap: 10px;
+  font-size: 11px;
+  color: #B8A88A;
+  margin-bottom: 4px;
+}
+.boss-target-ticket {
+  font-size: 12px;
+  color: #FF8C00;
+  font-weight: 600;
+}
+.boss-target-ticket.none {
+  color: #EF5350;
+  font-weight: 400;
+}
+
+.boss-challenge-confirm {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.btn-back {
+  align-self: flex-start;
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #B8A88A;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn-back:hover {
+  background: rgba(255, 255, 255, 0.06);
+}
+.boss-confirm-info {
+  padding: 12px;
+  background: rgba(255, 140, 0, 0.06);
+  border: 1px solid rgba(255, 140, 0, 0.25);
+  border-radius: 8px;
+}
+.boss-confirm-name {
+  font-size: 16px;
+  font-weight: 700;
+  color: #FFD86B;
+  margin-bottom: 4px;
+}
+.boss-confirm-zone {
+  font-size: 12px;
+  color: #B8A88A;
+  font-weight: 400;
+}
+.boss-confirm-desc {
+  font-size: 12px;
+  color: #B8A88A;
+  margin-bottom: 8px;
+  font-style: italic;
+}
+.boss-confirm-stats {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 10px;
+  font-size: 12px;
+  color: #E8DCC4;
+  margin-bottom: 8px;
+}
+.boss-confirm-traits {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px;
+  margin-bottom: 8px;
+}
+.boss-trait-tag {
+  padding: 2px 8px;
+  background: rgba(255, 69, 0, 0.2);
+  border: 1px solid rgba(255, 69, 0, 0.4);
+  border-radius: 10px;
+  font-size: 11px;
+  color: #FFB347;
+}
+.boss-confirm-meta {
+  display: flex;
+  flex-direction: column;
+  gap: 4px;
+  padding-top: 8px;
+  border-top: 1px dashed rgba(255, 140, 0, 0.2);
+}
+.meta-row {
+  display: flex;
+  justify-content: space-between;
+  font-size: 13px;
+}
+.meta-label {
+  color: #B8A88A;
+}
+.meta-value {
+  font-weight: 600;
+}
+
+.boss-count-selector {
+  display: flex;
+  align-items: center;
+  flex-wrap: wrap;
+  gap: 8px;
+  padding: 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+}
+.count-label {
+  font-size: 13px;
+  color: #E8DCC4;
+}
+.count-options {
+  display: flex;
+  gap: 4px;
+}
+.count-opt {
+  padding: 4px 10px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #B8A88A;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+.count-opt:hover {
+  background: rgba(255, 140, 0, 0.1);
+  color: #FFB347;
+}
+.count-opt.active {
+  background: rgba(255, 140, 0, 0.25);
+  border-color: rgba(255, 140, 0, 0.5);
+  color: #FFB347;
+  font-weight: 600;
+}
+.count-input {
+  width: 60px;
+  padding: 4px 6px;
+  background: rgba(0, 0, 0, 0.3);
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #FFB347;
+  border-radius: 4px;
+  font-size: 12px;
+  text-align: center;
+}
+.count-max-btn {
+  padding: 4px 10px;
+  background: rgba(255, 140, 0, 0.15);
+  border: 1px solid rgba(255, 140, 0, 0.35);
+  color: #FFB347;
+  border-radius: 4px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.count-max-btn:hover {
+  background: rgba(255, 140, 0, 0.25);
+}
+
+.btn-execute-challenge {
+  padding: 12px 16px;
+  background: linear-gradient(135deg, #FF8C00 0%, #FF4500 100%);
+  color: #fff;
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 8px;
+  cursor: pointer;
+  font-size: 15px;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(255, 69, 0, 0.4);
+  transition: all 0.15s ease;
+}
+.btn-execute-challenge:hover:not(:disabled) {
+  transform: translateY(-1px);
+  box-shadow: 0 6px 18px rgba(255, 69, 0, 0.55);
+}
+.btn-execute-challenge:disabled {
+  background: rgba(80, 80, 80, 0.5);
+  border-color: rgba(255, 255, 255, 0.1);
+  color: #888;
+  cursor: not-allowed;
+  box-shadow: none;
+}
+
+.boss-challenge-result {
+  padding: 12px;
+  background: rgba(76, 175, 80, 0.08);
+  border: 1px solid rgba(76, 175, 80, 0.3);
+  border-radius: 8px;
+}
+.result-summary {
+  display: flex;
+  gap: 16px;
+  font-size: 14px;
+  font-weight: 600;
+  margin-bottom: 8px;
+}
+.result-victory {
+  color: #66BB6A;
+}
+.result-defeat {
+  color: #EF5350;
+}
+.result-drops-title {
+  font-size: 12px;
+  color: #B8A88A;
+  margin-bottom: 4px;
+}
+.result-drops-list {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+}
+.result-drop-item {
+  display: flex;
+  align-items: center;
+  gap: 4px;
+  padding: 4px 8px;
+  background: rgba(255, 140, 0, 0.12);
+  border: 1px solid rgba(255, 140, 0, 0.3);
+  border-radius: 4px;
+  font-size: 12px;
+}
+.drop-name {
+  color: #FFB347;
+}
+.drop-amount {
+  color: #FFD86B;
+  font-weight: 600;
+}
+
+.boss-challenge-error {
+  padding: 10px;
+  background: rgba(255, 82, 82, 0.1);
+  border: 1px solid rgba(255, 82, 82, 0.35);
+  border-radius: 6px;
+  color: #FFB3B3;
+  font-size: 13px;
+}
+
+/* 日间模式：BOSS 挑战面板配色调整 */
+html:not(.dark) .boss-challenge-modal {
+  background: linear-gradient(180deg, #fff5e6 0%, #f8e8cc 100%);
+  border-color: rgba(255, 140, 0, 0.5);
+  color: #5a3a1a;
+}
+html:not(.dark) .boss-challenge-header {
+  background: linear-gradient(90deg, rgba(255, 140, 0, 0.25) 0%, rgba(255, 69, 0, 0.08) 100%);
+  border-bottom-color: rgba(255, 140, 0, 0.35);
+}
+html:not(.dark) .boss-challenge-header h3 {
+  color: #c2410c;
+}
+html:not(.dark) .boss-challenge-body {
+  color: #5a3a1a;
+}
+html:not(.dark) .boss-challenge-build-info {
+  background: rgba(255, 140, 0, 0.12);
+  border-color: rgba(255, 140, 0, 0.35);
+}
+html:not(.dark) .boss-challenge-build-info > span:first-child {
+  color: #c2410c;
+}
+html:not(.dark) .boss-challenge-tip {
+  color: #8a5a2a;
+}
+html:not(.dark) .boss-group {
+  border-color: rgba(255, 140, 0, 0.3);
+}
+html:not(.dark) .boss-group-title {
+  background: rgba(255, 140, 0, 0.15);
+  border-bottom-color: rgba(255, 140, 0, 0.3);
+}
+html:not(.dark) .boss-group-name {
+  color: #c2410c;
+}
+html:not(.dark) .boss-target-card {
+  background: rgba(255, 255, 255, 0.6);
+  border-color: rgba(180, 120, 60, 0.25);
+}
+html:not(.dark) .boss-target-card:hover {
+  background: rgba(255, 140, 0, 0.15);
+  border-color: rgba(255, 140, 0, 0.5);
+}
+html:not(.dark) .boss-target-name {
+  color: #c2410c;
+}
+html:not(.dark) .boss-target-stats {
+  color: #8a5a2a;
+}
+html:not(.dark) .boss-target-ticket {
+  color: #ea580c;
+}
+html:not(.dark) .boss-target-ticket.none {
+  color: #dc2626;
+}
+html:not(.dark) .btn-back {
+  color: #8a5a2a;
+  border-color: rgba(180, 120, 60, 0.3);
+}
+html:not(.dark) .boss-confirm-info {
+  background: rgba(255, 140, 0, 0.1);
+  border-color: rgba(255, 140, 0, 0.35);
+}
+html:not(.dark) .boss-confirm-name {
+  color: #c2410c;
+}
+html:not(.dark) .boss-confirm-zone,
+html:not(.dark) .boss-confirm-desc {
+  color: #8a5a2a;
+}
+html:not(.dark) .boss-confirm-stats {
+  color: #5a3a1a;
+}
+html:not(.dark) .meta-label {
+  color: #8a5a2a;
+}
+html:not(.dark) .boss-count-selector {
+  background: rgba(255, 255, 255, 0.5);
+}
+html:not(.dark) .count-label {
+  color: #5a3a1a;
+}
+html:not(.dark) .count-opt {
+  color: #8a5a2a;
+  border-color: rgba(180, 120, 60, 0.3);
+}
+html:not(.dark) .count-input {
+  background: rgba(255, 255, 255, 0.7);
+  color: #c2410c;
+  border-color: rgba(180, 120, 60, 0.3);
+}
+html:not(.dark) .boss-challenge-result {
+  background: rgba(76, 175, 80, 0.12);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+html:not(.dark) .result-drop-item {
+  background: rgba(255, 140, 0, 0.15);
+  border-color: rgba(255, 140, 0, 0.4);
+}
+html:not(.dark) .drop-name {
+  color: #c2410c;
+}
+html:not(.dark) .drop-amount {
+  color: #ea580c;
+}
+html:not(.dark) .boss-challenge-error {
+  background: rgba(255, 82, 82, 0.12);
+  border-color: rgba(255, 82, 82, 0.4);
+  color: #dc2626;
 }
 </style>

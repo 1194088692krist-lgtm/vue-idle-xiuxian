@@ -365,6 +365,59 @@ export const getBossMaterialByBossId = (zoneId, bossId) => {
   return getBossMaterialByZoneIndex(zoneId, idx)
 }
 
+// BOSS 挑战券：每个 BOSS 对应一种专属挑战券，仅在挂机该 BOSS 所在秘境时按 ~30% 概率获得 1~2 张
+// 挑战券 id 命名与 zones.js 中 bossId 保持一致（前缀 `ticket_` + bossId），便于解析与展示
+export const BOSS_TICKETS = {
+  forest_edge: [
+    { id: 'ticket_forest_boss_1', name: '狼王挑战券', description: '挑战狼王的入场凭证，仅在青萝林挂机有概率获得' },
+    { id: 'ticket_forest_boss_2', name: '山匪头目挑战券', description: '挑战山匪头目的入场凭证，仅在青萝林挂机有概率获得' }
+  ],
+  misty_valley: [
+    { id: 'ticket_valley_boss_1', name: '迷雾虎王挑战券', description: '挑战迷雾虎王的入场凭证，仅在迷雾谷挂机有概率获得' },
+    { id: 'ticket_valley_boss_2', name: '骷髅将军挑战券', description: '挑战骷髅将军的入场凭证，仅在迷雾谷挂机有概率获得' }
+  ],
+  phoenix_cave: [
+    { id: 'ticket_phoenix_boss_1', name: '焰魔领主挑战券', description: '挑战焰魔领主的入场凭证，仅在凤凰窟挂机有概率获得' },
+    { id: 'ticket_phoenix_boss_2', name: '火凤凰挑战券', description: '挑战火凤凰的入场凭证，仅在凤凰窟挂机有概率获得' }
+  ],
+  dragon_abyss: [
+    { id: 'ticket_dragon_boss_1', name: '深渊蛟龙挑战券', description: '挑战深渊蛟龙的入场凭证，仅在龙渊挂机有概率获得' },
+    { id: 'ticket_dragon_boss_2', name: '血魔大帝挑战券', description: '挑战血魔大帝的入场凭证，仅在龙渊挂机有概率获得' }
+  ],
+  ghost_wasteland: [
+    { id: 'ticket_ghost_boss_1', name: '噬魂鬼王挑战券', description: '挑战噬魂鬼王的入场凭证，仅在鬼荒原挂机有概率获得' },
+    { id: 'ticket_ghost_boss_2', name: '白骨魔尊挑战券', description: '挑战白骨魔尊的入场凭证，仅在鬼荒原挂机有概率获得' }
+  ],
+  ice_palace: [
+    { id: 'ticket_ice_boss_1', name: '冰凰挑战券', description: '挑战冰凰的入场凭证，仅在冰雪宫挂机有概率获得' },
+    { id: 'ticket_ice_boss_2', name: '冰封古魔挑战券', description: '挑战冰封古魔的入场凭证，仅在冰雪宫挂机有概率获得' }
+  ],
+  immortal_ruins: [
+    { id: 'ticket_immortal_boss_1', name: '仙墟守护者挑战券', description: '挑战仙墟守护者的入场凭证，仅在仙墟挂机有概率获得' },
+    { id: 'ticket_immortal_boss_2', name: '堕落仙君挑战券', description: '挑战堕落仙君的入场凭证，仅在仙墟挂机有概率获得' }
+  ],
+  chaos_realm: [
+    { id: 'ticket_chaos_boss_1', name: '混沌主宰挑战券', description: '挑战混沌主宰的入场凭证，仅在混沌界挂机有概率获得' },
+    { id: 'ticket_chaos_boss_2', name: '天道化身挑战券', description: '挑战天道化身的入场凭证，仅在混沌界挂机有概率获得' }
+  ]
+}
+
+// 按秘境 + boss 序号（0/1）取 BOSS 挑战券定义
+export const getBossTicketByZoneIndex = (zoneId, index) => {
+  const arr = BOSS_TICKETS[zoneId]
+  if (!arr || index < 0 || index >= arr.length) return null
+  return arr[index]
+}
+
+// 按 boss id 解析末尾数字得到 boss 序号，再查对应挑战券
+export const getBossTicketByBossId = (zoneId, bossId) => {
+  if (!bossId) return null
+  const match = String(bossId).match(/_(\d+)$/)
+  if (!match) return null
+  const idx = Math.max(0, parseInt(match[1], 10) - 1)
+  return getBossTicketByZoneIndex(zoneId, idx)
+}
+
 // 12 阶强化对应难度 BOSS 素材映射
 // +1 -> forest_edge[0]（野猪獠牙，对应「狼王」）
 // +2 -> forest_edge[1]

@@ -708,7 +708,8 @@
     { key: 'liquid', label: '灵液' },
     { key: 'core', label: '妖核' },
     { key: 'special', label: '奇遇' },
-    { key: 'boss_material', label: 'BOSS素材' }
+    { key: 'boss_material', label: 'BOSS素材' },
+    { key: 'boss_ticket', label: '挑战券' }
   ]
   const selectedMaterialCategory = ref('all')
 
@@ -763,7 +764,8 @@
     liquid: '灵液',
     core: '妖核',
     special: '奇遇素材',
-    boss_material: 'BOSS素材'
+    boss_material: 'BOSS素材',
+    boss_ticket: '挑战券'
   }
 
   const MATERIAL_PRICE_MAP = {
