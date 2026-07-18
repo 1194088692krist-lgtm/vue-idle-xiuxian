@@ -3071,7 +3071,17 @@ function startIdleTimers() {
   if (!visibilityHandler) {
     visibilityHandler = () => {
       if (document.visibilityState === 'visible') {
-        catchUpMissedEncounters({ forceFinish: false })
+        // 守卫：如果正在实时战斗中（含 BOSS 挑战），跳过补算，避免与实时战斗并发造成状态混乱
+        // 实时战斗有自己的 sessionId 校验机制，熄屏恢复后会自行继续或被新遭遇取代
+        if (isRunning || (currentEncounter.value && currentEncounter.value.inProgress)) {
+          return
+        }
+        // 防抖：亮屏后延迟 200ms 再补算，避免某些浏览器连续触发 visibilitychange
+        setTimeout(() => {
+          if (document.visibilityState === 'visible' && !isRunning) {
+            catchUpMissedEncounters({ forceFinish: false })
+          }
+        }, 200)
       }
     }
     document.addEventListener('visibilitychange', visibilityHandler)
@@ -3347,13 +3357,18 @@ function finishIdle() {
 
 function processOfflineIdle() {
   // 启动恢复时统一走补算流程并强制收尾（原行为：离线期间按概率结算后直接出结算页）
+  // 改为异步：不阻塞 loadGame，让游戏先进入界面，补算在后台分批进行
   catchUpMissedEncounters({ forceFinish: true })
 }
 
 // 补算漏掉的遭遇：移动端息屏/切后台期间 setInterval 被浏览器节流，导致 runIdleEncounter 未触发，
 // 遭遇数与奖励落后于墙钟。页面恢复可见时调用本函数，用轻量的 runOfflineEncounter（概率结算）补齐。
 // forceFinish=true 时无论时长是否到都收尾（用于启动恢复）；否则仅当墙钟耗尽才收尾，继续实时挂机。
-function catchUpMissedEncounters({ forceFinish = false } = {}) {
+// 优化：改为异步分批补算（每批 30 场，用 setTimeout(0) 让出主线程），避免一次性补算 500 场卡死 UI
+let catchUpInProgress = false
+async function catchUpMissedEncounters({ forceFinish = false } = {}) {
+  // 防止重入：熄屏恢复时如果上一次补算还没结束，直接跳过
+  if (catchUpInProgress) return
   const s = store()
   const idleState = s.idleExploration
   if (!idleState || !idleState.isActive) return
@@ -3370,22 +3385,36 @@ function catchUpMissedEncounters({ forceFinish = false } = {}) {
   const missed = Math.max(0, expected - idleState.encounterCount)
   if (missed > 0) {
     // 上限保护：避免一次性补算过多卡死 UI（例如挂机数小时后返回）
-    const MAX_CATCHUP = 500
+    // 进一步降低上限：补算过多意义不大（收益已封顶），200 场足够覆盖 8 分钟息屏
+    const MAX_CATCHUP = 200
+    const BATCH_SIZE = 30  // 每批 30 场，让出主线程避免卡顿
     const toCatch = Math.min(missed, MAX_CATCHUP)
     const tip = missed > toCatch
       ? `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，补算最近 ${toCatch} 场……`
       : `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，正在补算……`
     logs.value.push({ type: 'info', text: tip, time: new Date().toLocaleTimeString() })
     const baseCount = idleState.encounterCount
-    for (let i = 0; i < toCatch; i++) {
-      runOfflineEncounter(zone, diff, baseCount + i + 1)
+    catchUpInProgress = true
+    try {
+      for (let i = 0; i < toCatch; i += BATCH_SIZE) {
+        const end = Math.min(i + BATCH_SIZE, toCatch)
+        for (let j = i; j < end; j++) {
+          runOfflineEncounter(zone, diff, baseCount + j + 1)
+        }
+        // 每批之间让出主线程，让 UI 能响应（加载进度条/动画不卡死）
+        await new Promise(r => setTimeout(r, 0))
+        // 中途检测挂机是否已被用户手动停止，避免补算到已结束的会话
+        if (!s.idleExploration || !s.idleExploration.isActive) break
+      }
+      // 同步本地计数与持久化状态，使后续实时遭遇从正确序号继续
+      const newCount = baseCount + toCatch
+      idleEncounterCount.value = newCount
+      s.updateIdleExploration({ encounterCount: newCount, lastEncounterTime: Date.now() })
+      // 补算收益立即落盘，防止丢失
+      s.saveData()
+    } finally {
+      catchUpInProgress = false
     }
-    // 同步本地计数与持久化状态，使后续实时遭遇从正确序号继续
-    const newCount = baseCount + toCatch
-    idleEncounterCount.value = newCount
-    s.updateIdleExploration({ encounterCount: newCount, lastEncounterTime: Date.now() })
-    // 补算收益立即落盘，防止丢失
-    s.saveData()
   }
   // 时间耗尽或强制结束 → 收尾；否则继续实时挂机
   if (forceFinish || elapsed >= totalDuration) {
@@ -3394,6 +3423,7 @@ function catchUpMissedEncounters({ forceFinish = false } = {}) {
 }
 
 // App.vue 常驻初始化：恢复挂机状态并启动推进
+// 优化：先启动定时器与 UI，再延后异步补算离线遭遇，避免阻塞 loadGame 的 80% 阶段
 function initIdle() {
   const s = store()
   s.regenerateSpirit()
@@ -3411,8 +3441,13 @@ function initIdle() {
       idlePlayerHP.value = probe.stats.maxHealth
       runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, bossTickets: 0, bossMaterials: 0 }
       logs.value = []
+      // 先启动定时器，让 UI 立即显示挂机进行中的状态
       startIdleTimers()
-      processOfflineIdle()
+      // 延后异步补算：用 setTimeout(0) 推到下一个事件循环，让 loadGame 先完成（isLoading=false）
+      // 这样补算即使耗时，用户也已看到游戏界面，不会感觉卡在加载中
+      setTimeout(() => {
+        processOfflineIdle()
+      }, 0)
     } else {
       s.stopIdleExploration()
     }

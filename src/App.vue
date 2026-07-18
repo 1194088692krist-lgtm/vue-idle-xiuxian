@@ -233,7 +233,6 @@ import SaveButton from './components/SaveButton.vue'
 
     updateLoading('正在初始化游戏引擎...', 5)
     await nextTick()
-    await new Promise(r => setTimeout(r, 50))
 
     updateLoading('正在加载存档数据...', 20)
     await nextTick()
@@ -245,17 +244,14 @@ import SaveButton from './components/SaveButton.vue'
 
     // 已登录且非开发者模式：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
     // 开发者模式：跳过云同步，仅使用本地存档
+    // 优化：云同步改为完全后台（不 await），用 2 秒短超时，失败也不阻塞加载
     const authStore = useAuthStore()
     if (authStore.isLoggedIn && !authStore.devMode) {
-      try {
-        // 3 秒超时，防止网络请求 hang 住导致加载卡死（用户可手动触发云同步重试）
-        await Promise.race([
-          playerStore.migrate({ interactive: false }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 3000))
-        ])
-      } catch (e) {
-        console.warn('启动云同步失败（不影响本地游玩）:', e)
-      }
+      // 云同步后台执行，不阻塞加载流程；失败/超时均不影响本地游玩
+      Promise.race([
+        playerStore.migrate({ interactive: false }),
+        new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 2000))
+      ]).catch(e => console.warn('启动云同步失败（不影响本地游玩）:', e))
       // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点（完全后台，不等待）
       playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
     } else if (authStore.devMode) {
@@ -267,18 +263,16 @@ import SaveButton from './components/SaveButton.vue'
     await initCharacterDefs()
 
     // 立绘资源已改为完全后台加载（loadSharedPortraits 内部 fetch 不阻塞）
-    // 此处仅展示进度，无需 await，立绘会在游戏加载完成后陆续填充到 sharedPortraitMap
     updateLoading('正在加载立绘资源...', 60)
     await nextTick()
-    await new Promise(r => setTimeout(r, 50))
 
     updateLoading('正在初始化挂机系统...', 80)
     await nextTick()
+    // initIdle 内部已改为：先启动定时器，离线补算延后到 setTimeout(0) 异步执行，不阻塞加载
     idleSystem.initIdle()
 
     updateLoading('正在进入游戏...', 95)
     await nextTick()
-    await new Promise(r => setTimeout(r, 50))
 
     isLoading.value = false
     localStorage.setItem('hasLoadedBefore', 'true')
