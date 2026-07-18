@@ -612,11 +612,186 @@
             <button class="modal-close" @click="closeBossChallengePanel">✕</button>
           </div>
           <div class="boss-challenge-body">
-            <!-- 当前 Build 提示 -->
-            <div class="boss-challenge-build-info">
-              <span>当前 Build 强度：{{ formatNumber(playerBuildStrength) }}</span>
-              <span class="boss-challenge-tip">挑战需消耗对应 BOSS 专属挑战券（挂机该秘境击杀 BOSS 时 ~30% 概率掉落 1~2 张）</span>
+            <!-- ===== BOSS 挑战实时战斗模式：复用挂机同款 BattleStage + 仪表盘 + 单场结算 ===== -->
+            <div v-if="isBossChallengeInProgress" class="boss-challenge-live">
+              <!-- 进度提示 -->
+              <div class="boss-live-progress">
+                <span class="boss-live-progress-text">
+                  ⚔️ {{ bossChallengeZoneName }} · {{ bossChallengeBossName }} 挑战中
+                  （第 {{ bossChallengeRound }}/{{ bossChallengeTotalRounds }} 场）
+                </span>
+              </div>
+
+              <!-- 实时战斗舞台（与挂机同款 BattleStage，由 currentEncounter 驱动） -->
+              <BattleStage v-if="currentEncounter && currentEncounter.enemy && currentEncounter.players && currentEncounter.players.length" :encounter="currentEncounter" />
+
+              <!-- BOSS 挑战专属仪表盘（与挂机仪表盘样式一致） -->
+              <div v-if="idleDashboard" class="idle-dashboard">
+                <div class="dashboard-title">📊 挑战仪表盘</div>
+                <div class="dashboard-grid">
+                  <div class="dash-item">
+                    <span class="dash-label">胜/负</span>
+                    <span class="dash-value">{{ idleDashboard.victories }}/{{ idleDashboard.defeats }}</span>
+                  </div>
+                  <div class="dash-item">
+                    <span class="dash-label">匹配度</span>
+                    <span class="dash-value" :style="{ color: idleDashboard.buildRatio >= 1 ? '#4caf50' : '#ff5252' }">{{ Math.round(idleDashboard.buildRatio * 100) }}%</span>
+                  </div>
+                  <div class="dash-item">
+                    <span class="dash-label">灵石</span>
+                    <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
+                  </div>
+                  <div class="dash-item">
+                    <span class="dash-label">幻灵结晶</span>
+                    <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
+                  </div>
+                  <div class="dash-item">
+                    <span class="dash-label">修为</span>
+                    <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
+                  </div>
+                  <div class="dash-item">
+                    <span class="dash-label">装备</span>
+                    <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
+                  </div>
+                  <div class="dash-item" v-if="idleDashboard.totalBossTickets > 0">
+                    <span class="dash-label">🎟️ 挑战券</span>
+                    <span class="dash-value" style="color:#FF8C00">+{{ idleDashboard.totalBossTickets }}</span>
+                  </div>
+                  <div class="dash-item" v-if="idleDashboard.totalBossMaterials > 0">
+                    <span class="dash-label">👹 BOSS素材</span>
+                    <span class="dash-value" style="color:#FF4500">+{{ idleDashboard.totalBossMaterials }}</span>
+                  </div>
+                  <div class="dash-item" v-if="idleDashboard.totalDamageDealt > 0">
+                    <span class="dash-label">⚔️ 总伤害</span>
+                    <span class="dash-value" style="color:#ff5722">{{ formatNumber(idleDashboard.totalDamageDealt) }}</span>
+                  </div>
+                  <div class="dash-item" v-if="idleDashboard.totalDamageTaken > 0">
+                    <span class="dash-label">🩸 总受伤</span>
+                    <span class="dash-value" style="color:#e53935">{{ formatNumber(idleDashboard.totalDamageTaken) }}</span>
+                  </div>
+                </div>
+                <!-- 当前 BOSS 怪物信息面板 -->
+                <div v-if="idleDashboard.enemy" class="dash-enemy no-hp boss-emphasis">
+                  <div class="dash-enemy-title">
+                    <span class="dash-enemy-emoji">👑</span>
+                    <span>BOSS 挑战目标</span>
+                    <span class="enemy-tier-badge tier-boss">BOSS</span>
+                  </div>
+                  <div class="dash-enemy-name">
+                    {{ idleDashboard.enemy.name }}
+                    <span v-if="idleDashboard.enemy.realm" class="enemy-realm">{{ idleDashboard.enemy.realm }}</span>
+                  </div>
+                  <div class="enemy-stats-grid compact">
+                    <div class="enemy-stat"><span class="es-label">攻击</span><span class="es-value">{{ idleDashboard.enemy.damage }}</span></div>
+                    <div class="enemy-stat"><span class="es-label">防御</span><span class="es-value">{{ idleDashboard.enemy.defense }}</span></div>
+                    <div class="enemy-stat"><span class="es-label">速度</span><span class="es-value">{{ idleDashboard.enemy.speed }}</span></div>
+                    <div class="enemy-stat"><span class="es-label">暴击</span><span class="es-value">{{ idleDashboard.enemy.critRate }}</span></div>
+                  </div>
+                </div>
+              </div>
+
+              <!-- 单场结算（与挂机 currentEncounterSummary 一致样式） -->
+              <div v-if="currentEncounterSummary" class="encounter-summary">
+                <div class="encounter-summary-header">
+                  <span :class="['encounter-result', currentEncounterSummary.victory ? 'victory' : 'defeat']">
+                    {{ currentEncounterSummary.victory ? '✅ 胜利' : '❌ 失败' }}
+                  </span>
+                  <span class="encounter-enemy">第 {{ currentEncounterSummary.count }} 场 · {{ currentEncounterSummary.enemyName }}</span>
+                </div>
+                <div v-if="currentEncounterSummary.rewards && currentEncounterSummary.rewards.length" class="encounter-rewards">
+                  <div v-for="(r, idx) in currentEncounterSummary.rewards" :key="idx" class="encounter-reward-item">
+                    <span class="reward-name">{{ r.name }}</span>
+                    <span v-if="r.amount" class="reward-amount">×{{ r.amount }}</span>
+                  </div>
+                </div>
+                <div v-if="currentEncounterSummary.loss > 0" class="encounter-loss">
+                  损失修为：{{ currentEncounterSummary.loss }}
+                </div>
+              </div>
             </div>
+
+            <!-- ===== BOSS 挑战总结算模式：与挂机结算栏样式一致 ===== -->
+            <div v-else-if="bossChallengeSummary && !selectedBossTarget" class="boss-challenge-summary-view">
+              <div class="idle-summary-header">
+                <h3 class="section-title">🎯 BOSS 挑战结算</h3>
+                <span class="idle-summary-meta">
+                  {{ bossChallengeSummary.zoneName }} · {{ bossChallengeSummary.bossName }} · {{ bossChallengeSummary.encounters }}场
+                </span>
+              </div>
+              <div class="idle-summary">
+                <div class="summary-item">
+                  <span class="summary-label">总挑战</span>
+                  <span class="summary-value">{{ bossChallengeSummary.encounters }}次</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">胜利</span>
+                  <span class="summary-value green">{{ bossChallengeSummary.victories }}次</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">失败</span>
+                  <span class="summary-value red">{{ bossChallengeSummary.defeats }}次</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">获得灵石</span>
+                  <span class="summary-value gold">{{ bossChallengeSummary.totalStones }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">获得幻灵结晶</span>
+                  <span class="summary-value" style="color:#9370db">{{ bossChallengeSummary.totalPhantomCrystals || 0 }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">获得修为</span>
+                  <span class="summary-value">{{ bossChallengeSummary.totalCultivation }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">获得装备</span>
+                  <span class="summary-value">{{ bossChallengeSummary.totalEquipment }}</span>
+                </div>
+                <div class="summary-item" v-if="bossChallengeSummary.totalBossTickets > 0">
+                  <span class="summary-label">🎟️ 挑战券</span>
+                  <span class="summary-value" style="color:#FF8C00">+{{ bossChallengeSummary.totalBossTickets }}</span>
+                </div>
+                <div class="summary-item" v-if="bossChallengeSummary.totalBossMaterials > 0">
+                  <span class="summary-label">👹 BOSS素材</span>
+                  <span class="summary-value" style="color:#FF4500">+{{ bossChallengeSummary.totalBossMaterials }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">总伤害</span>
+                  <span class="summary-value" style="color:#ff5722">{{ formatNumber(bossChallengeSummary.totalDamageDealt || 0) }}</span>
+                </div>
+                <div class="summary-item">
+                  <span class="summary-label">总受伤</span>
+                  <span class="summary-value" style="color:#e53935">{{ formatNumber(bossChallengeSummary.totalDamageTaken || 0) }}</span>
+                </div>
+              </div>
+              <div v-if="bossChallengeSummary.materialSummary && bossChallengeSummary.materialSummary.length" class="material-detail-section">
+                <div class="material-detail-header">
+                  <span class="material-detail-title">📦 获得素材</span>
+                </div>
+                <div class="material-detail-list">
+                  <div
+                    v-for="m in bossChallengeSummary.materialSummary"
+                    :key="m.type"
+                    class="material-detail-item"
+                  >
+                    <img v-if="m.icon" :src="m.icon" class="material-icon" :alt="m.name" />
+                    <span class="material-name">{{ m.name }}</span>
+                    <span class="material-amount">×{{ m.amount }}</span>
+                  </div>
+                </div>
+              </div>
+              <div class="boss-challenge-back-btn">
+                <button class="btn btn-secondary" @click="bossChallengeSummary = null">返回选择 BOSS</button>
+              </div>
+            </div>
+
+            <!-- ===== 默认：BOSS 选择 / 确认面板 ===== -->
+            <template v-else>
+              <!-- 当前 Build 提示 -->
+              <div class="boss-challenge-build-info">
+                <span>当前 Build 强度：{{ formatNumber(playerBuildStrength) }}</span>
+                <span class="boss-challenge-tip">挑战需消耗对应 BOSS 专属挑战券（挂机该秘境击杀 BOSS 时 ~30% 概率掉落 1~2 张）</span>
+              </div>
 
             <!-- BOSS 选择网格（按秘境分组） -->
             <div v-if="!selectedBossTarget" class="boss-groups">
@@ -732,6 +907,7 @@
                 ⚠️ {{ bossChallengeResult.message }}
               </div>
             </div>
+            </template>
           </div>
         </div>
       </div>
@@ -807,7 +983,14 @@ const {
   bossTimeRemaining,
   // BOSS 挑战系统
   bossChallengeResult,
-  runBossChallenge
+  runBossChallenge,
+  isBossChallengeInProgress,
+  bossChallengeRound,
+  bossChallengeTotalRounds,
+  bossChallengeBossName,
+  bossChallengeZoneName,
+  bossChallengeSummary,
+  currentEncounterSummary
 } = useIdleSystem()
 
 // 匹配度配色
@@ -914,15 +1097,22 @@ const selectBossTarget = (zoneId, boss) => {
   bossChallengeCount.value = 1
 }
 // 关闭 BOSS 挑战面板
+// 挑战进行中不允许关闭（防止意外中断战斗）
 const closeBossChallengePanel = () => {
+  if (isBossChallengeInProgress.value) return
   showBossChallengePanel.value = false
   selectedBossTarget.value = null
 }
-// 执行 BOSS 挑战
-const executeBossChallenge = () => {
+// 执行 BOSS 挑战（异步：进入实时战斗，UI 切换到战斗模式）
+// 挑战开始后清除 selectedBossTarget 让 BOSS 挑战面板切换为战斗视图
+const executeBossChallenge = async () => {
   if (!selectedBossTarget.value) return
+  if (isBossChallengeInProgress.value) return
   const count = Math.max(1, Math.floor(bossChallengeCount.value) || 1)
-  runBossChallenge(selectedBossTarget.value.zoneId, selectedBossTarget.value.bossId, count)
+  // 清除 selectedBossTarget 让 UI 切换到 boss-challenge-live 视图（基于 isBossChallengeInProgress）
+  const target = { ...selectedBossTarget.value }
+  selectedBossTarget.value = null
+  await runBossChallenge(target.zoneId, target.bossId, count)
 }
 // 挑战结果汇总展示用：按 type 聚合 drops
 const bossChallengeDropSummary = computed(() => {
@@ -3726,6 +3916,89 @@ html:not(.dark) .equip-select-modal .attr-col-final {
   overflow-y: auto;
   padding: 14px 18px;
   color: #E8DCC4;
+}
+/* ===== BOSS 挑战实时战斗模式样式 ===== */
+.boss-challenge-live {
+  display: flex;
+  flex-direction: column;
+  gap: 14px;
+}
+.boss-live-progress {
+  padding: 10px 14px;
+  background: linear-gradient(90deg, rgba(255, 69, 0, 0.25) 0%, rgba(255, 140, 0, 0.1) 100%);
+  border: 1px solid rgba(255, 140, 0, 0.5);
+  border-radius: 8px;
+  text-align: center;
+}
+.boss-live-progress-text {
+  color: #FFB347;
+  font-weight: 700;
+  font-size: 14px;
+  letter-spacing: 0.5px;
+}
+/* 让 BattleStage 在 BOSS 挑战弹窗内适配宽度 */
+.boss-challenge-live :deep(.battle-stage) {
+  width: 100%;
+}
+.boss-challenge-summary-view {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+}
+.boss-challenge-back-btn {
+  display: flex;
+  justify-content: center;
+  padding-top: 10px;
+}
+.encounter-summary {
+  padding: 12px 14px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+}
+.encounter-summary-header {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  margin-bottom: 8px;
+  font-size: 14px;
+}
+.encounter-result.victory {
+  color: #66BB6A;
+  font-weight: 700;
+}
+.encounter-result.defeat {
+  color: #EF5350;
+  font-weight: 700;
+}
+.encounter-enemy {
+  color: #B8A98E;
+}
+.encounter-rewards {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+.encounter-reward-item {
+  padding: 4px 8px;
+  background: rgba(255, 215, 0, 0.08);
+  border: 1px solid rgba(255, 215, 0, 0.3);
+  border-radius: 6px;
+  font-size: 12px;
+  display: flex;
+  align-items: center;
+  gap: 4px;
+}
+.encounter-reward-item .reward-name {
+  color: #FFD700;
+}
+.encounter-reward-item .reward-amount {
+  color: #B8A98E;
+}
+.encounter-loss {
+  margin-top: 6px;
+  color: #EF5350;
+  font-size: 12px;
 }
 .boss-challenge-build-info {
   display: flex;
