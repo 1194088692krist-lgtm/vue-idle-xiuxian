@@ -134,18 +134,45 @@
       </div>
     </transition>
 
-    <!-- 完整日志弹窗 -->
+    <!-- 实时战斗日志弹窗（旧版 logs 系统，按场次累积；含时间戳/类型彩色/清空按钮） -->
     <teleport to="body">
       <div v-if="showFullLog" class="battle-log-modal" @click.self="showFullLog = false">
         <div class="battle-log-modal-content">
           <div class="modal-header">
-            <span>完整战斗日志</span>
-            <button class="close-btn" @click="showFullLog = false">×</button>
+            <span class="modal-title">📜 实时战报</span>
+            <div class="modal-actions">
+              <button class="btn-clear-log" @click="clearRealtimeLog" title="清空当前日志">清空日志</button>
+              <button class="close-btn" @click="showFullLog = false">×</button>
+            </div>
           </div>
           <div class="battle-log-modal-body" ref="fullLogBody">
-            <div v-for="(log, idx) in fullBattleLog" :key="idx" class="battle-log-item" :class="log.type">
-              <img v-if="log.avatar" :src="log.avatar" class="battle-log-avatar" loading="lazy" decoding="async" />
-              <span class="battle-log-text">{{ log.text }}</span>
+            <div v-if="!realtimeLogEntries.length" class="empty-log-tip">暂无日志，挂机开始后即会实时累积……</div>
+            <div
+              v-for="(log, idx) in realtimeLogEntries"
+              :key="idx"
+              class="rt-log-item"
+              :class="log.type"
+            >
+              <span class="rt-log-time">{{ log.time }}</span>
+              <span v-if="log.avatar" class="rt-log-avatar-wrap">
+                <img :src="log.avatar" class="rt-log-avatar" loading="lazy" decoding="async" />
+              </span>
+              <span v-else class="rt-log-bullet" :class="log.type">•</span>
+              <span class="rt-log-text">
+                <template v-if="log.text">{{ log.text }}</template>
+                <template v-else-if="log.parts && log.parts.length">
+                  <span
+                    v-for="(part, pi) in log.parts"
+                    :key="pi"
+                    class="rt-log-part"
+                    :class="{ 'has-icon': !!part.icon }"
+                  >
+                    <img v-if="part.icon" :src="part.icon" class="rt-log-part-icon" loading="lazy" decoding="async" />
+                    <span v-if="part.text">{{ part.text }}</span>
+                  </span>
+                </template>
+                <span v-if="log.detail" class="rt-log-detail"> ({{ log.detail }})</span>
+              </span>
             </div>
           </div>
         </div>
@@ -178,7 +205,8 @@ const props = defineProps({
 })
 
 // 完整战斗日志累积源：挂机时跨所有遭遇，从挂机开始累积到当前（非当前回合）
-const { idleCombatLog } = useIdleSystem()
+// 现已切换回旧版「实时战斗日志」系统（logs/displayLogs），保留时间戳与彩色分类
+const { displayLogs, clearIdleLogs } = useIdleSystem()
 
 const stageRef = ref(null)
 
@@ -250,16 +278,23 @@ const battleLogDisplay = computed(() => {
   return log.slice(-3).map((t, i) => ({ id: (props.encounter?.round || 0) + '-' + i, type: logType(t), text: t }))
 })
 
-// 完整日志弹窗数据源：
-// - 挂机中：使用 idleCombatLog（本次挂机开始至当前、跨所有遭遇的累积战斗日志）
-// - 手动战斗/无挂机：回退到当前 encounter.combatLog（即本场战斗日志）
-const fullBattleLog = computed(() => {
-  const session = idleCombatLog.value || []
-  const source = session.length ? session : (props.encounter?.combatLog || [])
-  return source.map(t => ({ type: logType(t), text: t }))
+// 实时战斗日志弹窗数据源：直接复用 useIdleSystem 中的 displayLogs
+// 挂机中 = logs.value（实时累积），挂机结束 = lastSummary.value.logs（本次挂机快照）
+const realtimeLogEntries = computed(() => {
+  const arr = displayLogs.value || []
+  // 把字符串数组（手动战斗回退场景）也包装为统一结构
+  if (arr.length && typeof arr[0] === 'string') {
+    return arr.map(t => ({ time: '', text: t, type: logType(t), parts: null, avatar: null, detail: null }))
+  }
+  return arr
 })
 
-// 完整日志弹窗自动滚动到底部：打开瞬间定位到最新一条，新日志到达时保持贴底
+// 清空实时日志：调用 useIdleSystem 暴露的方法，同步清理 logs 与 lastSummary.logs
+function clearRealtimeLog() {
+  if (typeof clearIdleLogs === 'function') clearIdleLogs()
+}
+
+// 实时战斗日志弹窗自动滚动到底部：打开瞬间定位到最新一条，新日志到达时保持贴底
 const fullLogBody = ref(null)
 function scrollFullLogToBottom() {
   nextTick(() => {
@@ -268,7 +303,7 @@ function scrollFullLogToBottom() {
   })
 }
 watch(() => showFullLog.value, (v) => { if (v) scrollFullLogToBottom() })
-watch(() => fullBattleLog.value.length, () => { if (showFullLog.value) scrollFullLogToBottom() })
+watch(() => realtimeLogEntries.value.length, () => { if (showFullLog.value) scrollFullLogToBottom() })
 
 const enemyEmoji = computed(() => {
   const tier = props.encounter?.enemy?.tier
@@ -1178,11 +1213,12 @@ onUnmounted(() => {
   white-space: nowrap;
 }
 
-/* 完整日志弹窗 */
+/* 实时战斗日志弹窗（旧版 logs 系统复刻 LogPanel 风格：时间戳 + 彩色 + 清空按钮） */
 .battle-log-modal {
   position: fixed;
   inset: 0;
-  background: rgba(0, 0, 0, 0.7);
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(4px);
   display: flex;
   align-items: center;
   justify-content: center;
@@ -1191,12 +1227,12 @@ onUnmounted(() => {
 }
 
 .battle-log-modal-content {
-  width: 90%;
-  max-width: 500px;
-  max-height: 70vh;
-  background: linear-gradient(135deg, rgba(30, 20, 40, 0.98), rgba(15, 10, 25, 0.98));
-  border: 1px solid rgba(139, 92, 246, 0.3);
-  border-radius: 12px;
+  width: min(620px, 96vw);
+  max-height: 82vh;
+  background: linear-gradient(180deg, rgba(28, 22, 38, 0.98) 0%, rgba(15, 11, 22, 0.99) 100%);
+  border: 1px solid rgba(139, 92, 246, 0.35);
+  border-radius: 14px;
+  box-shadow: 0 16px 48px rgba(76, 29, 149, 0.35), 0 0 0 1px rgba(255, 255, 255, 0.04) inset;
   display: flex;
   flex-direction: column;
   overflow: hidden;
@@ -1206,45 +1242,328 @@ onUnmounted(() => {
   display: flex;
   align-items: center;
   justify-content: space-between;
-  padding: 12px 16px;
+  padding: 14px 18px;
   border-bottom: 1px solid rgba(255, 255, 255, 0.08);
-  font-size: 14px;
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.18) 0%, rgba(139, 92, 246, 0.04) 100%);
+  font-size: 15px;
   color: #e5e7eb;
   font-weight: 600;
 }
+.modal-title {
+  color: #c4b5fd;
+  letter-spacing: 0.02em;
+}
+.modal-actions {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+}
+.btn-clear-log {
+  padding: 4px 12px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #fca5a5;
+  border-radius: 12px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.15s ease;
+}
+.btn-clear-log:hover {
+  background: rgba(239, 68, 68, 0.3);
+  color: #fff;
+}
 
 .close-btn {
-  width: 24px;
-  height: 24px;
-  border: none;
-  background: rgba(255, 255, 255, 0.1);
+  width: 28px;
+  height: 28px;
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  background: rgba(255, 255, 255, 0.08);
   color: #d1d5db;
   border-radius: 50%;
   cursor: pointer;
   font-size: 16px;
   line-height: 1;
+  transition: all 0.15s ease;
+}
+.close-btn:hover {
+  background: rgba(239, 68, 68, 0.35);
+  color: #fff;
 }
 
 .battle-log-modal-body {
-  padding: 12px 16px;
+  padding: 12px 14px;
   overflow-y: auto;
   display: flex;
   flex-direction: column;
-  gap: 6px;
+  gap: 4px;
+  scrollbar-width: thin;
+}
+.battle-log-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.battle-log-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(139, 92, 246, 0.4);
+  border-radius: 3px;
 }
 
-.battle-log-modal-body .battle-log-item {
-  font-size: 12px;
-  white-space: normal;
-  text-overflow: initial;
+.empty-log-tip {
+  padding: 32px 16px;
+  text-align: center;
+  color: #6b7280;
+  font-size: 13px;
+  font-style: italic;
 }
-/* 修复：弹窗内日志文本需完整换行展示，覆盖基础样式的 nowrap + 省略号截断 */
-.battle-log-modal-body .battle-log-text {
-  white-space: normal;
-  overflow: visible;
-  text-overflow: clip;
+
+/* 实时战斗日志条目：时间戳 + 彩色圆点/头像 + 文本 */
+.rt-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 8px;
+  font-size: 12.5px;
+  color: #e5e7eb;
+  padding: 4px 8px;
+  border-radius: 6px;
+  background: rgba(255, 255, 255, 0.02);
+  border-left: 2px solid transparent;
+  line-height: 1.55;
+  transition: background 0.15s ease;
+}
+.rt-log-item:hover {
+  background: rgba(255, 255, 255, 0.05);
+}
+.rt-log-time {
+  flex-shrink: 0;
+  font-size: 10.5px;
+  color: #6b7280;
+  padding: 1px 6px;
+  background: rgba(255, 255, 255, 0.05);
+  border-radius: 8px;
+  font-variant-numeric: tabular-nums;
+  letter-spacing: 0.02em;
+  margin-top: 1px;
+}
+.rt-log-avatar-wrap {
+  flex-shrink: 0;
+  width: 18px;
+  height: 18px;
+  margin-top: 1px;
+}
+.rt-log-avatar {
+  width: 100%;
+  height: 100%;
+  border-radius: 4px;
+  object-fit: cover;
+}
+.rt-log-bullet {
+  flex-shrink: 0;
+  font-size: 14px;
+  line-height: 1;
+  color: #9ca3af;
+  width: 14px;
+  text-align: center;
+  margin-top: 2px;
+}
+.rt-log-text {
+  flex: 1;
+  min-width: 0;
   word-break: break-word;
+  white-space: normal;
 }
+.rt-log-detail {
+  color: #9ca3af;
+  font-size: 11px;
+}
+.rt-log-part {
+  display: inline-flex;
+  align-items: center;
+  gap: 3px;
+}
+.rt-log-part-icon {
+  width: 18px;
+  height: 18px;
+  vertical-align: middle;
+  border-radius: 3px;
+}
+
+/* 按 log type 上色：左侧色条 + 文本色 */
+.rt-log-item.info { color: #93c5fd; border-left-color: rgba(147, 197, 253, 0.5); }
+.rt-log-item.info .rt-log-bullet { color: #93c5fd; }
+
+.rt-log-item.warning { color: #fbbf24; border-left-color: rgba(251, 191, 36, 0.5); }
+.rt-log-item.warning .rt-log-bullet { color: #fbbf24; }
+
+.rt-log-item.header {
+  color: #fbbf24;
+  font-weight: 700;
+  background: rgba(251, 191, 36, 0.08);
+  border-left-color: rgba(251, 191, 36, 0.65);
+  margin-top: 6px;
+  letter-spacing: 0.02em;
+}
+.rt-log-item.header .rt-log-bullet { color: #fbbf24; }
+
+.rt-log-item.scene { color: #9ca3af; font-style: italic; border-left-color: rgba(156, 163, 175, 0.4); }
+.rt-log-item.scene .rt-log-bullet { color: #9ca3af; }
+
+.rt-log-item.enemy-normal { color: #d1d5db; border-left-color: rgba(209, 213, 219, 0.4); }
+.rt-log-item.enemy-normal .rt-log-bullet { color: #d1d5db; }
+.rt-log-item.enemy-elite { color: #fdba74; border-left-color: rgba(253, 186, 116, 0.5); }
+.rt-log-item.enemy-elite .rt-log-bullet { color: #fdba74; }
+.rt-log-item.enemy-boss {
+  color: #f87171;
+  font-weight: 700;
+  background: rgba(248, 113, 113, 0.1);
+  border-left-color: rgba(248, 113, 113, 0.7);
+}
+.rt-log-item.enemy-boss .rt-log-bullet { color: #f87171; }
+
+.rt-log-item.combat { color: #e5e7eb; border-left-color: rgba(229, 231, 235, 0.3); }
+.rt-log-item.combat .rt-log-bullet { color: #e5e7eb; }
+
+.rt-log-item.vampire { color: #86efac; border-left-color: rgba(134, 239, 172, 0.5); }
+.rt-log-item.vampire .rt-log-bullet { color: #86efac; }
+
+.rt-log-item.dodge { color: #9ca3af; font-style: italic; border-left-color: rgba(156, 163, 175, 0.4); }
+.rt-log-item.dodge .rt-log-bullet { color: #9ca3af; }
+
+.rt-log-item.crit { color: #fca5a5; font-weight: 600; border-left-color: rgba(252, 165, 165, 0.6); }
+.rt-log-item.crit .rt-log-bullet { color: #fca5a5; }
+
+.rt-log-item.shield { color: #fde047; border-left-color: rgba(253, 224, 71, 0.5); }
+.rt-log-item.shield .rt-log-bullet { color: #fde047; }
+
+.rt-log-item.counter { color: #93c5fd; border-left-color: rgba(147, 197, 253, 0.5); }
+.rt-log-item.counter .rt-log-bullet { color: #93c5fd; }
+
+.rt-log-item.stun { color: #c4b5fd; border-left-color: rgba(196, 181, 253, 0.5); }
+.rt-log-item.stun .rt-log-bullet { color: #c4b5fd; }
+
+.rt-log-item.victory {
+  color: #4ade80;
+  font-weight: 700;
+  background: rgba(74, 222, 128, 0.1);
+  border-left-color: rgba(74, 222, 128, 0.7);
+}
+.rt-log-item.victory .rt-log-bullet { color: #4ade80; }
+
+.rt-log-item.defeat {
+  color: #f87171;
+  font-weight: 700;
+  background: rgba(248, 113, 113, 0.1);
+  border-left-color: rgba(248, 113, 113, 0.7);
+}
+.rt-log-item.defeat .rt-log-bullet { color: #f87171; }
+
+.rt-log-item.drop { color: #fbbf24; border-left-color: rgba(251, 191, 36, 0.5); }
+.rt-log-item.drop .rt-log-bullet { color: #fbbf24; }
+
+.rt-log-item.drop-rare {
+  color: #f0abfc;
+  font-weight: 600;
+  background: rgba(240, 171, 252, 0.1);
+  border-left-color: rgba(240, 171, 252, 0.65);
+}
+.rt-log-item.drop-rare .rt-log-bullet { color: #f0abfc; }
+
+.rt-log-item.reward-normal { color: #fde047; border-left-color: rgba(253, 224, 71, 0.5); }
+.rt-log-item.reward-normal .rt-log-bullet { color: #fde047; }
+
+.rt-log-item.reward-equipment {
+  color: #fbbf24;
+  font-weight: 600;
+  background: rgba(251, 191, 36, 0.08);
+  border-left-color: rgba(251, 191, 36, 0.65);
+}
+.rt-log-item.reward-equipment .rt-log-bullet { color: #fbbf24; }
+
+.rt-log-item.fortune {
+  color: #f0abfc;
+  font-weight: 600;
+  background: rgba(240, 171, 252, 0.08);
+  border-left-color: rgba(240, 171, 252, 0.65);
+}
+.rt-log-item.fortune .rt-log-bullet { color: #f0abfc; }
+
+.rt-log-item.skit {
+  color: #93c5fd;
+  font-style: italic;
+  background: rgba(147, 197, 253, 0.06);
+  border-left-color: rgba(147, 197, 253, 0.5);
+}
+.rt-log-item.skit .rt-log-bullet { color: #93c5fd; }
+
+/* 日间模式：弹窗配色调整 */
+html:not(.dark) .battle-log-modal-content {
+  background: linear-gradient(180deg, #fdf4ff 0%, #f5f3ff 100%);
+  border-color: rgba(139, 92, 246, 0.5);
+  box-shadow: 0 16px 48px rgba(139, 92, 246, 0.25);
+}
+html:not(.dark) .modal-header {
+  background: linear-gradient(90deg, rgba(139, 92, 246, 0.2) 0%, rgba(139, 92, 246, 0.05) 100%);
+  border-bottom-color: rgba(139, 92, 246, 0.25);
+}
+html:not(.dark) .modal-title { color: #6d28d9; }
+html:not(.dark) .rt-log-item {
+  color: #3f3f5a;
+  background: rgba(0, 0, 0, 0.02);
+}
+html:not(.dark) .rt-log-item:hover {
+  background: rgba(139, 92, 246, 0.08);
+}
+html:not(.dark) .rt-log-time {
+  color: #6b7280;
+  background: rgba(0, 0, 0, 0.05);
+}
+html:not(.dark) .rt-log-detail {
+  color: #6b7280;
+}
+html:not(.dark) .empty-log-tip {
+  color: #9ca3af;
+}
+html:not(.dark) .rt-log-item.info { color: #2563eb; border-left-color: rgba(37, 99, 235, 0.5); }
+html:not(.dark) .rt-log-item.info .rt-log-bullet { color: #2563eb; }
+html:not(.dark) .rt-log-item.warning { color: #d97706; border-left-color: rgba(217, 119, 6, 0.5); }
+html:not(.dark) .rt-log-item.warning .rt-log-bullet { color: #d97706; }
+html:not(.dark) .rt-log-item.header { color: #d97706; background: rgba(217, 119, 6, 0.08); border-left-color: rgba(217, 119, 6, 0.65); }
+html:not(.dark) .rt-log-item.header .rt-log-bullet { color: #d97706; }
+html:not(.dark) .rt-log-item.scene { color: #6b7280; border-left-color: rgba(107, 114, 128, 0.4); }
+html:not(.dark) .rt-log-item.scene .rt-log-bullet { color: #6b7280; }
+html:not(.dark) .rt-log-item.enemy-normal { color: #4b5563; border-left-color: rgba(75, 85, 99, 0.4); }
+html:not(.dark) .rt-log-item.enemy-normal .rt-log-bullet { color: #4b5563; }
+html:not(.dark) .rt-log-item.enemy-elite { color: #ea580c; border-left-color: rgba(234, 88, 12, 0.5); }
+html:not(.dark) .rt-log-item.enemy-elite .rt-log-bullet { color: #ea580c; }
+html:not(.dark) .rt-log-item.enemy-boss { color: #dc2626; background: rgba(220, 38, 38, 0.1); border-left-color: rgba(220, 38, 38, 0.7); }
+html:not(.dark) .rt-log-item.enemy-boss .rt-log-bullet { color: #dc2626; }
+html:not(.dark) .rt-log-item.combat { color: #1f2937; border-left-color: rgba(31, 41, 55, 0.3); }
+html:not(.dark) .rt-log-item.combat .rt-log-bullet { color: #1f2937; }
+html:not(.dark) .rt-log-item.vampire { color: #16a34a; border-left-color: rgba(22, 163, 74, 0.5); }
+html:not(.dark) .rt-log-item.vampire .rt-log-bullet { color: #16a34a; }
+html:not(.dark) .rt-log-item.dodge { color: #6b7280; border-left-color: rgba(107, 114, 128, 0.4); }
+html:not(.dark) .rt-log-item.dodge .rt-log-bullet { color: #6b7280; }
+html:not(.dark) .rt-log-item.crit { color: #b91c1c; border-left-color: rgba(185, 28, 28, 0.6); }
+html:not(.dark) .rt-log-item.crit .rt-log-bullet { color: #b91c1c; }
+html:not(.dark) .rt-log-item.shield { color: #ca8a04; border-left-color: rgba(202, 138, 4, 0.5); }
+html:not(.dark) .rt-log-item.shield .rt-log-bullet { color: #ca8a04; }
+html:not(.dark) .rt-log-item.counter { color: #2563eb; border-left-color: rgba(37, 99, 235, 0.5); }
+html:not(.dark) .rt-log-item.counter .rt-log-bullet { color: #2563eb; }
+html:not(.dark) .rt-log-item.stun { color: #7c3aed; border-left-color: rgba(124, 58, 237, 0.5); }
+html:not(.dark) .rt-log-item.stun .rt-log-bullet { color: #7c3aed; }
+html:not(.dark) .rt-log-item.victory { color: #16a34a; background: rgba(22, 163, 74, 0.1); border-left-color: rgba(22, 163, 74, 0.7); }
+html:not(.dark) .rt-log-item.victory .rt-log-bullet { color: #16a34a; }
+html:not(.dark) .rt-log-item.defeat { color: #dc2626; background: rgba(220, 38, 38, 0.1); border-left-color: rgba(220, 38, 38, 0.7); }
+html:not(.dark) .rt-log-item.defeat .rt-log-bullet { color: #dc2626; }
+html:not(.dark) .rt-log-item.drop { color: #ca8a04; border-left-color: rgba(202, 138, 4, 0.5); }
+html:not(.dark) .rt-log-item.drop .rt-log-bullet { color: #ca8a04; }
+html:not(.dark) .rt-log-item.drop-rare { color: #c026d3; background: rgba(192, 38, 211, 0.1); border-left-color: rgba(192, 38, 211, 0.65); }
+html:not(.dark) .rt-log-item.drop-rare .rt-log-bullet { color: #c026d3; }
+html:not(.dark) .rt-log-item.reward-normal { color: #ca8a04; border-left-color: rgba(202, 138, 4, 0.5); }
+html:not(.dark) .rt-log-item.reward-normal .rt-log-bullet { color: #ca8a04; }
+html:not(.dark) .rt-log-item.reward-equipment { color: #ca8a04; background: rgba(202, 138, 4, 0.08); border-left-color: rgba(202, 138, 4, 0.65); }
+html:not(.dark) .rt-log-item.reward-equipment .rt-log-bullet { color: #ca8a04; }
+html:not(.dark) .rt-log-item.fortune { color: #c026d3; background: rgba(192, 38, 211, 0.08); border-left-color: rgba(192, 38, 211, 0.65); }
+html:not(.dark) .rt-log-item.fortune .rt-log-bullet { color: #c026d3; }
+html:not(.dark) .rt-log-item.skit { color: #2563eb; background: rgba(37, 99, 235, 0.06); border-left-color: rgba(37, 99, 235, 0.5); }
+html:not(.dark) .rt-log-item.skit .rt-log-bullet { color: #2563eb; }
 
 /* 怪物头像样式 */
 .enemy-avatar.clickable-portrait {

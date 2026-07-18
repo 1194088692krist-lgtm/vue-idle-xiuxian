@@ -645,7 +645,7 @@
 
 <script setup>
   import { usePlayerStore } from '../stores/player'
-  import { ref, computed, onMounted, onUnmounted } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
   import { useMessage } from 'naive-ui'
   import { getStatName, formatStatValue } from '../plugins/stats'
   import { getRealmName } from '../plugins/realm'
@@ -733,6 +733,9 @@
 
   const currentMaterialPage = ref(1)
   const materialPageSize = ref(12)
+
+  // 切换素材分类时重置页码到第 1 页，避免之前翻到第 N 页后切到分类页数不足导致显示空
+  watch(selectedMaterialCategory, () => { currentMaterialPage.value = 1 })
 
   const displayMaterials = computed(() => {
     const start = (currentMaterialPage.value - 1) * materialPageSize.value
