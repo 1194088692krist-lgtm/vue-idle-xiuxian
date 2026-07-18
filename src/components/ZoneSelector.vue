@@ -298,11 +298,11 @@
             </div>
             <!-- 真实伤害统计：按各场遭遇 combatStats 累加 -->
             <div class="dash-item" v-if="idleDashboard.totalDamageDealt > 0">
-              <span class="dash-label">⚔️ 总造成伤害</span>
+              <span class="dash-label">⚔️ 总伤害</span>
               <span class="dash-value" style="color:#ff5722">{{ formatNumber(idleDashboard.totalDamageDealt) }}</span>
             </div>
             <div class="dash-item" v-if="idleDashboard.totalDamageTaken > 0">
-              <span class="dash-label">🩸 总受到伤害</span>
+              <span class="dash-label">🩸 总受伤</span>
               <span class="dash-value" style="color:#e53935">{{ formatNumber(idleDashboard.totalDamageTaken) }}</span>
             </div>
           </div>
@@ -451,11 +451,11 @@
           <span class="summary-value" style="color:#FF4500">+{{ lastSummary.totalBossMaterials }}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">总造成伤害</span>
+          <span class="summary-label">总伤害</span>
           <span class="summary-value" style="color:#ff5722">{{ formatNumber(lastSummary.totalDamageDealt || 0) }}</span>
         </div>
         <div class="summary-item">
-          <span class="summary-label">总受到伤害</span>
+          <span class="summary-label">总受伤</span>
           <span class="summary-value" style="color:#e53935">{{ formatNumber(lastSummary.totalDamageTaken || 0) }}</span>
         </div>
       </div>
@@ -850,6 +850,8 @@ const bossChallengeCount = ref(1)
 const BOSS_CHALLENGE_COUNT_OPTIONS = [1, 5, 10, 20]
 // 展开的 BOSS 挑战面板：按秘境分组列出所有 16 个 BOSS
 const bossChallengeGroups = computed(() => {
+  // 显式访问 playerStore.materials 让 Vue 追踪依赖，确保素材库变化时本 computed 重算
+  const materials = playerStore.materials || []
   return zones.map(zone => ({
     zoneId: zone.id,
     zoneName: zone.name,
@@ -858,7 +860,11 @@ const bossChallengeGroups = computed(() => {
     zoneDifficultyColor: zone.difficultyColor,
     bosses: (zone.bosses || []).map(boss => {
       const ticketDef = getBossTicketByBossId(zone.id, boss.id)
-      const ticketCount = ticketDef ? playerStore.countMaterial('boss_ticket', ticketDef.id) : 0
+      // 直接在 materials 数组上 filter 计数（避免 countMaterial action 闭包问题）
+      const ticketId = ticketDef?.id
+      const ticketCount = ticketId
+        ? materials.filter(m => m && m.kind === 'boss_ticket' && m.id === ticketId).length
+        : 0
       return {
         zoneId: zone.id,
         bossId: boss.id,
@@ -866,7 +872,7 @@ const bossChallengeGroups = computed(() => {
         description: boss.description,
         stats: boss.stats,
         traits: boss.traits || [],
-        ticketId: ticketDef?.id || null,
+        ticketId: ticketId || null,
         ticketName: ticketDef?.name || '挑战券',
         ticketCount
       }
@@ -878,7 +884,9 @@ const selectedBossTicketCount = computed(() => {
   if (!selectedBossTarget.value) return 0
   const ticketDef = getBossTicketByBossId(selectedBossTarget.value.zoneId, selectedBossTarget.value.bossId)
   if (!ticketDef) return 0
-  return playerStore.countMaterial('boss_ticket', ticketDef.id)
+  // 显式访问 playerStore.materials 让 Vue 追踪依赖
+  const materials = playerStore.materials || []
+  return materials.filter(m => m && m.kind === 'boss_ticket' && m.id === ticketDef.id).length
 })
 // 当前选中 BOSS 的胜率预测（基于 Build 与 BOSS 推荐 Build 比例）
 const selectedBossWinChance = computed(() => {

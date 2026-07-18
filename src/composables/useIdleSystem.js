@@ -2462,6 +2462,12 @@ async function runIdleEncounter() {
     // 仅当本轮 BOSS 窗口起点落在总挂机时间内，才在本轮刷 BOSS（避免不完整尾轮误刷）
     const roundHasBossWindow = (roundIndex * IDLE_ROUND_MS + ROUND_MOB_MS) < idleDuration
     const inBossPhase = roundElapsed >= ROUND_MOB_MS && roundHasBossWindow
+    // 前 4 分钟小怪阶段：每次遭遇有 ~7% 概率额外遇到 BOSS（区间 5~10%，仅本轮尚未刷过 BOSS 时生效）
+    // 最后一分钟（inBossPhase）：必遇到 BOSS
+    const farmPhaseRandomBoss = !inBossPhase
+      && bossAttemptedRound.value !== roundIndex
+      && effectiveZone.bosses && effectiveZone.bosses.length
+      && Math.random() < 0.07  // 7% 概率，落点在 5~10% 区间内
 
     // 停止挂机或新挂机已启动时立即退出，避免清空 currentEncounter 后又被创建新遭遇覆盖
     if (!isIdling.value || isFinishingIdle || mySessionId !== idleSessionId) {
@@ -2481,7 +2487,7 @@ async function runIdleEncounter() {
       let enemyData
       let enemy
       if (inBossPhase && bossAttemptedRound.value !== roundIndex && effectiveZone.bosses && effectiveZone.bosses.length) {
-        // ===== 本轮 BOSS 决战窗口：刷新秘境 BOSS（限时 1 分钟，失败则进入下一轮） =====
+        // ===== 本轮 BOSS 决战窗口（最后 1 分钟）：必刷新秘境 BOSS（限时 1 分钟，失败则进入下一轮） =====
         isBossEncounter = true
         bossSpawned.value = true
         bossSpawnRound.value = roundIndex
@@ -2493,6 +2499,19 @@ async function runIdleEncounter() {
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
         addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${enemy.name}！限时 1 分钟内击杀，失败则进入下一轮！`)
         // 在完整战斗日志中插入本轮 BOSS 分隔符，便于「查看完整日志」按场次区分
+        idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${enemy.name} ——`)
+      } else if (farmPhaseRandomBoss) {
+        // ===== 前 4 分钟小怪阶段：~7% 概率偶遇 BOSS（同样计入本轮 BOSS 已刷标记，避免重复刷） =====
+        isBossEncounter = true
+        bossSpawned.value = true
+        bossSpawnRound.value = roundIndex
+        bossAttemptedRound.value = roundIndex
+        bossSpawnTime.value = Date.now()
+        const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+        enemy = createBossEnemy(bossData, effectiveZone)
+        enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
+        idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+        addLog('header', `👑【${zone.name}·${diff.label}】偶遇 BOSS：${enemy.name}！限时 1 分钟内击杀！`)
         idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${enemy.name} ——`)
       } else {
         if (inBossPhase && bossAttemptedRound.value !== roundIndex) {

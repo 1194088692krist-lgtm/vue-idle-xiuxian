@@ -120,12 +120,12 @@ export const calculateBreakthroughCost = (level) => {
 
 export const BOSS_MATERIALS = {
   forest_edge: [
-    { id: 'boar_tusk', name: '野猪獠牙', description: '野猪精的獠牙，坚硬无比' },
-    { id: 'bandit_emblem', name: '山匪令牌', description: '山匪首领的令牌' }
+    { id: 'wolf_fang', name: '狼王獠牙', description: '狼王的獠牙，锋利无匹，散发着野性气息' },
+    { id: 'bandit_leader_emblem', name: '山匪头目令牌', description: '山匪头目的令牌，刻有神秘的匪号' }
   ],
   misty_valley: [
-    { id: 'snake_scale', name: '蛇鳞', description: '剧毒蛇妖的鳞片' },
-    { id: 'spirit_wolf_fur', name: '灵狼皮毛', description: '灵狼的珍贵皮毛' }
+    { id: 'tiger_king_claw', name: '虎王利爪', description: '迷雾虎王的利爪，锐利如刀' },
+    { id: 'skeleton_general_bone', name: '骷髅将军骨刃', description: '骷髅将军的骨刃，坚硬无比' }
   ],
   phoenix_cave: [
     { id: 'phoenix_feather', name: '凤凰羽毛', description: '浴火凤凰的羽毛，蕴含火之力' },
@@ -178,47 +178,47 @@ export const getBossMaterialForLevel = (level) => {
 export const ZONE_BOSSES = {
   forest_edge: [
     {
-      id: 'boss_boar_king',
-      name: '野猪王',
-      description: '青萝林的霸主，力大无穷',
+      id: 'forest_boss_1',
+      name: '狼王',
+      description: '青萝林的霸主，统领狼群横行霸道',
       hpMultiplier: 5,
       attackMultiplier: 3,
-      dropMaterial: 'boar_tusk',
+      dropMaterial: 'wolf_fang',
       dropChance: 0.15
     },
     {
-      id: 'boss_bandit_leader',
-      name: '山匪首领',
-      description: '青萝林周边的匪首',
+      id: 'forest_boss_2',
+      name: '山匪头目',
+      description: '盘踞山林的悍匪首领，刀法凌厉',
       hpMultiplier: 4,
       attackMultiplier: 4,
-      dropMaterial: 'bandit_emblem',
+      dropMaterial: 'bandit_leader_emblem',
       dropChance: 0.18
     }
   ],
   misty_valley: [
     {
-      id: 'boss_poison_snake',
-      name: '毒蟒',
-      description: '迷雾谷深处的剧毒蟒蛇',
+      id: 'valley_boss_1',
+      name: '迷雾虎王',
+      description: '迷雾中潜伏的兽王，一击致命',
       hpMultiplier: 8,
       attackMultiplier: 5,
-      dropMaterial: 'snake_scale',
+      dropMaterial: 'tiger_king_claw',
       dropChance: 0.12
     },
     {
-      id: 'boss_spirit_wolf',
-      name: '灵狼王',
-      description: '迷雾谷的狼群之王',
+      id: 'valley_boss_2',
+      name: '骷髅将军',
+      description: '远古战场遗留的亡灵将军，刀枪不入',
       hpMultiplier: 6,
       attackMultiplier: 7,
-      dropMaterial: 'spirit_wolf_fur',
+      dropMaterial: 'skeleton_general_bone',
       dropChance: 0.14
     }
   ],
   phoenix_cave: [
     {
-      id: 'boss_phoenix',
+      id: 'phoenix_boss_1',
       name: '浴火凤凰',
       description: '镇守凤凰窟的神鸟',
       hpMultiplier: 15,
@@ -227,7 +227,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.10
     },
     {
-      id: 'boss_flame_elemental',
+      id: 'phoenix_boss_2',
       name: '炎魔',
       description: '火焰凝聚的魔物',
       hpMultiplier: 12,
@@ -238,7 +238,7 @@ export const ZONE_BOSSES = {
   ],
   dragon_abyss: [
     {
-      id: 'boss_ancient_dragon',
+      id: 'dragon_boss_1',
       name: '远古巨龙',
       description: '沉睡于龙渊的远古巨龙',
       hpMultiplier: 25,
@@ -247,7 +247,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.08
     },
     {
-      id: 'boss_dragon_spirit',
+      id: 'dragon_boss_2',
       name: '龙魂',
       description: '巨龙死后残留的灵魂',
       hpMultiplier: 20,
@@ -258,7 +258,7 @@ export const ZONE_BOSSES = {
   ],
   ghost_wasteland: [
     {
-      id: 'boss_ghost_lord',
+      id: 'ghost_boss_1',
       name: '鬼帝',
       description: '鬼荒原的统治者',
       hpMultiplier: 40,
@@ -267,7 +267,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.07
     },
     {
-      id: 'boss_skeleton_king',
+      id: 'ghost_boss_2',
       name: '白骨妖王',
       description: '白骨堆积而成的妖王',
       hpMultiplier: 35,
@@ -278,7 +278,7 @@ export const ZONE_BOSSES = {
   ],
   ice_palace: [
     {
-      id: 'boss_ice_empress',
+      id: 'ice_boss_1',
       name: '冰后',
       description: '冰雪宫的主人',
       hpMultiplier: 60,
@@ -287,7 +287,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.06
     },
     {
-      id: 'boss_frozen_titan',
+      id: 'ice_boss_2',
       name: '冰封巨人',
       description: '被冰封千年的巨人',
       hpMultiplier: 55,
@@ -298,7 +298,7 @@ export const ZONE_BOSSES = {
   ],
   immortal_ruins: [
     {
-      id: 'boss_immortal_guardian',
+      id: 'immortal_boss_1',
       name: '仙人守卫',
       description: '仙墟的守护者',
       hpMultiplier: 100,
@@ -307,7 +307,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.05
     },
     {
-      id: 'boss_divine_beast',
+      id: 'immortal_boss_2',
       name: '神兽',
       description: '守护仙墟的远古神兽',
       hpMultiplier: 90,
@@ -318,7 +318,7 @@ export const ZONE_BOSSES = {
   ],
   chaos_realm: [
     {
-      id: 'boss_chaos_lord',
+      id: 'chaos_boss_1',
       name: '混沌之主',
       description: '混沌界的主宰',
       hpMultiplier: 200,
@@ -327,7 +327,7 @@ export const ZONE_BOSSES = {
       dropChance: 0.04
     },
     {
-      id: 'boss_void_walker',
+      id: 'chaos_boss_2',
       name: '虚空行者',
       description: '来自虚空的神秘存在',
       hpMultiplier: 180,
