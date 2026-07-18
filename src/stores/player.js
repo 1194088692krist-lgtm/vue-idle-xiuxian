@@ -6,9 +6,9 @@ import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
 import { getSkillsForBreakthrough } from '../plugins/skills'
-import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel } from '../plugins/cultivationSystem'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
-import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig } from '../plugins/equipment'
+import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 
 // 装备出售/分解相关常量
@@ -1393,6 +1393,17 @@ export const usePlayerStore = defineStore('player', {
           remaining--
         }
       }
+      // 12 阶强化每阶消耗对应难度 BOSS 素材 1 个（仅成功时消耗；失败回退不消耗）
+      const bossCost = result.bossCost
+      if (bossCost) {
+        let bossRemaining = bossCost.count
+        for (let i = this.materials.length - 1; i >= 0 && bossRemaining > 0; i--) {
+          if (this.materials[i].kind === 'boss_material' && this.materials[i].id === bossCost.id) {
+            this.materials.splice(i, 1)
+            bossRemaining--
+          }
+        }
+      }
       if (usedBonus > 0) {
         this.enhanceBonus = 0
       }
@@ -1416,7 +1427,7 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '装备不存在' }
       }
       const usedSafe = this.reforgeSafeCharges > 0
-      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat)
+      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat, this.materials)
       if (!result.success) {
         return result
       }
@@ -1462,13 +1473,31 @@ export const usePlayerStore = defineStore('player', {
       if (mode === 'single' && !targetStat) {
         return { success: false, message: '请选择要洗练的词条' }
       }
+      // 按装备品级预检 BOSS 素材（凡品对应青萝林狼王素材）
+      const rarity = targetEquip.rarity || 'common'
+      const bossDef = getReforgeBossMaterial(rarity)
+      if (bossDef) {
+        const have = this.materials.filter(m => m.kind === 'boss_material' && m.id === bossDef.id).length
+        if (have < 1) {
+          return { success: false, message: `BOSS素材【${bossDef.name}】不足` }
+        }
+      }
       const usedSafe = this.reforgeSafeCharges > 0
       // 点击洗练立即扣费
       this.refinementStones -= reforgeConfig.costPerAttempt
       if (usedSafe) {
         this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
       }
-      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat)
+      // 同步扣除 BOSS 素材 1 个
+      if (bossDef) {
+        for (let i = this.materials.length - 1; i >= 0; i--) {
+          if (this.materials[i].kind === 'boss_material' && this.materials[i].id === bossDef.id) {
+            this.materials.splice(i, 1)
+            break
+          }
+        }
+      }
+      const result = reforgeEquipment(targetEquip, this.refinementStones, false, usedSafe, targetStat, this.materials)
       if (!result.success) {
         return result
       }
@@ -1599,6 +1628,35 @@ export const usePlayerStore = defineStore('player', {
       this.phantomCrystals += amount
       this.queueSave()
       return { success: true, message: `成功兑换 ${amount} 幻灵结晶` }
+    },
+    // 妖兽核兑换幻灵结晶（1 妖兽核 = 5 幻灵结晶）
+    exchangeBeastCoreForCrystals(amount) {
+      if (!amount || amount <= 0) {
+        return { success: false, message: '兑换数量必须大于 0' }
+      }
+      if (!Array.isArray(this.materials)) this.materials = []
+      const beastCoreIndices = []
+      for (let i = 0; i < this.materials.length; i++) {
+        if (this.materials[i].kind === 'core' && this.materials[i].id === 'beast_core') {
+          beastCoreIndices.push(i)
+        }
+      }
+      if (beastCoreIndices.length < amount) {
+        return { success: false, message: `妖兽核不足，需要 ${amount} 个，当前 ${beastCoreIndices.length} 个` }
+      }
+      // 从后往前删，避免索引错位
+      for (let i = 0; i < amount; i++) {
+        this.materials.splice(beastCoreIndices[beastCoreIndices.length - 1 - i], 1)
+      }
+      const crystals = amount * 5
+      this.phantomCrystals += crystals
+      this.queueSave()
+      return { success: true, message: `成功使用 ${amount} 个妖兽核兑换 ${crystals} 幻灵结晶` }
+    },
+    // 统计某种素材的数量（按 kind+id）
+    countMaterial(kind, id) {
+      if (!Array.isArray(this.materials)) return 0
+      return this.materials.filter(m => m.kind === kind && m.id === id).length
     },
     // 召回灵宠
     recallPet() {

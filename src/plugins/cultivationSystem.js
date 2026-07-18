@@ -347,6 +347,69 @@ export const getBossEncounterChance = (difficultyKey) => {
   return chances[difficultyKey] || 0
 }
 
+// 按秘境 + boss 序号（0/1）取 BOSS 素材定义
+// 用于「击杀 boss 掉对应素材」以及「强化/洗练消耗对应难度 boss 素材」
+export const getBossMaterialByZoneIndex = (zoneId, index) => {
+  const arr = BOSS_MATERIALS[zoneId]
+  if (!arr || index < 0 || index >= arr.length) return null
+  return arr[index]
+}
+
+// 按 boss id（如 zones.js 中 forest_boss_1/forest_boss_2 的命名）
+// 解析末尾数字得到 boss 序号（_1 -> 0, _2 -> 1），再查对应素材
+export const getBossMaterialByBossId = (zoneId, bossId) => {
+  if (!bossId) return null
+  const match = String(bossId).match(/_(\d+)$/)
+  if (!match) return null
+  const idx = Math.max(0, parseInt(match[1], 10) - 1)
+  return getBossMaterialByZoneIndex(zoneId, idx)
+}
+
+// 12 阶强化对应难度 BOSS 素材映射
+// +1 -> forest_edge[0]（野猪獠牙，对应「狼王」）
+// +2 -> forest_edge[1]
+// +3 ~ +12 按 6 个秘境（青萝林~冰雪宫）每图两个素材递增
+// 仙墟/混沌界 boss 素材仅作为掉落奖励，不用于强化消耗（保留稀缺性）
+export const ENHANCE_BOSS_MATERIAL_MAP = {
+  1:  { zoneId: 'forest_edge',     index: 0 },
+  2:  { zoneId: 'forest_edge',     index: 1 },
+  3:  { zoneId: 'misty_valley',    index: 0 },
+  4:  { zoneId: 'misty_valley',    index: 1 },
+  5:  { zoneId: 'phoenix_cave',    index: 0 },
+  6:  { zoneId: 'phoenix_cave',    index: 1 },
+  7:  { zoneId: 'dragon_abyss',    index: 0 },
+  8:  { zoneId: 'dragon_abyss',    index: 1 },
+  9:  { zoneId: 'ghost_wasteland', index: 0 },
+  10: { zoneId: 'ghost_wasteland', index: 1 },
+  11: { zoneId: 'ice_palace',      index: 0 },
+  12: { zoneId: 'ice_palace',      index: 1 }
+}
+
+// 取强化某阶所需的 BOSS 素材（返回 {id,name,description} 或 null）
+export const getEnhanceBossMaterial = (level) => {
+  const cfg = ENHANCE_BOSS_MATERIAL_MAP[level]
+  if (!cfg) return null
+  return getBossMaterialByZoneIndex(cfg.zoneId, cfg.index)
+}
+
+// 6 档品级洗练对应难度 BOSS 素材映射
+// 凡品(common) -> forest_edge[0]（对应「狼王」），按品级递增取更高难度秘境
+export const REFORGE_BOSS_MATERIAL_MAP = {
+  common:    { zoneId: 'forest_edge',     index: 0 },
+  uncommon:  { zoneId: 'misty_valley',    index: 0 },
+  rare:      { zoneId: 'phoenix_cave',    index: 0 },
+  epic:      { zoneId: 'dragon_abyss',    index: 0 },
+  legendary: { zoneId: 'ghost_wasteland', index: 0 },
+  mythic:    { zoneId: 'ice_palace',      index: 0 }
+}
+
+// 取某品级洗练所需的 BOSS 素材
+export const getReforgeBossMaterial = (rarity) => {
+  const cfg = REFORGE_BOSS_MATERIAL_MAP[rarity]
+  if (!cfg) return null
+  return getBossMaterialByZoneIndex(cfg.zoneId, cfg.index)
+}
+
 export const calculateStatIncrease = (level) => {
   const phase = getPhaseByLevel(level)
   const phaseMultiplier = {

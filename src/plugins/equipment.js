@@ -1,4 +1,5 @@
 // 装备强化和洗练相关配置
+import { getEnhanceBossMaterial, getReforgeBossMaterial } from './cultivationSystem'
 
 // 强化等级配置
 const enhanceConfig = {
@@ -21,6 +22,9 @@ const enhanceConfig = {
     11: { type: 'supreme_enhance_stone', count: 4 },
     12: { type: 'supreme_enhance_stone', count: 8 }
   },
+  // 12 阶强化每阶需对应难度 BOSS 素材 1 个（+1 对应青萝林狼王素材）
+  // bossMaterialCount = 每阶所需 BOSS 素材数量
+  bossMaterialCount: 1,
   enhanceMult: 1.2
 }
 
@@ -126,6 +130,18 @@ function getEnhanceStoneCost(currentLevel) {
   return enhanceConfig.stoneCosts[currentLevel + 1] || { type: 'common_enhance_stone', count: 0 }
 }
 
+// 取强化某阶（currentLevel+1）所需 BOSS 素材（id/name/count）
+function getEnhanceBossMaterialCost(currentLevel) {
+  const targetLevel = currentLevel + 1
+  const def = getEnhanceBossMaterial(targetLevel)
+  if (!def) return null
+  return {
+    id: def.id,
+    name: def.name,
+    count: enhanceConfig.bossMaterialCount || 1
+  }
+}
+
 function getLockLevel(currentLevel) {
   if (currentLevel >= enhanceConfig.lockLevels[1]) return enhanceConfig.lockLevels[1]
   if (currentLevel >= enhanceConfig.lockLevels[0]) return enhanceConfig.lockLevels[0]
@@ -149,6 +165,14 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
   if (stoneCount < stoneCost.count) {
     return { success: false, message: `${enhanceStoneTypes[stoneCost.type]?.name || '强化石'}不足` }
   }
+  // 12 阶强化每阶需对应难度 BOSS 素材 1 个
+  const bossCost = getEnhanceBossMaterialCost(currentLevel)
+  if (bossCost) {
+    const bossCount = (playerMaterials || []).filter(m => m.kind === 'boss_material' && m.id === bossCost.id).length
+    if (bossCount < bossCost.count) {
+      return { success: false, message: `BOSS素材【${bossCost.name}】不足` }
+    }
+  }
   const successRate = Math.min(1, enhanceConfig.baseSuccessRate - currentLevel * 0.03 + (enhanceBonus || 0))
   const isSuccess = Math.random() < successRate
   if (!isSuccess) {
@@ -160,6 +184,7 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
       message: `强化失败，强化等级从+${oldLevel}回退到+${lockLevel}`,
       goldCost,
       stoneCost,
+      bossCost,
       oldLevel,
       newLevel: lockLevel,
       isFailure: true
@@ -187,6 +212,7 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
     message: `强化成功，强化等级+${equipment.enhanceLevel}`,
     goldCost,
     stoneCost,
+    bossCost,
     oldStats,
     newStats: equipment.stats,
     oldLevel,
@@ -238,12 +264,27 @@ const PERCENT_STATS = ['critRate', 'critDamageBoost', 'critDamageReduce', 'dodge
   'combatBoost', 'resistanceBoost', 'critResist', 'comboResist', 'counterResist', 'stunResist',
   'dodgeResist', 'vampireResist', 'haste']
 
-function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true, reforgeSafe = false, targetStat = null) {
+function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true, reforgeSafe = false, targetStat = null, playerMaterials = null) {
   if (!equipment || !equipment.stats || !equipment.type) {
     return { success: false, message: '无效的装备' }
   }
   if (playerReforgeStones < reforgeConfig.costPerAttempt) {
     return { success: false, message: '洗练石不足' }
+  }
+  const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
+  const rarity = equipment.rarity || 'common'
+
+  // 按装备品级消耗 1 个对应难度的 BOSS 素材（凡品对应青萝林狼王素材）
+  const bossCost = (() => {
+    const def = getReforgeBossMaterial(rarity)
+    if (!def) return null
+    return { id: def.id, name: def.name, count: 1 }
+  })()
+  if (bossCost) {
+    const bossCount = (playerMaterials || []).filter(m => m.kind === 'boss_material' && m.id === bossCost.id).length
+    if (bossCount < bossCost.count) {
+      return { success: false, message: `BOSS素材【${bossCost.name}】不足` }
+    }
   }
   // 预处理：直接删除非法值的可洗练词条
   Object.keys(equipment.stats).forEach(key => {
@@ -253,9 +294,6 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
       delete equipment.stats[key]
     }
   })
-
-  const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
-  const rarity = equipment.rarity || 'common'
 
   // 清理非法/废弃属性：移除不在可洗练池中的属性，移除值为 0 的百分比词条
   const cleanedStats = {}
@@ -384,6 +422,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     success: true,
     message: confirmNewStats ? '洗练成功' : '保留原有属性',
     cost: reforgeConfig.costPerAttempt,
+    bossCost,
     oldStats,
     newStats: finalStats,
     confirmed: confirmNewStats,
@@ -432,9 +471,9 @@ function disassembleEquipment(equipment) {
 
 import { calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
 
-export { 
+export {
   enhanceConfig, reforgeConfig, reforgeableStats, statCaps, statBaseRanges,
   enhanceEquipment, reforgeEquipment, disassembleEquipment,
-  getEnhanceSpiritStoneCost, getEnhanceStoneCost, getLockLevel,
-  calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses 
+  getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, getLockLevel,
+  calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses
 }

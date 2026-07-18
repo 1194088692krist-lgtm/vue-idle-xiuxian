@@ -7,7 +7,8 @@ export const MATERIAL_KINDS = {
   ore: { name: '矿料', color: '#b08d57' },
   liquid: { name: '灵液', color: '#3aa0c0' },
   core: { name: '妖丹', color: '#c0392b' },
-  special: { name: '至宝', color: '#FFD700' }
+  special: { name: '至宝', color: '#FFD700' },
+  boss_material: { name: 'BOSS素材', color: '#FF4500' }
 }
 
 // 矿料（zoneMin: 该秘境最低难度才可能出现；chance: 相对权重）
@@ -121,7 +122,24 @@ export const getRandomCore = (tier = 'normal') => {
   return makeMaterial(c, 'core', 'drop')
 }
 
-// 至宝：当前仅定灵珠；可扩展为随机至宝
-export const getRandomSpecial = () => makeMaterial(specials[0], 'special', 'boss')
+// 至宝：默认按权重抽取（定灵珠 70% / 天玄碎片 30%）
+// zone 可选：若传入 zone 且 difficulty < 7（非仙墟/混沌界），天玄碎片不会出现
+// —— 天培元丹的「天玄碎片」只能从最后两张高难度图获得
+export const getRandomSpecial = (zone = null) => {
+  const allowHeavenFragment = !zone || (zone.difficulty || 0) >= 7
+  const pool = allowHeavenFragment
+    ? [
+        { ...specials[0], weight: 7 },
+        { ...specials[1], weight: 3 }
+      ]
+    : [{ ...specials[0], weight: 1 }]
+  const total = pool.reduce((s, m) => s + (m.weight || 1), 0)
+  let rand = Math.random() * total
+  for (const m of pool) {
+    rand -= (m.weight || 1)
+    if (rand <= 0) return makeMaterial(m, 'special', 'boss')
+  }
+  return makeMaterial(pool[0], 'special', 'boss')
+}
 
 export { allMaterials }

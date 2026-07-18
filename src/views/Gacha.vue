@@ -79,6 +79,19 @@
           </div>
         </div>
 
+        <div class="crystal-exchange beast-core-exchange">
+          <div class="exchange-info">
+            <span class="label">妖兽核 → 幻灵结晶</span>
+            <span class="rate">1 妖兽核 = 5 幻灵结晶（持有 {{ beastCoreCount }} 个）</span>
+          </div>
+          <div class="exchange-actions">
+            <button class="btn btn-info" :disabled="beastCoreCount < 1" @click="exchangeBeastCore(1)">兑换1</button>
+            <button class="btn btn-info" :disabled="beastCoreCount < 10" @click="exchangeBeastCore(10)">兑换10</button>
+            <button class="btn btn-info" :disabled="beastCoreCount < 100" @click="exchangeBeastCore(100)">兑换100</button>
+            <button class="btn btn-info" :disabled="beastCoreCount < 1" @click="exchangeBeastCoreAll">全部</button>
+          </div>
+        </div>
+
         <div v-if="gachaResults.length > 0" class="gacha-results">
           <h3 class="section-title">祈福结果</h3>
           <div class="results-grid">
@@ -482,6 +495,24 @@
     else showMessage('error', result.message)
   }
 
+  // 妖兽核数量（响应式：随 materials 自动更新）
+  const beastCoreCount = computed(() => playerStore.countMaterial('core', 'beast_core'))
+
+  // 妖兽核 → 幻灵结晶（1 = 5）
+  const exchangeBeastCore = (amount) => {
+    const result = playerStore.exchangeBeastCoreForCrystals(amount)
+    if (result.success) showMessage('success', result.message)
+    else showMessage('error', result.message)
+  }
+  const exchangeBeastCoreAll = () => {
+    const all = beastCoreCount.value
+    if (all <= 0) {
+      showMessage('error', '妖兽核不足')
+      return
+    }
+    exchangeBeastCore(all)
+  }
+
   const clearLogPanel = () => {
     logRef.value?.clearLogs()
   }
@@ -797,6 +828,13 @@
     margin-bottom: 12px;
     flex-wrap: wrap;
     gap: 8px;
+  }
+  .crystal-exchange.beast-core-exchange {
+    background: rgba(192, 57, 43, 0.08);
+    border-color: rgba(192, 57, 43, 0.3);
+  }
+  .beast-core-exchange .exchange-info .label {
+    color: #ff8a78;
   }
   .exchange-info {
     display: flex;

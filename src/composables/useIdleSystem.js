@@ -6,11 +6,12 @@ import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
-import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES } from '../plugins/cultivationSystem'
+import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
 import { getInitialSkills } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
+import { triggerRandomEvent } from '../plugins/events'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
@@ -1111,29 +1112,37 @@ function generateZoneEnemy(effectiveZone, encounterCount, difficultyKey = 'xiong
 function grantBossMaterialDrops(enemy, zoneId) {
   const s = store()
   const drops = []
-  const bossMaterials = BOSS_MATERIALS[zoneId]
-  if (!bossMaterials || !enemy.bossData) return drops
-  
-  const zoneBosses = ZONE_BOSSES[zoneId]
-  const bossInfo = zoneBosses?.find(b => b.name === enemy.name)
-  
-  if (bossInfo) {
-    const materialId = bossInfo.dropMaterial
-    const dropChance = bossInfo.dropChance
-    const material = bossMaterials.find(m => m.id === materialId)
-    
-    if (material && Math.random() < dropChance) {
-      const materialItem = {
-        id: materialId,
-        name: material.name,
-        type: 'boss_material',
-        description: material.description
-      }
-      s.items.push(materialItem)
-      drops.push(materialItem)
+  if (!enemy.bossData) return drops
+
+  // 旧实现用 enemy.name 与 cultivationSystem.ZONE_BOSSES 的中文名做关联，
+  // 但 zones.js（bossData 来源）与 cultivationSystem.ZONE_BOSSES 的 boss 名字/id 完全不匹配
+  // （如 zones.js「狼王」vs cultivationSystem.js「野猪王」），导致永远找不到 bossInfo，从未掉落。
+  // 现改为用 boss id 末尾数字（_1/_2）解析 boss 序号，再查 BOSS_MATERIALS[zoneId][index]。
+  const bossId = enemy.bossData.id || enemy.bossId
+  const materialDef = getBossMaterialByBossId(zoneId, bossId)
+  if (!materialDef) return drops
+
+  // 同时从 ZONE_BOSSES 取该 boss 的掉落概率（按序号匹配）
+  const zoneBosses = ZONE_BOSSES[zoneId] || []
+  const match = String(bossId || '').match(/_(\d+)$/)
+  const idx = match ? Math.max(0, parseInt(match[1], 10) - 1) : 0
+  const bossInfo = zoneBosses[idx]
+  const dropChance = bossInfo?.dropChance ?? 0.10
+
+  if (Math.random() < dropChance) {
+    const materialItem = {
+      id: materialDef.id,
+      name: materialDef.name,
+      kind: 'boss_material',
+      quality: 'rare',
+      description: materialDef.description,
+      baseValue: 80,
+      source: 'boss'
     }
+    s.gainMaterial(materialItem)
+    drops.push({ ...materialItem, type: 'boss_material' })
   }
-  
+
   return drops
 }
 
@@ -1141,9 +1150,12 @@ function grantCombatDrops(enemy, zoneId = null) {
   const s = store()
   const drops = []
   const tier = enemy?.tier || 'normal'
+  // 取当前秘境对象，用于「天玄碎片仅仙墟/混沌界掉落」等 zone 门控
+  const zone = zoneId ? getZoneById(zoneId) : null
   if (tier === 'boss') {
     if (Math.random() < 0.6) { const c = getRandomCore('boss'); s.gainMaterial(c); drops.push(c) }
-    if (Math.random() < 0.08) { const sp = getRandomSpecial(); s.gainMaterial(sp); drops.push(sp) }
+    // 天玄碎片仅从仙墟/混沌界获得；其余秘境 boss 仍可掉定灵珠
+    if (Math.random() < 0.08) { const sp = getRandomSpecial(zone); s.gainMaterial(sp); drops.push(sp) }
     if (Math.random() < 0.25) { const h = getRandomHerb({ difficulty: 9 }); s.gainMaterial(h); drops.push(h) }
     if (zoneId) {
       const bossDrops = grantBossMaterialDrops(enemy, zoneId)
@@ -1203,7 +1215,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
         const pool = [
           getRandomHerb({ difficulty: 9 }),
           ...(effectiveZone.difficulty >= 5 ? [getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 })] : []),
-          getRandomSpecial()
+          getRandomSpecial(effectiveZone)
         ].filter(Boolean)
         const pickItem = pool[Math.floor(Math.random() * pool.length)]
         if (pickItem) { s.gainMaterial(pickItem); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + pickItem.name, material: pickItem }) }
@@ -2392,10 +2404,20 @@ async function runIdleEncounter() {
         const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5) * getPillBuffMultiplier('cultivationRate'))
         s.cultivate(cultBonus)
         runStats.value.cultivation += cultBonus
-        if (count % 20 === 0 && Math.random() < 0.5) {
-          const fortunePool = [getRandomHerb({ difficulty: 9 }), getRandomOre({ difficulty: 9 }), getRandomLiquid({ difficulty: 9 }), getRandomSpecial()].filter(Boolean)
-          const fp = fortunePool[Math.floor(Math.random() * fortunePool.length)]
-          if (fp) { s.gainMaterial(fp); rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + fp.name, material: fp }) }
+        // 奇遇系统：每 10 次探索有较高概率触发一次事件（events.js）
+        // 事件奖励按当前秘境难度缩放，包含修为/灵力/灵石/强化石/洗练石/幻灵结晶/丹方残页等
+        if (count % 10 === 0 && Math.random() < 0.7) {
+          const eventCtx = {
+            zone: effectiveZone,
+            showMessage: (severity, text) => {
+              const logType = severity === 'error' ? 'warning' : (severity === 'success' ? 'fortune' : 'scene')
+              addLog(logType, text)
+            }
+          }
+          const triggered = triggerRandomEvent(s, eventCtx)
+          if (triggered) {
+            rewards.push({ type: 'fortune', amount: 1, name: `奇遇·${triggered.name}` })
+          }
         }
         runStats.value.victories++
         const expGain = Math.round(10 * effectiveZone.difficulty)

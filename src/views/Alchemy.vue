@@ -245,6 +245,12 @@
                         {{ getEnhanceStoneCount(selectedForgeEquip) }} / {{ getEnhanceStoneNeed(selectedForgeEquip) }}
                       </span>
                     </div>
+                    <div class="cost-item" v-if="getEnhanceBossMaterialInfo(selectedForgeEquip)">
+                      <span class="cost-name">BOSS素材·{{ getEnhanceBossMaterialInfo(selectedForgeEquip).name }}</span>
+                      <span class="cost-value" :class="{ insufficient: getEnhanceBossMaterialOwn(selectedForgeEquip) < getEnhanceBossMaterialInfo(selectedForgeEquip).count }">
+                        {{ getEnhanceBossMaterialOwn(selectedForgeEquip) }} / {{ getEnhanceBossMaterialInfo(selectedForgeEquip).count }}
+                      </span>
+                    </div>
                   </div>
                 </div>
 
@@ -344,6 +350,12 @@
                       <span class="cost-name">洗练石</span>
                       <span class="cost-value" :class="{ insufficient: playerStore.refinementStones < reforgeConfig.costPerAttempt }">
                         {{ playerStore.refinementStones || 0 }} / {{ reforgeConfig.costPerAttempt }}
+                      </span>
+                    </div>
+                    <div class="cost-item" v-if="getReforgeBossMaterialInfo(selectedForgeEquip)">
+                      <span class="cost-name">BOSS素材·{{ getReforgeBossMaterialInfo(selectedForgeEquip).name }}</span>
+                      <span class="cost-value" :class="{ insufficient: getReforgeBossMaterialOwn(selectedForgeEquip) < getReforgeBossMaterialInfo(selectedForgeEquip).count }">
+                        {{ getReforgeBossMaterialOwn(selectedForgeEquip) }} / {{ getReforgeBossMaterialInfo(selectedForgeEquip).count }}
                       </span>
                     </div>
                   </div>
@@ -594,7 +606,8 @@
     InfoCircleOutlined,
     FireOutlined
   } from '@ant-design/icons-vue'
-  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, calculateEquipmentScore } from '../plugins/equipment'
+  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
+  import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -1020,12 +1033,26 @@
     return playerStore.materials.filter(m => m.id === cost.type).length
   }
 
+  // 12 阶强化每阶所需的 BOSS 素材信息
+  const getEnhanceBossMaterialInfo = (equip) => {
+    if (!equip) return null
+    return getEnhanceBossMaterialCost(equip.enhanceLevel || 0)
+  }
+  const getEnhanceBossMaterialOwn = (equip) => {
+    const info = getEnhanceBossMaterialInfo(equip)
+    if (!info) return 0
+    return playerStore.materials.filter(m => m.kind === 'boss_material' && m.id === info.id).length
+  }
+
   const canEnhance = (equip) => {
     if (!equip) return false
     const level = equip.enhanceLevel || 0
     if (level >= enhanceConfig.maxLevel) return false
     if (playerStore.spiritStones < getEnhanceGoldCost(equip)) return false
     if (getEnhanceStoneCount(equip) < getEnhanceStoneNeed(equip)) return false
+    // 检查 BOSS 素材是否足够
+    const bossInfo = getEnhanceBossMaterialInfo(equip)
+    if (bossInfo && getEnhanceBossMaterialOwn(equip) < bossInfo.count) return false
     return true
   }
 
@@ -1039,9 +1066,25 @@
     }
   }
 
+  // 洗练按装备品级所需的 BOSS 素材信息
+  const getReforgeBossMaterialInfo = (equip) => {
+    if (!equip) return null
+    const def = getReforgeBossMaterial(equip.rarity || 'common')
+    if (!def) return null
+    return { id: def.id, name: def.name, count: 1 }
+  }
+  const getReforgeBossMaterialOwn = (equip) => {
+    const info = getReforgeBossMaterialInfo(equip)
+    if (!info) return 0
+    return playerStore.materials.filter(m => m.kind === 'boss_material' && m.id === info.id).length
+  }
+
   const canReforge = (equip) => {
     if (!equip) return false
     if (playerStore.refinementStones < reforgeConfig.costPerAttempt) return false
+    // 检查 BOSS 素材是否足够
+    const bossInfo = getReforgeBossMaterialInfo(equip)
+    if (bossInfo && getReforgeBossMaterialOwn(equip) < bossInfo.count) return false
     if (reforgeMode.value === 'single') {
       if (Object.keys(cleanAffixStats.value).length === 0) return false
       if (!selectedReforgeStat.value) return false
