@@ -882,7 +882,9 @@ const bossChallengeGroups = computed(() => {
 // 当前选中 BOSS 的挑战券数量（响应式，会随玩家素材库变化）
 const selectedBossTicketCount = computed(() => {
   if (!selectedBossTarget.value) return 0
-  const ticketDef = getBossTicketByBossId(selectedBossTarget.value.zoneId, selectedBossTarget.value.bossId)
+  // 兼容历史字段：bossId 优先，其次 boss.id
+  const bossId = selectedBossTarget.value.bossId || selectedBossTarget.value.boss?.id
+  const ticketDef = getBossTicketByBossId(selectedBossTarget.value.zoneId, bossId)
   if (!ticketDef) return 0
   // 显式访问 playerStore.materials 让 Vue 追踪依赖
   const materials = playerStore.materials || []
@@ -895,7 +897,9 @@ const selectedBossWinChance = computed(() => {
   if (!zone) return 0
   const diff = (zone.difficulties || []).find(d => d.key === 'xiongxian') || zone.difficulties?.[2]
   if (!diff) return 0
-  const match = String(selectedBossTarget.value.bossId || '').match(/_(\d+)$/)
+  // 兼容历史字段：bossId 优先，其次 boss.id
+  const bossId = selectedBossTarget.value.bossId || selectedBossTarget.value.boss?.id || ''
+  const match = String(bossId).match(/_(\d+)$/)
   const idx = match ? Math.max(0, parseInt(match[1], 10) - 1) : 0
   const bossBuild = Math.max(1, Math.floor((diff.recommendedBuild || 1) * (1 + idx * 0.15)))
   const ratio = (playerStore.buildStrength || 1) / bossBuild
@@ -903,8 +907,10 @@ const selectedBossWinChance = computed(() => {
   return Math.round(chance * 100)
 })
 // 选择挑战目标 BOSS
+// 注意：boss 来自 bossChallengeGroups，字段名为 bossId（无 id 字段）；
+// 兼容 zones.js 原始 boss 对象（含 id 字段）传入的情况
 const selectBossTarget = (zoneId, boss) => {
-  selectedBossTarget.value = { zoneId, bossId: boss.id, boss }
+  selectedBossTarget.value = { zoneId, bossId: boss.bossId ?? boss.id, boss }
   bossChallengeCount.value = 1
 }
 // 关闭 BOSS 挑战面板

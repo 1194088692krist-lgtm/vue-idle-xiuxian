@@ -999,15 +999,21 @@ function createPlayerEntity() {
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
+// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升 3 倍
+// 统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度），不影响 zones.js 资料卡显示数值
+const BOSS_POWER_MULTIPLIER = 3
+
 function createBossEnemy(bossData, effectiveZone) {
   const secretLv = effectiveZone.difficulty
   // boss 基础 stats 现已与 recommendedStats（凶险档）量级对齐，
   // 再按 enemyScale 缩放：游历0.30/试炼0.60/凶险1.00/绝境1.60/灭世2.50
   // 这样灭世档 boss 是凶险档的 2.5 倍，避免高难度档仍被秒杀。
+  // 最后统一应用 BOSS_POWER_MULTIPLIER（当前为 3 倍），让 BOSS 整体实力提升 3 倍。
   const scale = effectiveZone.enemyScale || 1
-  const scaledHealth = Math.floor(bossData.stats.health * scale)
-  const scaledAttack = Math.floor(bossData.stats.attack * scale)
-  const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale)
+  const scaledHealth = Math.floor(bossData.stats.health * scale * BOSS_POWER_MULTIPLIER)
+  const scaledAttack = Math.floor(bossData.stats.attack * scale * BOSS_POWER_MULTIPLIER)
+  const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale * BOSS_POWER_MULTIPLIER)
+  const scaledSpeed = Math.floor((bossData.stats.speed || 10) * BOSS_POWER_MULTIPLIER)
   // 高难度档 boss 附加额外战斗属性，让其对高 build 玩家有真实威胁
   // combatBoost 提升自身全部战斗属性（攻击/速度/暴击等综合）
   const bossCombatBoost = Math.min(0.5, Math.max(0, (scale - 1) * 0.2))
@@ -1020,7 +1026,7 @@ function createBossEnemy(bossData, effectiveZone) {
     maxHealth: scaledHealth,
     damage: scaledAttack,
     defense: scaledDefense,
-    speed: bossData.stats.speed || 10,
+    speed: scaledSpeed,
     critRate: Math.min(0.35, 0.05 + secretLv * 0.02),
     comboRate: Math.min(0.2, 0.02 + secretLv * 0.01),
     counterRate: Math.min(0.2, 0.02 + secretLv * 0.01),
