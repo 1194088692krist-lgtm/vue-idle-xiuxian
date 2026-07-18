@@ -1007,9 +1007,9 @@ function createPlayerEntity() {
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
-// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升 3 倍
+// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升 1.5 倍
 // 统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度），不影响 zones.js 资料卡显示数值
-const BOSS_POWER_MULTIPLIER = 3
+const BOSS_POWER_MULTIPLIER = 1.5
 
 function createBossEnemy(bossData, effectiveZone) {
   const secretLv = effectiveZone.difficulty

@@ -153,6 +153,7 @@ export function syncCharacterDefs(list) {
 }
 
 // 应用启动时调用：从 IndexedDB（ gm_characters ）载入立绘定义，回退 localStorage / 静态表
+// 优化：立绘 manifest 的 fetch 完全后台化，不阻塞 initCharacterDefs 与游戏加载
 export async function initCharacterDefs() {
   let list = null
   try {
@@ -167,7 +168,9 @@ export async function initCharacterDefs() {
     syncCharacterDefs(characterList)
   }
   // 载入随站点部署的「共享立绘包」：所有玩家同源可见（开发者发布后生效）
-  try { await loadSharedPortraits() } catch (e) { /* 无共享包时静默降级 */ }
+  // 注意：loadSharedPortraits 内部已用 fetch().then() 后台异步加载 manifest.json，
+  //      不会阻塞本函数返回；此处不再 await，让游戏立即可用，立绘在后台填充。
+  try { loadSharedPortraits() } catch (e) { /* 无共享包时静默降级 */ }
   return characterDefMap
 }
 

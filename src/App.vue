@@ -143,7 +143,7 @@
   import { useRouter, useRoute } from 'vue-router'
   import { usePlayerStore } from './stores/player'
   import { useAuthStore } from './stores/auth'
-  import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
   import { NIcon, darkTheme } from 'naive-ui'
   import {
     BookOutlined,
@@ -232,9 +232,11 @@ import SaveButton from './components/SaveButton.vue'
     document.documentElement.classList.toggle('dark', playerStore.isDarkMode)
 
     updateLoading('正在初始化游戏引擎...', 5)
-    await new Promise(r => setTimeout(r, 100))
+    await nextTick()
+    await new Promise(r => setTimeout(r, 50))
 
     updateLoading('正在加载存档数据...', 20)
+    await nextTick()
     try {
       await playerStore.initializePlayer()
     } catch (e) {
@@ -246,31 +248,37 @@ import SaveButton from './components/SaveButton.vue'
     const authStore = useAuthStore()
     if (authStore.isLoggedIn && !authStore.devMode) {
       try {
-        // 5 秒超时，防止网络请求 hang 住导致加载卡死
+        // 3 秒超时，防止网络请求 hang 住导致加载卡死（用户可手动触发云同步重试）
         await Promise.race([
           playerStore.migrate({ interactive: false }),
-          new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 5000))
+          new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 3000))
         ])
       } catch (e) {
         console.warn('启动云同步失败（不影响本地游玩）:', e)
       }
-      // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点
+      // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点（完全后台，不等待）
       playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
     } else if (authStore.devMode) {
       console.info('[开发者模式] 跳过云同步，仅使用本地存档')
     }
 
     updateLoading('正在加载角色定义...', 40)
+    await nextTick()
     await initCharacterDefs()
 
+    // 立绘资源已改为完全后台加载（loadSharedPortraits 内部 fetch 不阻塞）
+    // 此处仅展示进度，无需 await，立绘会在游戏加载完成后陆续填充到 sharedPortraitMap
     updateLoading('正在加载立绘资源...', 60)
-    await new Promise(r => setTimeout(r, 200))
+    await nextTick()
+    await new Promise(r => setTimeout(r, 50))
 
     updateLoading('正在初始化挂机系统...', 80)
+    await nextTick()
     idleSystem.initIdle()
 
     updateLoading('正在进入游戏...', 95)
-    await new Promise(r => setTimeout(r, 100))
+    await nextTick()
+    await new Promise(r => setTimeout(r, 50))
 
     isLoading.value = false
     localStorage.setItem('hasLoadedBefore', 'true')
