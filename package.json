@@ -17,10 +17,16 @@
     "preview": "vite preview --open --port 2026",
     "gen:guide": "python3 scripts/gen_guide.py",
     "test": "vitest run",
-    "test:watch": "vitest"
+    "test:watch": "vitest",
+    "cap:sync": "vite build && cap copy android",
+    "cap:open": "cap open android",
+    "cap:build": "vite build && cap sync android && cap open android"
   },
   "dependencies": {
     "@ant-design/icons-vue": "^7.0.1",
+    "@capacitor/android": "^8.4.2",
+    "@capacitor/cli": "^8.4.2",
+    "@capacitor/core": "^8.4.2",
     "@vicons/antd": "^0.13.0",
     "@vicons/ionicons5": "^0.13.0",
     "crypto-js": "^4.2.0",

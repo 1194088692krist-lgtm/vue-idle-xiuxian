@@ -1,0 +1,16 @@
+{
+  "appId": "com.jntm.idle",
+  "appName": "修仙梦途",
+  "webDir": "docs",
+  "android": {
+    "allowMixedContent": false,
+    "webContentsDebuggingEnabled": false
+  },
+  "plugins": {
+    "SplashScreen": {
+      "launchShowDuration": 1500,
+      "backgroundColor": "#0D0D12",
+      "showSpinner": false
+    }
+  }
+}

@@ -1,0 +1,12 @@
+[
+  {
+    "relation": ["delegate_permission/common.handle_all_urls"],
+    "target": {
+      "namespace": "android_app",
+      "package_name": "com.jntm.idle",
+      "sha256_cert_fingerprints": [
+        "CF:EB:B8:2C:5F:99:B2:1E:08:5D:2B:74:3D:42:64:BC:00:D5:E7:D8:04:E7:A2:74:6D:1C:F5:8A:DE:B5:64:90"
+      ]
+    }
+  }
+]

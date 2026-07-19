@@ -26,3 +26,12 @@ docs
 
 # 本地 wrangler 开发缓存（miniflare D1）
 .wrangler/
+
+# Android 签名密钥（敏感文件，不能进 git）
+android-signing/
+*.jks
+*.keystore
+
+# Capacitor 原生工程（在本机用 Android Studio 打开构建 APK）
+android/
+ios/
