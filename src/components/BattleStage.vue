@@ -247,15 +247,23 @@ function openMonsterPortrait() {
   if (!enemy) return
   // 优先用响应式 computed（manifest 就绪后返回真实立绘 URL），回退到 enemy 对象上已赋值的字段
   const portrait = enemyPortrait.value || enemy.portrait || enemyAvatar.value || enemy.avatar
-  if (portrait && (portrait.startsWith('http') || portrait.startsWith('/'))) {
+  if (isImageUrl(portrait)) {
     monsterPortraitUrl.value = portrait
     monsterPortraitName.value = enemy.name || '怪物'
     showMonsterPortrait.value = true
   }
 }
 
+// 判断字符串是否为图片 URL（支持 http/https、绝对路径 /xxx、相对路径 ./xxx / ../xxx）
+// 因 vite.config.js 配置 base: './'，怪物立绘 URL 形如 ./monsters/xxx.jpg
+// 旧版仅接受 http 或 / 开头，导致 ./monsters/... 全部被识别为 emoji 而无法显示
 function isImageUrl(str) {
-  return str && (str.startsWith('http') || str.startsWith('/'))
+  if (!str) return false
+  if (str.startsWith('http://') || str.startsWith('https://')) return true
+  if (str.startsWith('/')) return true
+  if (str.startsWith('./') || str.startsWith('../')) return true
+  // 不以路径开头但包含图片扩展名，也认为是 URL
+  return /\.(jpg|jpeg|png|webp|gif|svg|ico|avif)$/i.test(str)
 }
 
 const enemyHpPct = computed(() => {

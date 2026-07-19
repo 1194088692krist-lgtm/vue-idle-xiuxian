@@ -313,6 +313,114 @@
       </div>
     </div>
 
+    <!-- 资源管理：一键下载/清理本地资源 -->
+    <div class="main-card glass-card">
+      <div class="card-header">
+        <div class="header-icon">
+          <CloudDownloadOutlined />
+        </div>
+        <div class="header-info">
+          <h2 class="card-title gold-gradient-text">资源管理</h2>
+          <p class="card-subtitle">下载游戏素材到本地，加速加载并支持离线游玩</p>
+        </div>
+      </div>
+      <div class="card-body">
+        <!-- 当前缓存状态 -->
+        <div class="setting-row">
+          <label class="setting-label">本地缓存</label>
+          <div class="setting-input-group asset-stats">
+            <span class="asset-stat-pill">
+              {{ cachedFileCount }} 个文件
+            </span>
+            <span class="asset-stat-pill">
+              {{ cachedMB }} MB
+            </span>
+            <button class="btn btn-small btn-info" :disabled="isDownloading || isCleaning" @click="refreshCacheStats">
+              刷新
+            </button>
+          </div>
+          <p class="setting-hint">
+            已缓存的人物头像、怪物立绘、背景图、JS/CSS 等资源会自动从本地读取，无需反复下载。
+          </p>
+        </div>
+
+        <!-- 一键下载 -->
+        <div class="setting-row">
+          <label class="setting-label">一键下载</label>
+          <div class="setting-input-group">
+            <button
+              class="btn btn-primary"
+              :disabled="isDownloading || isCleaning"
+              @click="handleDownloadAll"
+            >
+              {{ isDownloading ? '下载中…' : (cachedFileCount > 0 ? '更新本地资源' : '下载游戏资源到本地') }}
+            </button>
+            <button
+              v-if="isDownloading"
+              class="btn btn-outline"
+              @click="() => {}"
+              disabled
+            >
+              {{ progress }}%
+            </button>
+          </div>
+          <p class="setting-hint">
+            首次约下载 {{ cachedMB || '~31' }} MB 资源，下载完成后除手动清理外永久生效，二次访问秒开。
+          </p>
+        </div>
+
+        <!-- 下载进度面板 -->
+        <div v-if="isDownloading || lastDownloadResult" class="download-progress-panel">
+          <div class="progress-bar-wrap">
+            <div class="progress-bar" :style="{ width: progress + '%' }"></div>
+          </div>
+          <div class="progress-stats">
+            <span>{{ doneCount }} / {{ totalCount }} 文件</span>
+            <span>已下载 {{ downloadedMB }} MB</span>
+            <span v-if="isDownloading">速度 {{ speedKBps }} KB/s</span>
+            <span v-if="isDownloading && etaSec > 0">剩余 ~{{ etaSec }}s</span>
+          </div>
+          <div v-if="currentFile" class="progress-current-file" :title="currentFile">
+            正在下载：{{ currentFile }}
+          </div>
+          <div v-if="lastDownloadResult && !isDownloading" class="progress-result">
+            <template v-if="lastDownloadResult.success">
+              ✓ 下载完成：共 {{ lastDownloadResult.total }} 个，
+              跳过 {{ lastDownloadResult.skipped }} 个已缓存，
+              <span v-if="lastDownloadResult.failed > 0" class="warn-text">失败 {{ lastDownloadResult.failed }} 个</span>
+              <span v-else>全部成功</span>，
+              用时 {{ lastDownloadResult.elapsedSec }}s
+            </template>
+            <template v-else>
+              ✗ 下载失败：{{ lastDownloadResult.error }}
+            </template>
+          </div>
+        </div>
+
+        <!-- 一键清理 -->
+        <div class="setting-row">
+          <label class="setting-label">清理本地资源</label>
+          <div class="setting-input-group">
+            <button
+              class="btn btn-danger"
+              :disabled="isDownloading || isCleaning || cachedFileCount === 0"
+              @click="handleClearAssets"
+            >
+              {{ isCleaning ? '清理中…' : '一键清理本地资源' }}
+            </button>
+          </div>
+          <p class="setting-hint warn-text">
+            仅清理本游戏缓存的图片/JS/CSS 等资源文件，不会触及你的浏览器数据、系统文件或存档。
+            清理后下次访问需重新下载资源。
+          </p>
+        </div>
+
+        <div v-if="assetErrorMessage" class="setting-row">
+          <p class="setting-hint warn-text">⚠ {{ assetErrorMessage }}</p>
+        </div>
+      </div>
+    </div>
+
   </div>
 </template>
 
@@ -329,9 +437,70 @@
     SaveOutlined,
     InfoCircleOutlined,
     GithubOutlined,
-    UserOutlined
+    UserOutlined,
+    CloudDownloadOutlined
   } from '@ant-design/icons-vue'
   import { GAME_VERSION, GAME_VERSION_NAME, GAME_VERSION_DATE } from '../plugins/version'
+  import {
+    useAssetManager,
+    downloadAllAssets,
+    clearAllAssets,
+    refreshCacheStats
+  } from '../composables/useAssetManager'
+
+  // 资源管理状态
+  const {
+    isDownloading,
+    isCleaning,
+    totalCount,
+    doneCount,
+    downloadedBytes,
+    currentFile,
+    speed,
+    progress,
+    downloadedMB,
+    speedKBps,
+    cachedMB,
+    cachedFileCount,
+    cachedBytes,
+    etaSec,
+    lastDownloadResult,
+    errorMessage: assetErrorMessage
+  } = useAssetManager()
+
+  // 处理一键下载
+  async function handleDownloadAll() {
+    try {
+      const result = await downloadAllAssets()
+      if (result?.success) {
+        if (result.failed > 0) {
+          message.warning(`下载完成，但 ${result.failed} 个资源失败（可能网络中断），可重试更新`)
+        } else {
+          message.success(`下载完成！共 ${result.total} 个资源已缓存到本地`)
+        }
+      }
+    } catch (e) {
+      message.error('下载失败：' + (e.message || e))
+    }
+  }
+
+  // 处理一键清理
+  function handleClearAssets() {
+    dialog.warning({
+      title: '清理本地资源',
+      content: '将删除所有已缓存的人物头像、怪物立绘、背景图等资源文件。下次访问需重新下载。存档和游戏进度不受影响。确认继续？',
+      positiveText: '确认清理',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        try {
+          const result = await clearAllAssets()
+          message.success(`已清理 ${result.deletedCaches} 个本地缓存`)
+        } catch (e) {
+          message.error('清理失败：' + (e.message || e))
+        }
+      }
+    })
+  }
 
   const clickCount = ref(0)
   const newName = ref('')
@@ -743,6 +912,8 @@
     if (auth.isLoggedIn) loadGifts()
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     isFullscreen.value = !!document.fullscreenElement
+    // 初始化：刷新本地资源缓存统计
+    refreshCacheStats().catch(() => {})
   })
 
   onUnmounted(() => {
@@ -847,6 +1018,77 @@
     margin-top: 12px;
     color: #F5DEB3;
     font-size: 13px;
+  }
+
+  /* 资源管理：状态徽章 */
+  .asset-stats {
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .asset-stat-pill {
+    display: inline-flex;
+    align-items: center;
+    padding: 6px 12px;
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.3);
+    border-radius: 16px;
+    font-size: 13px;
+    color: #FFD700;
+    font-weight: 500;
+  }
+
+  /* 资源管理：下载进度面板 */
+  .download-progress-panel {
+    margin: 12px 0;
+    padding: 14px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(255, 215, 0, 0.15);
+    border-radius: 10px;
+  }
+  .progress-bar-wrap {
+    width: 100%;
+    height: 8px;
+    background: rgba(255, 255, 255, 0.08);
+    border-radius: 4px;
+    overflow: hidden;
+    margin-bottom: 10px;
+  }
+  .progress-bar {
+    height: 100%;
+    background: linear-gradient(90deg, #FFD700, #FFA500);
+    border-radius: 4px;
+    transition: width 0.3s ease;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.4);
+  }
+  .progress-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 14px;
+    font-size: 12px;
+    color: #C9C4BA;
+    margin-bottom: 6px;
+  }
+  .progress-stats span {
+    white-space: nowrap;
+  }
+  .progress-current-file {
+    font-size: 11px;
+    color: #9CA3AF;
+    overflow: hidden;
+    text-overflow: ellipsis;
+    white-space: nowrap;
+    font-family: 'Courier New', monospace;
+    opacity: 0.85;
+  }
+  .progress-result {
+    margin-top: 8px;
+    font-size: 13px;
+    color: #7CFC00;
+    padding-top: 8px;
+    border-top: 1px solid rgba(255, 255, 255, 0.06);
+  }
+  .warn-text {
+    color: #FFB347 !important;
   }
 
   /* 按钮 */

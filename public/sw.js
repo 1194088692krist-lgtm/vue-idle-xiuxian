@@ -102,14 +102,21 @@ self.addEventListener('fetch', event => {
 
 // Cache-First：缓存优先（图片）
 // 命中缓存→立即返回；未命中→网络获取并写入缓存
+// 注意：先遍历所有 cache 查找（兼容客户端 useAssetManager 写入的 user-assets cache）
 async function cacheFirst(req, cacheName) {
-  const cache = await caches.open(cacheName)
-  const cached = await cache.match(req)
-  if (cached) return cached
+  // 1. 遍历所有 cache 查找命中（兼容客户端预下载的 cache）
+  const keys = await caches.keys()
+  for (const k of keys) {
+    const cache = await caches.open(k)
+    const cached = await cache.match(req)
+    if (cached) return cached
+  }
+  // 2. 未命中：走网络并写入默认 cache
   try {
     const res = await fetch(req)
     // 仅缓存同源基础响应（opaque 跨域响应不缓存）
     if (res && res.ok && res.type === 'basic') {
+      const cache = await caches.open(cacheName)
       cache.put(req, res.clone())
     }
     return res
