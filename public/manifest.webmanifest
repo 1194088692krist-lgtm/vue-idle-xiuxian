@@ -1,0 +1,20 @@
+{
+  "name": "修仙梦途",
+  "short_name": "修仙梦途",
+  "description": "一款基于 Vue 3 的修仙挂机游戏",
+  "start_url": "./",
+  "scope": "./",
+  "display": "standalone",
+  "orientation": "any",
+  "background_color": "#0D0D12",
+  "theme_color": "#FFD700",
+  "lang": "zh-CN",
+  "icons": [
+    {
+      "src": "./favicon.ico",
+      "sizes": "128x128 64x64 32x32 16x16",
+      "type": "image/x-icon",
+      "purpose": "any"
+    }
+  ]
+}

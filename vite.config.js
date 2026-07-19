@@ -4,6 +4,9 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
 import pkg from './package.json'
+import fs from 'fs'
+import path from 'path'
+import { fileURLToPath } from 'url'
 
 export default defineConfig({
   define: {
@@ -78,6 +81,19 @@ export default defineConfig({
           /<link\s+rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g,
           (match, href) => `<link rel="preload" href="${href}" as="style" onload="this.onload=null;this.rel='stylesheet'">`
         )
+      }
+    },
+    // Service Worker 版本注入：把 sw.js 中的 __SW_VERSION__ 占位符
+    // 替换为 v{version}_{timestamp}，发版时 SW 自动更新 + 清理旧缓存
+    {
+      name: 'sw-version-inject',
+      closeBundle: () => {
+        const __dirname = path.dirname(fileURLToPath(import.meta.url))
+        const swPath = path.resolve(__dirname, 'docs/sw.js')
+        if (!fs.existsSync(swPath)) return
+        const version = `v${pkg.version}_${Date.now()}`
+        const content = fs.readFileSync(swPath, 'utf8')
+        fs.writeFileSync(swPath, content.replace(/__SW_VERSION__/g, version))
       }
     }
   ],
