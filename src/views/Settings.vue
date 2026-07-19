@@ -410,8 +410,9 @@
             </button>
           </div>
           <p class="setting-hint warn-text">
-            仅清理本游戏缓存的图片/JS/CSS 等资源文件，不会触及你的浏览器数据、系统文件或存档。
-            清理后下次访问需重新下载资源。
+            仅清理本游戏缓存的素材文件（人物立绘/怪物立绘/背景图/图标/立绘清单），
+            保留 JS/CSS 代码文件，不会触及你的浏览器数据、系统文件或存档。
+            清理后下次访问需重新下载素材，但代码仍从本地读取。
           </p>
         </div>
 
@@ -487,14 +488,14 @@
   // 处理一键清理
   function handleClearAssets() {
     dialog.warning({
-      title: '清理本地资源',
-      content: '将删除所有已缓存的人物头像、怪物立绘、背景图等资源文件。下次访问需重新下载。存档和游戏进度不受影响。确认继续？',
+      title: '清理本地素材',
+      content: '将删除已缓存的人物头像、怪物立绘、背景图、立绘清单等素材文件，保留 JS/CSS 代码文件。下次访问素材需重新下载。存档和游戏进度不受影响。确认继续？',
       positiveText: '确认清理',
       negativeText: '取消',
       onPositiveClick: async () => {
         try {
           const result = await clearAllAssets()
-          message.success(`已清理 ${result.deletedCaches} 个本地缓存`)
+          message.success(`已清理 ${result.deletedFiles} 个素材文件（JS/CSS 代码已保留）`)
         } catch (e) {
           message.error('清理失败：' + (e.message || e))
         }

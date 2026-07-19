@@ -239,8 +239,23 @@ export async function refreshCacheStats() {
   cachedBytes.value = bytes
 }
 
-// 一键清理本地资源：删除所有 Cache Storage + 注销 Service Worker
-// 注意：只清理游戏自己创建的 cache，不触碰任何系统/浏览器数据
+// 判定一个缓存条目是否为「素材文件」（应被清理）
+// 素材 = 图片(jpg/png/webp/svg/ico/avif/gif) + 视频(mp4/webm) + 立绘清单 JSON
+// 代码文件 = JS/CSS/HTML/字体等，应保留
+function isAssetFile(url) {
+  if (!url) return false
+  // 立绘清单 manifest.json（在 portraits/ 或 monsters/ 目录下）
+  if (/\/(portraits|monsters)\/manifest\.json(\?|$)/i.test(url)) return true
+  // 图片/视频扩展名
+  if (/\.(jpg|jpeg|png|webp|gif|svg|ico|avif|mp4|webm)$/i.test(url)) return true
+  // 素材目录下的文件（保险起见，凡是路径含 /portraits/ /monsters/ /assets/bg/ /assets/icons/ /assets/zones/ 都算素材）
+  if (/\/(portraits|monsters|assets\/bg|assets\/icons|assets\/zones)\//i.test(url)) return true
+  return false
+}
+
+// 一键清理本地资源：仅清理各类素材文件（图片/立绘/视频/立绘清单 JSON）
+// 保留所有代码文件（JS/CSS/HTML/字体），避免重新下载代码导致版本错乱
+// 同时保留 Service Worker 注册（SW 本身是代码，且负责缓存管理）
 export async function clearAllAssets() {
   if (isCleaning.value) return
   isCleaning.value = true
@@ -249,25 +264,26 @@ export async function clearAllAssets() {
     if (!('caches' in window)) {
       throw new Error('当前浏览器不支持 Cache Storage API')
     }
-    // 1. 删除所有 Cache Storage（包含 user-assets / core-* / assets-*）
+    // 1. 遍历所有 cache，仅删除素材条目（保留 JS/CSS/HTML 等代码文件）
     const keys = await caches.keys()
     let deletedCount = 0
     for (const k of keys) {
-      const ok = await caches.delete(k)
-      if (ok) deletedCount++
-    }
-    // 2. 注销 Service Worker（让下次访问时重新注册、重新下载）
-    if ('serviceWorker' in navigator) {
-      const regs = await navigator.serviceWorker.getRegistrations()
-      for (const r of regs) {
-        await r.unregister()
+      const cache = await caches.open(k)
+      const requests = await cache.keys()
+      for (const req of requests) {
+        const url = req.url || ''
+        if (isAssetFile(url)) {
+          await cache.delete(req)
+          deletedCount++
+        }
       }
     }
+    // 2. 不注销 Service Worker —— SW 是代码，且负责缓存管理
+    // 注销 SW 反而会丢失已缓存的代码文件，导致下次访问重新下载全部 JS/CSS
     // 3. 刷新统计
-    cachedFileCount.value = 0
-    cachedBytes.value = 0
+    await refreshCacheStats()
     lastDownloadResult.value = null
-    return { deletedCaches: deletedCount }
+    return { deletedFiles: deletedCount }
   } catch (e) {
     errorMessage.value = e.message || String(e)
     throw e
