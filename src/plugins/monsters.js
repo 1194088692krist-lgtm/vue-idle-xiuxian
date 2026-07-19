@@ -1,6 +1,8 @@
 // 怪物头像与立绘系统
 // 与人物系统相同的架构：public/monsters/ 目录存放资源，manifest.json 管理映射
 
+import { ref } from 'vue'
+
 // 使用 BASE_URL（与角色立绘一致），保证 GitHub Pages 子路径部署也能正确解析
 const MONSTER_ASSETS_BASE = (import.meta.env.BASE_URL || './') + 'monsters/'
 
@@ -9,21 +11,25 @@ function safeFileName(name) {
   return name.replace(/[\/\\:*?"<>|]/g, '_')
 }
 
-// 怪物资源信息缓存
-let monsterManifest = null
+// 怪物资源信息缓存（响应式 ref：manifest 加载完后递增 version 触发依赖更新）
+// 解决「manifest 异步加载完前 getMonsterAvatarSync 返回 emoji，之后不更新」的 bug
+export const monsterManifest = ref({})
+export const monsterManifestVersion = ref(0)
 let manifestPromise = null
 
 async function loadMonsterManifest() {
-  if (monsterManifest) return monsterManifest
+  if (monsterManifest.value && Object.keys(monsterManifest.value).length) return monsterManifest.value
   if (manifestPromise) return manifestPromise
   manifestPromise = fetch(`${MONSTER_ASSETS_BASE}manifest.json`, { cache: 'force-cache' })
     .then(r => r.ok ? r.json() : {})
     .then(data => {
-      monsterManifest = data
+      monsterManifest.value = data || {}
+      // 递增版本号，让所有依赖 monsterManifestVersion 的 computed 重新计算
+      monsterManifestVersion.value++
       return data
     })
     .catch(() => {
-      monsterManifest = {}
+      monsterManifest.value = {}
       return {}
     })
   return manifestPromise
@@ -52,15 +58,20 @@ export async function getMonsterPortrait(monsterName) {
   return getMonsterAvatar(monsterName, 'thumbnail')
 }
 
-// 同步版本：获取怪物头像（如果 manifest 已加载）
+// 同步版本：获取怪物头像（基于响应式 manifest）
+// 调用方应在 computed 中访问，并显式读取 monsterManifestVersion.value 以建立响应式依赖
+// 这样 manifest 异步加载完后，所有依赖此函数的视图会自动刷新
 export function getMonsterAvatarSync(monsterName, size = 'thumbnail') {
-  if (!monsterManifest) {
-    // manifest 尚未就绪：先触发预取（fire-and-forget），下一次调用即可命中真实立绘
+  // 显式访问 version ref，建立响应式依赖（在 computed 中调用时生效）
+  // eslint-disable-next-line no-unused-expressions
+  monsterManifestVersion.value
+  // manifest 尚未就绪时触发预取（fire-and-forget），下一次响应式更新会拿到真实立绘
+  if (!monsterManifest.value || !Object.keys(monsterManifest.value).length) {
     loadMonsterManifest()
     return getMonsterEmoji(monsterName)
   }
   const key = safeFileName(monsterName)
-  const entry = monsterManifest[key]
+  const entry = monsterManifest.value[key]
   if (entry && entry[size]) {
     return `${MONSTER_ASSETS_BASE}${entry[size]}`
   }

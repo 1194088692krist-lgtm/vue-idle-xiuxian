@@ -58,12 +58,12 @@
           <div class="avatar-wrap">
             <div
               class="fighter-avatar enemy-avatar"
-              :class="{ 'clickable-portrait': isImageUrl(encounter.enemy?.avatar) }"
+              :class="{ 'clickable-portrait': isImageUrl(enemyAvatar) }"
               @click="openMonsterPortrait"
             >
               <img
-                v-if="isImageUrl(encounter.enemy?.avatar)"
-                :src="encounter.enemy.avatar"
+                v-if="isImageUrl(enemyAvatar)"
+                :src="enemyAvatar"
                 class="enemy-avatar-img"
                 :alt="encounter.enemy?.name"
                 decoding="async"
@@ -199,6 +199,7 @@
 <script setup>
 import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem.js'
+import { getMonsterAvatarSync, monsterManifestVersion } from '../plugins/monsters'
 
 const props = defineProps({
   encounter: { type: Object, default: null }
@@ -244,7 +245,8 @@ const monsterPortraitName = ref('')
 function openMonsterPortrait() {
   const enemy = props.encounter?.enemy
   if (!enemy) return
-  const portrait = enemy.portrait || enemy.avatar
+  // 优先用响应式 computed（manifest 就绪后返回真实立绘 URL），回退到 enemy 对象上已赋值的字段
+  const portrait = enemyPortrait.value || enemy.portrait || enemyAvatar.value || enemy.avatar
   if (portrait && (portrait.startsWith('http') || portrait.startsWith('/'))) {
     monsterPortraitUrl.value = portrait
     monsterPortraitName.value = enemy.name || '怪物'
@@ -310,6 +312,26 @@ const enemyEmoji = computed(() => {
   if (tier === 'boss') return '👹'
   if (tier === 'elite') return '👺'
   return '🐺'
+})
+
+// 怪物头像/立绘：响应式获取
+// 修复「manifest 异步加载完前 getMonsterAvatarSync 返回 emoji，enemy.avatar 已赋值不会更新」的 bug
+// 通过显式访问 monsterManifestVersion.value 建立响应式依赖，manifest 加载完后自动刷新
+const enemyAvatar = computed(() => {
+  // eslint-disable-next-line no-unused-expressions
+  monsterManifestVersion.value  // 建立响应式依赖
+  const enemy = props.encounter?.enemy
+  if (!enemy) return ''
+  // 优先用怪物名实时获取（manifest 就绪后返回真实 URL，未就绪返回 emoji）
+  const url = getMonsterAvatarSync(enemy.name, 'thumbnail')
+  return url
+})
+const enemyPortrait = computed(() => {
+  // eslint-disable-next-line no-unused-expressions
+  monsterManifestVersion.value
+  const enemy = props.encounter?.enemy
+  if (!enemy) return ''
+  return getMonsterAvatarSync(enemy.name, 'full')
 })
 const tierText = computed(() => {
   const t = props.encounter?.enemy?.tier
