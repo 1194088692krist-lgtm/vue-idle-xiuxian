@@ -3,7 +3,7 @@ import { usePlayerStore } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugins/combat'
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
-import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial } from '../plugins/materials'
+import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial, getRandomZoneMaterial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
@@ -1218,6 +1218,15 @@ function grantCombatDrops(enemy, zoneId = null) {
     // 天玄碎片仅从仙墟/混沌界获得；其余秘境 boss 仍可掉定灵珠
     if (Math.random() < 0.08) { const sp = getRandomSpecial(zone); s.gainMaterial(sp); drops.push(sp) }
     if (Math.random() < 0.25) { const h = getRandomHerb({ difficulty: 9 }); s.gainMaterial(h); drops.push(h) }
+    // 定向素材：BOSS 必掉 1~2 个该秘境丹药所需素材（解决"洗髓花等关键主料从未获取"）
+    // 配合 zoneMaterialPool：每个秘境 BOSS 都掉对应丹方所需素材
+    if (zoneId) {
+      const zoneMatCount = 1 + (Math.random() < 0.4 ? 1 : 0)
+      for (let i = 0; i < zoneMatCount; i++) {
+        const zm = getRandomZoneMaterial(zoneId)
+        if (zm) { s.gainMaterial(zm); drops.push(zm) }
+      }
+    }
     if (zoneId) {
       const bossDrops = grantBossMaterialDrops(enemy, zoneId)
       // 统计 BOSS 素材获得次数（用于仪表盘/结算栏）
@@ -1235,8 +1244,18 @@ function grantCombatDrops(enemy, zoneId = null) {
   } else if (tier === 'elite') {
     if (Math.random() < 0.5) { const c = getRandomCore('elite'); s.gainMaterial(c); drops.push(c) }
     const beast = getRandomCore('normal'); s.gainMaterial(beast); drops.push(beast)
+    // 精英怪 25% 概率掉 1 个该秘境定向素材（让低难玩家也有途径）
+    if (zoneId && Math.random() < 0.25) {
+      const zm = getRandomZoneMaterial(zoneId)
+      if (zm) { s.gainMaterial(zm); drops.push(zm) }
+    }
   } else {
     if (Math.random() < 0.4) { const c = getRandomCore('normal'); s.gainMaterial(c); drops.push(c) }
+    // 普通怪 8% 概率掉 1 个该秘境定向素材
+    if (zoneId && Math.random() < 0.08) {
+      const zm = getRandomZoneMaterial(zoneId)
+      if (zm) { s.gainMaterial(zm); drops.push(zm) }
+    }
   }
   return drops
 }

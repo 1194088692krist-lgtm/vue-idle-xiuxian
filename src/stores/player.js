@@ -2154,7 +2154,7 @@ export const usePlayerStore = defineStore('player', {
       const statNameMap = { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }
 
       const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain', 'combatBoost', 'allAttributes']
-      const memberTypes = ['permanentStat', 'effortGain', 'healBattle', 'cleanse', 'autoHeal', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
+      const memberTypes = ['permanentStat', 'permanentStatMulti', 'effortGain', 'healBattle', 'cleanse', 'autoHeal', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
 
       if (globalTypes.includes(baseEffect.type)) {
         this.activePillBuffs.push({
@@ -2221,6 +2221,25 @@ export const usePlayerStore = defineStore('player', {
               member.baseStats[stat] += val
               changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + val, delta: val })
             }
+            break
+          }
+          case 'permanentStatMulti': {
+            // 仙灵丹/五行丹：一次性永久提升多种属性
+            if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+            if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+            const stats = effect.stats || baseEffect.stats || {}
+            Object.entries(stats).forEach(([stat, val]) => {
+              const roundedVal = Math.round(val)
+              if (roundedVal <= 0) return
+              const oldBase = member.baseStats[stat] || 0
+              member.baseStats[stat] = oldBase + roundedVal
+              if (member.permanentBonuses[stat] !== undefined) {
+                member.permanentBonuses[stat] += roundedVal
+              } else {
+                member.permanentBonuses[stat] = roundedVal
+              }
+              changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + roundedVal, delta: roundedVal })
+            })
             break
           }
           case 'effortGain': {

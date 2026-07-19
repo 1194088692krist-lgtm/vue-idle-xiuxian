@@ -64,24 +64,24 @@ export const pillRecipes = [
   {
     id: 'thunder_power',
     name: '雷灵丹',
-    description: '提升战斗属性的丹药',
+    description: '提升修炼速度的丹药（中阶修炼类，填补聚气丹与天元丹之间的档位）',
     grade: 'grade3',
-    type: 'attribute',
+    type: 'cultivation',
     materials: [
       { kind: 'herb', id: 'thunder_root', count: 2 },
       { kind: 'herb', id: 'dragon_breath_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
     baseEffect: {
-      type: 'combatBoost',
-      value: 0.12,
-      duration: 900
+      type: 'cultivationRate',
+      value: 0.25,
+      duration: 1800
     }
   },
   {
     id: 'immortal_essence',
     name: '仙灵丹',
-    description: '全属性提升的神奇丹药',
+    description: '永久提升多属性的中阶神丹（攻击+15，防御+10，生命+50）',
     grade: 'grade4',
     type: 'special',
     materials: [
@@ -89,16 +89,13 @@ export const pillRecipes = [
       { kind: 'herb', id: 'immortal_jade_grass', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
-    baseEffect: {
-      type: 'allAttributes',
-      value: 0.2,
-      duration: 600
-    }
+    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
+    baseEffect: { type: 'permanentStatMulti', stats: { attack: 15, defense: 10, health: 50 }, duration: 0 }
   },
   {
     id: 'five_elements_pill',
     name: '五行丹',
-    description: '融合五行之力的神奇丹药，全面提升修炼者素质',
+    description: '永久提升多属性的高阶神丹（攻击+30，防御+20，生命+100，速度+5）',
     grade: 'grade5',
     type: 'attribute',
     materials: [
@@ -106,11 +103,8 @@ export const pillRecipes = [
       { kind: 'herb', id: 'phoenix_feather_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
-    baseEffect: {
-      type: 'allAttributes',
-      value: 0.3,
-      duration: 1200
-    }
+    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
+    baseEffect: { type: 'permanentStatMulti', stats: { attack: 30, defense: 20, health: 100, speed: 5 }, duration: 0 }
   },
   {
     id: 'celestial_essence_pill',
@@ -149,7 +143,7 @@ export const pillRecipes = [
   {
     id: 'phoenix_rebirth_pill',
     name: '涅槃丹',
-    description: '蕴含不死凤凰之力的神丹，能在战斗中自动恢复生命',
+    description: '蕴含不死凤凰之力的神丹，永久提升突破成功率（高阶突破辅助）',
     grade: 'grade8',
     type: 'special',
     materials: [
@@ -157,11 +151,8 @@ export const pillRecipes = [
       { kind: 'herb', id: 'celestial_dew_grass', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade8'),
-    baseEffect: {
-      type: 'autoHeal',
-      value: 0.05,
-      duration: 3600
-    }
+    // 原 autoHeal 类型在战斗系统中无消费者，改为突破成功率提升（高阶）
+    baseEffect: { type: 'breakthroughRate', value: 0.15, duration: 0 }
   },
   {
     id: 'spirit_recovery',
@@ -183,24 +174,25 @@ export const pillRecipes = [
   {
     id: 'essence_condensation',
     name: '凝元丹',
-    description: '提升修炼效率的高级丹药',
+    description: '提升灵石获取效率的中阶丹药（填补回灵丹与日月丹之间的档位）',
     grade: 'grade3',
-    type: 'cultivation',
+    type: 'spirit_stone',
     materials: [
       { kind: 'herb', id: 'nine_leaf_lingzhi', count: 2 },
       { kind: 'herb', id: 'purple_ginseng', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
+    // 原 cultivationEfficiency 类型无消费者，改为灵石获取（聚灵丹0.1/回灵丹0.15/凝元丹0.25/日月丹0.35）
     baseEffect: {
-      type: 'cultivationEfficiency',
-      value: 0.18,
+      type: 'spiritStoneRate',
+      value: 0.25,
       duration: 1500
     }
   },
   {
     id: 'mind_clarity',
     name: '清心丹',
-    description: '提升心境和悟性的丹药',
+    description: '凝神静心，永久提升突破成功率（低阶突破辅助）',
     grade: 'grade3',
     type: 'special',
     materials: [
@@ -208,16 +200,13 @@ export const pillRecipes = [
       { kind: 'herb', id: 'fire_heart_flower', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
-    baseEffect: {
-      type: 'comprehension',
-      value: 0.15,
-      duration: 2400
-    }
+    // 原 comprehension 类型无消费者，改为突破成功率提升（低阶，与渡厄丹/涅槃丹形成低-中-高三档）
+    baseEffect: { type: 'breakthroughRate', value: 0.06, duration: 0 }
   },
   {
     id: 'fire_essence',
     name: '火元丹',
-    description: '提升火属性修炼速度的丹药',
+    description: '淬炼器物，永久提升装备强化成功率（高阶强化辅助）',
     grade: 'grade4',
     type: 'attribute',
     materials: [
@@ -225,11 +214,8 @@ export const pillRecipes = [
       { kind: 'herb', id: 'dragon_breath_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
-    baseEffect: {
-      type: 'combatBoost',
-      value: 0.15,
-      duration: 1800
-    }
+    // 原 combatBoost 类型在 getEffectiveStats 中无消费者，改为强化成功率提升（高阶，淬灵丹+0.15 / 火元丹+0.25）
+    baseEffect: { type: 'enhanceRate', value: 0.25, duration: 0 }
   },
   // ===== 新增：丹药多元化（打破"全是限时 buff"） =====
   // func 仅用于炼丹界面分类展示；materials 采用 {kind,id,count} 统一素材模型
@@ -463,7 +449,7 @@ export const calculatePillEffect = (recipe, playerLevel) => {
   const grade = pillGrades[recipe.grade]
   const type = pillTypes[recipe.type]
   // 数值类丹药（努力值、永久属性、战斗回血等）不受境界缩放，避免夸张
-  const fixedValueTypes = ['effortGain', 'permanentStat', 'healBattle', 'cleanse', 'reforgeSafe', 'breakthroughRate', 'enhanceRate']
+  const fixedValueTypes = ['effortGain', 'permanentStat', 'permanentStatMulti', 'healBattle', 'cleanse', 'reforgeSafe', 'breakthroughRate', 'enhanceRate']
   const isFixed = fixedValueTypes.includes(recipe.baseEffect.type)
   const levelMultiplier = isFixed ? 1 : Math.min(2, 1 + (playerLevel - 1) * 0.05)
   return {

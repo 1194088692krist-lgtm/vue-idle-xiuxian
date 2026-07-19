@@ -143,4 +143,87 @@ export const getRandomSpecial = (zone = null) => {
   return makeMaterial(pool[0], 'special', 'boss')
 }
 
+// 秘境→定向素材池：击杀该秘境 BOSS 时按权重掉落对应丹药所需素材
+// 解决"洗髓花等关键主料从未获取"的问题——每个秘境 BOSS 都必掉该秘境丹药所需素材
+// 配合 pillZoneMapping 使用：玩家通关某秘境即可定向获取该秘境丹药素材
+export const zoneMaterialPool = {
+  forest_edge: [
+    { kind: 'herb', id: 'wash_marrow_herb', weight: 3 },
+    { kind: 'herb', id: 'flesh_growth_herb', weight: 3 },
+    { kind: 'herb', id: 'spirit_grass', weight: 2 },
+    { kind: 'ore', id: 'iron_essence', weight: 2 }
+  ],
+  misty_valley: [
+    { kind: 'herb', id: 'forge_bone_wood', weight: 3 },
+    { kind: 'herb', id: 'disaster_ward_flower', weight: 3 },
+    { kind: 'herb', id: 'enlightenment_leaf', weight: 2 },
+    { kind: 'ore', id: 'dark_iron_marrow', weight: 2 },
+    { kind: 'liquid', id: 'ward_evil_dew', weight: 2 }
+  ],
+  phoenix_cave: [
+    { kind: 'herb', id: 'treasure_scent_herb', weight: 3 },
+    { kind: 'herb', id: 'calm_mind_herb', weight: 3 },
+    { kind: 'herb', id: 'nine_leaf_lingzhi', weight: 2 },
+    { kind: 'ore', id: 'spirit_quench_sand', weight: 2 },
+    { kind: 'liquid', id: 'spirit_spring_water', weight: 2 },
+    { kind: 'liquid', id: 'jade_marrow_liquid', weight: 1 }
+  ],
+  dragon_abyss: [
+    { kind: 'herb', id: 'fire_heart_flower', weight: 3 },
+    { kind: 'herb', id: 'tribulation_lotus', weight: 2 },
+    { kind: 'herb', id: 'immortal_jade_grass', weight: 2 },
+    { kind: 'ore', id: 'tribulation_thunder_stone', weight: 2 },
+    { kind: 'core', id: 'demon_king_core', weight: 2 }
+  ],
+  ghost_wasteland: [
+    { kind: 'herb', id: 'five_elements_grass', weight: 3 },
+    { kind: 'herb', id: 'sun_essence_flower', weight: 2 },
+    { kind: 'herb', id: 'celestial_dew_grass', weight: 2 },
+    { kind: 'core', id: 'demon_king_core', weight: 3 },
+    { kind: 'special', id: 'heaven_fragment', weight: 1 }
+  ],
+  ice_palace: [
+    { kind: 'herb', id: 'moonlight_orchid', weight: 3 },
+    { kind: 'herb', id: 'celestial_dew_grass', weight: 3 },
+    { kind: 'liquid', id: 'jade_marrow_liquid', weight: 2 }
+  ],
+  immortal_ruins: [
+    { kind: 'herb', id: 'sun_essence_flower', weight: 3 },
+    { kind: 'herb', id: 'moonlight_orchid', weight: 3 },
+    { kind: 'ore', id: 'dao_essence_stone', weight: 2 },
+    { kind: 'special', id: 'calm_spirit_pearl', weight: 2 }
+  ],
+  chaos_realm: [
+    { kind: 'herb', id: 'phoenix_feather_herb', weight: 3 },
+    { kind: 'herb', id: 'celestial_dew_grass', weight: 3 },
+    { kind: 'special', id: 'heaven_fragment', weight: 3 },
+    { kind: 'core', id: 'demon_king_core', weight: 3 }
+  ]
+}
+
+// 按秘境素材池抽取一个素材（BOSS 击杀时使用）
+export const getRandomZoneMaterial = (zoneId) => {
+  const pool = zoneMaterialPool[zoneId]
+  if (!pool || pool.length === 0) return null
+  const total = pool.reduce((s, m) => s + (m.weight || 1), 0)
+  let rand = Math.random() * total
+  for (const m of pool) {
+    rand -= (m.weight || 1)
+    if (rand <= 0) {
+      const kind = m.kind
+      const id = m.id
+      // 从对应类型清单中查找素材定义
+      let base = null
+      if (kind === 'herb') base = herbs.find(h => h.id === id)
+      else if (kind === 'ore') base = ores.find(o => o.id === id)
+      else if (kind === 'liquid') base = liquids.find(l => l.id === id)
+      else if (kind === 'core') base = cores.find(c => c.id === id)
+      else if (kind === 'special') base = specials.find(s => s.id === id)
+      if (!base) return null
+      return makeMaterial(base, kind, 'boss_zone')
+    }
+  }
+  return null
+}
+
 export { allMaterials }
