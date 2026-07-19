@@ -1244,15 +1244,15 @@ function grantCombatDrops(enemy, zoneId = null) {
   } else if (tier === 'elite') {
     if (Math.random() < 0.5) { const c = getRandomCore('elite'); s.gainMaterial(c); drops.push(c) }
     const beast = getRandomCore('normal'); s.gainMaterial(beast); drops.push(beast)
-    // 精英怪 25% 概率掉 1 个该秘境定向素材（让低难玩家也有途径）
-    if (zoneId && Math.random() < 0.25) {
+    // 精英怪 40% 概率掉 1 个该秘境定向素材（让低难玩家也有途径）
+    if (zoneId && Math.random() < 0.40) {
       const zm = getRandomZoneMaterial(zoneId)
       if (zm) { s.gainMaterial(zm); drops.push(zm) }
     }
   } else {
     if (Math.random() < 0.4) { const c = getRandomCore('normal'); s.gainMaterial(c); drops.push(c) }
-    // 普通怪 8% 概率掉 1 个该秘境定向素材
-    if (zoneId && Math.random() < 0.08) {
+    // 普通怪 18% 概率掉 1 个该秘境定向素材（让前期玩家也能稳定获取丹药主料）
+    if (zoneId && Math.random() < 0.18) {
       const zm = getRandomZoneMaterial(zoneId)
       if (zm) { s.gainMaterial(zm); drops.push(zm) }
     }

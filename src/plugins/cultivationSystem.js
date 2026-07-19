@@ -339,10 +339,15 @@ export const ZONE_BOSSES = {
 }
 
 export const getBossEncounterChance = (difficultyKey) => {
+  // 修复：原仅 xiongxian/juejing/mieshi 三档出 BOSS，
+  // 导致前期玩家挂 youli/shilian 档永远遇不到 BOSS，
+  // 也就永远掉不到 zoneMaterialPool 中的定向素材（洗髓花/锻骨木/护厄花等丹药主料）
   const chances = {
-    xiongxian: 0.50,
-    juejing: 0.75,
-    mieshi: 0.90
+    youli: 0.10,     // 游历：10% 概率出 BOSS（让前期玩家也有途径获取丹药素材）
+    shilian: 0.25,   // 试炼：25%
+    xiongxian: 0.50, // 凶险：50%
+    juejing: 0.75,   // 绝境：75%
+    mieshi: 0.90     // 灭世：90%
   }
   return chances[difficultyKey] || 0
 }

@@ -204,27 +204,32 @@ export const getHerbValue = (herb, quality) => {
 }
 
 // 随机获取灵草
+// 修复：原实现用 Math.random() 与 chance 累积值比较，但所有 herbs 的 chance
+// 累积后 > 1.7，rand 永远 < 累积值，导致排序靠后的新增灵草（洗髓花/锻骨木/护厄花/
+// 悟道叶/寻宝草/定心草/九叶灵芝/火心花/渡厄莲/仙玉草/五行草/日精花/天露草/
+// 月华兰/凤羽草等所有丹药主料）命中率实际为 0，玩家永远无法获取。
+// 改为按 chance 作为相对权重抽取：先求总权重，再按区间命中。
 export const getRandomHerb = () => {
-  const rand = Math.random()
-  let cumulative = 0
+  const total = herbs.reduce((s, h) => s + (h.chance || 0), 0)
+  if (total <= 0) return null
+  let rand = Math.random() * total
+  let picked = herbs[herbs.length - 1]
   for (const herb of herbs) {
-    cumulative += herb.chance
-    if (rand <= cumulative) {
-      // 随机决定品质
-      const qualities = Object.keys(herbQualities)
-      const qualityRand = Math.random()
-      let quality
-      if (qualityRand < 0.5) quality = qualities[0] // 50% 普通
-      else if (qualityRand < 0.8) quality = qualities[1] // 30% 优质
-      else if (qualityRand < 0.95) quality = qualities[2] // 15% 稀有
-      else if (qualityRand < 0.99) quality = qualities[3] // 4% 极品
-      else quality = qualities[4] // 1% 仙品
-      return {
-        ...herb,
-        quality,
-        value: getHerbValue(herb, quality)
-      }
-    }
+    rand -= (herb.chance || 0)
+    if (rand <= 0) { picked = herb; break }
   }
-  return null
+  // 随机决定品质
+  const qualities = Object.keys(herbQualities)
+  const qualityRand = Math.random()
+  let quality
+  if (qualityRand < 0.5) quality = qualities[0] // 50% 普通
+  else if (qualityRand < 0.8) quality = qualities[1] // 30% 优质
+  else if (qualityRand < 0.95) quality = qualities[2] // 15% 稀有
+  else if (qualityRand < 0.99) quality = qualities[3] // 4% 极品
+  else quality = qualities[4] // 1% 仙品
+  return {
+    ...picked,
+    quality,
+    value: getHerbValue(picked, quality)
+  }
 }
