@@ -1007,28 +1007,47 @@ function createPlayerEntity() {
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
-// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升 1.5 倍
+// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升
 // 统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度），不影响 zones.js 资料卡显示数值
-const BOSS_POWER_MULTIPLIER = 1.5
+const BOSS_POWER_MULTIPLIER = 1.8
+
+// 后期秘境额外强化系数（小怪与 BOSS 共用）
+// 用户反馈：凤凰窟之后的秘境怪物实力羸弱，需要重点强化
+// 越往后倍率越高，让后期秘境对高 build 玩家仍具威胁，但前期秘境保持轻量影响
+const LATE_ZONE_ENEMY_MULT = {
+  phoenix_cave: 1.15,
+  dragon_abyss: 1.30,
+  ghost_wasteland: 1.50,
+  ice_palace: 1.70,
+  immortal_ruins: 2.00,
+  chaos_realm: 2.30
+}
+
+// 获取秘境的后期强化倍率（前期秘境返回 1，无影响）
+function getLateZoneMult(zoneId) {
+  return LATE_ZONE_ENEMY_MULT[zoneId] || 1
+}
 
 function createBossEnemy(bossData, effectiveZone) {
   const secretLv = effectiveZone.difficulty
   // boss 基础 stats 现已与 recommendedStats（凶险档）量级对齐，
   // 再按 enemyScale 缩放：游历0.30/试炼0.60/凶险1.00/绝境1.60/灭世2.50
   // 这样灭世档 boss 是凶险档的 2.5 倍，避免高难度档仍被秒杀。
-  // 最后统一应用 BOSS_POWER_MULTIPLIER（当前为 3 倍），让 BOSS 整体实力提升 3 倍。
+  // 应用 BOSS_POWER_MULTIPLIER（1.8 倍）+ 后期秘境额外倍率（LATE_ZONE_ENEMY_MULT）
   const scale = effectiveZone.enemyScale || 1
-  const scaledHealth = Math.floor(bossData.stats.health * scale * BOSS_POWER_MULTIPLIER)
-  const scaledAttack = Math.floor(bossData.stats.attack * scale * BOSS_POWER_MULTIPLIER)
-  const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale * BOSS_POWER_MULTIPLIER)
-  const scaledSpeed = Math.floor((bossData.stats.speed || 10) * BOSS_POWER_MULTIPLIER)
+  const lateMult = getLateZoneMult(effectiveZone.id)
+  const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult
+  const scaledHealth = Math.floor(bossData.stats.health * scale * totalBossMult)
+  const scaledAttack = Math.floor(bossData.stats.attack * scale * totalBossMult)
+  const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale * totalBossMult)
+  const scaledSpeed = Math.floor((bossData.stats.speed || 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
   // 高难度档 boss 附加额外战斗属性，让其对高 build 玩家有真实威胁
   // combatBoost 提升自身全部战斗属性（攻击/速度/暴击等综合）
-  const bossCombatBoost = Math.min(0.5, Math.max(0, (scale - 1) * 0.2))
-  // finalDamageBoost 提升最终伤害（独立乘区），灭世档最高约 0.3
-  const bossFinalDamageBoost = Math.min(0.5, 0.1 + Math.max(0, (scale - 1) * 0.2))
+  const bossCombatBoost = Math.min(0.6, Math.max(0, (scale - 1) * 0.22) + (lateMult - 1) * 0.15)
+  // finalDamageBoost 提升最终伤害（独立乘区），后期秘境 boss 显著强化
+  const bossFinalDamageBoost = Math.min(0.6, 0.1 + Math.max(0, (scale - 1) * 0.22) + (lateMult - 1) * 0.18)
   // finalDamageReduce 让 boss 抗打（降低承受伤害）
-  const bossFinalDamageReduce = Math.min(0.4, Math.max(0, (scale - 1) * 0.15))
+  const bossFinalDamageReduce = Math.min(0.5, Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.12)
   const baseStats = {
     health: scaledHealth,
     maxHealth: scaledHealth,
@@ -1094,33 +1113,44 @@ function generateZoneEnemy(effectiveZone, encounterCount, difficultyKey = 'xiong
     return { mainEnemy: bossEnemies[0], allBosses: bossEnemies, hasBoss: true, isElite: false }
   }
   
+  // 小怪整体强化（用户反馈小怪实力羸弱）：
+  // - HP 倍率 0.7 → 0.85（+21%）
+  // - ATK 倍率 0.5 → 0.6（+20%）
+  // - DEF 倍率 0.12 → 0.15（+25%）
+  // 后期秘境额外应用 LATE_ZONE_ENEMY_MULT，重点强化凤凰窟之后的怪物
+  const lateMult = getLateZoneMult(effectiveZone.id)
+  const smallHpBase = Math.floor(effectiveZone.recommendedStats.health * 0.85 * scale * lateMult)
+  const smallAtkBase = Math.floor(effectiveZone.recommendedStats.attack * 0.6 * scale * lateMult)
+  const smallDefBase = Math.floor(effectiveZone.recommendedStats.attack * 0.15 * scale * lateMult)
+  // 后期秘境小怪速度小幅提升，让其能跟上后期玩家
+  const smallSpeedBonus = Math.floor((lateMult - 1) * 8)
   const baseStats = {
-    health: Math.floor(effectiveZone.recommendedStats.health * 0.7 * scale),
-    damage: Math.floor(effectiveZone.recommendedStats.attack * 0.5 * scale),
-    defense: Math.floor(effectiveZone.recommendedStats.attack * 0.12 * scale),
-    speed: 5 + secretLv * 2,
-    critRate: Math.min(0.2, 0.02 + secretLv * 0.012),
-    comboRate: Math.min(0.15, 0.01 + secretLv * 0.008),
-    counterRate: Math.min(0.15, 0.01 + secretLv * 0.008),
-    stunRate: Math.min(0.12, 0.01 + secretLv * 0.005),
-    dodgeRate: Math.min(0.18, 0.02 + secretLv * 0.012),
-    vampireRate: Math.min(0.12, 0.01 + secretLv * 0.005),
-    critResist: Math.min(0.15, 0.02 + secretLv * 0.008),
-    comboResist: Math.min(0.15, 0.02 + secretLv * 0.008),
-    counterResist: Math.min(0.15, 0.02 + secretLv * 0.008),
-    stunResist: Math.min(0.15, 0.02 + secretLv * 0.008),
-    dodgeResist: Math.min(0.15, 0.02 + secretLv * 0.008),
-    vampireResist: Math.min(0.15, 0.02 + secretLv * 0.008),
+    health: smallHpBase,
+    damage: smallAtkBase,
+    defense: smallDefBase,
+    speed: 5 + secretLv * 2 + smallSpeedBonus,
+    critRate: Math.min(0.22, 0.02 + secretLv * 0.012 + (lateMult - 1) * 0.04),
+    comboRate: Math.min(0.18, 0.01 + secretLv * 0.008 + (lateMult - 1) * 0.03),
+    counterRate: Math.min(0.18, 0.01 + secretLv * 0.008 + (lateMult - 1) * 0.03),
+    stunRate: Math.min(0.14, 0.01 + secretLv * 0.005 + (lateMult - 1) * 0.02),
+    dodgeRate: Math.min(0.22, 0.02 + secretLv * 0.012 + (lateMult - 1) * 0.04),
+    vampireRate: Math.min(0.14, 0.01 + secretLv * 0.005 + (lateMult - 1) * 0.02),
+    critResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
+    comboResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
+    counterResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
+    stunResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
+    dodgeResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
+    vampireResist: Math.min(0.18, 0.02 + secretLv * 0.008 + (lateMult - 1) * 0.04),
     healBoost: 0,
     critDamageBoost: 0.3,
     critDamageReduce: 0,
-    // 高难度档普通怪也按 scale 获得 finalDamageBoost/combatBoost，
-    // 让绝境/灭世档的小怪对高 build 玩家有真实威胁（不再被一击秒杀全场）
-    finalDamageBoost: Math.min(0.3, Math.max(0, (scale - 1) * 0.15)),
-    finalDamageReduce: Math.min(0.25, Math.max(0, (scale - 1) * 0.12)),
-    combatBoost: Math.min(0.35, Math.max(0, (scale - 1) * 0.18)),
+    // 高难度档+后期秘境普通怪获得显著 finalDamageBoost/combatBoost，
+    // 让绝境/灭世档 + 后期秘境的小怪对高 build 玩家有真实威胁（不再被一击秒杀全场）
+    finalDamageBoost: Math.min(0.35, Math.max(0, (scale - 1) * 0.16) + (lateMult - 1) * 0.1),
+    finalDamageReduce: Math.min(0.30, Math.max(0, (scale - 1) * 0.13) + (lateMult - 1) * 0.08),
+    combatBoost: Math.min(0.40, Math.max(0, (scale - 1) * 0.19) + (lateMult - 1) * 0.1),
     resistanceBoost: 0,
-    maxHealth: Math.floor(effectiveZone.recommendedStats.health * 0.7 * scale)
+    maxHealth: smallHpBase
   }
 
   let monsterName
