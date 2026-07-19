@@ -4,7 +4,6 @@ import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
 import pkg from './package.json'
-import vitePluginBundleObfuscator from 'vite-plugin-bundle-obfuscator'
 
 export default defineConfig({
   define: {
@@ -69,28 +68,18 @@ export default defineConfig({
     Components({
       resolvers: [NaiveUiResolver()]
     }),
-    vitePluginBundleObfuscator({
-      log: false,
-      enable: true,
-      options: {
-        log: false,
-        compact: true,
-        stringArray: true,
-        renameGlobals: false,
-        selfDefending: false,
-        debugProtection: false,
-        rotateStringArray: true,
-        deadCodeInjection: false,
-        stringArrayEncoding: ['none'],
-        disableConsoleOutput: true,
-        stringArrayThreshold: 0.75,
-        controlFlowFlattening: false,
-        unicodeEscapeSequence: true,
-        identifierNamesGenerator: 'hexadecimal'
-      },
-      // excludes: ['router.js'],
-      autoExcludeNodeModules: true
-    })
+    // CSS 异步加载插件：把 <link rel="stylesheet"> 改为 preload，
+    // 让浏览器解析 HTML 时立即渲染 inline loading 占位，不被外部 CSS 阻塞首次绘制
+    // CSS 仍会在加载完后立即应用（onload 回退为 stylesheet），不会出现长时间无样式
+    {
+      name: 'async-css-load',
+      transformIndexHtml(html) {
+        return html.replace(
+          /<link\s+rel="stylesheet"[^>]*href="([^"]+)"[^>]*>/g,
+          (match, href) => `<link rel="preload" href="${href}" as="style" onload="this.onload=null;this.rel='stylesheet'">`
+        )
+      }
+    }
   ],
   worker: {
     format: 'es'
