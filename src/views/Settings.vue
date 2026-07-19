@@ -129,7 +129,7 @@
               <template v-if="slot.name">
                 <div class="slot-name">{{ slot.name }}</div>
                 <div class="slot-detail">
-                  <span>{{ slot.realm }}</span>
+                  <span v-if="slot.teamPower">战力 {{ formatPower(slot.teamPower) }}</span>
                   <span v-if="slot.saveTime" class="slot-time">
                     {{ formatTime(slot.saveTime) }}
                   </span>
@@ -270,7 +270,7 @@
             <div v-for="b in localBackups" :key="b.key" class="backup-item">
               <div class="backup-info">
                 <span class="backup-name">{{ b.name }}</span>
-                <span class="backup-time">Lv.{{ b.level }} · {{ b.realm }} · {{ formatTime(b.time) }}</span>
+                <span class="backup-time">战力 {{ formatPower(b.teamPower) }} · {{ formatTime(b.time) }}</span>
               </div>
               <div class="backup-actions">
                 <button class="btn btn-small btn-success" @click="restoreBackup(b)">恢复</button>
@@ -296,14 +296,14 @@
               <div class="conflict-card">
                 <div class="conflict-side">本地存档</div>
                 <div class="conflict-name">{{ c.local.name }}</div>
-                <div class="conflict-detail">Lv.{{ c.local.level }} · {{ c.local.realm }}</div>
+                <div class="conflict-detail" v-if="c.local.teamPower">战力 {{ formatPower(c.local.teamPower) }}</div>
                 <div class="conflict-time">{{ c.localTime ? formatTime(c.localTime) : '未知时间' }}</div>
                 <button class="btn btn-small btn-success" @click="resolveConflict(c.slot, false)">用本地</button>
               </div>
               <div class="conflict-card">
                 <div class="conflict-side">云端存档</div>
                 <div class="conflict-name">{{ c.cloud.name }}</div>
-                <div class="conflict-detail">Lv.{{ c.cloud.level }} · {{ c.cloud.realm }}</div>
+                <div class="conflict-detail" v-if="c.cloud.teamPower">战力 {{ formatPower(c.cloud.teamPower) }}</div>
                 <div class="conflict-time">{{ c.cloudTime ? formatTime(c.cloudTime) : '未知时间' }}</div>
                 <button class="btn btn-small btn-primary" @click="resolveConflict(c.slot, true)">用云端</button>
               </div>
@@ -441,6 +441,14 @@
     const hour = String(d.getHours()).padStart(2, '0')
     const minute = String(d.getMinutes()).padStart(2, '0')
     return `${month}/${day} ${hour}:${minute}`
+  }
+
+  // 队伍总战力格式化：<1万 显示原值；1万~1亿 显示「X.X万」；≥1亿 显示「X.X亿」
+  const formatPower = (power) => {
+    if (!power || power <= 0) return '0'
+    if (power < 10000) return String(power)
+    if (power < 100000000) return (power / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+    return (power / 100000000).toFixed(2).replace(/\.?0+$/, '') + '亿'
   }
 
   // 导出存档
@@ -676,7 +684,7 @@
       await GameDB.setData(key, blob)
       const d = decryptData(blob)
       const list = JSON.parse(localStorage.getItem(BACKUP_KEY) || '[]')
-      list.unshift({ key, time: ts, name: d?.name || '未知', level: d?.level || 1, realm: d?.realm || '' })
+      list.unshift({ key, time: ts, name: d?.name || '未知', level: d?.level || 1, realm: d?.realm || '', teamPower: d?._teamPower || 0 })
       localStorage.setItem(BACKUP_KEY, JSON.stringify(list.slice(0, 20)))
       message.success('已创建本地备份')
       loadBackups()

@@ -127,7 +127,7 @@
               <div class="slot-number">{{ slot.slot }}</div>
               <div class="slot-info">
                 <div class="slot-name">{{ slot.name || '空存档槽' }}</div>
-                <div class="slot-realm" v-if="slot.realm">{{ slot.realm }}</div>
+                <div class="slot-power" v-if="slot.teamPower">战力 {{ formatPower(slot.teamPower) }}</div>
                 <div class="slot-time" v-if="slot.saveTime">
                   {{ formatTime(slot.saveTime) }}
                 </div>
@@ -203,14 +203,14 @@
               <div class="conflict-card local">
                 <div class="conflict-side">本地存档</div>
                 <div class="conflict-name">{{ c.local.name }}</div>
-                <div class="conflict-detail">Lv.{{ c.local.level }} · {{ c.local.realm }}</div>
+                <div class="conflict-detail" v-if="c.local.teamPower">战力 {{ formatPower(c.local.teamPower) }}</div>
                 <div class="conflict-time">{{ c.localTime ? formatTime(c.localTime) : '未知时间' }}</div>
                 <button class="btn-conflict btn-local" @click="handleResolveConflict(c.slot, false)">用本地</button>
               </div>
               <div class="conflict-card cloud">
                 <div class="conflict-side">云端存档</div>
                 <div class="conflict-name">{{ c.cloud.name }}</div>
-                <div class="conflict-detail">Lv.{{ c.cloud.level }} · {{ c.cloud.realm }}</div>
+                <div class="conflict-detail" v-if="c.cloud.teamPower">战力 {{ formatPower(c.cloud.teamPower) }}</div>
                 <div class="conflict-time">{{ c.cloudTime ? formatTime(c.cloudTime) : '未知时间' }}</div>
                 <button class="btn-conflict btn-cloud" @click="handleResolveConflict(c.slot, true)">用云端</button>
               </div>
@@ -458,6 +458,14 @@ const formatTime = (timestamp) => {
   } else {
     return date.toLocaleDateString('zh-CN')
   }
+}
+
+// 队伍总战力格式化：<1万 显示原值；1万~1亿 显示「X.X万」；≥1亿 显示「X.X亿」
+const formatPower = (power) => {
+  if (!power || power <= 0) return '0'
+  if (power < 10000) return String(power)
+  if (power < 100000000) return (power / 10000).toFixed(1).replace(/\.0$/, '') + '万'
+  return (power / 100000000).toFixed(2).replace(/\.?0+$/, '') + '亿'
 }
 
 // ===== 冲突解决（分支③）=====

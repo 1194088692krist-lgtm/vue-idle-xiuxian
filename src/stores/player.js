@@ -640,6 +640,10 @@ export const usePlayerStore = defineStore('player', {
         this.saveTimer = null
       }
       this.pendingSave = false
+      // 写入时间戳与战力快照：migrate() 依赖 _saveTime 判断新旧，存档列表依赖 _teamPower 显示战力
+      // 之前未写 _saveTime 导致 migrate 把本地当成时间戳 0，无差别用云端覆盖本地，造成 cultivationPool 异常回滚
+      this._saveTime = Date.now()
+      this._teamPower = this._snapshotTeamPower()
       const encryptedData = encryptData(this.$state)
       if (encryptedData) {
         try {
@@ -653,6 +657,17 @@ export const usePlayerStore = defineStore('player', {
       }
       // 登录后：本地落盘即自动云同步（节流）
       this._scheduleCloudSync()
+    },
+    // 队伍总战力快照（与挂机系统 playerBuildStrength 口径一致）
+    // 无队伍时返回主角 buildStrength，有队伍时返回 getTeamTotalBuild()
+    _snapshotTeamPower() {
+      try {
+        const team = this.getTeamMembersDetail ? this.getTeamMembersDetail() : []
+        if (!team || team.length === 0) return this.buildStrength || 0
+        return this.getTeamTotalBuild ? this.getTeamTotalBuild() : (this.buildStrength || 0)
+      } catch {
+        return this.buildStrength || 0
+      }
     },
     // 防抖保存：高频操作使用此接口，避免每次调用都加密写入 IndexedDB
     // 连续活动时会合并保存，但最多 10 秒强制保存一次，防止进度丢失
@@ -729,8 +744,14 @@ export const usePlayerStore = defineStore('player', {
     // 从密文 blob 提取基础信息（用于分支③对比弹窗）
     _slotInfo(blob) {
       const d = decryptData(blob)
-      if (!d) return { name: '（损坏）', level: '-', realm: '-', time: null }
-      return { name: d.name || '未知', level: d.level || 1, realm: d.realm || '未知', time: d._saveTime || null }
+      if (!d) return { name: '（损坏）', level: '-', realm: '-', teamPower: 0, time: null }
+      return {
+        name: d.name || '未知',
+        level: d.level || 1,
+        realm: d.realm || '未知',
+        teamPower: d._teamPower || 0,
+        time: d._saveTime || null
+      }
     },
     // 从云端下载覆盖本地
     async pullFromCloud() {
@@ -828,7 +849,24 @@ export const usePlayerStore = defineStore('player', {
               cloudTime
             })
           } else if (cloudTime >= localTime) {
-            await GameDB.setData(key, cloudBlob)
+            // 兜底保护：若本地修为池显著大于云端（>1.5 倍），即便云端时间戳较新
+            // 也保留本地较大值，避免因时间戳异常（如旧版未写 _saveTime）造成 cultivationPool 回滚损失
+            const localDecoded = decryptData(localBlob)
+            const cloudDecoded = decryptData(cloudBlob)
+            const localPool = typeof localDecoded?.cultivationPool === 'number' ? localDecoded.cultivationPool : 0
+            const cloudPool = typeof cloudDecoded?.cultivationPool === 'number' ? cloudDecoded.cultivationPool : 0
+            if (localPool > cloudPool * 1.5 && localPool > 0) {
+              cloudDecoded.cultivationPool = localPool
+              cloudDecoded._saveTime = cloudDecoded._saveTime || Date.now()
+              const mergedBlob = encryptData(cloudDecoded)
+              await GameDB.setData(key, mergedBlob || cloudBlob)
+              if (mergedBlob) {
+                await this.pushSlotToCloud(slot, mergedBlob, cloudDecoded._saveTime)
+              }
+              console.warn(`[migrate] slot=${slot} 保护本地 cultivationPool=${localPool}（云端仅 ${cloudPool}）`)
+            } else {
+              await GameDB.setData(key, cloudBlob)
+            }
           } else {
             await this.pushSlotToCloud(slot, localBlob, localTime)
           }
@@ -953,13 +991,14 @@ export const usePlayerStore = defineStore('player', {
               name: decryptedData?.name || `修士${i}`,
               level: decryptedData?.level || 1,
               realm: decryptedData?.realm || '未知',
+              teamPower: decryptedData?._teamPower || 0,
               saveTime: decryptedData?._saveTime || null
             })
           } catch {
-            slots.push({ slot: i, name: '存档损坏', level: 0, realm: '未知', saveTime: null })
+            slots.push({ slot: i, name: '存档损坏', level: 0, realm: '未知', teamPower: 0, saveTime: null })
           }
         } else {
-          slots.push({ slot: i, name: null, level: 0, realm: '', saveTime: null })
+          slots.push({ slot: i, name: null, level: 0, realm: '', teamPower: 0, saveTime: null })
         }
       }
       return slots
@@ -1016,8 +1055,9 @@ export const usePlayerStore = defineStore('player', {
         if (!decryptedData || !validateData(decryptedData)) {
           throw new Error('存档数据损坏或无效')
         }
-        // 删除非游戏数据
+        // 删除非游戏数据（_saveTime / _teamPower 仅为存档列表摘要使用，运行时不需要）
         delete decryptedData._saveTime
+        delete decryptedData._teamPower
         // 写入主存档
         const encryptedData = encryptData(decryptedData)
         await GameDB.setData('playerData', encryptedData)
