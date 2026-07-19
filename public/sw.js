@@ -46,10 +46,13 @@ self.addEventListener('install', event => {
 self.addEventListener('activate', event => {
   event.waitUntil((async () => {
     const keys = await caches.keys()
-    // 清理非当前版本的所有缓存
+    // 清理非当前版本的核心/资产缓存，但保留 user-assets
+    // user-assets 是用户主动通过"一键下载"缓存的素材（人物立绘/怪物立绘/背景图等），
+    // 不应被 SW 版本更新清理，否则用户辛苦下载的素材会在下次发版后丢失
+    const PRESERVE_CACHES = [CORE_CACHE, ASSET_CACHE, 'user-assets']
     await Promise.all(
       keys
-        .filter(k => k !== CORE_CACHE && k !== ASSET_CACHE)
+        .filter(k => !PRESERVE_CACHES.includes(k))
         .map(k => caches.delete(k))
     )
     // 立即接管所有页面（不必等刷新）
