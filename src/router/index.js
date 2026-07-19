@@ -2,20 +2,16 @@ import { createRouter, createWebHashHistory } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
 import StartScreen from '../views/StartScreen.vue'
-
-// 路由级懒加载：除首屏 StartScreen 外，所有视图组件按需加载
-// 修复「启动时所有页面组件同步导入，导致卡很久才开始读条」的问题
-// Vite 会自动为每个动态 import 切出独立 chunk，首屏只下载 StartScreen + 主框架代码
-const Home = () => import('../views/Home.vue')
-const Cultivation = () => import('../views/Cultivation.vue')
-const Inventory = () => import('../views/Inventory.vue')
-const Exploration = () => import('../views/Exploration.vue')
-const Guide = () => import('../views/Guide.vue')
-const Settings = () => import('../views/Settings.vue')
-const GM = () => import('../views/GM.vue')
-const GMTools = () => import('../views/GMTools.vue')
-const Alchemy = () => import('../views/Alchemy.vue')
-const Gacha = () => import('../views/Gacha.vue')
+import Home from '../views/Home.vue'
+import Cultivation from '../views/Cultivation.vue'
+import Inventory from '../views/Inventory.vue'
+import Exploration from '../views/Exploration.vue'
+import Guide from '../views/Guide.vue'
+import Settings from '../views/Settings.vue'
+import GM from '../views/GM.vue'
+import GMTools from '../views/GMTools.vue'
+import Alchemy from '../views/Alchemy.vue'
+import Gacha from '../views/Gacha.vue'
 
 const routes = [
   {
