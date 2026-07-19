@@ -13,7 +13,17 @@
   </head>
 
   <body>
-    <div id="app"></div>
+    <div id="app">
+      <!-- JS bundle 下载/解析期间的占位 loading，Vue mount 后自动替换 -->
+      <div id="initial-loading" style="position:fixed;inset:0;display:flex;flex-direction:column;align-items:center;justify-content:center;background:linear-gradient(135deg,#0D0D12 0%,#1A1A2E 50%,#16213E 100%);color:#FFD700;font-family:'楷体','KaiTi',serif;z-index:9999;">
+        <div style="font-size:36px;font-weight:bold;text-shadow:0 0 20px rgba(255,215,0,0.5);margin-bottom:24px;">修仙梦途</div>
+        <div style="width:240px;height:6px;background:rgba(255,255,255,0.1);border-radius:3px;overflow:hidden;border:1px solid rgba(255,215,0,0.3);">
+          <div style="height:100%;width:30%;background:linear-gradient(90deg,#FFD700,#FFA500,#FFD700);border-radius:3px;animation:ilp 1.4s ease-in-out infinite;"></div>
+        </div>
+        <div style="margin-top:16px;font-size:14px;color:#9CA3AF;letter-spacing:2px;">正在加载游戏资源...</div>
+      </div>
+      <style>@keyframes ilp{0%,100%{transform:translateX(-100%)}50%{transform:translateX(200%)}}</style>
+    </div>
     <script type="module" src="/src/main.js"></script>
   </body>
 
