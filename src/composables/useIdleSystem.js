@@ -472,13 +472,21 @@ function cleanExpiredPillBuffs() {
   s.activePillBuffs = s.activePillBuffs.filter(buff => buff.expiresAt > now)
 }
 
-// 丹药 buff 加成：读取 playerStore 生效效果，同类型 value 累加，返回 1 + total
+// 丹药 buff 加成：读取 playerStore 生效效果，同类型 value 累加并封顶，返回 1 + total
+// P0-B：原实现纯加法无封顶，玩家可囤药击穿经济。现对每类增益封顶 +100%（即最大 2 倍）。
+const PILL_BUFF_CAPS = {
+  spiritStoneRate: 1.0,
+  cultivationRate: 1.0,
+  dropRate: 1.0,
+  expGain: 1.0
+}
 function getPillBuffMultiplier(type) {
   const s = store()
   cleanExpiredPillBuffs()
   const effects = s.getActivePillEffects ? s.getActivePillEffects() : []
   const total = effects.filter(e => e.type === type).reduce((sum, e) => sum + (e.value || 0), 0)
-  return 1 + total
+  const cap = PILL_BUFF_CAPS[type] ?? 2.0
+  return 1 + Math.min(cap, total)
 }
 
 let idleInterval = null

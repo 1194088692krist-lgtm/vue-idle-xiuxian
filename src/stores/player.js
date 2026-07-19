@@ -411,25 +411,19 @@ export const usePlayerStore = defineStore('player', {
       return (this.materials || []).filter(m => m.kind === 'herb')
     },
     // 临时增益聚合（悟道丹修为加成 / 寻宝丹掉落加成），仅统计未过期项
+    // P2-A：原 getter 双读 pillEffects + activePillBuffs，会与 P0-B 的"同步刷新"逻辑重复计数。
+    // 现统一只读 activePillBuffs（pillEffects 已无写入路径，仅旧存档兼容字段）
     expBonus() {
       const now = Date.now()
-      const fromOld = (this.pillEffects || [])
-        .filter(e => e.type === 'expGain' && e.endTime > now)
-        .reduce((s, e) => s + (e.value || 0), 0)
-      const fromNew = (this.activePillBuffs || [])
+      return (this.activePillBuffs || [])
         .filter(e => e.type === 'expGain' && e.expiresAt > now)
         .reduce((s, e) => s + (e.value || 0), 0)
-      return fromOld + fromNew
     },
     dropBonus() {
       const now = Date.now()
-      const fromOld = (this.pillEffects || [])
-        .filter(e => e.type === 'dropRate' && e.endTime > now)
-        .reduce((s, e) => s + (e.value || 0), 0)
-      const fromNew = (this.activePillBuffs || [])
+      return (this.activePillBuffs || [])
         .filter(e => e.type === 'dropRate' && e.expiresAt > now)
         .reduce((s, e) => s + (e.value || 0), 0)
-      return fromOld + fromNew
     }
   },
   actions: {
@@ -1242,53 +1236,6 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: `出售 ${sellCount} 个，获得 ${totalPrice} 灵石`, sellCount, totalPrice }
     },
-    // 清理过期临时增益
-    pruneExpiredEffects() {
-      const now = Date.now()
-      if (Array.isArray(this.pillEffects)) {
-        this.pillEffects = this.pillEffects.filter(e => (e.endTime || 0) > now)
-      }
-    },
-    // 应用丹药效果（按 baseEffect.type 分支）
-    applyPillEffect(effect) {
-      if (!effect) return { success: false, message: '无效丹药' }
-      const now = Date.now()
-      this.pruneExpiredEffects()
-      switch (effect.type) {
-        case 'permanentStat': {
-          // 永久提升基础属性并沉淀
-          const stat = effect.stat
-          const val = Math.round(effect.value)
-          if (this.permanentBonuses[stat] !== undefined) this.permanentBonuses[stat] += val
-          if (this.baseAttributes[stat] !== undefined) this.baseAttributes[stat] += val
-          return { success: true, message: `永久提升${stat} +${val}` }
-        }
-        case 'breakthroughRate':
-          this.breakthroughBonus = Math.min(0.9, this.breakthroughBonus + effect.value)
-          return { success: true, message: `突破成功率 +${Math.round(effect.value * 100)}%` }
-        case 'enhanceRate':
-          this.enhanceBonus = Math.min(0.9, this.enhanceBonus + effect.value)
-          return { success: true, message: `强化成功率 +${Math.round(effect.value * 100)}%` }
-        case 'reforgeSafe':
-          this.reforgeSafeCharges += Math.max(1, Math.round(effect.value))
-          return { success: true, message: `获得洗练保底 ${Math.max(1, Math.round(effect.value))} 次` }
-        case 'healBattle':
-        case 'cleanse':
-          // 进入战斗丹药队列，由战斗界面消耗
-          this.battlePills.push({ ...effect, uid: `${effect.type}_${now}_${Math.floor(Math.random() * 1e6)}`, used: false })
-          return { success: true, message: effect.type === 'healBattle' ? '疗伤丹已就绪（战斗中可使用）' : '解厄丹已就绪（战斗中可使用）' }
-        case 'expGain':
-        case 'dropRate':
-          // 临时增益，带过期时间
-          this.pillEffects.push({ ...effect, startTime: now, endTime: now + (effect.duration || 600) * 1000 })
-          return { success: true, message: effect.type === 'expGain' ? '修为获取提升' : '探索掉落提升' }
-        default:
-          // 原限时 buff 逻辑
-          this.activeEffects.push({ ...effect, startTime: now, endTime: now + (effect.duration || 0) * 1000 })
-          this.activeEffects = this.activeEffects.filter(e => e.endTime > now)
-          return { success: true, message: '使用丹药成功' }
-      }
-    },
     // 战斗界面消耗一枚战斗丹药，返回其效果供战斗逻辑使用
     consumeBattlePill(uid) {
       if (!Array.isArray(this.battlePills)) return null
@@ -1298,15 +1245,6 @@ export const usePlayerStore = defineStore('player', {
       this.battlePills.splice(idx, 1)
       this.queueSave()
       return p
-    },
-    // 使用物品（丹药或灵宠）
-    useItem(item) {
-      if (item.type === 'pill') {
-        return this.usePill(item)
-      } else if (item.type === 'pet') {
-        return this.usePet(item)
-      }
-      return { success: false, message: '无法使用该物品' }
     },
     // 出售装备（获得灵石，按装备评分折价）
     async sellEquipment(equipment) {
@@ -1590,58 +1528,6 @@ export const usePlayerStore = defineStore('player', {
       return {
         success: true,
         message: `成功出售 ${toSell.length} 件装备，获得 ${total} 灵石`
-      }
-    },
-    // 使用丹药
-    usePill(pill) {
-      if (pill.effect?.type === 'effortGain') {
-        return { success: false, message: '此丹药需指定角色服用' }
-      }
-      const res = this.applyPillEffect(pill.effect)
-      // 移除已使用的丹药
-      const index = this.items.findIndex(i => i.id === pill.id)
-      if (index > -1) {
-        this.items.splice(index, 1)
-        this.pillsConsumed++
-      }
-      this.queueSave()
-      return { success: true, message: res.message || '使用丹药成功' }
-    },
-    // 给指定角色服用丹药（主要用于努力值丹药）
-    usePillOnMember(pill, memberId) {
-      const member = this.sectMembers.find(m => m.id === memberId)
-      if (!member) return { success: false, message: '成员不存在' }
-      if (!pill.effect || pill.effect.type !== 'effortGain') {
-        return this.usePill(pill)
-      }
-      if (!member.star) member.star = 3
-      if (typeof member.effortValue !== 'number') member.effortValue = 0
-      if (typeof member.talentValue !== 'number') member.talentValue = 100
-      const gain = pill.effect.value || 0
-      const ignoreCap = pill.effect.ignoreCap
-      const cap = getEffortCap(member.star)
-      if (!ignoreCap && member.effortValue >= cap) {
-        return { success: false, message: `${member.name}的努力值已达上限` }
-      }
-      const oldValue = member.effortValue
-      let newValue = oldValue + gain
-      if (!ignoreCap) {
-        newValue = Math.min(newValue, cap)
-      }
-      const actualGain = Math.round(newValue - oldValue)
-      if (actualGain <= 0) {
-        return { success: false, message: '努力值没有提升' }
-      }
-      member.effortValue = Math.round(newValue)
-      const index = this.items.findIndex(i => i.id === pill.id)
-      if (index > -1) {
-        this.items.splice(index, 1)
-        this.pillsConsumed++
-      }
-      this.queueSave()
-      return {
-        success: true,
-        message: `${member.name}服用${pill.name}，根骨潜力+${actualGain}（${Math.round(oldValue)} → ${Math.round(newValue)}）`
       }
     },
     // 使用灵宠（出战/召回）
@@ -2075,6 +1961,9 @@ export const usePlayerStore = defineStore('player', {
       }
       let successCount = 0
       let failCount = 0
+      // P1-B：失败损失 50% 材料（向上取整），让"成功率"重新成为真实的代价杠杆
+      // （原实现失败不扣料，等于免费重试，让品阶难度形同虚设）
+      const FAILURE_LOSS_RATIO = 0.5
       for (let n = 0; n < count; n++) {
         const result = tryCreatePill(recipe, this.materials, this, fragments, this.luck * this.alchemyRate)
         if (result.success) {
@@ -2098,8 +1987,25 @@ export const usePlayerStore = defineStore('player', {
           this.ownedPills[recipeId].craftedAt = Date.now()
           this.pillsCrafted++
           successCount++
-        } else {
+        } else if (result.message === '炼制失败') {
+          // 仅"炼制失败"才扣料（"材料不足"不扣——根本没材料可扣）
           failCount++
+          recipe.materials.forEach(material => {
+            const kind = material.kind || 'herb'
+            const mid = material.id || material.herb
+            const loss = Math.ceil(material.count * FAILURE_LOSS_RATIO)
+            let remaining = loss
+            for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+              if (this.materials[i].kind === kind && this.materials[i].id === mid) {
+                this.materials.splice(i, 1)
+                remaining--
+              }
+            }
+          })
+        } else {
+          // 材料不足等其它原因：直接中止后续批量
+          failCount++
+          break
         }
       }
       if (successCount > 0) {
@@ -2116,18 +2022,6 @@ export const usePlayerStore = defineStore('player', {
         successCount,
         failCount
       }
-    },
-    // 使用丹药（与上方 usePill 统一逻辑）
-    useItem(item) {
-      if (item.type === 'pill') {
-        return this.usePill(item)
-      }
-      return false
-    },
-    // 获取当前有效的丹药效果
-    getActiveEffects() {
-      const now = Date.now()
-      return this.activeEffects.filter(effect => effect.endTime > now)
     },
     // 获取当前未过期的全局丹药 buff
     getActivePillEffects() {
@@ -2153,10 +2047,13 @@ export const usePlayerStore = defineStore('player', {
       const changes = []
       const statNameMap = { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }
 
-      const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain', 'combatBoost', 'allAttributes']
-      const memberTypes = ['permanentStat', 'permanentStatMulti', 'effortGain', 'healBattle', 'cleanse', 'autoHeal', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
+      const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain']
+      const memberTypes = ['permanentStat', 'permanentStatMulti', 'effortGain', 'healBattle', 'cleanse', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
 
       if (globalTypes.includes(baseEffect.type)) {
+        // P0-B：同类丹药改为"刷新而非叠加"——服用新 buff 前清除同类型旧 buff
+        // （否则玩家可囤药击穿封顶，与 getPillBuffMultiplier 的 Math.min 配合实现"以最新为准"）
+        this.activePillBuffs = (this.activePillBuffs || []).filter(b => b.type !== baseEffect.type)
         this.activePillBuffs.push({
           pillId,
           type: baseEffect.type,
@@ -2164,8 +2061,9 @@ export const usePlayerStore = defineStore('player', {
           expiresAt,
           scope: 'global'
         })
-        // 兼容旧 getter：expGain / dropRate 同时写入 pillEffects
+        // 兼容旧 getter：expGain / dropRate 同步刷新 pillEffects（先清后写，避免双写累积）
         if (baseEffect.type === 'expGain' || baseEffect.type === 'dropRate') {
+          this.pillEffects = (this.pillEffects || []).filter(e => e.type !== baseEffect.type)
           this.pillEffects.push({
             type: baseEffect.type,
             value: effect.value,
@@ -2177,9 +2075,7 @@ export const usePlayerStore = defineStore('player', {
           spiritStoneRate: '灵石获取',
           cultivationRate: '修炼速度',
           dropRate: '掉落加成',
-          expGain: '修为获取',
-          combatBoost: '战斗属性',
-          allAttributes: '全属性'
+          expGain: '修为获取'
         }
         const pct = Math.round(effect.value * 100)
         changes.push({
@@ -2211,38 +2107,55 @@ export const usePlayerStore = defineStore('player', {
         })
         // 即时生效逻辑
         switch (baseEffect.type) {
-          case 'permanentStat': {
-            const stat = effect.stat
-            const val = Math.round(effect.value)
-            if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
-            if (member.permanentBonuses[stat] !== undefined) member.permanentBonuses[stat] += val
-            const oldBase = member.baseStats?.[stat] || 0
-            if (member.baseStats && member.baseStats[stat] !== undefined) {
-              member.baseStats[stat] += val
-              changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + val, delta: val })
+          case 'permanentStat':
+          case 'permanentStatMulti': {
+            // P0-A：永久丹必须消耗"努力值预算"——这是星级稀有度的总闸门
+            // 5★ 无上限跳过；3★/4★ 校验 member.effortValue + cost <= cap
+            if (!member.star) member.star = 3
+            if (typeof member.effortValue !== 'number') member.effortValue = 0
+            const effortCost = effect.effortCost || 0
+            const cap = getEffortCap(member.star)
+            if (effortCost > 0 && member.effortValue + effortCost > cap) {
+              window.$message?.error(`${member.name}的努力值不足（${member.effortValue}/${cap}，需要 ${effortCost}）`)
+              return { success: false, message: '努力值不足（受星级上限限制）' }
+            }
+            if (effortCost > 0) {
+              const oldEffort = member.effortValue
+              member.effortValue += effortCost
+              changes.push({ stat: '努力值', old: oldEffort, new: member.effortValue, delta: effortCost, note: `（占用 ${effortCost}）` })
+            }
+            if (baseEffect.type === 'permanentStat') {
+              const stat = effect.stat
+              const val = Math.round(effect.value)
+              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+              if (member.permanentBonuses[stat] !== undefined) member.permanentBonuses[stat] += val
+              const oldBase = member.baseStats?.[stat] || 0
+              if (member.baseStats && member.baseStats[stat] !== undefined) {
+                member.baseStats[stat] += val
+                changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + val, delta: val })
+              }
+            } else {
+              // permanentStatMulti：仙灵丹/五行丹一次性永久提升多属性
+              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+              if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+              const stats = effect.stats || baseEffect.stats || {}
+              Object.entries(stats).forEach(([stat, val]) => {
+                const roundedVal = Math.round(val)
+                if (roundedVal <= 0) return
+                const oldBase = member.baseStats[stat] || 0
+                member.baseStats[stat] = oldBase + roundedVal
+                if (member.permanentBonuses[stat] !== undefined) {
+                  member.permanentBonuses[stat] += roundedVal
+                } else {
+                  member.permanentBonuses[stat] = roundedVal
+                }
+                changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + roundedVal, delta: roundedVal })
+              })
             }
             break
           }
-          case 'permanentStatMulti': {
-            // 仙灵丹/五行丹：一次性永久提升多种属性
-            if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
-            if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
-            const stats = effect.stats || baseEffect.stats || {}
-            Object.entries(stats).forEach(([stat, val]) => {
-              const roundedVal = Math.round(val)
-              if (roundedVal <= 0) return
-              const oldBase = member.baseStats[stat] || 0
-              member.baseStats[stat] = oldBase + roundedVal
-              if (member.permanentBonuses[stat] !== undefined) {
-                member.permanentBonuses[stat] += roundedVal
-              } else {
-                member.permanentBonuses[stat] = roundedVal
-              }
-              changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + roundedVal, delta: roundedVal })
-            })
-            break
-          }
           case 'effortGain': {
+            // 培元丹系列：作为"努力值来源"，受 cap 约束（与永久丹消费方向相反）
             if (!member.star) member.star = 3
             if (typeof member.effortValue !== 'number') member.effortValue = 0
             const gain = effect.value || 0
@@ -2262,7 +2175,7 @@ export const usePlayerStore = defineStore('player', {
             }
             member.effortValue = Math.round(newValue)
             changes.push({ stat: '努力值', old: Math.round(oldValue), new: Math.round(newValue), delta: actualGain })
-            // 直接属性增益
+            // 直接属性增益（培元丹附赠属性，不消耗 effort，由 effortGain 自身的发放预算承担）
             if (effect.extraStats) {
               if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
               Object.entries(effect.extraStats).forEach(([stat, val]) => {
@@ -2311,9 +2224,6 @@ export const usePlayerStore = defineStore('player', {
             changes.push({ stat: '洗练保底', old: oldVal, new: member.reforgeSafeCharges, delta: Math.max(1, Math.round(effect.value)) })
             break
           }
-          case 'autoHeal':
-            // 仅存入 member.activePills，由战斗系统后续读取
-            break
         }
       } else {
         // 未知类型默认全局

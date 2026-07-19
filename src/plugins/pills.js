@@ -11,12 +11,12 @@ export const pillGrades = {
   grade9: { name: '九品', difficulty: 6, successRate: 0.1 }
 }
 
-// 丹药类型
+// 丹药类型（仅用于界面分类展示；effectMultiplier 已移除，避免描述与实算不一致）
 export const pillTypes = {
-  spirit_stone: { name: '灵石类', effectMultiplier: 1 },
-  cultivation: { name: '修炼类', effectMultiplier: 1.2 },
-  attribute: { name: '属性类', effectMultiplier: 1.5 },
-  special: { name: '特殊类', effectMultiplier: 2 }
+  spirit_stone: { name: '灵石类' },
+  cultivation: { name: '修炼类' },
+  attribute: { name: '属性类' },
+  special: { name: '特殊类' }
 }
 
 // 根据品阶计算所需残页数量
@@ -90,7 +90,7 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
     // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
-    baseEffect: { type: 'permanentStatMulti', stats: { attack: 15, defense: 10, health: 50 }, duration: 0 }
+    baseEffect: { type: 'permanentStatMulti', stats: { attack: 15, defense: 10, health: 50 }, duration: 0, effortCost: 2 }
   },
   {
     id: 'five_elements_pill',
@@ -104,7 +104,7 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
     // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
-    baseEffect: { type: 'permanentStatMulti', stats: { attack: 30, defense: 20, health: 100, speed: 5 }, duration: 0 }
+    baseEffect: { type: 'permanentStatMulti', stats: { attack: 30, defense: 20, health: 100, speed: 5 }, duration: 0, effortCost: 3 }
   },
   {
     id: 'celestial_essence_pill',
@@ -231,7 +231,7 @@ export const pillRecipes = [
       { kind: 'ore', id: 'iron_essence', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade1'),
-    baseEffect: { type: 'permanentStat', stat: 'attack', value: 5, duration: 0 }
+    baseEffect: { type: 'permanentStat', stat: 'attack', value: 5, duration: 0, effortCost: 1 }
   },
   {
     id: 'forge_bone_pill',
@@ -245,7 +245,7 @@ export const pillRecipes = [
       { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
-    baseEffect: { type: 'permanentStat', stat: 'defense', value: 6, duration: 0 }
+    baseEffect: { type: 'permanentStat', stat: 'defense', value: 6, duration: 0, effortCost: 1 }
   },
   {
     id: 'heal_pill',
@@ -445,9 +445,9 @@ export const getZoneByPill = (pillId) => {
 }
 
 // 计算丹药实际效果（基于玩家境界）
+// 注意：value 即为 description 显示值，不再乘 type.effectMultiplier，确保"所见即所得"
 export const calculatePillEffect = (recipe, playerLevel) => {
   const grade = pillGrades[recipe.grade]
-  const type = pillTypes[recipe.type]
   // 数值类丹药（努力值、永久属性、战斗回血等）不受境界缩放，避免夸张
   const fixedValueTypes = ['effortGain', 'permanentStat', 'permanentStatMulti', 'healBattle', 'cleanse', 'reforgeSafe', 'breakthroughRate', 'enhanceRate']
   const isFixed = fixedValueTypes.includes(recipe.baseEffect.type)
@@ -455,9 +455,12 @@ export const calculatePillEffect = (recipe, playerLevel) => {
   return {
     type: recipe.baseEffect.type,
     stat: recipe.baseEffect.stat,
-    value: recipe.baseEffect.value * type.effectMultiplier * levelMultiplier,
+    value: (recipe.baseEffect.value || 0) * levelMultiplier,
+    stats: recipe.baseEffect.stats, // permanentStatMulti 的多属性直接透传，不受 multiplier 影响
     duration: recipe.baseEffect.duration || 0,
     successRate: grade.successRate,
+    effortCost: recipe.baseEffect.effortCost || 0, // 永久丹消耗的努力值预算
+    ignoreCap: recipe.baseEffect.ignoreCap || false,
     extraStats: recipe.baseEffect.extraStats || null
   }
 }
