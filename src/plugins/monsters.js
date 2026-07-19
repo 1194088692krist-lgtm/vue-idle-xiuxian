@@ -1,7 +1,12 @@
 // 怪物头像与立绘系统
 // 与人物系统相同的架构：public/monsters/ 目录存放资源，manifest.json 管理映射
+// 注意：manifest 数据已内联到 JS bundle（import monsterManifestData），不依赖网络 fetch
+// 修复「GitHub Pages 网络慢导致 manifest fetch 失败，怪物头像/立绘永远显示 emoji」的 bug
 
 import { ref } from 'vue'
+// 直接 import JSON：Vite 会把 manifest 打包进 JS bundle，加载时同步可用，永不失败
+// 之前用 fetch 加载 manifest.json，网络慢时 fetch 失败会 catch 为 {} 且永不重试
+import monsterManifestData from '../data/monster-manifest.json'
 
 // 使用 BASE_URL（与角色立绘一致），保证 GitHub Pages 子路径部署也能正确解析
 const MONSTER_ASSETS_BASE = (import.meta.env.BASE_URL || './') + 'monsters/'
@@ -11,28 +16,15 @@ function safeFileName(name) {
   return name.replace(/[\/\\:*?"<>|]/g, '_')
 }
 
-// 怪物资源信息缓存（响应式 ref：manifest 加载完后递增 version 触发依赖更新）
-// 解决「manifest 异步加载完前 getMonsterAvatarSync 返回 emoji，之后不更新」的 bug
-export const monsterManifest = ref({})
-export const monsterManifestVersion = ref(0)
-let manifestPromise = null
+// 怪物资源信息（响应式 ref：内联数据初始化，无需异步加载）
+// 保留 monsterManifestVersion 用于兼容旧代码（BattleStage.vue 中的 computed 依赖它）
+// 虽然不再需要递增触发更新（数据已同步可用），但保留 ref 避免破坏现有依赖
+export const monsterManifest = ref(monsterManifestData || {})
+export const monsterManifestVersion = ref(1)
 
+// 兼容函数：数据已加载，直接返回（保留函数签名以兼容旧调用）
 async function loadMonsterManifest() {
-  if (monsterManifest.value && Object.keys(monsterManifest.value).length) return monsterManifest.value
-  if (manifestPromise) return manifestPromise
-  manifestPromise = fetch(`${MONSTER_ASSETS_BASE}manifest.json`, { cache: 'force-cache' })
-    .then(r => r.ok ? r.json() : {})
-    .then(data => {
-      monsterManifest.value = data || {}
-      // 递增版本号，让所有依赖 monsterManifestVersion 的 computed 重新计算
-      monsterManifestVersion.value++
-      return data
-    })
-    .catch(() => {
-      monsterManifest.value = {}
-      return {}
-    })
-  return manifestPromise
+  return monsterManifest.value
 }
 
 // 获取怪物头像 URL
@@ -270,5 +262,4 @@ export function getMonsterPromptsByZone(zoneId) {
   })).filter(item => item.thumbnail && item.portrait)
 }
 
-// 模块加载即预取怪物立绘 manifest，确保同步接口 getMonsterAvatarSync 在战斗开始前已可用
-loadMonsterManifest()
+// manifest 已通过 import 内联到 JS bundle，无需模块加载时预取

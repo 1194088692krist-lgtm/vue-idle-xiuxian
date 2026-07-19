@@ -439,6 +439,7 @@ import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 import { formatNumber } from '../utils/formatNumber.js'
+import { getIconUrl } from '../plugins/icons'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
@@ -561,18 +562,18 @@ const resonanceDesc = computed(() => {
 const slotNames = { head:'头部', body:'衣服', legs:'裤子', feet:'鞋子', shoulder:'肩甲', hands:'手套', wrist:'护腕', necklace:'项链', ring1:'戒指1', ring2:'戒指2', belt:'腰带', artifact:'法宝' }
 const slots = Object.keys(slotNames)
 const slotBgImages = {
-  head: '/assets/icons/reward_eq_head.png',
-  body: '/assets/icons/reward_eq_body.png',
-  legs: '/assets/icons/reward_eq_legs.png',
-  feet: '/assets/icons/reward_eq_feet.png',
-  shoulder: '/assets/icons/reward_eq_shoulder.png',
-  hands: '/assets/icons/reward_eq_wrist.png',
-  wrist: '/assets/icons/reward_eq_wrist.png',
-  necklace: '/assets/icons/reward_eq_necklace.png',
-  ring1: '/assets/icons/reward_eq_ring.png',
-  ring2: '/assets/icons/reward_eq_ring.png',
-  belt: '/assets/icons/reward_eq_belt.png',
-  artifact: '/assets/icons/reward_eq_artifact.png'
+  head: getIconUrl('reward_eq_head.png'),
+  body: getIconUrl('reward_eq_body.png'),
+  legs: getIconUrl('reward_eq_legs.png'),
+  feet: getIconUrl('reward_eq_feet.png'),
+  shoulder: getIconUrl('reward_eq_shoulder.png'),
+  hands: getIconUrl('reward_eq_wrist.png'),
+  wrist: getIconUrl('reward_eq_wrist.png'),
+  necklace: getIconUrl('reward_eq_necklace.png'),
+  ring1: getIconUrl('reward_eq_ring.png'),
+  ring2: getIconUrl('reward_eq_ring.png'),
+  belt: getIconUrl('reward_eq_belt.png'),
+  artifact: getIconUrl('reward_eq_artifact.png')
 }
 
 const rarityColorMap = {

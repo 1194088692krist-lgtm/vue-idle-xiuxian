@@ -926,6 +926,7 @@ import { formatNumber } from '../utils/formatNumber.js'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getPillsByZone } from '../plugins/pills'
 import { BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
+import { getIconUrl } from '../plugins/icons'
 import BattleStage from './BattleStage.vue'
 
 // 装备槽位中文映射（结算栏装备展示用）
@@ -1226,20 +1227,20 @@ const getZoneIcon = (id) => {
 }
 
 const EQUIP_ICON_MAP = {
-  head: '/assets/icons/reward_eq_head.png',
-  body: '/assets/icons/reward_eq_body.png',
-  legs: '/assets/icons/reward_eq_legs.png',
-  feet: '/assets/icons/reward_eq_feet.png',
-  shoulder: '/assets/icons/reward_eq_shoulder.png',
-  hands: '/assets/icons/reward_eq_wrist.png',
-  wrist: '/assets/icons/reward_eq_wrist.png',
-  necklace: '/assets/icons/reward_eq_necklace.png',
-  ring1: '/assets/icons/reward_eq_ring.png',
-  ring2: '/assets/icons/reward_eq_ring.png',
-  belt: '/assets/icons/reward_eq_belt.png',
-  artifact: '/assets/icons/reward_eq_artifact.png',
-  equipment: '/assets/icons/reward_eq_default.png',
-  pet: '/assets/icons/reward_pet.png'
+  head: getIconUrl('reward_eq_head.png'),
+  body: getIconUrl('reward_eq_body.png'),
+  legs: getIconUrl('reward_eq_legs.png'),
+  feet: getIconUrl('reward_eq_feet.png'),
+  shoulder: getIconUrl('reward_eq_shoulder.png'),
+  hands: getIconUrl('reward_eq_wrist.png'),
+  wrist: getIconUrl('reward_eq_wrist.png'),
+  necklace: getIconUrl('reward_eq_necklace.png'),
+  ring1: getIconUrl('reward_eq_ring.png'),
+  ring2: getIconUrl('reward_eq_ring.png'),
+  belt: getIconUrl('reward_eq_belt.png'),
+  artifact: getIconUrl('reward_eq_artifact.png'),
+  equipment: getIconUrl('reward_eq_default.png'),
+  pet: getIconUrl('reward_pet.png')
 }
 
 const EQUIP_EMOJI_MAP = {
@@ -1260,14 +1261,14 @@ const EQUIP_EMOJI_MAP = {
 }
 
 const REWARD_TYPE_ICON_MAP = {
-  spirit_stone: '/assets/icons/reward_eq_default.png',
-  herb: '/assets/icons/reward_mat_herb.png',
-  ore: '/assets/icons/reward_mat_ore.png',
-  liquid: '/assets/icons/reward_mat_liquid.png',
-  fortune: '/assets/icons/reward_mat_core.png',
-  cultivation: '/assets/icons/reward_eq_default.png',
-  equipment: '/assets/icons/reward_eq_default.png',
-  pet: '/assets/icons/reward_pet.png'
+  spirit_stone: getIconUrl('reward_eq_default.png'),
+  herb: getIconUrl('reward_mat_herb.png'),
+  ore: getIconUrl('reward_mat_ore.png'),
+  liquid: getIconUrl('reward_mat_liquid.png'),
+  fortune: getIconUrl('reward_mat_core.png'),
+  cultivation: getIconUrl('reward_eq_default.png'),
+  equipment: getIconUrl('reward_eq_default.png'),
+  pet: getIconUrl('reward_pet.png')
 }
 
 const REWARD_TYPE_NAME_MAP = {
@@ -1286,7 +1287,7 @@ const getRewardTypeName = (type, name) => {
 }
 
 const getEquipIcon = (slot) => {
-  return EQUIP_ICON_MAP[slot] || '/assets/icons/reward_eq_default.png'
+  return EQUIP_ICON_MAP[slot] || getIconUrl('reward_eq_default.png')
 }
 
 const getEquipEmoji = (slot) => {
@@ -1294,7 +1295,7 @@ const getEquipEmoji = (slot) => {
 }
 
 const getRewardIcon = (type) => {
-  return REWARD_TYPE_ICON_MAP[type] || '/assets/icons/reward_eq_default.png'
+  return REWARD_TYPE_ICON_MAP[type] || getIconUrl('reward_eq_default.png')
 }
 
 const getZonePillNames = (zoneId) => {

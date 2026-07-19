@@ -10,6 +10,7 @@ import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByB
 import { getCharacterThumbnail } from '../plugins/characters'
 import { getInitialSkills } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
+import { getIconUrl } from '../plugins/icons'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
 import { triggerRandomEvent } from '../plugins/events'
 
@@ -101,15 +102,15 @@ const bossChallengeSummary = ref(null)        // 全部挑战结束后的总结�
 // 已在发放时按其本身 kind 累计到对应类别（herb/ore/liquid/special），不再单独存在
 const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal', 'boss_material', 'boss_ticket']
 const MATERIAL_DISPLAY = {
-  herb: { name: '灵草', icon: '/assets/icons/reward_mat_herb.png' },
-  ore: { name: '矿料', icon: '/assets/icons/reward_mat_ore.png' },
-  liquid: { name: '灵液', icon: '/assets/icons/reward_mat_liquid.png' },
-  core: { name: '妖兽内丹', icon: '/assets/icons/reward_mat_core.png' },
-  special: { name: '至宝', icon: '/assets/icons/reward_mat_core.png' },
-  pet_fragment: { name: '升星碎片', icon: '/assets/icons/reward_mat_pet_fragment.png' },
-  phantom_crystal: { name: '幻灵结晶', icon: '/assets/icons/reward_mat_phantom_crystal.png' },
-  boss_material: { name: 'BOSS素材', icon: '/assets/icons/reward_mat_core.png' },
-  boss_ticket: { name: '挑战券', icon: '/assets/icons/reward_mat_core.png' }
+  herb: { name: '灵草', icon: getIconUrl('reward_mat_herb.png') },
+  ore: { name: '矿料', icon: getIconUrl('reward_mat_ore.png') },
+  liquid: { name: '灵液', icon: getIconUrl('reward_mat_liquid.png') },
+  core: { name: '妖兽内丹', icon: getIconUrl('reward_mat_core.png') },
+  special: { name: '至宝', icon: getIconUrl('reward_mat_core.png') },
+  pet_fragment: { name: '升星碎片', icon: getIconUrl('reward_mat_pet_fragment.png') },
+  phantom_crystal: { name: '幻灵结晶', icon: getIconUrl('reward_mat_phantom_crystal.png') },
+  boss_material: { name: 'BOSS素材', icon: getIconUrl('reward_mat_core.png') },
+  boss_ticket: { name: '挑战券', icon: getIconUrl('reward_mat_core.png') }
 }
 // 将一次遭遇的奖励累计进本次挂机素材统计
 // 支持 reward.type 字段（如 herb/ore/liquid/phantom_crystal）以及 material 对象的 kind 字段
@@ -1707,21 +1708,20 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
     rewards.push({ type: 'pet_fragment', amount: fragmentAmount, name: '升星碎片' })
   }
 
-  // 通关灭世难度有概率解锁丹方
-  if (diff >= 5 && Math.random() < 0.15) {
+  // 通关灭世难度：一次性解锁该秘境所有未解锁丹方
+  // 修复「通关迷雾谷灭世后只解锁培元丹，其他 5 个丹方未解锁」的问题
+  // 之前逻辑：15% 概率触发 + 随机选 1 个解锁，导致通关多次仍可能只解锁 1 个
+  // 新逻辑：通关灭世直接解锁该秘境所有未解锁丹方，符合「通关最高难度」的奖励期望
+  if (diff >= 5) {
     const pills = getPillsByZone(effectiveZone.id)
-    if (pills.length > 0) {
-      const lockedPills = pills.filter(p => !s.pillRecipes.includes(p.id))
-      if (lockedPills.length > 0) {
-        const pill = lockedPills[Math.floor(Math.random() * lockedPills.length)]
+    const lockedPills = pills.filter(p => !s.pillRecipes.includes(p.id))
+    for (const pill of lockedPills) {
+      // 给足够多残页直接合成解锁（灭世难度奖励）
+      const fragmentsNeeded = pill.fragmentsNeeded || 10
+      for (let i = 0; i < fragmentsNeeded; i++) {
         s.gainPillFragment(pill.id)
-        // 给足够多的残页直接解锁（灭世难度奖励）
-        const fragmentsNeeded = pill.fragmentsNeeded || 10
-        for (let i = 0; i < fragmentsNeeded; i++) {
-          s.gainPillFragment(pill.id)
-        }
-        rewards.push({ type: 'pill_recipe', name: pill.name + '丹方', amount: 1 })
       }
+      rewards.push({ type: 'pill_recipe', name: pill.name + '丹方', amount: 1 })
     }
   }
 
@@ -1806,32 +1806,32 @@ async function runManualBattle(effectiveZone) {
 
 // ============ 宝物高亮弹窗 ============
 let flashTimer = null
-// 奖励类型对应图标路径
+// 奖励类型对应图标路径（通过 icons.js 统一获取，已内联为 base64 data URI）
 const REWARD_ICON_MAP = {
-  head: '/assets/icons/reward_eq_head.png',
-  body: '/assets/icons/reward_eq_body.png',
-  legs: '/assets/icons/reward_eq_legs.png',
-  feet: '/assets/icons/reward_eq_feet.png',
-  shoulder: '/assets/icons/reward_eq_shoulder.png',
-  hands: '/assets/icons/reward_eq_wrist.png',
-  wrist: '/assets/icons/reward_eq_wrist.png',
-  necklace: '/assets/icons/reward_eq_necklace.png',
-  ring1: '/assets/icons/reward_eq_ring.png',
-  ring2: '/assets/icons/reward_eq_ring.png',
-  belt: '/assets/icons/reward_eq_belt.png',
-  artifact: '/assets/icons/reward_eq_artifact.png',
-  equipment: '/assets/icons/reward_eq_default.png',
-  pet: '/assets/icons/reward_pet.png',
-  herb: '/assets/icons/reward_mat_herb.png',
-  ore: '/assets/icons/reward_mat_ore.png',
-  liquid: '/assets/icons/reward_mat_liquid.png',
-  core: '/assets/icons/reward_mat_core.png',
-  pet_fragment: '/assets/icons/reward_mat_pet_fragment.png',
-  phantom_crystal: '/assets/icons/reward_mat_phantom_crystal.png',
-  monster: '/assets/icons/reward_monster.png',
-  spirit_stone: '/assets/icons/reward_eq_default.png',
-  cultivation: '/assets/icons/reward_eq_default.png',
-  fortune: '/assets/icons/reward_eq_default.png'
+  head: getIconUrl('reward_eq_head.png'),
+  body: getIconUrl('reward_eq_body.png'),
+  legs: getIconUrl('reward_eq_legs.png'),
+  feet: getIconUrl('reward_eq_feet.png'),
+  shoulder: getIconUrl('reward_eq_shoulder.png'),
+  hands: getIconUrl('reward_eq_wrist.png'),
+  wrist: getIconUrl('reward_eq_wrist.png'),
+  necklace: getIconUrl('reward_eq_necklace.png'),
+  ring1: getIconUrl('reward_eq_ring.png'),
+  ring2: getIconUrl('reward_eq_ring.png'),
+  belt: getIconUrl('reward_eq_belt.png'),
+  artifact: getIconUrl('reward_eq_artifact.png'),
+  equipment: getIconUrl('reward_eq_default.png'),
+  pet: getIconUrl('reward_pet.png'),
+  herb: getIconUrl('reward_mat_herb.png'),
+  ore: getIconUrl('reward_mat_ore.png'),
+  liquid: getIconUrl('reward_mat_liquid.png'),
+  core: getIconUrl('reward_mat_core.png'),
+  pet_fragment: getIconUrl('reward_mat_pet_fragment.png'),
+  phantom_crystal: getIconUrl('reward_mat_phantom_crystal.png'),
+  monster: getIconUrl('reward_monster.png'),
+  spirit_stone: getIconUrl('reward_eq_default.png'),
+  cultivation: getIconUrl('reward_eq_default.png'),
+  fortune: getIconUrl('reward_eq_default.png')
 }
 
 // 奖励类型对应 emoji
@@ -2089,7 +2089,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
 
     for (const r of bossMaterialRewards) {
       addLog('drop-rare', '', null, null, [
-        { icon: '/assets/icons/reward_mat_core.png', text: '' },
+        { icon: getIconUrl('reward_mat_core.png'), text: '' },
         { icon: null, text: `获得 BOSS 素材【${r.name}】！此乃 ${enemy.name} 身上的珍贵材料，极为稀有！` }
       ])
       showTreasureFlash(r)
@@ -2097,7 +2097,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
 
     for (const r of fortuneRewards) {
       addLog('fortune', '', null, null, [
-        { icon: '/assets/icons/reward_mat_core.png', text: '' },
+        { icon: getIconUrl('reward_mat_core.png'), text: '' },
         { icon: null, text: pick(FORTUNE_LINES)(r.material?.name || r.name) }
       ])
       showTreasureFlash(r)
@@ -2106,7 +2106,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
     if (materialRewards.length > 0 || currencyRewards.length > 0) {
       const materialParts = []
       for (const r of materialRewards) {
-        const iconUrls = { herb: '/assets/icons/reward_mat_herb.png', ore: '/assets/icons/reward_mat_ore.png', liquid: '/assets/icons/reward_mat_liquid.png', core: '/assets/icons/reward_mat_core.png', pet_fragment: '/assets/icons/reward_mat_pet_fragment.png', phantom_crystal: '/assets/icons/reward_mat_phantom_crystal.png' }
+        const iconUrls = { herb: getIconUrl('reward_mat_herb.png'), ore: getIconUrl('reward_mat_ore.png'), liquid: getIconUrl('reward_mat_liquid.png'), core: getIconUrl('reward_mat_core.png'), pet_fragment: getIconUrl('reward_mat_pet_fragment.png'), phantom_crystal: getIconUrl('reward_mat_phantom_crystal.png') }
         const names = { herb: '灵草', ore: '矿料', liquid: '灵液', core: '妖兽内丹', pet_fragment: '升星碎片', phantom_crystal: '幻灵结晶' }
         materialParts.push({ icon: iconUrls[r.type], text: `${r.amount} ${names[r.type] || r.name}` })
       }

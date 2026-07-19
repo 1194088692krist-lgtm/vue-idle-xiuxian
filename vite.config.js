@@ -29,6 +29,9 @@ export default defineConfig({
     outDir: 'docs',
     minify: 'terser',
     chunkSizeWarningLimit: 800,
+    // 素材/装备图标已压缩到 3-7KB（96x96），内联为 base64 避免每次渲染都发网络请求
+    // 修复「素材图标加载延迟非常大」的问题：内联后图标随 JS bundle 一次性加载，0 网络请求
+    assetsInlineLimit: 8192,
     rollupOptions: {
       output: {
         manualChunks: id => {
