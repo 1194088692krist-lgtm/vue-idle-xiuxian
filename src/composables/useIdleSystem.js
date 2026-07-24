@@ -1043,9 +1043,9 @@ function createPlayerEntity() {
 }
 
 // BOSS 整体实力倍率：统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度）
-// 平衡修复：原值 1.8 与 LATE_ZONE_ENEMY_MULT 叠加后让后期 BOSS 实际强度是显示值的 3 倍以上，
-// 且推荐 Build 基于未强化的 boss 算出，导致匹配度严重失真。降至 1.3，配合减伤公式修正。
-const BOSS_POWER_MULTIPLIER = 1.3
+// 平衡修复（v2）：原 1.8 倍 + LATE_ZONE_ENEMY_MULT 让 BOSS 过强，玩家 build 133% 仍打不过首轮。
+// 降至 1.2，配合 HP 公式调整让 BOSS 战更可控（HP 和 DEF 用此倍率，ATK 已单独基于 recommendedStats.health）
+const BOSS_POWER_MULTIPLIER = 1.2
 
 // 后期秘境额外强化系数（小怪与 BOSS 共用）
 // 平衡修复：温和化后期强化曲线，避免数值膨胀过快导致脱节

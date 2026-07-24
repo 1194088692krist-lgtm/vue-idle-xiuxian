@@ -12,19 +12,18 @@ export const DIFFICULTY_TEMPLATES = [
 ]
 
 // 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
-// 平衡修复：原值基于未强化的 boss 基础属性，但实际战斗中 boss 会被 BOSS_POWER_MULTIPLIER(1.3)
-// 和 LATE_ZONE_ENEMY_MULT(1.0~2.0) 双重强化，导致推荐值严重偏低、匹配度失真。
-// 现按 boss 实际战斗强度（base × 1.3 × lateMult）反推，100% 匹配 ≈ 能在 5 回合内打败凶险档 boss。
+// 平衡修复（v2）：配合 getCharacterBuildStrength 权重调整（主属性权重提高、人物占比 40%→55%），
+// 推荐 Build 同步下调，让 100% 匹配 = 能勉强击杀首轮 BOSS，133%+ 能稳定挂机通关。
 // 玩家挂机的“成功/提前失败”即以「自身 Build 强度 ÷ 推荐 Build」为判定基准
 const ZONE_BUILD_BASE = {
-  forest_edge: 10000,      // boss 实际 HP≈1040/ATK≈130（×1.3），新手起步
-  misty_valley: 40000,     // boss 实际 HP≈5850/ATK≈364（×1.3），初阶装备
-  phoenix_cave: 130000,    // boss 实际 HP≈18200/ATK≈2150（×1.3×1.10），≈入门级满装
-  dragon_abyss: 350000,    // boss 实际 HP≈51500/ATK≈4680（×1.3×1.20），中阶装备
-  ghost_wasteland: 1500000, // boss 实际 HP≈245700/ATK≈21060（×1.3×1.35），≈强力级
-  ice_palace: 2500000,     // boss 实际 HP≈468000/ATK≈54600（×1.3×1.50），强力到顶级之间
-  immortal_ruins: 7000000, // boss 实际 HP≈1326000/ATK≈154700（×1.3×1.70），≈顶级
-  chaos_realm: 28000000    // boss 实际 HP≈5720000/ATK≈650000（×1.3×2.00），顶级到极限之间
+  forest_edge: 6000,
+  misty_valley: 25000,
+  phoenix_cave: 80000,
+  dragon_abyss: 200000,
+  ghost_wasteland: 800000,
+  ice_palace: 1500000,
+  immortal_ruins: 4000000,
+  chaos_realm: 18000000
 }
 
 // Build 强度参考阶梯（区间）：极品中的极品过于稀有，故给玩家一个“可达成的上限”参考

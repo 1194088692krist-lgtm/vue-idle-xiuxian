@@ -2596,15 +2596,19 @@ export const usePlayerStore = defineStore('player', {
       return Math.round(baseTotal * resonanceMultiplier)
     },
     // 获取单个角色的Build强度
-    // 人物强度占40%，装备强度占60%
+    // 平衡修复（v2）：原公式装备占 60%，但装备评分被小数值百分比词条（critRate/combatBoost 等
+    // value 仅 0.05~0.3 的词条每条 × 300 分）虚高堆分，导致 build 133% 的玩家实际攻击力不够破防。
+    // 现调整：人物基础属性（attack/health/defense/speed）占 55%，装备占 45%，
+    // 让 build 更忠实反映"能造成多少伤害/能扛多久"，而非"堆了多少词条"。
     getCharacterBuildStrength(character) {
       if (!character) return 0
       const effStats = getEffectiveBaseStats(character)
       const ts = character.talentStats || {}
-      const charBaseScore = ((effStats.attack || 0) + (ts.attack || 0)) * 5 +
-                        ((effStats.health || 0) + (ts.health || 0)) * 0.5 +
-                        ((effStats.defense || 0) + (ts.defense || 0)) * 3 +
-                        ((effStats.speed || 0) + (ts.speed || 0)) * 8
+      // 主属性权重提高：attack 从 5→8、health 从 0.5→0.8、defense 从 3→5、speed 从 8→12
+      const charBaseScore = ((effStats.attack || 0) + (ts.attack || 0)) * 8 +
+                        ((effStats.health || 0) + (ts.health || 0)) * 0.8 +
+                        ((effStats.defense || 0) + (ts.defense || 0)) * 5 +
+                        ((effStats.speed || 0) + (ts.speed || 0)) * 12
       let equipScore = 0
       const artifacts = character.equippedArtifacts || {}
       Object.values(artifacts).forEach(eq => {
@@ -2614,7 +2618,7 @@ export const usePlayerStore = defineStore('player', {
       let petScore = 0
       if (character.equippedPet) {
         const ca = character.equippedPet.combatAttributes || {}
-        petScore = (ca.attack || 0) * 5 + (ca.health || 0) * 0.5 + (ca.defense || 0) * 3 + (ca.speed || 0) * 8
+        petScore = (ca.attack || 0) * 8 + (ca.health || 0) * 0.8 + (ca.defense || 0) * 5 + (ca.speed || 0) * 12
       }
       let setScore = 0
       const activeSets = getActiveSetBonuses(artifacts)
@@ -2645,7 +2649,8 @@ export const usePlayerStore = defineStore('player', {
       }
       const characterPower = charBaseScore + skillScore + petScore * 0.5
       const equipmentPower = equipScore + setScore
-      const totalPower = characterPower * 0.4 + equipmentPower * 0.6
+      // 人物占 55%（原 40%），装备占 45%（原 60%）
+      const totalPower = characterPower * 0.55 + equipmentPower * 0.45
       const levelMult = 1 + ((character.level || 1) - 1) * 0.02
       return Math.round(totalPower * levelMult)
     },
