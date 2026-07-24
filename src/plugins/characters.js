@@ -171,10 +171,35 @@ export async function initCharacterDefs() {
   // 注意：loadSharedPortraits 内部已用 fetch().then() 后台异步加载 manifest.json，
   //      不会阻塞本函数返回；此处不再 await，让游戏立即可用，立绘在后台填充。
   try { loadSharedPortraits() } catch (e) { /* 无共享包时静默降级 */ }
+  // 皮肤清单（立绘切换）：后台异步加载，不阻塞游戏加载
+  try { loadSkinsManifest() } catch (e) { /* 无皮肤包时静默降级 */ }
   return characterDefMap
 }
 
 export const sharedPortraitMap = reactive({})
+
+// 皮肤清单：记录每个角色拥有的皮肤数量（立绘弹窗切换用）
+export const skinMap = reactive({})
+let skinsLoaded = false
+
+// 后台异步加载 skins.json（不阻塞游戏加载），填充 skinMap
+// skins.json 形如 { "char_001": 2, ... }，值为该角色可用皮肤数（不含原立绘）
+export async function loadSkinsManifest() {
+  if (skinsLoaded) return
+  skinsLoaded = true
+  const base = import.meta.env.BASE_URL || './'
+  fetch(`${base}portraits/skins.json`, { cache: 'force-cache' })
+    .then(res => {
+      if (!res.ok) throw new Error(`HTTP ${res.status}`)
+      return res.json()
+    })
+    .then(map => {
+      if (map && typeof map === 'object') {
+        Object.entries(map).forEach(([id, count]) => { skinMap[id] = count })
+      }
+    })
+    .catch(e => console.warn('[skins] 加载 skins.json 失败，皮肤切换不可用:', e.message))
+}
 
 // 立绘资源加载状态：避免重复 fetch
 let portraitsLoaded = false
@@ -257,6 +282,30 @@ export function getCharacterAvatar(member, size = 'full') {
 
 export function getCharacterThumbnail(member) {
   return getCharacterAvatar(member, 'thumbnail')
+}
+
+/**
+ * 获取角色拥有的皮肤数量（不含原立绘）。0 表示无额外皮肤。
+ */
+export function getSkinCount(member) {
+  if (!member) return 0
+  const id = member.templateId || member.id
+  return skinMap[id] || 0
+}
+
+/**
+ * 获取指定皮肤（skin>=1）的立绘 URL。
+ * skin 超过该角色拥有的皮肤数时返回 null（调用方回退到原立绘）。
+ * 返回形如 `${base}portraits/char_0XX_skin{n}.jpg`
+ */
+export function getCharacterSkinUrl(member, skin) {
+  if (!member || !skin || skin < 1) return null
+  const id = member.templateId || member.id
+  if (!id) return null
+  const count = skinMap[id] || 0
+  if (skin > count) return null
+  const base = import.meta.env.BASE_URL || './'
+  return `${base}portraits/${id}_skin${skin}.jpg`
 }
 
 /**

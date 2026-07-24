@@ -13,9 +13,9 @@
             <img
               v-if="avatar"
               ref="imgEl"
-              :src="avatar"
+              :src="displaySrc"
               class="char-portrait-static"
-              :class="{ 'is-loaded': avatarLoaded, 'is-hidden': shouldShowVideo && videoReady }"
+              :class="{ 'is-loaded': avatarLoaded, 'is-hidden': videoVisible && videoReady }"
               alt="角色立绘"
               draggable="false"
               decoding="async"
@@ -33,7 +33,7 @@
                  2) 同时监听 loadeddata 与 canplay，尽早显示并播放；
                  3) 加载失败时带缓存破坏参数重试一次，应对偶发网络/解码失败。 -->
             <video
-              v-if="shouldShowVideo"
+              v-if="videoVisible"
               :key="videoReloadKey"
               ref="videoEl"
               class="char-portrait-video"
@@ -53,6 +53,11 @@
               @playing="onVideoPlaying"
               @error="onVideoError"
             ></video>
+            <!-- 皮肤切换（突破>=1 且拥有皮肤时显示左右箭头） -->
+            <button v-if="canSwitch" class="skin-arrow skin-arrow-left" @click.stop="prevSkin" aria-label="上一个皮肤">‹</button>
+            <button v-if="canSwitch" class="skin-arrow skin-arrow-right" @click.stop="nextSkin" aria-label="下一个皮肤">›</button>
+            <div v-if="canSwitch" class="skin-indicator">{{ skinLabel }}</div>
+            <div v-else-if="skinCount >= 2" class="skin-lock-hint">🔒 突破 1 次解锁皮肤切换</div>
           </div>
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
@@ -66,7 +71,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
-import { getCharacterAvatar, getCharacterVideo } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterVideo, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
 import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
@@ -91,6 +96,24 @@ const effectiveVideoSrc = computed(() =>
 )
 // 同时满足：动态效果开启 + 该角色配置了视频
 const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!effectiveVideoSrc.value)
+
+// ===== 皮肤切换 =====
+// 突破 >=1 次且角色拥有 >=2 张皮肤时，允许在 skin1 / skin2 之间左右切换
+const breakThrough = computed(() => (props.character && props.character.breakThrough) || 0)
+const skinCount = computed(() => getSkinCount(props.character))
+const canSwitch = computed(() => breakThrough.value >= 1 && skinCount.value >= 2)
+// currentSkin: 0 = 原立绘；1 = skin1；2 = skin2
+const currentSkin = ref(0)
+// 当前展示的立绘：选中皮肤则取皮肤图，否则回退原立绘
+const displaySrc = computed(() => {
+  if (currentSkin.value >= 1) {
+    const u = getCharacterSkinUrl(props.character, currentSkin.value)
+    if (u) return u
+  }
+  return avatar.value
+})
+// 动态视频仅原立绘（currentSkin===0）时播放
+const videoVisible = computed(() => currentSkin.value === 0 && shouldShowVideo.value)
 
 // 静态图加载完成回调
 const onAvatarLoad = () => {
@@ -155,26 +178,51 @@ onMounted(() => {
   if (imgEl.value && imgEl.value.complete) {
     avatarLoaded.value = true
   }
-  if (shouldShowVideo.value) {
+  if (videoVisible.value) {
     nextTick(() => requestAnimationFrame(tryPlay))
   }
 })
 
-// 切换角色 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
+// 切换角色 / 皮肤 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
 watch(
-  () => [props.character, shouldShowVideo.value, effectiveVideoSrc.value],
+  () => [props.character, currentSkin.value, videoVisible.value, effectiveVideoSrc.value],
   () => {
     videoReady.value = false
     avatarLoaded.value = false
     // 切换目标时清零重试状态，避免把上一次的重试参数带到新视频
     videoErrorRetries.value = 0
     videoReloadKey.value = 0
-    if (shouldShowVideo.value) {
+    if (videoVisible.value) {
       // 等待 video 元素渲染后再尝试播放
       nextTick(() => requestAnimationFrame(tryPlay))
     }
   }
 )
+
+// 角色或「可切换」状态变化时，重置当前皮肤：可切换则默认 skin1，否则原立绘
+watch(
+  () => [props.character, canSwitch.value],
+  () => { currentSkin.value = canSwitch.value ? 1 : 0 },
+  { immediate: true }
+)
+
+// 最大索引 = skinCount（0 原立绘 + skin1..skinN）
+const maxSkinIndex = computed(() => skinCount.value)
+const skinLabel = computed(() => {
+  if (currentSkin.value === 0) return '原立绘'
+  return `皮肤 ${currentSkin.value}/${skinCount.value}`
+})
+// 左右切换皮肤：循环 [0 原立绘, 1 skin1, 2 skin2, ...]
+const prevSkin = () => {
+  if (!canSwitch.value) return
+  currentSkin.value = currentSkin.value === 0 ? maxSkinIndex.value : currentSkin.value - 1
+  avatarLoaded.value = false
+}
+const nextSkin = () => {
+  if (!canSwitch.value) return
+  currentSkin.value = currentSkin.value === maxSkinIndex.value ? 0 : currentSkin.value + 1
+  avatarLoaded.value = false
+}
 
 onBeforeUnmount(() => {
   videoReady.value = false
@@ -283,6 +331,64 @@ onBeforeUnmount(() => {
 }
 .char-portrait-video.is-visible {
   opacity: 1;
+}
+/* 皮肤左右切换箭头 */
+.skin-arrow {
+  position: absolute;
+  top: 50%;
+  transform: translateY(-50%);
+  width: 44px;
+  height: 44px;
+  border-radius: 50%;
+  border: 2px solid rgba(218, 165, 32, 0.6);
+  background: rgba(13, 27, 42, 0.7);
+  color: #FFD700;
+  font-size: 28px;
+  line-height: 1;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  cursor: pointer;
+  z-index: 5;
+  user-select: none;
+  transition: background 0.2s ease, transform 0.15s ease;
+}
+.skin-arrow:hover {
+  background: rgba(218, 165, 32, 0.35);
+}
+.skin-arrow:active {
+  transform: translateY(-50%) scale(0.92);
+}
+.skin-arrow-left { left: 12px; }
+.skin-arrow-right { right: 12px; }
+/* 皮肤序号指示 */
+.skin-indicator {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 12px;
+  background: rgba(13, 27, 42, 0.7);
+  border: 1px solid rgba(218, 165, 32, 0.4);
+  color: #FFD700;
+  font-size: 14px;
+  letter-spacing: 1px;
+  z-index: 5;
+}
+/* 未突破时的锁定提示 */
+.skin-lock-hint {
+  position: absolute;
+  bottom: 12px;
+  left: 50%;
+  transform: translateX(-50%);
+  padding: 4px 14px;
+  border-radius: 12px;
+  background: rgba(13, 27, 42, 0.6);
+  border: 1px solid rgba(255, 255, 255, 0.15);
+  color: rgba(255, 255, 255, 0.7);
+  font-size: 13px;
+  z-index: 5;
 }
 .char-modal-footer {
   padding: 16px 20px 24px;

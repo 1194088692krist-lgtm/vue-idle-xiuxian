@@ -415,8 +415,15 @@
           </span>
         </div>
         <div class="simple-divider">基础属性</div>
-        <div v-for="(value, stat) in filteredEquipmentStats" :key="stat" class="detail-row">
-          <span>{{ getStatName(stat) }}</span><span>{{ formatStatValue(stat, value) }}</span>
+        <div class="detail-row stat-header">
+          <span class="stat-name">属性</span>
+          <span class="stat-base">基础</span>
+          <span class="stat-final">最终</span>
+        </div>
+        <div v-for="(value, stat) in filteredEquipmentStats" :key="stat" class="detail-row stat-row">
+          <span class="stat-name">{{ getStatName(stat) }}</span>
+          <span class="stat-base">{{ formatStatValue(stat, value) }}</span>
+          <span class="stat-final">{{ formatStatValue(stat, equipmentFinalStats[stat] ?? value) }}</span>
         </div>
         <div v-if="selectedEquipment.affixes && selectedEquipment.affixes.length > 0" class="affixes-section">
           <div class="simple-divider">词条</div>
@@ -727,7 +734,7 @@
 <script setup>
   import { usePlayerStore } from '../stores/player'
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
-  import { useMessage } from 'naive-ui'
+  import { useMessage, useDialog } from 'naive-ui'
   import { getStatName, formatStatValue } from '../plugins/stats'
   import { getRealmName } from '../plugins/realm'
   import { getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
@@ -735,7 +742,7 @@
   import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
   import { qualityTierLabel, qualityTierClass, bestAffixTier, bestAffixTierTag } from '../utils/affixQuality'
   import { craftCurrencies } from '../plugins/craftCurrency'
-  import { getRuneSynergy, RUNE_ELEMENTS } from '../plugins/runes'
+  import { getRuneSynergy, RUNE_ELEMENTS, getRuneStats } from '../plugins/runes'
 
   // 移动端适配
   const isMobile = ref(window.innerWidth <= 768)
@@ -783,6 +790,7 @@
 
   const playerStore = usePlayerStore()
   const message = useMessage()
+  const dialog = useDialog()
 
   // 素材分类
   const materialCategories = [
@@ -1476,17 +1484,43 @@
     return filteredEquipmentList.value.slice(start, end)
   })
 
-  // 批量卖出装备
+  // 批量卖出装备（先弹确认，防止误触）
   const batchSellEquipments = async () => {
-    const result = await playerStore.batchSellEquipments(
-      selectedQuality.value === 'all' ? null : selectedQuality.value,
-      selectedEquipmentType.value
-    )
-    if (result.success) {
-      message.success(result.message)
-    } else {
-      message.error(result.message || '批量卖出失败')
+    const count = filteredEquipmentList.value.length
+    if (count === 0) {
+      message.warning('当前筛选下没有可出售的装备')
+      return
     }
+    const qualityText =
+      selectedQuality.value === 'all' || !selectedQuality.value
+        ? '全部品质'
+        : selectedQuality.value
+    const typeText = !selectedEquipmentType.value
+      ? '全部类别'
+      : selectedEquipmentType.value === 'artifact'
+        ? '法宝'
+        : selectedEquipmentType.value === 'armor'
+          ? '防具'
+          : selectedEquipmentType.value === 'accessory'
+            ? '饰品'
+            : selectedEquipmentType.value
+    dialog.warning({
+      title: '确认一键出售',
+      content: `将按当前筛选（品质：${qualityText} / 类别：${typeText}）一次性出售 ${count} 件装备并折算为灵石。此操作不可撤销，确定继续吗？`,
+      positiveText: '确认出售',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        const result = await playerStore.batchSellEquipments(
+          selectedQuality.value === 'all' ? null : selectedQuality.value,
+          selectedEquipmentType.value
+        )
+        if (result.success) {
+          message.success(result.message)
+        } else {
+          message.error(result.message || '批量卖出失败')
+        }
+      }
+    })
   }
 
   // 装备按评分排序
@@ -1603,6 +1637,22 @@
       }
     })
     return result
+  })
+  // 基础属性经强化、词条、打造、灵纹后的最终数值
+  const equipmentFinalStats = computed(() => {
+    if (!selectedEquipment.value || !selectedEquipment.value.stats) return {}
+    const base = { ...selectedEquipment.value.stats }
+    const final = { ...base }
+    const apply = (stat, value, valueType) => {
+      if (final[stat] === undefined) final[stat] = 0
+      if (valueType === 'percent') final[stat] = final[stat] * (1 + value)
+      else final[stat] = final[stat] + value
+    }
+    // 词条（含打造后的结果）
+    ;(selectedEquipment.value.affixes || []).forEach(a => apply(a.stat, a.value, a.valueType))
+    // 灵纹 + 共鸣
+    getRuneStats(selectedEquipment.value).forEach(rs => apply(rs.stat, rs.value, rs.valueType))
+    return final
   })
 
   // 出售预览灵石（按评分折价）
@@ -2119,6 +2169,35 @@
 
   .detail-row span:first-child {
     color: #C9C4BA;
+  }
+
+  /* 基础属性三列：属性 | 基础 | 最终 */
+  .stat-row,
+  .stat-header {
+    display: grid;
+    grid-template-columns: 1fr 90px 90px;
+    gap: 8px;
+    align-items: center;
+  }
+  .stat-header {
+    font-size: 11px;
+    opacity: 0.65;
+    padding: 4px 0;
+    border-bottom: 1px solid rgba(255, 255, 255, 0.12);
+  }
+  .stat-header .stat-name,
+  .stat-header .stat-base,
+  .stat-header .stat-final {
+    color: #C9C4BA;
+  }
+  .stat-base,
+  .stat-final {
+    text-align: right;
+    font-variant-numeric: tabular-nums;
+  }
+  .stat-final {
+    color: #FFD86B;
+    font-weight: 600;
   }
 
   .modal-actions {
@@ -2729,5 +2808,60 @@
   html:not(.dark) .inventory-page .simple-modal-content p,
   html:not(.dark) .inventory-page .modal-body p {
     color: #F5F0E8;
+  }
+
+  /* 日间模式补充：强化预览 / 词条效果 / 素材快速卖出 等子面板显式亮色
+     根因：.inventory-page 在日间模式下强制深色卡片+亮色字体，但上述子元素
+     未在日间覆盖块中声明颜色，部分沿用深色主题下的暗色（如 qtier-5/6 灰阶）
+     或继承链在弹窗内断裂，导致在深色卡片上对比度不足、文字看不清。
+     此处统一显式提亮，且保持档位色相区分（仅提亮不抹平）。 */
+  html:not(.dark) .inventory-page .enhance-preview-header {
+    color: #F5DEB3;
+  }
+  html:not(.dark) .inventory-page .enhance-preview-row {
+    color: #E8E0D0;
+  }
+  html:not(.dark) .inventory-page .equip-affix-preview,
+  html:not(.dark) .inventory-page .pill-effect,
+  html:not(.dark) .inventory-page .pill-effect-value {
+    color: #B6E3B8;
+  }
+  html:not(.dark) .inventory-page .affix-row,
+  html:not(.dark) .inventory-page .affix-name {
+    color: #E8E0D0;
+  }
+  html:not(.dark) .inventory-page .material-sell-row {
+    color: #E8E0D0;
+    border-bottom-color: rgba(255, 255, 255, 0.12);
+  }
+  html:not(.dark) .inventory-page .material-sell-count {
+    color: #E8E0D0;
+  }
+  html:not(.dark) .inventory-page .btn-mini {
+    color: #F5F0E8;
+    border-color: rgba(255, 255, 255, 0.25);
+    background: rgba(0, 0, 0, 0.35);
+  }
+  html:not(.dark) .inventory-page .craft-desc {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .craft-currency-btn {
+    color: #E8E0D0;
+    background: rgba(255, 255, 255, 0.08);
+    border-color: rgba(255, 255, 255, 0.18);
+  }
+  /* 低对比度档位标签提亮：深色卡片上可读且保持色相区分 */
+  html:not(.dark) .inventory-page .qtier-5 { color: #C9C9C9; }
+  html:not(.dark) .inventory-page .qtier-6 { color: #B6AFA4; }
+  html:not(.dark) .inventory-page .affix-tier-1 { color: #5BE05B; }
+  html:not(.dark) .inventory-page .affix-tier-2 { color: #5AB0FF; }
+  html:not(.dark) .inventory-page .affix-tier-3 { color: #FFE066; }
+  html:not(.dark) .inventory-page .stat-header .stat-name,
+  html:not(.dark) .inventory-page .stat-header .stat-base,
+  html:not(.dark) .inventory-page .stat-header .stat-final {
+    color: #C9C4BA;
+  }
+  html:not(.dark) .inventory-page .stat-final {
+    color: #FFE066;
   }
 </style>

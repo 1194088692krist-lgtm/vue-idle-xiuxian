@@ -160,7 +160,7 @@
               <span v-else class="rt-log-bullet" :class="log.type">•</span>
               <span class="rt-log-text">
                 <template v-if="log.text">{{ log.text }}</template>
-                <template v-else-if="log.parts && log.parts.length">
+                <template v-if="log.parts && log.parts.length">
                   <span
                     v-for="(part, pi) in log.parts"
                     :key="pi"
