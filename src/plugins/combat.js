@@ -93,8 +93,13 @@ class CombatStats {
   calculateDamageReduction(incomingDamage, attackerStats) {
     let damage = Math.abs(incomingDamage)
     // 应用防御减伤（考虑战斗属性提升）
+    // 平衡修复：原公式 100/(100+DEF) 在大数值下过度压缩伤害（DEF=2万时伤害仅剩 0.5%），
+    // 导致玩家高 Build 仍打不动后期 BOSS。改用 sqrt 压缩 DEF，让高 DEF 仍有意义但边际递减：
+    //   DEF=100   → 减伤 9%（原 50%）
+    //   DEF=10000 → 减伤 50%（原 99%）
+    //   DEF=20000 → 减伤 58%（原 99.5%）
     const effectiveDefense = this.defense * (1 + this.combatBoost)
-    damage *= 100 / (100 + effectiveDefense)
+    damage *= 100 / (100 + Math.sqrt(effectiveDefense))
     // 如果是暴击伤害，应用暴击伤害减免
     if (attackerStats && attackerStats.isCrit) {
       damage *= 1 - this.critDamageReduce

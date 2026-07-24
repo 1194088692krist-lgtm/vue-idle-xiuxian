@@ -71,11 +71,13 @@ const currentEncounter = ref({
 // 本次挂机「完整战斗日志」累积源：跨所有遭遇（每场战斗）的战斗日志文本，
 // 从挂机开始持续累积到当前，供 BattleStage「查看完整日志」弹窗展示（而非仅当前回合）。
 const idleCombatLog = ref([])
-// 按轮 BOSS 调度（核心玩法）：每轮 5 分钟 = 前 4 分钟小怪 + 后 1 分钟限时 BOSS，多轮递进。
-// 1 分钟内未击杀 BOSS 则本轮失败，强制进入下一轮（4 分钟小怪 + 1 分钟 BOSS）。
+// 按轮 BOSS 调度（核心玩法）：每轮 5 分钟 = 前 3.5 分钟小怪 + 后 1.5 分钟限时 BOSS，多轮递进。
+// 限时内未击杀 BOSS 则本轮失败，强制进入下一轮。
+// 平衡修复：原 BOSS 限时 60s，配合 3.5s 回合动画延迟实际只能打 ~17 回合，
+// 对高 HP 后期 BOSS 完全不够。延长至 90s（约 25 回合），同时缩短小怪阶段保持总轮时长不变。
 const IDLE_ROUND_MS = 5 * 60 * 1000    // 每轮总时长 5 分钟
-const ROUND_MOB_MS = 4 * 60 * 1000     // 每轮前 4 分钟为小怪阶段
-const BOSS_TIME_LIMIT_MS = 60 * 1000   // BOSS 限时 1 分钟
+const ROUND_MOB_MS = 3.5 * 60 * 1000   // 每轮前 3.5 分钟为小怪阶段
+const BOSS_TIME_LIMIT_MS = 90 * 1000   // BOSS 限时 1.5 分钟
 const bossSpawned = ref(false)         // 当前轮是否已有 BOSS 战进行中
 const bossDefeated = ref(false)        // 本次挂机是否曾击杀任意一轮 BOSS（用于横幅/结算）
 const bossSpawnRound = ref(-1)         // 当前进行中 BOSS 所属的轮次索引（-1 表示无）
@@ -1040,20 +1042,20 @@ function createPlayerEntity() {
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
-// BOSS 整体实力倍率：用户要求将 BOSS 整体实力提升
-// 统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度），不影响 zones.js 资料卡显示数值
-const BOSS_POWER_MULTIPLIER = 1.8
+// BOSS 整体实力倍率：统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度）
+// 平衡修复：原值 1.8 与 LATE_ZONE_ENEMY_MULT 叠加后让后期 BOSS 实际强度是显示值的 3 倍以上，
+// 且推荐 Build 基于未强化的 boss 算出，导致匹配度严重失真。降至 1.3，配合减伤公式修正。
+const BOSS_POWER_MULTIPLIER = 1.3
 
 // 后期秘境额外强化系数（小怪与 BOSS 共用）
-// 用户反馈：凤凰窟之后的秘境怪物实力羸弱，需要重点强化
-// 越往后倍率越高，让后期秘境对高 build 玩家仍具威胁，但前期秘境保持轻量影响
+// 平衡修复：温和化后期强化曲线，避免数值膨胀过快导致脱节
 const LATE_ZONE_ENEMY_MULT = {
-  phoenix_cave: 1.15,
-  dragon_abyss: 1.30,
-  ghost_wasteland: 1.50,
-  ice_palace: 1.70,
-  immortal_ruins: 2.00,
-  chaos_realm: 2.30
+  phoenix_cave: 1.10,
+  dragon_abyss: 1.20,
+  ghost_wasteland: 1.35,
+  ice_palace: 1.50,
+  immortal_ruins: 1.70,
+  chaos_realm: 2.00
 }
 
 // 获取秘境的后期强化倍率（前期秘境返回 1，无影响）
