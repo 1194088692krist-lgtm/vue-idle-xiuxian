@@ -11,7 +11,10 @@ const rarityConfig = {
 }
 
 const affixPool = [
-  { id: 'sharp_blade', name: '利刃', stat: 'attack', valueType: 'flat', baseRange: [5, 15], tier: 1, slots: ['hands', 'wrist', 'ring1', 'artifact'] },
+  // 基础属性词条统一为百分比加成（v2 平衡修复）
+  // 原 flat 词条（利刃/铁壁/活力/迅捷）在角色属性量级提升后毫无作用（如 +14 防御 vs 7280 防御），
+  // 已与同 stat 的 percent 词条合并，扩展 slots 覆盖范围，避免功能重复
+  { id: 'sharp_blade', name: '利刃', stat: 'attack', valueType: 'percent', baseRange: [0.03, 0.08], tier: 1, slots: ['hands', 'wrist', 'ring1', 'artifact'] },
   { id: 'mighty_strike', name: '重击', stat: 'attack', valueType: 'percent', baseRange: [0.03, 0.08], tier: 2, slots: ['hands', 'ring1', 'artifact'] },
   { id: 'critical_eye', name: '鹰眼', stat: 'critRate', valueType: 'percent', baseRange: [0.02, 0.05], tier: 2, slots: ['hands', 'ring1', 'head', 'necklace', 'artifact'] },
   { id: 'fierce_crit', name: '暴击', stat: 'critDamageBoost', valueType: 'percent', baseRange: [0.05, 0.15], tier: 2, slots: ['ring1', 'hands', 'artifact'] },
@@ -20,11 +23,11 @@ const affixPool = [
   { id: 'counter_stance', name: '反击', stat: 'counterRate', valueType: 'percent', baseRange: [0.02, 0.05], tier: 2, slots: ['shoulder', 'wrist', 'body'] },
   { id: 'stun_strike', name: '眩晕', stat: 'stunRate', valueType: 'percent', baseRange: [0.01, 0.04], tier: 2, slots: ['hands', 'head', 'artifact'] },
   { id: 'agile', name: '敏捷', stat: 'dodgeRate', valueType: 'percent', baseRange: [0.02, 0.06], tier: 2, slots: ['feet', 'legs', 'ring2'] },
-  { id: 'iron_skin', name: '铁壁', stat: 'defense', valueType: 'flat', baseRange: [3, 10], tier: 1, slots: ['head', 'body', 'legs', 'feet', 'shoulder', 'ring2', 'belt'] },
+  { id: 'iron_skin', name: '铁壁', stat: 'defense', valueType: 'percent', baseRange: [0.03, 0.08], tier: 1, slots: ['head', 'body', 'legs', 'feet', 'shoulder', 'ring2', 'belt'] },
   { id: 'tough_hide', name: '坚韧', stat: 'defense', valueType: 'percent', baseRange: [0.03, 0.08], tier: 2, slots: ['body', 'belt', 'shoulder'] },
-  { id: 'vitality', name: '活力', stat: 'health', valueType: 'flat', baseRange: [30, 80], tier: 1, slots: ['head', 'body', 'necklace', 'belt', 'ring2'] },
+  { id: 'vitality', name: '活力', stat: 'health', valueType: 'percent', baseRange: [0.03, 0.08], tier: 1, slots: ['head', 'body', 'necklace', 'belt', 'ring2'] },
   { id: 'life_force', name: '生命', stat: 'health', valueType: 'percent', baseRange: [0.03, 0.08], tier: 2, slots: ['body', 'belt', 'necklace'] },
-  { id: 'swift_feet', name: '迅捷', stat: 'speed', valueType: 'flat', baseRange: [2, 6], tier: 1, slots: ['feet', 'legs'] },
+  { id: 'swift_feet', name: '迅捷', stat: 'speed', valueType: 'percent', baseRange: [0.03, 0.08], tier: 1, slots: ['feet', 'legs'] },
   { id: 'haste', name: '急速', stat: 'speed', valueType: 'percent', baseRange: [0.03, 0.08], tier: 2, slots: ['feet', 'legs', 'hands'] },
   { id: 'healing_touch', name: '治疗', stat: 'healBoost', valueType: 'percent', baseRange: [0.03, 0.1], tier: 2, slots: ['necklace', 'ring2', 'wrist'] },
   { id: 'damage_amp', name: '增伤', stat: 'finalDamageBoost', valueType: 'percent', baseRange: [0.02, 0.06], tier: 3, slots: ['ring1', 'artifact'] },
@@ -198,12 +201,23 @@ function inferAffixQualityTier(baseRange, value) {
 // ===== 存量存档迁移（M0）：为旧装备补齐 ilvl / qualityTier / 镶嵌与腐化字段 =====
 // 幂等：可重复执行不破坏数据。旧装 ilvl 默认 3（中性、对应中档），qualityTier 按现有数值反推，
 // 高 roll 旧装→高档、低 roll→低档，尊重旧 roll 品质；镶嵌(sockets/runes)/腐化(corrupted)为后续阶段预留默认值。
+// v2 平衡修复：若旧装仍带 flat 基础属性词条（利刃/铁壁/活力/迅捷），将其转换为等价 percent 数值。
 function migrateEquipmentFields(eq) {
   if (!eq || typeof eq !== 'object') return eq
   if (eq.ilvl === undefined) eq.ilvl = 3
   if (Array.isArray(eq.affixes)) {
     eq.affixes.forEach(a => {
-      if (a && a.qualityTier === undefined) {
+      if (!a) return
+      // 旧 flat 词条 → percent 迁移（幂等：valueType 已是 percent 则跳过）
+      if (a.valueType === 'flat' && FLAT_TO_PERCENT_MAP[a.id]) {
+        const conv = FLAT_TO_PERCENT_MAP[a.id]
+        // 按角色满级属性量级估算等价百分比（旧 +14 防御 → 约 0.05 即 5% 防御）
+        const equivalentPercent = a.value / conv.referenceStat
+        a.valueType = 'percent'
+        a.value = Math.max(0.01, Math.min(0.15, Math.round(equivalentPercent * 1000) / 1000))
+        a.tier = conv.tier
+      }
+      if (a.qualityTier === undefined) {
         const pool = affixPool.find(p => p.id === a.id || p.stat === a.stat)
         a.qualityTier = pool ? inferAffixQualityTier(pool.baseRange, a.value) : 4
       }
@@ -213,6 +227,15 @@ function migrateEquipmentFields(eq) {
   if (!Array.isArray(eq.runes)) eq.runes = []
   if (eq.corrupted === undefined) eq.corrupted = false
   return eq
+}
+
+// 旧 flat 词条 → percent 迁移映射表
+// referenceStat：用于把旧 flat 数值换算为等价百分比的角色属性量级（按满级中等装备估算）
+const FLAT_TO_PERCENT_MAP = {
+  sharp_blade: { referenceStat: 300, tier: 1 },   // 旧 +5~15 攻击 → 约 0.017~0.05 攻击百分比
+  iron_skin: { referenceStat: 200, tier: 1 },     // 旧 +3~10 防御 → 约 0.015~0.05 防御百分比
+  vitality: { referenceStat: 1500, tier: 1 },      // 旧 +30~80 生命 → 约 0.02~0.053 生命百分比
+  swift_feet: { referenceStat: 80, tier: 1 }       // 旧 +2~6 速度 → 约 0.025~0.075 速度百分比
 }
 
 function getAffixesForSlot(slot, rarity, ilvl = null) {
