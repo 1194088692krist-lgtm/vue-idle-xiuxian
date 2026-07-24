@@ -592,11 +592,6 @@
 
         <!-- ==================== 灵石阁（商店） ==================== -->
         <template v-if="activeTab === 'shop'">
-          <div class="tips-box">
-            <InfoCircleOutlined />
-            <span>消耗品增益丹随境界定价自动变贵，是回收通胀的主力。黑市每日刷新，限量大额回收囤积灵石。</span>
-          </div>
-
           <!-- 当前资产 + 出售折价状态 -->
           <div class="shop-status-bar">
             <span class="shop-balance">灵石：<b class="gold-text">{{ formatNumber(playerStore.spiritStones) }}</b></span>

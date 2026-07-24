@@ -17,15 +17,6 @@ export const CONSUMABLES = [
     category: 'combat'
   },
   {
-    id: 'buff_spirit',
-    name: '聚灵符',
-    description: '下次挂机期间灵力恢复速度 +50%，持续 1 小时',
-    icon: '💧',
-    effect: { type: 'spiritRate', multiplier: 0.5, duration: 3600 },
-    basePrice: 6000,
-    category: 'cultivation'
-  },
-  {
     id: 'buff_drop',
     name: '寻宝符',
     description: '下次挂机期间装备/素材掉率 +15%，持续 1 小时',
