@@ -44,11 +44,11 @@ function urlFromPath(p) {
 }
 
 // 收集所有需要预下载的资源 URL
-// 包括：人物立绘（50×2）、怪物立绘（28×2）、立绘清单 2 个、背景图 1 个、立绘动态视频 1 个
+// 包括：人物立绘（50×2）+ 皮肤立绘（100）、怪物立绘（28×2）、立绘清单 2 个、皮肤清单 1 个、背景图 1 个、立绘动态视频 1 个
 async function collectResourceUrls() {
   const urls = []
   // 1. 立绘清单
-  const manifestUrls = ['./portraits/manifest.json', './monsters/manifest.json']
+  const manifestUrls = ['./portraits/manifest.json', './monsters/manifest.json', './portraits/skins.json']
   for (const m of manifestUrls) {
     urls.push(m)
   }
@@ -57,7 +57,7 @@ async function collectResourceUrls() {
   urls.push('./favicon.ico')
   // 3. 从立绘清单提取所有图片 URL
   try {
-    const [portraitsRes, monstersRes] = await Promise.all(
+    const [portraitsRes, monstersRes, skinsRes] = await Promise.all(
       manifestUrls.map(u => fetch(urlFromPath(u)))
     )
     const portraitsData = await portraitsRes.json()
@@ -74,6 +74,17 @@ async function collectResourceUrls() {
       const entry = monstersData[key]
       if (entry.full) urls.push('./monsters/' + entry.full)
       if (entry.thumbnail) urls.push('./monsters/' + entry.thumbnail)
+    }
+    // 皮肤立绘：skins.json 结构为 { "char_001": 2, ... }，值为每个角色的皮肤数量
+    // 需为每个角色下载 skin1~skinN 的立绘文件
+    if (skinsRes.ok) {
+      const skinsData = await skinsRes.json()
+      for (const charId in skinsData) {
+        const count = skinsData[charId] || 0
+        for (let i = 1; i <= count; i++) {
+          urls.push(`./portraits/${charId}_skin${i}.jpg`)
+        }
+      }
     }
   } catch (e) {
     console.warn('[useAssetManager] 立绘清单加载失败', e)

@@ -199,10 +199,11 @@ watch(
   }
 )
 
-// 角色或「可切换」状态变化时，重置当前皮肤：可切换则默认 skin1，否则原立绘
+// 角色或「可切换」状态变化时，重置当前皮肤：默认显示原立绘（0），用户可手动切换皮肤
+// 修复：原实现可切换时默认 skin1，导致皮肤1覆盖原立绘，用户看不到原立绘
 watch(
   () => [props.character, canSwitch.value],
-  () => { currentSkin.value = canSwitch.value ? 1 : 0 },
+  () => { currentSkin.value = 0 },
   { immediate: true }
 )
 

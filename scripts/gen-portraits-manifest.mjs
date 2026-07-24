@@ -36,6 +36,9 @@ async function processFile(file) {
   const ext = extname(file).toLowerCase()
   const filePath = join(portraitsDir, file)
   if (filePath.startsWith(thumbnailsDir)) return null
+  // 跳过皮肤文件（char_001_skin1.jpg 等）——皮肤清单由 skins.json 单独管理，
+  // 不应进入原立绘 manifest，否则会因 includes 匹配覆盖原立绘条目
+  if (/_skin\d+$/i.test(basename(file, ext))) return null
   // 动态立绘视频：合并到同名角色的 manifest 条目（video 字段）
   if (VIDEO_EXT.has(ext)) {
     const stem = basename(file, ext)
@@ -47,20 +50,20 @@ async function processFile(file) {
     return { id, videoFile: file }
   }
   if (!IMG_EXT.has(ext)) return null
-  
+
   const stem = basename(file, ext)
-  
+
   if (filePath.startsWith(thumbnailsDir)) return null
-  
+
   const key = stem.trim().toLowerCase()
   let hit = idName.find(c => c.id.toLowerCase() === key)
   if (!hit) hit = idName.find(c => c.name.toLowerCase() === key)
   if (!hit) hit = idName.find(c => key.includes(c.id.toLowerCase()) || key.includes(c.name.toLowerCase()))
   const id = hit ? hit.id : stem
-  
+
   const thumbnailFile = `${stem}_thumb.webp`
   const thumbnailPath = join(thumbnailsDir, thumbnailFile)
-  
+
   if (!existsSync(thumbnailPath)) {
     if (!sharp) {
       // sharp 不可用时，manifest 仍记录图片但无缩略图
@@ -76,7 +79,7 @@ async function processFile(file) {
       console.warn(`[portraits] 生成缩略图失败 ${file}:`, e.message)
     }
   }
-  
+
   return { id, file, thumbnailFile, generated: false }
 }
 
