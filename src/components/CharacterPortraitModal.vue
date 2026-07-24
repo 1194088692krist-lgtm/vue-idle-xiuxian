@@ -5,13 +5,19 @@
         <div class="char-modal-close" @click="$emit('close')">✕</div>
         <div class="char-modal-content">
           <div class="char-portrait-large">
-            <!-- 加载占位：图片/视频未就绪时显示 -->
-            <div v-if="!avatarLoaded" class="char-portrait-loading">
+            <!-- 加载占位：图片/视频未就绪且未出错时显示 -->
+            <div v-if="!avatarLoaded && !avatarError" class="char-portrait-loading">
               <div class="loading-spinner"></div>
+            </div>
+            <!-- 加载失败占位：显示角色名，不让用户对着空 spinner 发呆 -->
+            <div v-if="avatarError" class="char-portrait-fallback">
+              <span class="fallback-icon">🖼️</span>
+              <span class="fallback-text">{{ character?.name || '角色' }}</span>
+              <span class="fallback-hint">立绘加载失败</span>
             </div>
             <!-- 静态立绘：始终作为底层；无视频时直接展示，有视频时作为首帧垫底 -->
             <img
-              v-if="avatar"
+              v-if="avatar && !avatarError"
               ref="imgEl"
               :src="displaySrc"
               class="char-portrait-static"
@@ -84,6 +90,9 @@ const videoEl = ref(null)
 const imgEl = ref(null)
 const videoReady = ref(false)
 const avatarLoaded = ref(false)
+const avatarError = ref(false)
+// 图片重试：加载失败时带缓存破坏参数重试一次（应对偶发 404/SW 缓存不一致）
+const imgRetryCount = ref(0)
 // 重试计数与重载 key：首次加载偶发失败时，破坏缓存后重新加载一次
 const videoErrorRetries = ref(0)
 const videoReloadKey = ref(0)
@@ -105,12 +114,16 @@ const canSwitch = computed(() => breakThrough.value >= 1 && skinCount.value >= 2
 // currentSkin: 0 = 原立绘；1 = skin1；2 = skin2
 const currentSkin = ref(0)
 // 当前展示的立绘：选中皮肤则取皮肤图，否则回退原立绘
+// 含图片重试缓存破坏参数：imgRetryCount > 0 时追加 ?r=N
 const displaySrc = computed(() => {
+  let url
   if (currentSkin.value >= 1) {
     const u = getCharacterSkinUrl(props.character, currentSkin.value)
-    if (u) return u
+    if (u) url = u
   }
-  return avatar.value
+  if (!url) url = avatar.value
+  if (!url) return null
+  return imgRetryCount.value > 0 ? `${url}?r=${imgRetryCount.value}` : url
 })
 // 动态视频仅原立绘（currentSkin===0）时播放
 const videoVisible = computed(() => currentSkin.value === 0 && shouldShowVideo.value)
@@ -118,9 +131,16 @@ const videoVisible = computed(() => currentSkin.value === 0 && shouldShowVideo.v
 // 静态图加载完成回调
 const onAvatarLoad = () => {
   avatarLoaded.value = true
+  avatarError.value = false
 }
 const onAvatarError = () => {
-  avatarLoaded.value = false
+  // 加载失败：重试一次（带缓存破坏参数），仍失败则显示 fallback 而非永久转圈
+  if (imgRetryCount.value < 1) {
+    imgRetryCount.value++
+  } else {
+    avatarError.value = true
+    avatarLoaded.value = false
+  }
 }
 
 // 触发播放：优先依赖 autoplay 原生属性；此函数为兜底（已缓存/竞态场景）。
@@ -175,7 +195,7 @@ const onVideoError = (e) => {
 // 组件挂载后立即尝试播放（处理视频已缓存、loadeddata 不再触发的情况）
 onMounted(() => {
   // 静态图可能已缓存（complete 状态），直接标记为已加载
-  if (imgEl.value && imgEl.value.complete) {
+  if (imgEl.value && imgEl.value.complete && imgEl.value.naturalWidth > 0) {
     avatarLoaded.value = true
   }
   if (videoVisible.value) {
@@ -189,13 +209,21 @@ watch(
   () => {
     videoReady.value = false
     avatarLoaded.value = false
+    avatarError.value = false
+    imgRetryCount.value = 0
     // 切换目标时清零重试状态，避免把上一次的重试参数带到新视频
     videoErrorRetries.value = 0
     videoReloadKey.value = 0
-    if (videoVisible.value) {
-      // 等待 video 元素渲染后再尝试播放
-      nextTick(() => requestAnimationFrame(tryPlay))
-    }
+    // 修复：已缓存图片切换时 @load 可能不触发（浏览器认为 src 没变或缓存命中跳过事件）。
+    // nextTick 后手动检查 img.complete，若已就绪直接标记 loaded。
+    nextTick(() => {
+      if (imgEl.value && imgEl.value.complete && imgEl.value.naturalWidth > 0) {
+        avatarLoaded.value = true
+      }
+      if (videoVisible.value) {
+        requestAnimationFrame(tryPlay)
+      }
+    })
   }
 )
 
@@ -298,6 +326,22 @@ onBeforeUnmount(() => {
   border-radius: 50%;
   animation: spin 0.8s linear infinite;
 }
+/* 加载失败占位 */
+.char-portrait-fallback {
+  position: absolute;
+  top: 0; left: 0;
+  width: 100%; height: 100%;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  z-index: 1;
+  color: rgba(218, 165, 32, 0.6);
+}
+.fallback-icon { font-size: 48px; }
+.fallback-text { font-size: 20px; font-weight: bold; }
+.fallback-hint { font-size: 13px; color: rgba(255, 255, 255, 0.4); }
 @keyframes spin {
   to { transform: rotate(360deg); }
 }

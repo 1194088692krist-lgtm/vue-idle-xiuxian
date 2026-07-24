@@ -19,4 +19,12 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .catch(err => console.warn('[SW] 注册失败：', err.message))
   })
+  // 修复：监听 SW 更新，新 SW 接管后自动刷新页面。
+  // 否则用户浏览器永远停留在旧 JS（旧 bug 不会消失），即使新代码已部署。
+  let refreshing = false
+  navigator.serviceWorker.addEventListener('controllerchange', () => {
+    if (refreshing) return
+    refreshing = true
+    window.location.reload()
+  })
 }
