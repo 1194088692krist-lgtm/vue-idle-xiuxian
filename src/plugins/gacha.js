@@ -1,6 +1,6 @@
 // 抽奖系统配置
 
-import { getAffixesForSlot, setBonuses, rarityConfig, affixPool } from '../plugins/buildSystem'
+import { getAffixesForSlot, setBonuses, rarityConfig, affixPool, inferAffixQualityTier } from '../plugins/buildSystem'
 import { generateRandomCharacter } from '../plugins/characters'
 
 // 装备品质配置
@@ -165,7 +165,8 @@ export const generateEquipment = (playerLevel = 1, specificType = null) => {
       const roundedValue = affix.valueType === 'percent' ? Math.round(value * 1000) / 1000 : Math.round(value)
       affixes = [{
         id: affix.id, name: affix.name, stat: affix.stat,
-        value: roundedValue, valueType: affix.valueType, tier: affix.tier
+        value: roundedValue, valueType: affix.valueType, tier: affix.tier,
+        qualityTier: inferAffixQualityTier(affix.baseRange, roundedValue)   // M0：补 roll 品质字段，保持词缀字段一致
       }]
     }
   }

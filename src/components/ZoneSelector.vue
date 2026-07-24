@@ -395,7 +395,7 @@
         <div v-if="dashEqDetail.affixes && dashEqDetail.affixes.length" class="attr-block">
           <h4 class="sub-title">词条</h4>
           <div v-for="a in dashEqDetail.affixes" :key="a.id" class="attr-row">
-            <span class="attr-col-label" :class="'affix-tier-' + a.tier">{{ a.name }}</span>
+            <span class="attr-col-label" :class="'affix-tier-' + a.tier"><span v-if="a.qualityTier" class="qtier-badge" :class="qualityTierClass(a.qualityTier)">{{ qualityTierLabel(a.qualityTier) }}</span>{{ a.name }}</span>
             <span class="attr-col-final">{{ a.valueType === 'percent' ? (a.value * 100).toFixed(1) + '%' : a.value }}</span>
           </div>
         </div>
@@ -504,7 +504,7 @@
             </div>
             <div v-if="eq.affixes && eq.affixes.length > 0" class="eq-affixes">
               <span v-for="(affix, idx) in eq.affixes" :key="idx" class="eq-affix">
-                {{ affix.name }}
+                <span v-if="affix.qualityTier" class="qtier-badge" :class="qualityTierClass(affix.qualityTier)">{{ qualityTierLabel(affix.qualityTier) }}</span>{{ affix.name }}
               </span>
             </div>
             <div class="eq-click-hint">点击查看详情</div>
@@ -924,6 +924,7 @@ import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../
 import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
+import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
 import { getPillsByZone } from '../plugins/pills'
 import { BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
 import { getIconUrl } from '../plugins/icons'
@@ -3841,6 +3842,25 @@ html:not(.dark) .equip-select-modal .attr-col-label {
 html:not(.dark) .equip-select-modal .attr-col-final {
   color: #FFD86B;
 }
+
+/* ===== 词缀 roll 品质档徽章（T1 极品 → T6 最差）===== */
+.qtier-badge {
+  display: inline-block;
+  padding: 0 5px;
+  margin-right: 6px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: bold;
+  line-height: 1.5;
+  border: 1px solid currentColor;
+  vertical-align: middle;
+}
+.qtier-1 { color: #FFD700; text-shadow: 0 0 6px rgba(255, 215, 0, 0.6); background: rgba(255, 215, 0, 0.12); }
+.qtier-2 { color: #FF8C00; background: rgba(255, 140, 0, 0.10); }
+.qtier-3 { color: #1E90FF; background: rgba(30, 144, 255, 0.10); }
+.qtier-4 { color: #32CD32; background: rgba(50, 205, 50, 0.10); }
+.qtier-5 { color: #9E9E9E; background: rgba(158, 158, 158, 0.10); }
+.qtier-6 { color: #6B6B6B; background: rgba(107, 107, 107, 0.10); }
 
 /* ============ BOSS 挑战系统 ============ */
 .boss-challenge-btn {

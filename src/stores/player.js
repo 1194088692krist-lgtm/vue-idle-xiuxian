@@ -4,7 +4,8 @@ import { useAuthStore } from './auth'
 import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
-import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild } from '../plugins/buildSystem'
+import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
+import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards } from '../plugins/craftCurrency'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
@@ -158,6 +159,7 @@ export const usePlayerStore = defineStore('player', {
     petEssence: 0, // 灵宠精华
     petFragments: 0, // 灵宠升星碎片
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
+    craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
     // 丹药沉淀与系统加成
     permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 永久属性加成（洗髓/锻骨丹）
     breakthroughBonus: 0, // 突破成功率加成（如 0.1 = +10%，下次突破消耗）
@@ -530,6 +532,13 @@ export const usePlayerStore = defineStore('player', {
             if (this.equippedArtifacts && typeof this.equippedArtifacts === 'object') {
               Object.values(this.equippedArtifacts).forEach(cleanZeroStats)
             }
+            // M0 迁移：为旧装备补齐 ilvl / qualityTier / 镶嵌与腐化字段（幂等）
+            if (Array.isArray(this.items)) this.items.forEach(migrateEquipmentFields)
+            if (this.equippedArtifacts && typeof this.equippedArtifacts === 'object') {
+              Object.values(this.equippedArtifacts).forEach(migrateEquipmentFields)
+            }
+            // M0-B 迁移：旧档补工艺货币库存
+            if (!this.craftCurrencies || typeof this.craftCurrencies !== 'object') this.craftCurrencies = {}
           } else {
             console.error('存档数据验证失败，使用初始数据')
           }
@@ -1293,6 +1302,9 @@ export const usePlayerStore = defineStore('player', {
       if (rewards.reforge_stone) {
         this.refinementStones += rewards.reforge_stone
       }
+      // M0-B：分解额外返工艺货币（按品质，净 sink）
+      const currencyRewards = disassembleCurrencyRewards(equipment.rarity || 'common')
+      Object.entries(currencyRewards).forEach(([cid, n]) => this.gainCraftCurrency(cid, n))
       this.items.splice(index, 1)
       this.queueSave()
       const parts = []
@@ -1300,7 +1312,64 @@ export const usePlayerStore = defineStore('player', {
       if (rewards.advanced_enhance_stone) parts.push(`高级强化石×${rewards.advanced_enhance_stone}`)
       if (rewards.supreme_enhance_stone) parts.push(`至尊强化石×${rewards.supreme_enhance_stone}`)
       if (rewards.reforge_stone) parts.push(`洗练石×${rewards.reforge_stone}`)
+      Object.entries(currencyRewards).forEach(([cid, n]) => parts.push(`${craftCurrencies[cid]?.name || cid}×${n}`))
       return { success: true, message: `分解成功，获得 ${parts.join('、')}` }
+    },
+    // ===== M0-B 工艺货币 =====
+    // 增加货币
+    gainCraftCurrency(currencyId, count = 1) {
+      if (!this.craftCurrencies || typeof this.craftCurrencies !== 'object') this.craftCurrencies = {}
+      this.craftCurrencies[currencyId] = (this.craftCurrencies[currencyId] || 0) + count
+    },
+    // 查询货币数量
+    getCraftCurrencyCount(currencyId) {
+      return (this.craftCurrencies && this.craftCurrencies[currencyId]) || 0
+    },
+    hasCraftCurrency(currencyId, count = 1) {
+      return this.getCraftCurrencyCount(currencyId) >= count
+    },
+    // 消耗货币（不足返回 false）
+    consumeCraftCurrency(currencyId, count = 1) {
+      if (!this.hasCraftCurrency(currencyId, count)) return false
+      this.craftCurrencies[currencyId] -= count
+      if (this.craftCurrencies[currencyId] <= 0) delete this.craftCurrencies[currencyId]
+      return true
+    },
+    // 对装备使用工艺货币（craft 面板入口）
+    craftEquipmentWithCurrency(equipmentId, currencyId, targetAffixId = null) {
+      // 定位装备（背包或已装备）
+      let equip = this.items.find(i => i.id === equipmentId)
+      if (!equip) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipmentId) { equip = this.equippedArtifacts[slot]; break }
+        }
+      }
+      if (!equip) return { success: false, message: '装备不存在' }
+      if (equip.corrupted && currencyId !== 'blood_sigil') return { success: false, message: '已腐化装备不可再 craft' }
+      // 锁灵符特殊：解锁免费，仅"锁定"消耗 1 个
+      if (currencyId === 'lock_rune') {
+        const af = (equip.affixes || []).find(a => a.id === targetAffixId)
+        if (!af) return { success: false, message: '词缀不存在' }
+        if (!af.locked && !this.consumeCraftCurrency(currencyId, 1)) return { success: false, message: `${craftCurrencies[currencyId]?.name}不足` }
+      } else {
+        if (!this.consumeCraftCurrency(currencyId, 1)) return { success: false, message: `${craftCurrencies[currencyId]?.name}不足` }
+      }
+      const result = applyCraftCurrency(equip, currencyId, targetAffixId, { allowEmpty: !!this.allowRiskyAnnul })
+      if (!result.success) {
+        // 失败则退回货币（除血祭已腐化的情况）
+        if (currencyId !== 'blood_sigil') this.gainCraftCurrency(currencyId, 1)
+        return result
+      }
+      // 血祭碎裂：移除装备
+      if (result.shattered) {
+        const idx = this.items.findIndex(i => i.id === equipmentId)
+        if (idx !== -1) this.items.splice(idx, 1)
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipmentId) this.equippedArtifacts[slot] = null
+        }
+      }
+      this.queueSave()
+      return result
     },
     // 批量分解装备
     async batchDisassembleEquipments(equipmentIds) {

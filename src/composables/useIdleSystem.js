@@ -5,6 +5,7 @@ import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugin
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial, getRandomZoneMaterial } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
+import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '../plugins/craftCurrency'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
@@ -100,7 +101,7 @@ const bossChallengeSummary = ref(null)        // 全部挑战结束后的总结�
 // 素材类型展示信息（用于结算栏汇总显示）
 // 注：原 fortune(奇遇材料) 类型已废弃——奇遇奖励内部的素材（定灵珠/天玄碎片/灵草等）
 // 已在发放时按其本身 kind 累计到对应类别（herb/ore/liquid/special），不再单独存在
-const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal', 'boss_material', 'boss_ticket']
+const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal', 'boss_material', 'boss_ticket', 'craft_currency']
 const MATERIAL_DISPLAY = {
   herb: { name: '灵草', icon: getIconUrl('reward_mat_herb.png') },
   ore: { name: '矿料', icon: getIconUrl('reward_mat_ore.png') },
@@ -110,7 +111,8 @@ const MATERIAL_DISPLAY = {
   pet_fragment: { name: '升星碎片', icon: getIconUrl('reward_mat_pet_fragment.png') },
   phantom_crystal: { name: '幻灵结晶', icon: getIconUrl('reward_mat_phantom_crystal.png') },
   boss_material: { name: 'BOSS素材', icon: getIconUrl('reward_mat_core.png') },
-  boss_ticket: { name: '挑战券', icon: getIconUrl('reward_mat_core.png') }
+  boss_ticket: { name: '挑战券', icon: getIconUrl('reward_mat_core.png') },
+  craft_currency: { name: '工艺货币', icon: getIconUrl('reward_mat_ore.png') }
 }
 // 将一次遭遇的奖励累计进本次挂机素材统计
 // 支持 reward.type 字段（如 herb/ore/liquid/phantom_crystal）以及 material 对象的 kind 字段
@@ -895,6 +897,21 @@ function buildEffectiveZone(zone, diff) {
 const SLOTS = ['artifact', 'head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt']
 const RARITY_MULT = { common: 1, uncommon: 1.3, rare: 1.8, epic: 2.5, legendary: 4, mythic: 7 }
 
+// ===== M0 装备等级 iLvl（决定词缀可 roll 的最好档，决策 1）=====
+// 图序（zones.js 顺序 1~8）：青萝林1…混沌境8
+const ZONE_INDEX = {
+  forest_edge: 1, misty_valley: 2, phoenix_cave: 3, dragon_abyss: 4,
+  ghost_wasteland: 5, ice_palace: 6, immortal_ruins: 7, chaos_realm: 8
+}
+// 难度加成（effectiveZone.difficulty = 难度序号 1~5：游历1/试炼2/凶险3/绝境4/灭世5）
+const DIFF_ILVL_BONUS = { 1: 0, 2: 0, 3: 1, 4: 2, 5: 3 }
+// iLvl = 图序 + 难度加成（上限 11）
+function computeIlvl(effectiveZone) {
+  const zoneIdx = ZONE_INDEX[effectiveZone?.id] || 1
+  const diffBonus = DIFF_ILVL_BONUS[effectiveZone?.difficulty] || 0
+  return Math.min(11, zoneIdx + diffBonus)
+}
+
 // 使用真实装备名库（与抽卡系统一致），避免挂机产出「良品戒」这类虚拟命名
 function getEquipName(slot, rarity, setId = null) {
   const nameParts = equipmentNameParts[slot] || ['未知']
@@ -910,7 +927,8 @@ function getEquipName(slot, rarity, setId = null) {
 function generateEquipment(rarity, effectiveZone) {
   const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)]
   const mult = RARITY_MULT[rarity] || 1
-  const affixes = getAffixesForSlot(slot, rarity)
+  const ilvl = computeIlvl(effectiveZone)
+  const affixes = getAffixesForSlot(slot, rarity, ilvl)
   let setId = null
   if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
     const availableSets = setBonuses.filter(s => s.pieces.includes(slot))
@@ -924,6 +942,7 @@ function generateEquipment(rarity, effectiveZone) {
     quality: rarity,
     rarity,
     qualityInfo: { name: (rarityConfig[rarity] || {}).name || rarity, color: (rarityConfig[rarity] || {}).color || '#999' },
+    ilvl,          // M0 新增：装备等级（决定词缀可 roll 的最好档，影响极品追逐与地图进度意义）
     stats: {
       attack: Math.floor(effectiveZone.recommendedStats.attack * 0.22 * mult),
       health: Math.floor(effectiveZone.recommendedStats.health * 0.16 * mult),
@@ -1735,6 +1754,18 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
     rewards.push({ type: 'pet_fragment', amount: fragmentAmount, name: '升星碎片' })
   }
 
+  // 工艺货币掉落（M0-B）：按图序+难度触发，从已解锁货币池按权重抽 1 个（决策 2）
+  const craftZoneIdx = ZONE_INDEX[effectiveZone.id] || 1
+  const craftDropChance = (CRAFT_DROP_CHANCE_BY_ZONE[craftZoneIdx] || 0) * (effectiveZone.dropBonus || 1)
+  if (Math.random() < craftDropChance) {
+    const cur = pickCraftCurrency(craftZoneIdx, isBoss)
+    if (cur) {
+      // 防御性调用：旧测试 mock 可能未实现 gainCraftCurrency，奖励发放不应因此中断
+      if (typeof s.gainCraftCurrency === 'function') s.gainCraftCurrency(cur, 1)
+      rewards.push({ type: 'craft_currency', amount: 1, name: craftCurrencies[cur]?.name || cur, currencyId: cur })
+    }
+  }
+
   // 通关灭世难度：一次性解锁该秘境所有未解锁丹方
   // 修复「通关迷雾谷灭世后只解锁培元丹，其他 5 个丹方未解锁」的问题
   // 之前逻辑：15% 概率触发 + 随机选 1 个解锁，导致通关多次仍可能只解锁 1 个
@@ -1858,7 +1889,8 @@ const REWARD_ICON_MAP = {
   monster: getIconUrl('reward_monster.png'),
   spirit_stone: getIconUrl('reward_eq_default.png'),
   cultivation: getIconUrl('reward_eq_default.png'),
-  fortune: getIconUrl('reward_eq_default.png')
+  fortune: getIconUrl('reward_eq_default.png'),
+  craft_currency: getIconUrl('reward_mat_ore.png')
 }
 
 // 奖励类型对应 emoji

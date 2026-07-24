@@ -74,6 +74,7 @@
                     {{ qualityInfoOf(item).name }}
                   </span>
                   <span class="equip-score-badge">评分 {{ calculateEquipmentScore(item) }}</span>
+                  <span v-if="bestAffixTier(item.affixes)" class="qtier-badge qtier-card" :class="qualityTierClass(bestAffixTier(item.affixes))">{{ qualityTierLabel(bestAffixTier(item.affixes)) }}{{ bestAffixTierTag(bestAffixTier(item.affixes)) ? '·' + bestAffixTierTag(bestAffixTier(item.affixes)) : '' }}</span>
                 </div>
                 <p>{{ equipmentTypes[item.slot] || item.slot }}</p>
                 <div class="equip-stats">
@@ -373,6 +374,7 @@
                 {{ qualityInfoOf(equipment).name }}
               </span>
               <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equipment) }}</span>
+              <span v-if="bestAffixTier(equipment.affixes)" class="qtier-badge qtier-card" :class="qualityTierClass(bestAffixTier(equipment.affixes))">{{ qualityTierLabel(bestAffixTier(equipment.affixes)) }}{{ bestAffixTierTag(bestAffixTier(equipment.affixes)) ? '·' + bestAffixTierTag(bestAffixTier(equipment.affixes)) : '' }}</span>
             </div>
             <p class="equip-affix-preview">词条：{{ formatAffixNames(equipment.affixes) }}</p>
             <p>境界要求：{{ getRealmName(equipment.requiredRealm || 1).name }}</p>
@@ -419,7 +421,10 @@
         <div v-if="selectedEquipment.affixes && selectedEquipment.affixes.length > 0" class="affixes-section">
           <div class="simple-divider">词条</div>
           <div v-for="affix in selectedEquipment.affixes" :key="affix.id" class="affix-row">
-            <span class="affix-name" :class="'affix-tier-' + affix.tier">{{ affix.name }}</span>
+            <span class="affix-left">
+              <span v-if="affix.qualityTier" class="qtier-badge" :class="qualityTierClass(affix.qualityTier)">{{ qualityTierLabel(affix.qualityTier) }}</span>
+              <span class="affix-name" :class="'affix-tier-' + affix.tier">{{ affix.name }}</span>
+            </span>
             <span>{{ getStatName(affix.stat) }} {{ affix.valueType === 'percent' ? '+' + (affix.value * 100).toFixed(1) + '%' : '+' + affix.value }}</span>
           </div>
         </div>
@@ -428,6 +433,43 @@
           <div v-for="bonus in getSetBonuses(selectedEquipment.setId)" :key="bonus.stat" class="set-bonus-row">
             <span>{{ bonus.label }}</span>
           </div>
+        </div>
+        <!-- 工艺面板（M0-B）：定向打造词缀 -->
+        <div class="craft-section">
+          <div class="simple-divider">工艺 · 定向打造</div>
+          <div v-if="selectedEquipment.corrupted" class="craft-corrupted-hint">⚠ 该装备已腐化，仅可使用「血祭符」</div>
+          <div class="craft-currency-list">
+            <button
+              v-for="cur in craftCurrencyList"
+              :key="cur.id"
+              class="craft-currency-btn"
+              :class="{ active: selectedCraftCurrency === cur.id, 'is-empty': cur.count === 0 }"
+              :disabled="cur.count === 0 || (selectedEquipment.corrupted && cur.id !== 'blood_sigil')"
+              :title="cur.desc"
+              @click="selectCraftCurrency(cur.id)"
+            >
+              {{ cur.name }}<em class="cur-count">×{{ cur.count }}</em>
+            </button>
+          </div>
+          <div v-if="currentCraftCurrency" class="craft-detail">
+            <p class="craft-desc">{{ currentCraftCurrency.desc }}</p>
+            <div v-if="currentCraftCurrency.needTarget" class="craft-target-list">
+              <span
+                v-for="affix in (selectedEquipment.affixes || [])"
+                :key="affix.id"
+                class="craft-target-affix"
+                :class="{ active: selectedTargetAffix === affix.id, locked: affix.locked }"
+                @click="selectedTargetAffix = affix.id"
+              >
+                {{ affix.name }}<em v-if="affix.qualityTier" class="cur-count">·T{{ affix.qualityTier }}</em><em v-if="affix.locked">🔒</em>
+              </span>
+            </div>
+            <button class="btn-small craft-apply-btn" :disabled="!canApplyCraft" @click="applyCraft">
+              使用{{ currentCraftCurrency.name }}
+            </button>
+            <p v-if="craftMessage" class="craft-message" :class="{ error: craftMessageError }">{{ craftMessage }}</p>
+          </div>
+          <p v-else class="craft-hint">选择一种工艺货币开始打造；货币由挂机掉落与分解装备获得。</p>
         </div>
         <div class="enhance-preview-section">
           <div class="simple-divider">强化预览 (+1 ~ +12)</div>
@@ -652,6 +694,8 @@
   import { getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
+  import { qualityTierLabel, qualityTierClass, bestAffixTier, bestAffixTierTag } from '../utils/affixQuality'
+  import { craftCurrencies } from '../plugins/craftCurrency'
 
   // 移动端适配
   const isMobile = ref(window.innerWidth <= 768)
@@ -1413,6 +1457,42 @@
       message.success('装备已按评分从高到低排序')
     } else {
       message.success('装备已恢复默认排序')
+    }
+  }
+
+  // ===== 工艺面板（M0-B）=====
+  const selectedCraftCurrency = ref(null)
+  const selectedTargetAffix = ref(null)
+  const craftMessage = ref('')
+  const craftMessageError = ref(false)
+  // 展示全部货币（含 0，便于发现系统），附实时数量
+  const craftCurrencyList = computed(() => {
+    return Object.values(craftCurrencies).map(c => ({ ...c, count: playerStore.getCraftCurrencyCount(c.id) }))
+  })
+  const currentCraftCurrency = computed(() => (selectedCraftCurrency.value ? craftCurrencies[selectedCraftCurrency.value] : null))
+  const canApplyCraft = computed(() => {
+    const c = currentCraftCurrency.value
+    if (!c || !selectedEquipment.value) return false
+    if (playerStore.getCraftCurrencyCount(c.id) < 1) return false
+    if (selectedEquipment.value.corrupted && c.id !== 'blood_sigil') return false
+    if (c.needTarget && !selectedTargetAffix.value) return false
+    return true
+  })
+  const selectCraftCurrency = id => {
+    selectedCraftCurrency.value = id
+    selectedTargetAffix.value = null
+    craftMessage.value = ''
+  }
+  const applyCraft = () => {
+    const c = currentCraftCurrency.value
+    if (!c || !selectedEquipment.value) return
+    const result = playerStore.craftEquipmentWithCurrency(selectedEquipment.value.id, c.id, selectedTargetAffix.value)
+    craftMessage.value = result.message || ''
+    craftMessageError.value = !result.success
+    if (result.success) {
+      selectedTargetAffix.value = null
+      // 血祭碎裂：装备已消失，关闭详情
+      if (result.shattered) showEquipmentDetailModal.value = false
     }
   }
 
@@ -2185,6 +2265,54 @@
     color: #FFD700;
     text-shadow: 0 0 5px rgba(255, 215, 0, 0.5);
   }
+
+  /* ===== 词缀 roll 品质档徽章（T1 极品 → T6 最差）===== */
+  .qtier-badge {
+    display: inline-block;
+    padding: 0 5px;
+    margin-right: 6px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: bold;
+    line-height: 1.5;
+    border: 1px solid currentColor;
+    vertical-align: middle;
+  }
+  .affix-left { display: inline-flex; align-items: center; }
+  .qtier-1 { color: #FFD700; text-shadow: 0 0 6px rgba(255, 215, 0, 0.6); background: rgba(255, 215, 0, 0.12); }
+  .qtier-2 { color: #FF8C00; background: rgba(255, 140, 0, 0.10); }
+  .qtier-3 { color: #1E90FF; background: rgba(30, 144, 255, 0.10); }
+  .qtier-4 { color: #32CD32; background: rgba(50, 205, 50, 0.10); }
+  .qtier-5 { color: #9E9E9E; background: rgba(158, 158, 158, 0.10); }
+  .qtier-6 { color: #6B6B6B; background: rgba(107, 107, 107, 0.10); }
+  .qtier-card { margin-left: 6px; margin-right: 0; }
+
+  /* ===== 工艺面板（M0-B）===== */
+  .craft-section { margin-top: 8px; }
+  .craft-corrupted-hint { font-size: 12px; color: #FF8A8A; margin: 4px 0; }
+  .craft-currency-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .craft-currency-btn {
+    padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.06); color: #E8E0D0;
+    border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.15s;
+  }
+  .craft-currency-btn:hover:not(:disabled) { border-color: #FFD700; }
+  .craft-currency-btn.active { background: rgba(255, 215, 0, 0.15); border-color: #FFD700; color: #FFD700; }
+  .craft-currency-btn:disabled { opacity: 0.4; cursor: not-allowed; }
+  .craft-currency-btn .cur-count { font-style: normal; opacity: 0.75; margin-left: 2px; }
+  .craft-desc { font-size: 12px; opacity: 0.8; margin: 4px 0; }
+  .craft-target-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .craft-target-affix {
+    padding: 3px 8px; font-size: 12px; border-radius: 4px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.15s;
+  }
+  .craft-target-affix:hover { border-color: #1E90FF; }
+  .craft-target-affix.active { background: rgba(30, 144, 255, 0.18); border-color: #1E90FF; color: #7FB8FF; }
+  .craft-target-affix.locked { border-color: #FFD700; }
+  .craft-apply-btn { margin-top: 6px; }
+  .craft-message { font-size: 12px; margin-top: 6px; color: #66BB6A; }
+  .craft-message.error { color: #FF8A8A; }
+  .craft-hint { font-size: 12px; opacity: 0.6; margin: 4px 0; }
 
   .set-bonus-section {
     margin-top: 8px;

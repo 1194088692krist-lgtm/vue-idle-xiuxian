@@ -144,7 +144,77 @@ const setBonuses = [
 
 const affixTierMultiplier = { 1: 1, 2: 1.5, 3: 2.5 }
 
-function getAffixesForSlot(slot, rarity) {
+// ===== 词缀品质档位系统（M0：流放之路式 T1~T6 roll 品质）=====
+// 设计意图：同一条词缀按"roll 品质档"区分强弱，T1 最好、T6 最差——让"极品 roll"成为追逐目标。
+// 工程取舍：词缀自带 `tier`（1/2/3）保留为"类别"（掉落权重 + UI 颜色 + 评分类别加成），
+//          新增 `qualityTier`（1~6）表示"roll 品质"，两者正交、互不干扰，避免连锁改动 UI。
+// 档位区间围绕该词缀 baseRange 的中点构造（单一事实源 = baseRange，无需为 27 条词缀手工维护 6 段区间）。
+const QUALITY_TIER_CENTER = { 1: 2.0, 2: 1.6, 3: 1.3, 4: 1.0, 5: 0.8, 6: 0.6 } // × baseRange 中点
+const QUALITY_TIER_BAND = 0.08      // 每档在中点附近 ±8% 窄带（带内仍有微随机）
+const AFFIX_QUALITY_MULT = { 1: 1.35, 2: 1.2, 3: 1.05, 4: 1.0, 5: 0.9, 6: 0.85 } // 评分加成（T4 为基准 1.0）
+
+// iLvl → 可 roll 的最好档（决策 1：iLvl = 图序 1~8 + 难度加成；仙墟/混沌境才出 T1）
+const BEST_TIER_BY_ILVL = { 1: 4, 2: 4, 3: 3, 4: 3, 5: 2, 6: 2, 7: 1, 8: 1, 9: 1, 10: 1, 11: 1 }
+function rollQualityTier(ilvl = 4) {
+  const best = BEST_TIER_BY_ILVL[ilvl] || 1
+  return Math.floor(Math.random() * (7 - best)) + best   // [best, 6] 均匀取档
+}
+
+// 计算某词缀在指定品质档下的取值区间（围绕 baseRange 中点）
+function getAffixQualityRange(baseRange, qualityTier) {
+  const [lo, hi] = baseRange
+  const mid = (lo + hi) / 2
+  const center = mid * (QUALITY_TIER_CENTER[qualityTier] || 1)
+  return [center * (1 - QUALITY_TIER_BAND), center * (1 + QUALITY_TIER_BAND)]
+}
+
+// 在指定品质档内 roll 一个值
+function rollAffixQualityValue(affix, qualityTier) {
+  const [lo, hi] = getAffixQualityRange(affix.baseRange, qualityTier)
+  let value = lo + Math.random() * (hi - lo)
+  if (affix.valueType === 'percent') {
+    value = Math.max(0.001, Math.round(value * 1000) / 1000)
+  } else {
+    value = Math.max(1, Math.round(value))
+  }
+  return value
+}
+
+// 由已 roll 出的数值反推所属品质档（旧装迁移 / 无 ilvl 中性生成时用，保证 qualityTier 始终存在）
+function inferAffixQualityTier(baseRange, value) {
+  const [lo, hi] = baseRange
+  const mid = (lo + hi) / 2
+  let best = 4
+  let bestDiff = Infinity
+  for (let t = 1; t <= 6; t++) {
+    const center = mid * QUALITY_TIER_CENTER[t]
+    const d = Math.abs(value - center)
+    if (d < bestDiff) { bestDiff = d; best = t }
+  }
+  return best
+}
+
+// ===== 存量存档迁移（M0）：为旧装备补齐 ilvl / qualityTier / 镶嵌与腐化字段 =====
+// 幂等：可重复执行不破坏数据。旧装 ilvl 默认 3（中性、对应中档），qualityTier 按现有数值反推，
+// 高 roll 旧装→高档、低 roll→低档，尊重旧 roll 品质；镶嵌(sockets/runes)/腐化(corrupted)为后续阶段预留默认值。
+function migrateEquipmentFields(eq) {
+  if (!eq || typeof eq !== 'object') return eq
+  if (eq.ilvl === undefined) eq.ilvl = 3
+  if (Array.isArray(eq.affixes)) {
+    eq.affixes.forEach(a => {
+      if (a && a.qualityTier === undefined) {
+        const pool = affixPool.find(p => p.id === a.id || p.stat === a.stat)
+        a.qualityTier = pool ? inferAffixQualityTier(pool.baseRange, a.value) : 4
+      }
+    })
+  }
+  if (eq.sockets === undefined) eq.sockets = 0
+  if (!Array.isArray(eq.runes)) eq.runes = []
+  if (eq.corrupted === undefined) eq.corrupted = false
+  return eq
+}
+
+function getAffixesForSlot(slot, rarity, ilvl = null) {
   const config = rarityConfig[rarity] || rarityConfig.common
   const [min, max] = config.affixCount
   const count = Math.floor(Math.random() * (max - min + 1)) + min
@@ -162,23 +232,33 @@ function getAffixesForSlot(slot, rarity) {
     })
     const affix = weighted[Math.floor(Math.random() * weighted.length)]
     used.add(affix.id)
-    const [minVal, maxVal] = affix.baseRange
-    let value = minVal + Math.random() * (maxVal - minVal)
-    if (affix.valueType === 'percent') {
-      value = Math.max(minVal * 0.5, value)
-      value = Math.round(value * 1000) / 1000
+    // 品质档：传了 ilvl 则按档位 roll（流放之路式 T1~T6）；未传 ilvl 保持旧的全区间 roll 再反推档位（中性，兼容抽卡等旧路径）
+    let qualityTier
+    let value
+    if (ilvl !== null && ilvl !== undefined) {
+      qualityTier = rollQualityTier(ilvl)
+      value = rollAffixQualityValue(affix, qualityTier)
     } else {
-      value = Math.max(1, value)
-      value = Math.round(value)
+      const [minVal, maxVal] = affix.baseRange
+      let v = minVal + Math.random() * (maxVal - minVal)
+      if (affix.valueType === 'percent') {
+        v = Math.max(minVal * 0.5, v)
+        v = Math.round(v * 1000) / 1000
+      } else {
+        v = Math.max(1, v)
+        v = Math.round(v)
+      }
+      value = v
+      qualityTier = inferAffixQualityTier(affix.baseRange, v)
     }
-    const roundedValue = value
     result.push({
       id: affix.id,
       name: affix.name,
       stat: affix.stat,
-      value: roundedValue,
+      value,
       valueType: affix.valueType,
-      tier: affix.tier
+      tier: affix.tier,      // 类别（权重/颜色/评分类别加成），保留原语义
+      qualityTier            // roll 品质（T1~T6），M0 新增
     })
   }
   return result
@@ -204,8 +284,9 @@ function calculateEquipmentScore(equipment) {
   if (equipment.affixes && equipment.affixes.length > 0) {
     equipment.affixes.forEach(affix => {
       const tierMult = affixTierMultiplier[affix.tier] || 1
+      const qualityMult = AFFIX_QUALITY_MULT[affix.qualityTier] || 1   // roll 品质加成（无 qualityTier 默认 1.0，不影响旧装）
       const statScore = getStatScore(affix.stat, affix.value, affix.valueType === 'percent')
-      affixScore += statScore * tierMult
+      affixScore += statScore * tierMult * qualityMult
     })
   }
   const enhanceLevel = equipment.enhanceLevel || 0
@@ -349,5 +430,14 @@ export {
   calculateTotalBuild,
   LEVEL_BUILD_RATE,
   getActiveSetBonuses,
-  applySetBonusStats
+  applySetBonusStats,
+  // M0 词缀品质档位系统
+  QUALITY_TIER_CENTER,
+  AFFIX_QUALITY_MULT,
+  BEST_TIER_BY_ILVL,
+  rollQualityTier,
+  getAffixQualityRange,
+  rollAffixQualityValue,
+  inferAffixQualityTier,
+  migrateEquipmentFields
 }
