@@ -1563,6 +1563,74 @@ onUnmounted(() => {
 }
 .rt-log-item.drop-rare .rt-log-bullet { color: #f0abfc; }
 
+/* 高品质装备掉落：epic/legendary/mythic 分级发光 + 文字流光，让玩家一眼看到珍品 */
+.rt-log-item.drop-epic {
+  color: #c89bff;
+  font-weight: bold;
+  border-left-color: #aa44ff;
+  background: rgba(170, 68, 255, 0.15);
+  box-shadow: 0 0 4px rgba(170, 68, 255, 0.3);
+  animation: rt-epicGlow 1.4s ease-in-out infinite;
+}
+.rt-log-item.drop-epic .rt-log-bullet { color: #c89bff; }
+
+.rt-log-item.drop-legendary {
+  color: #FFD700;
+  font-weight: bold;
+  border-left-color: #FFD700;
+  background: rgba(255, 215, 0, 0.18);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  box-shadow: 0 0 6px rgba(255, 215, 0, 0.4);
+  animation: rt-legendaryGlow 1.8s ease-in-out infinite, rt-dropPulse 2.6s ease-in-out infinite;
+}
+.rt-log-item.drop-legendary .rt-log-bullet { color: #FFD700; }
+
+.rt-log-item.drop-mythic {
+  color: #FF4500;
+  font-weight: bold;
+  border-left-color: #FF4500;
+  background: rgba(255, 69, 0, 0.2);
+  border: 1px solid rgba(255, 69, 0, 0.6);
+  box-shadow: 0 0 10px rgba(255, 69, 0, 0.6);
+  animation: rt-mythicGlow 1.5s ease-in-out infinite, rt-dropPulse 2s ease-in-out infinite;
+}
+.rt-log-item.drop-mythic .rt-log-bullet { color: #FF4500; }
+
+/* 极品及以上：文字流光（渐变扫过） */
+.rt-log-item.drop-epic .rt-log-text,
+.rt-log-item.drop-legendary .rt-log-text,
+.rt-log-item.drop-mythic .rt-log-text,
+.rt-log-item.drop-epic .rt-log-part,
+.rt-log-item.drop-legendary .rt-log-part,
+.rt-log-item.drop-mythic .rt-log-part {
+  background: linear-gradient(100deg, currentColor 20%, #ffffff 50%, currentColor 80%);
+  background-size: 220% auto;
+  -webkit-background-clip: text;
+  background-clip: text;
+  -webkit-text-fill-color: transparent;
+  animation: rt-dropShimmer 3s linear infinite;
+}
+@keyframes rt-epicGlow {
+  0%, 100% { box-shadow: 0 0 4px rgba(170, 68, 255, 0.3); }
+  50% { box-shadow: 0 0 14px rgba(170, 68, 255, 0.7); }
+}
+@keyframes rt-legendaryGlow {
+  0%, 100% { box-shadow: 0 0 6px rgba(255, 215, 0, 0.4); }
+  50% { box-shadow: 0 0 20px rgba(255, 215, 0, 0.9); }
+}
+@keyframes rt-mythicGlow {
+  0%, 100% { box-shadow: 0 0 8px rgba(255, 69, 0, 0.5); }
+  50% { box-shadow: 0 0 22px rgba(255, 69, 0, 1); }
+}
+@keyframes rt-dropPulse {
+  0%, 100% { transform: scale(1); }
+  50% { transform: scale(1.018); }
+}
+@keyframes rt-dropShimmer {
+  0% { background-position: 200% center; }
+  100% { background-position: 0% center; }
+}
+
 .rt-log-item.reward-normal { color: #fde047; border-left-color: rgba(253, 224, 71, 0.5); }
 .rt-log-item.reward-normal .rt-log-bullet { color: #fde047; }
 

@@ -1633,10 +1633,23 @@ export const usePlayerStore = defineStore('player', {
       return { success: true, message: '洗练成功' }
     },
     // 批量出售装备（按当前筛选，统一折算为灵石）
+    // 装备分类 → 多 slot 映射（支持 artifact/armor/accessory 分类概念）
     async batchSellEquipments(quality = null, equipmentType = null) {
+      const CATEGORY_SLOTS = {
+        artifact: ['artifact'],
+        armor: ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'belt'],
+        accessory: ['necklace', 'ring1', 'ring2']
+      }
+      const allowedSlots = equipmentType && CATEGORY_SLOTS[equipmentType] ? CATEGORY_SLOTS[equipmentType] : null
       const toSell = this.items.filter(item => {
         if (!isEquipmentItem(item)) return false
-        if (equipmentType && equipmentType !== 'all' && item.slot !== equipmentType) return false
+        if (allowedSlots) {
+          // 分类匹配：item.slot 必须在分类对应的 slot 列表内
+          if (!allowedSlots.includes(item.slot)) return false
+        } else if (equipmentType && equipmentType !== 'all' && item.slot !== equipmentType) {
+          // 单 slot 匹配（兼容旧调用：直接传 'head' 等具体 slot）
+          return false
+        }
         if (quality && item.quality !== quality) return false
         return true
       })
@@ -1650,6 +1663,29 @@ export const usePlayerStore = defineStore('player', {
       this.spiritStones += total
       const ids = new Set(toSell.map(e => e.id))
       this.items = this.items.filter(i => !ids.has(i.id))
+      this.queueSave()
+      return {
+        success: true,
+        message: `成功出售 ${toSell.length} 件装备，获得 ${total} 灵石`
+      }
+    },
+    // 按 ID 列表批量出售装备（多选模式专用）
+    async sellEquipmentsByIds(ids) {
+      if (!Array.isArray(ids) || ids.length === 0) {
+        return { success: false, message: '没有可出售的装备' }
+      }
+      const idSet = new Set(ids)
+      const toSell = this.items.filter(item => idSet.has(item.id) && isEquipmentItem(item))
+      if (toSell.length === 0) {
+        return { success: false, message: '没有可出售的装备' }
+      }
+      let total = 0
+      toSell.forEach(eq => {
+        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * SELL_DISCOUNT_RATE))
+      })
+      this.spiritStones += total
+      const soldIds = new Set(toSell.map(e => e.id))
+      this.items = this.items.filter(i => !soldIds.has(i.id))
       this.queueSave()
       return {
         success: true,

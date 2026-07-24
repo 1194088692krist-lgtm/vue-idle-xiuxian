@@ -2148,7 +2148,7 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
     const petRewards = rewards.filter(r => r.type === 'pet')
     const fortuneRewards = rewards.filter(r => r.type === 'fortune')
     const bossMaterialRewards = rewards.filter(r => r.type === 'boss_material')
-    const materialRewards = rewards.filter(r => ['herb', 'ore', 'liquid', 'core', 'pet_fragment', 'phantom_crystal'].includes(r.type))
+    const materialRewards = rewards.filter(r => ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal'].includes(r.type))
     const currencyRewards = rewards.filter(r => ['spirit_stone', 'cultivation'].includes(r.type))
 
     for (const r of equipmentRewards) {
@@ -2188,8 +2188,8 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
     if (materialRewards.length > 0 || currencyRewards.length > 0) {
       const materialParts = []
       for (const r of materialRewards) {
-        const iconUrls = { herb: getIconUrl('reward_mat_herb.png'), ore: getIconUrl('reward_mat_ore.png'), liquid: getIconUrl('reward_mat_liquid.png'), core: getIconUrl('reward_mat_core.png'), pet_fragment: getIconUrl('reward_mat_pet_fragment.png'), phantom_crystal: getIconUrl('reward_mat_phantom_crystal.png') }
-        const names = { herb: '灵草', ore: '矿料', liquid: '灵液', core: '妖兽内丹', pet_fragment: '升星碎片', phantom_crystal: '幻灵结晶' }
+        const iconUrls = { herb: getIconUrl('reward_mat_herb.png'), ore: getIconUrl('reward_mat_ore.png'), liquid: getIconUrl('reward_mat_liquid.png'), core: getIconUrl('reward_mat_core.png'), special: getIconUrl('reward_mat_core.png'), pet_fragment: getIconUrl('reward_mat_pet_fragment.png'), phantom_crystal: getIconUrl('reward_mat_phantom_crystal.png') }
+        const names = { herb: '灵草', ore: '矿料', liquid: '灵液', core: '妖兽内丹', special: '至宝', pet_fragment: '升星碎片', phantom_crystal: '幻灵结晶' }
         materialParts.push({ icon: iconUrls[r.type], text: `${r.amount} ${names[r.type] || r.name}` })
       }
       for (const r of currencyRewards) {
@@ -2971,7 +2971,10 @@ async function runIdleEncounter() {
         // 战斗掉落
         const drops = grantCombatDrops(enemy, effectiveZone.id)
         for (const d of drops) {
-          rewards.push({ type: d.type, name: d.name, amount: 1, ...d })
+          // 修复：普通战斗掉落素材（herb/ore/liquid/core 等）只有 kind 字段无 type 字段，
+          // 导致日志生成时按 r.type 过滤被排除，整条"获得素材"日志缺失、icon 不显示。
+          // 用 kind 作为 type 回退，让普通素材能进入日志的 materialParts 渲染。
+          rewards.push({ type: d.type || d.kind, name: d.name, amount: 1, ...d })
         }
         // 将 boss_material / boss_ticket 等「带 type 字段的掉落」也累计进挂机素材统计
         // （其它掉落如 core/herb/special 因不带 type 字段会被 accumulateMaterials 自然跳过）

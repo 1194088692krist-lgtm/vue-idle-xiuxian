@@ -38,13 +38,38 @@
             >
               🔼 按评分排序
             </button>
-            <button
-              class="btn-small btn-warning"
-              :disabled="displayEquipmentList.length === 0"
-              @click="batchSellEquipments"
-            >
-              一键出售
-            </button>
+            <template v-if="!isEquipmentSelectMode">
+              <button
+                class="btn-small btn-info"
+                :disabled="displayEquipmentAll.length === 0"
+                @click="enterEquipmentSelectMode"
+              >
+                ☑ 多选卖出
+              </button>
+              <button
+                class="btn-small btn-warning"
+                :disabled="displayEquipmentAll.length === 0"
+                @click="batchSellFilteredEquipments"
+              >
+                一键出售当前筛选
+              </button>
+            </template>
+            <template v-else>
+              <button
+                class="btn-small btn-info"
+                @click="toggleSelectAllEquipmentOnPage"
+              >
+                {{ isAllEquipmentOnPageSelected ? '取消本页全选' : '本页全选' }}
+              </button>
+              <button
+                class="btn-small btn-warning"
+                :disabled="selectedEquipmentIds.length === 0"
+                @click="confirmSellSelectedEquipments"
+              >
+                出售选中 ({{ selectedEquipmentIds.length }})
+              </button>
+              <button class="btn-small" @click="exitEquipmentSelectMode">取消</button>
+            </template>
           </div>
           <div v-if="displayEquipmentAll.length > equipmentPageSize" class="pagination-info">
             共 {{ displayEquipmentAll.length }} 件装备，当前第 {{ currentEquipmentPage }} 页
@@ -58,10 +83,18 @@
               class="simple-card"
               :class="[
                 `equip-border-${item.quality || 'common'}`,
-                `equip-bg-${item.quality || 'common'}`
+                `equip-bg-${item.quality || 'common'}`,
+                { selected: isEquipmentSelectMode && isEquipmentSelected(item.id) }
               ]"
-              @click="showEquipmentDetails(item)"
+              @click="onEquipmentCardClick(item)"
             >
+              <input
+                v-if="isEquipmentSelectMode"
+                type="checkbox"
+                class="card-checkbox"
+                :checked="isEquipmentSelected(item.id)"
+                @click.stop="toggleEquipmentSelect(item.id)"
+              />
               <div class="card-header">
                 <span :style="{ color: qualityInfoOf(item).color }" :class="'text-glow-' + (item.quality || 'common')">
                   {{ item.name }}
@@ -1523,6 +1556,111 @@
     })
   }
 
+  // 装备标签页专用：基于当前 Tab 筛选条件（分类+品质）一键出售
+  // 修复旧 bug：原实现误用弹窗的 selectedQuality/selectedEquipmentType，导致筛选后仍出售全部
+  const batchSellFilteredEquipments = async () => {
+    const list = displayEquipmentAll.value
+    if (!list || list.length === 0) {
+      message.warning('当前筛选下没有可出售的装备')
+      return
+    }
+    const qualityText = equipmentFilterQuality.value || '全部品质'
+    const categoryText = !equipmentFilterCategory.value
+      ? '全部类别'
+      : equipmentFilterCategory.value === 'artifact'
+        ? '法宝'
+        : equipmentFilterCategory.value === 'armor'
+          ? '防具'
+          : equipmentFilterCategory.value === 'accessory'
+            ? '饰品'
+            : equipmentFilterCategory.value
+    dialog.warning({
+      title: '确认一键出售',
+      content: `将按当前筛选（品质：${qualityText} / 类别：${categoryText}）一次性出售 ${list.length} 件装备并折算为灵石。此操作不可撤销，确定继续吗？`,
+      positiveText: '确认出售',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        const ids = list.map(i => i.id).filter(Boolean)
+        const result = await playerStore.sellEquipmentsByIds(ids)
+        if (result.success) {
+          message.success(result.message)
+          if (isEquipmentSelectMode.value) exitEquipmentSelectMode()
+        } else {
+          message.error(result.message || '批量卖出失败')
+        }
+      }
+    })
+  }
+
+  // ===== 装备多选卖出模式 =====
+  const isEquipmentSelectMode = ref(false)
+  const selectedEquipmentIds = ref([])
+
+  const isEquipmentSelected = (id) => selectedEquipmentIds.value.includes(id)
+  const toggleEquipmentSelect = (id) => {
+    const idx = selectedEquipmentIds.value.indexOf(id)
+    if (idx >= 0) {
+      selectedEquipmentIds.value.splice(idx, 1)
+    } else {
+      selectedEquipmentIds.value.push(id)
+    }
+  }
+  // 多选模式下点击卡片切换选中；非多选模式打开详情
+  const onEquipmentCardClick = (item) => {
+    if (isEquipmentSelectMode.value && item.id) {
+      toggleEquipmentSelect(item.id)
+    } else {
+      showEquipmentDetails(item)
+    }
+  }
+  const isAllEquipmentOnPageSelected = computed(() => {
+    const pageItems = displayEquipmentList.value
+    if (!pageItems.length) return false
+    return pageItems.every(i => i.id && selectedEquipmentIds.value.includes(i.id))
+  })
+  const toggleSelectAllEquipmentOnPage = () => {
+    const pageItems = displayEquipmentList.value
+    if (isAllEquipmentOnPageSelected.value) {
+      const pageIds = new Set(pageItems.map(i => i.id).filter(Boolean))
+      selectedEquipmentIds.value = selectedEquipmentIds.value.filter(id => !pageIds.has(id))
+    } else {
+      const set = new Set(selectedEquipmentIds.value)
+      pageItems.forEach(i => { if (i.id) set.add(i.id) })
+      selectedEquipmentIds.value = Array.from(set)
+    }
+  }
+  const enterEquipmentSelectMode = () => {
+    isEquipmentSelectMode.value = true
+    selectedEquipmentIds.value = []
+  }
+  const exitEquipmentSelectMode = () => {
+    isEquipmentSelectMode.value = false
+    selectedEquipmentIds.value = []
+  }
+  // 多选确认卖出：仅出售选中的装备
+  const confirmSellSelectedEquipments = async () => {
+    const ids = [...selectedEquipmentIds.value]
+    if (ids.length === 0) {
+      message.warning('请先勾选要出售的装备')
+      return
+    }
+    dialog.warning({
+      title: '确认出售选中装备',
+      content: `将出售选中的 ${ids.length} 件装备并折算为灵石。此操作不可撤销，确定继续吗？`,
+      positiveText: '确认出售',
+      negativeText: '取消',
+      onPositiveClick: async () => {
+        const result = await playerStore.sellEquipmentsByIds(ids)
+        if (result.success) {
+          message.success(result.message)
+          exitEquipmentSelectMode()
+        } else {
+          message.error(result.message || '批量卖出失败')
+        }
+      }
+    })
+  }
+
   // 装备按评分排序
   const sortEquipmentByScore = () => {
     equipmentSortedByScore.value = !equipmentSortedByScore.value
@@ -1899,10 +2037,28 @@
     padding: 10px;
     cursor: pointer;
     transition: all 0.2s;
+    position: relative;
   }
 
   .simple-card:hover {
     border-color: rgba(218, 165, 32, 0.5);
+  }
+
+  /* 装备多选模式：选中态 + checkbox 定位 */
+  .simple-card.selected {
+    border-color: #DAA520;
+    background: rgba(218, 165, 32, 0.12);
+    box-shadow: 0 0 0 1px rgba(218, 165, 32, 0.6);
+  }
+  .simple-card .card-checkbox {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 18px;
+    height: 18px;
+    cursor: pointer;
+    accent-color: #DAA520;
+    z-index: 2;
   }
 
   .simple-card .card-header {
