@@ -6,6 +6,7 @@ import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
+import { getRuneStats, getRandomRune, RUNE_ELEMENTS } from '../plugins/runes'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
@@ -160,6 +161,7 @@ export const usePlayerStore = defineStore('player', {
     petFragments: 0, // 灵宠升星碎片
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
+    runes: [], // 灵纹库存（M1，镶嵌用的灵纹实例数组）
     // 丹药沉淀与系统加成
     permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 永久属性加成（洗髓/锻骨丹）
     breakthroughBonus: 0, // 突破成功率加成（如 0.1 = +10%，下次突破消耗）
@@ -405,6 +407,11 @@ export const usePlayerStore = defineStore('player', {
         if (!eq || !eq.affixes) return
         eq.affixes.forEach(a => applyAffix(a.stat, a.value, a.valueType))
       })
+      // M1：应用已镶嵌灵纹词缀 + 相邻同元素共鸣加成
+      Object.values(this.equippedArtifacts || {}).forEach(eq => {
+        if (!eq || !Array.isArray(eq.runes)) return
+        getRuneStats(eq).forEach(rs => applyAffix(rs.stat, rs.value, rs.valueType))
+      })
       // 套装激活加成（仅作用于已存在的属性键），最终属性 = 自然 + 装备 + 套装
       return applySetBonusStats(this.equippedArtifacts || {}, { ...merged })
     },
@@ -539,6 +546,8 @@ export const usePlayerStore = defineStore('player', {
             }
             // M0-B 迁移：旧档补工艺货币库存
             if (!this.craftCurrencies || typeof this.craftCurrencies !== 'object') this.craftCurrencies = {}
+            // M1 迁移：旧档补灵纹库存
+            if (!Array.isArray(this.runes)) this.runes = []
           } else {
             console.error('存档数据验证失败，使用初始数据')
           }
@@ -1374,6 +1383,50 @@ export const usePlayerStore = defineStore('player', {
       }
       this.queueSave()
       return result
+    },
+    // ===== M1 灵纹镶嵌 =====
+    // 获得灵纹（掉落/Boss）
+    gainRune(rune) {
+      if (!rune) return
+      if (!Array.isArray(this.runes)) this.runes = []
+      this.runes.push(rune)
+    },
+    // 定位装备（背包或已装备）
+    _findEquipmentById(equipmentId) {
+      let equip = this.items.find(i => i.id === equipmentId)
+      if (!equip) {
+        for (const slot of EQUIPMENT_SLOTS) {
+          if (this.equippedArtifacts[slot]?.id === equipmentId) { equip = this.equippedArtifacts[slot]; break }
+        }
+      }
+      return equip || null
+    },
+    // 镶嵌灵纹到装备指定槽位
+    socketRune(equipmentId, slotIdx, runeUid) {
+      const equip = this._findEquipmentById(equipmentId)
+      if (!equip) return { success: false, message: '装备不存在' }
+      if (!Array.isArray(equip.runes) || slotIdx < 0 || slotIdx >= equip.runes.length) return { success: false, message: '该槽位不可用' }
+      if (equip.runes[slotIdx]) return { success: false, message: '该槽位已有灵纹，请先卸下' }
+      const rIdx = (this.runes || []).findIndex(r => r.uid === runeUid)
+      if (rIdx === -1) return { success: false, message: '灵纹不存在' }
+      const rune = this.runes[rIdx]
+      this.runes.splice(rIdx, 1)
+      equip.runes[slotIdx] = rune
+      this.queueSave()
+      return { success: true, message: `已将「${rune.name}」镶嵌到槽位 ${slotIdx + 1}` }
+    },
+    // 卸下装备指定槽位的灵纹（退回灵纹库存）
+    unsocketRune(equipmentId, slotIdx) {
+      const equip = this._findEquipmentById(equipmentId)
+      if (!equip) return { success: false, message: '装备不存在' }
+      if (!Array.isArray(equip.runes) || slotIdx < 0 || slotIdx >= equip.runes.length) return { success: false, message: '该槽位不可用' }
+      const rune = equip.runes[slotIdx]
+      if (!rune) return { success: false, message: '该槽位为空' }
+      equip.runes[slotIdx] = null
+      if (!Array.isArray(this.runes)) this.runes = []
+      this.runes.push(rune)
+      this.queueSave()
+      return { success: true, message: `已卸下「${rune.name}」` }
     },
     // 批量分解装备
     async batchDisassembleEquipments(equipmentIds) {

@@ -1,4 +1,5 @@
 // 装备Build系统：词条、套装、评分
+import { getRuneStats } from './runes.js'
 
 const rarityConfig = {
   common: { name: '凡品', color: '#808080', affixCount: [0, 0], scoreMultiplier: 1 },
@@ -289,13 +290,20 @@ function calculateEquipmentScore(equipment) {
       affixScore += statScore * tierMult * qualityMult
     })
   }
+  // M1：已镶嵌灵纹词缀 + 共鸣计入评分
+  let runeScore = 0
+  if (Array.isArray(equipment.runes)) {
+    getRuneStats(equipment).forEach(rs => {
+      runeScore += getStatScore(rs.stat, rs.value, rs.valueType === 'percent')
+    })
+  }
   const enhanceLevel = equipment.enhanceLevel || 0
   const enhanceMult = Math.pow(1.2, enhanceLevel)
   let setBonusScore = 0
   if (equipment.setId) {
     setBonusScore += 50
   }
-  const totalScore = Math.round((baseScore + affixScore + setBonusScore) * mult * enhanceMult)
+  const totalScore = Math.round((baseScore + affixScore + runeScore + setBonusScore) * mult * enhanceMult)
   return totalScore
 }
 

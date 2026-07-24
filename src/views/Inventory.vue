@@ -471,6 +471,45 @@
           </div>
           <p v-else class="craft-hint">选择一种工艺货币开始打造；货币由挂机掉落与分解装备获得。</p>
         </div>
+        <!-- 灵纹槽（M1） -->
+        <div v-if="(selectedEquipment.runes && selectedEquipment.runes.length > 0)" class="rune-section">
+          <div class="simple-divider">灵纹槽（{{ selectedEquipment.runes.filter(r=>r).length }}/{{ selectedEquipment.runes.length }}）</div>
+          <div class="rune-slots">
+            <div
+              v-for="(r, idx) in selectedEquipment.runes"
+              :key="idx"
+              class="rune-slot"
+              :class="{ filled: !!r, ['re-' + (r ? r.element : '')]: !!r }"
+              @click="onRuneSlotClick(idx)"
+            >
+              <template v-if="r">
+                <span class="rune-name">{{ r.name }}</span>
+                <span class="rune-desc">{{ runeStatDesc(r) }}</span>
+                <span class="rune-remove" title="卸下" @click.stop="unsocketRune(idx)">×</span>
+              </template>
+              <span v-else class="rune-empty">空槽 ＋</span>
+            </div>
+          </div>
+          <div v-if="runeSynergyList.length" class="rune-synergy">
+            <span v-for="(s, i) in runeSynergyList" :key="i" class="synergy-tag">共鸣·{{ elementName(s.element) }} {{ synergyDesc(s) }}</span>
+          </div>
+          <div v-if="socketingSlot !== null" class="rune-picker">
+            <div class="simple-divider">选择灵纹 → 槽位 {{ socketingSlot + 1 }}</div>
+            <div v-if="playerRunes.length === 0" class="rune-hint">暂无灵纹，可通过 Boss / 高难挂机获得</div>
+            <div class="rune-picker-list">
+              <span
+                v-for="r in playerRunes"
+                :key="r.uid"
+                class="rune-chip"
+                :class="'re-' + r.element"
+                @click="doSocketRune(r.uid)"
+              >
+                {{ r.name }}<em>{{ runeStatDesc(r) }}</em>
+              </span>
+            </div>
+            <button class="btn-small" @click="socketingSlot = null">取消</button>
+          </div>
+        </div>
         <div class="enhance-preview-section">
           <div class="simple-divider">强化预览 (+1 ~ +12)</div>
           <div class="enhance-preview-grid">
@@ -696,6 +735,7 @@
   import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
   import { qualityTierLabel, qualityTierClass, bestAffixTier, bestAffixTierTag } from '../utils/affixQuality'
   import { craftCurrencies } from '../plugins/craftCurrency'
+  import { getRuneSynergy, RUNE_ELEMENTS } from '../plugins/runes'
 
   // 移动端适配
   const isMobile = ref(window.innerWidth <= 768)
@@ -1495,6 +1535,26 @@
       if (result.shattered) showEquipmentDetailModal.value = false
     }
   }
+
+  // ===== 灵纹镶嵌（M1）=====
+  const socketingSlot = ref(null)
+  const playerRunes = computed(() => playerStore.runes || [])
+  const runeSynergyList = computed(() => (selectedEquipment.value ? getRuneSynergy(selectedEquipment.value) : []))
+  const onRuneSlotClick = idx => {
+    const r = selectedEquipment.value?.runes?.[idx]
+    if (!r) socketingSlot.value = idx   // 空槽 → 打开灵纹选择
+  }
+  const unsocketRune = idx => {
+    const res = playerStore.unsocketRune(selectedEquipment.value.id, idx)
+    if (res.success) message.success(res.message); else message.error(res.message)
+  }
+  const doSocketRune = uid => {
+    const res = playerStore.socketRune(selectedEquipment.value.id, socketingSlot.value, uid)
+    if (res.success) { message.success(res.message); socketingSlot.value = null } else message.error(res.message)
+  }
+  const runeStatDesc = r => `${getStatName(r.stat)} ${r.valueType === 'percent' ? '+' + (r.value * 100).toFixed(1) + '%' : '+' + r.value}`
+  const elementName = el => RUNE_ELEMENTS[el]?.name || el
+  const synergyDesc = s => `${getStatName(s.stat)} ${s.valueType === 'percent' ? '+' + (s.value * 100).toFixed(0) + '%' : '+' + s.value}`
 
   // 卖出单件装备
   // 出售当前装备（获得灵石，按评分折价）
@@ -2313,6 +2373,38 @@
   .craft-message { font-size: 12px; margin-top: 6px; color: #66BB6A; }
   .craft-message.error { color: #FF8A8A; }
   .craft-hint { font-size: 12px; opacity: 0.6; margin: 4px 0; }
+
+  /* ===== 灵纹槽（M1）===== */
+  .rune-section { margin-top: 8px; }
+  .rune-slots { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .rune-slot {
+    position: relative; min-width: 88px; padding: 6px 8px; border-radius: 5px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.05); border: 1px dashed rgba(255, 255, 255, 0.2);
+    display: flex; flex-direction: column; align-items: center; font-size: 12px; transition: all 0.15s;
+  }
+  .rune-slot.filled { border-style: solid; }
+  .rune-slot:hover { border-color: #FFD700; }
+  .rune-name { font-weight: bold; }
+  .rune-desc { font-size: 11px; opacity: 0.8; }
+  .rune-empty { opacity: 0.5; }
+  .rune-remove { position: absolute; top: 2px; right: 5px; font-size: 14px; color: #FF8A8A; cursor: pointer; line-height: 1; }
+  .rune-remove:hover { color: #FF4444; }
+  .rune-slot.re-fire, .rune-chip.re-fire { border-color: #FF4500; color: #FF7A50; }
+  .rune-slot.re-water, .rune-chip.re-water { border-color: #1E90FF; color: #6FB6FF; }
+  .rune-slot.re-metal, .rune-chip.re-metal { border-color: #C9C9C9; color: #E0E0E0; }
+  .rune-slot.re-wood, .rune-chip.re-wood { border-color: #3CB371; color: #6FD6A0; }
+  .rune-slot.re-earth, .rune-chip.re-earth { border-color: #D2691E; color: #E89B5A; }
+  .rune-synergy { display: flex; flex-wrap: wrap; gap: 6px; margin: 4px 0; }
+  .synergy-tag { font-size: 11px; padding: 2px 8px; border-radius: 4px; background: rgba(255, 215, 0, 0.12); border: 1px solid #FFD700; color: #FFD700; }
+  .rune-picker { margin-top: 6px; }
+  .rune-picker-list { display: flex; flex-wrap: wrap; gap: 6px; margin: 6px 0; }
+  .rune-chip {
+    padding: 4px 8px; font-size: 12px; border-radius: 4px; cursor: pointer;
+    background: rgba(255, 255, 255, 0.06); border: 1px solid rgba(255, 255, 255, 0.15); transition: all 0.15s;
+  }
+  .rune-chip:hover { transform: translateY(-1px); }
+  .rune-chip em { font-style: normal; opacity: 0.75; margin-left: 4px; font-size: 11px; }
+  .rune-hint { font-size: 12px; opacity: 0.6; margin: 4px 0; }
 
   .set-bonus-section {
     margin-top: 8px;
