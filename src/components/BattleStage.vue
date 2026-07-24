@@ -175,6 +175,12 @@
               </span>
             </div>
           </div>
+          <button
+            v-if="showScrollToBottomBtn"
+            class="scroll-to-bottom-btn"
+            title="回到最新日志"
+            @click="scrollFullLogToBottom"
+          >↓</button>
         </div>
       </div>
     </teleport>
@@ -308,21 +314,45 @@ function clearRealtimeLog() {
 // 新日志到达时仅当用户已在底部附近（未向上翻看历史）才自动滚动，
 // 避免用户回看历史日志时被新日志强制拉回底部。
 const fullLogBody = ref(null)
+// 悬浮「回到底部」按钮：向上翻看日志时出现，回到最下方时消失
+const showScrollToBottomBtn = ref(false)
 // 用户是否在底部附近（距底 < 80px 视为贴底）
 function isUserNearBottom() {
   const el = fullLogBody.value
   if (!el) return true
   return el.scrollHeight - el.scrollTop - el.clientHeight < 80
 }
+// 滚动事件：根据距底距离切换悬浮按钮显隐
+function handleLogScroll() {
+  showScrollToBottomBtn.value = !isUserNearBottom()
+}
 function scrollFullLogToBottom() {
   nextTick(() => {
     const el = fullLogBody.value
     if (el) el.scrollTop = el.scrollHeight
+    showScrollToBottomBtn.value = false
   })
 }
-watch(() => showFullLog.value, (v) => { if (v) scrollFullLogToBottom() })
+// 弹窗开关：打开时挂载滚动监听并定位到底部；关闭时卸载监听并重置按钮
+watch(() => showFullLog.value, (v) => {
+  const el = fullLogBody.value
+  if (v) {
+    scrollFullLogToBottom()
+    nextTick(() => {
+      const el2 = fullLogBody.value
+      if (el2) el2.addEventListener('scroll', handleLogScroll, { passive: true })
+    })
+  } else if (el) {
+    el.removeEventListener('scroll', handleLogScroll)
+    showScrollToBottomBtn.value = false
+  }
+})
 watch(() => realtimeLogEntries.value.length, () => {
   if (showFullLog.value && isUserNearBottom()) scrollFullLogToBottom()
+})
+onUnmounted(() => {
+  const el = fullLogBody.value
+  if (el) el.removeEventListener('scroll', handleLogScroll)
 })
 
 const enemyEmoji = computed(() => {
@@ -1276,6 +1306,34 @@ onUnmounted(() => {
   display: flex;
   flex-direction: column;
   overflow: hidden;
+  position: relative;
+}
+
+/* 悬浮「回到底部」按钮：向上翻看日志时出现，回到最下方时消失 */
+.scroll-to-bottom-btn {
+  position: absolute;
+  bottom: 18px;
+  right: 18px;
+  width: 38px;
+  height: 38px;
+  border-radius: 50%;
+  background: rgba(139, 92, 246, 0.85);
+  color: #fff;
+  border: 1px solid rgba(255, 255, 255, 0.25);
+  cursor: pointer;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  font-size: 20px;
+  line-height: 1;
+  font-weight: 700;
+  box-shadow: 0 4px 12px rgba(0, 0, 0, 0.4);
+  z-index: 10;
+  transition: transform 0.15s ease, background 0.15s ease;
+}
+.scroll-to-bottom-btn:hover {
+  background: rgba(167, 139, 250, 0.95);
+  transform: translateY(-2px);
 }
 
 .modal-header {
