@@ -304,8 +304,16 @@ function clearRealtimeLog() {
   if (typeof clearIdleLogs === 'function') clearIdleLogs()
 }
 
-// 实时战斗日志弹窗自动滚动到底部：打开瞬间定位到最新一条，新日志到达时保持贴底
+// 实时战斗日志弹窗自动滚动到底部：打开瞬间定位到最新一条。
+// 新日志到达时仅当用户已在底部附近（未向上翻看历史）才自动滚动，
+// 避免用户回看历史日志时被新日志强制拉回底部。
 const fullLogBody = ref(null)
+// 用户是否在底部附近（距底 < 80px 视为贴底）
+function isUserNearBottom() {
+  const el = fullLogBody.value
+  if (!el) return true
+  return el.scrollHeight - el.scrollTop - el.clientHeight < 80
+}
 function scrollFullLogToBottom() {
   nextTick(() => {
     const el = fullLogBody.value
@@ -313,7 +321,9 @@ function scrollFullLogToBottom() {
   })
 }
 watch(() => showFullLog.value, (v) => { if (v) scrollFullLogToBottom() })
-watch(() => realtimeLogEntries.value.length, () => { if (showFullLog.value) scrollFullLogToBottom() })
+watch(() => realtimeLogEntries.value.length, () => {
+  if (showFullLog.value && isUserNearBottom()) scrollFullLogToBottom()
+})
 
 const enemyEmoji = computed(() => {
   const tier = props.encounter?.enemy?.tier

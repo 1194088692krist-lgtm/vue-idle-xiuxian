@@ -410,6 +410,7 @@
         <span class="idle-summary-meta">
           {{ lastSummary.zoneName }} · {{ Math.round(lastSummary.duration / 60000) }}分钟 · {{ lastSummary.encounters }}次探索
         </span>
+        <button class="btn-view-full-log" @click="showSummaryLog = true">📜 查看完整日志</button>
       </div>
 
       <!-- 挂机统计 -->
@@ -512,6 +513,51 @@
         </div>
       </div>
     </div>
+
+    <!-- 挂机结算日志弹窗：复用 displayLogs（挂机结束后展示 lastSummary.logs 快照） -->
+    <teleport to="body">
+      <div v-if="showSummaryLog" class="battle-log-modal" @click.self="showSummaryLog = false">
+        <div class="battle-log-modal-content">
+          <div class="modal-header">
+            <span class="modal-title">📜 挂机完整日志</span>
+            <div class="modal-actions">
+              <button class="btn-clear-log" @click="clearIdleLogs" title="清空当前日志">清空日志</button>
+              <button class="close-btn" @click="showSummaryLog = false">×</button>
+            </div>
+          </div>
+          <div class="battle-log-modal-body" ref="summaryLogBody">
+            <div v-if="!summaryLogEntries.length" class="empty-log-tip">暂无日志</div>
+            <div
+              v-for="(log, idx) in summaryLogEntries"
+              :key="idx"
+              class="rt-log-item"
+              :class="log.type"
+            >
+              <span class="rt-log-time">{{ log.time }}</span>
+              <span v-if="log.avatar" class="rt-log-avatar-wrap">
+                <img :src="log.avatar" class="rt-log-avatar" loading="lazy" decoding="async" />
+              </span>
+              <span v-else class="rt-log-bullet" :class="log.type">•</span>
+              <span class="rt-log-text">
+                <template v-if="log.text">{{ log.text }}</template>
+                <template v-if="log.parts && log.parts.length">
+                  <span
+                    v-for="(part, pi) in log.parts"
+                    :key="pi"
+                    class="rt-log-part"
+                    :class="{ 'has-icon': !!part.icon }"
+                  >
+                    <img v-if="part.icon" :src="part.icon" class="rt-log-part-icon" loading="lazy" decoding="async" />
+                    <span v-if="part.text">{{ part.text }}</span>
+                  </span>
+                </template>
+                <span v-if="log.detail" class="rt-log-detail"> ({{ log.detail }})</span>
+              </span>
+            </div>
+          </div>
+        </div>
+      </div>
+    </teleport>
 
     <!-- 队伍选择弹窗 -->
     <Teleport to="body">
@@ -908,7 +954,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
+import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { zones, BUILD_TIERS } from '../plugins/zones'
 import { useIdleSystem } from '../composables/useIdleSystem'
@@ -985,8 +1031,31 @@ const {
   bossChallengeBossName,
   bossChallengeZoneName,
   bossChallengeSummary,
-  currentEncounterSummary
+  currentEncounterSummary,
+  displayLogs,
+  clearIdleLogs
 } = useIdleSystem()
+
+// ===== 挂机结算日志弹窗（挂机结束后回看完整日志） =====
+const showSummaryLog = ref(false)
+const summaryLogBody = ref(null)
+// 复用 BattleStage 的数据源：挂机结束后 displayLogs 自动切换到 lastSummary.logs 快照
+const summaryLogEntries = computed(() => {
+  const arr = displayLogs.value || []
+  if (arr.length && typeof arr[0] === 'string') {
+    return arr.map(t => ({ type: 'info', text: t, time: '', avatar: null }))
+  }
+  return arr
+})
+// 弹窗打开时滚动到底部
+watch(() => showSummaryLog.value, (v) => {
+  if (v) {
+    nextTick(() => {
+      const el = summaryLogBody.value
+      if (el) el.scrollTop = el.scrollHeight
+    })
+  }
+})
 
 // 匹配度配色
 const matchColor = computed(() => {
@@ -2405,6 +2474,163 @@ onUnmounted(() => {
   color: #E8E2D5;
   font-weight: 500;
 }
+.btn-view-full-log {
+  margin-left: auto;
+  padding: 4px 10px;
+  background: rgba(218, 165, 32, 0.15);
+  border: 1px solid rgba(218, 165, 32, 0.5);
+  color: #DAA520;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+  transition: all 0.2s;
+}
+.btn-view-full-log:hover {
+  background: rgba(218, 165, 32, 0.3);
+  border-color: #DAA520;
+}
+
+/* ===== 挂机结算日志弹窗（复用 BattleStage 的 class，此处补充 ZoneSelector 缺失的核心布局样式） ===== */
+.battle-log-modal {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  z-index: 9999;
+}
+.battle-log-modal-content {
+  width: min(92vw, 760px);
+  max-height: 85vh;
+  background: #1a1a2e;
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 12px;
+  display: flex;
+  flex-direction: column;
+  overflow: hidden;
+}
+.modal-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  padding: 12px 16px;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+}
+.modal-title {
+  font-size: 16px;
+  font-weight: bold;
+  color: #DAA520;
+}
+.modal-actions {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+}
+.btn-clear-log {
+  padding: 4px 10px;
+  background: rgba(239, 68, 68, 0.15);
+  border: 1px solid rgba(239, 68, 68, 0.4);
+  color: #ef4444;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 12px;
+}
+.btn-clear-log:hover {
+  background: rgba(239, 68, 68, 0.3);
+}
+.close-btn {
+  width: 28px;
+  height: 28px;
+  background: transparent;
+  border: 1px solid rgba(255, 255, 255, 0.2);
+  color: #fff;
+  border-radius: 6px;
+  cursor: pointer;
+  font-size: 18px;
+  line-height: 1;
+}
+.close-btn:hover {
+  background: rgba(255, 255, 255, 0.1);
+}
+.battle-log-modal-body {
+  flex: 1;
+  overflow-y: auto;
+  padding: 12px 16px;
+}
+.battle-log-modal-body::-webkit-scrollbar {
+  width: 6px;
+}
+.battle-log-modal-body::-webkit-scrollbar-thumb {
+  background: rgba(218, 165, 32, 0.3);
+  border-radius: 3px;
+}
+.empty-log-tip {
+  text-align: center;
+  color: rgba(255, 255, 255, 0.3);
+  padding: 40px 0;
+  font-size: 14px;
+}
+.rt-log-item {
+  display: flex;
+  align-items: flex-start;
+  gap: 6px;
+  padding: 4px 8px;
+  border-left: 3px solid rgba(255, 255, 255, 0.1);
+  margin-bottom: 2px;
+  font-size: 13px;
+  line-height: 1.5;
+  color: #e5e7eb;
+}
+.rt-log-time {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 11px;
+  white-space: nowrap;
+  flex-shrink: 0;
+}
+.rt-log-avatar-wrap {
+  flex-shrink: 0;
+}
+.rt-log-avatar {
+  width: 20px;
+  height: 20px;
+  border-radius: 4px;
+  vertical-align: middle;
+}
+.rt-log-bullet {
+  color: #9ca3af;
+  flex-shrink: 0;
+}
+.rt-log-text {
+  word-break: break-word;
+}
+.rt-log-detail {
+  color: rgba(255, 255, 255, 0.4);
+  font-size: 12px;
+}
+.rt-log-part {
+  display: inline;
+}
+.rt-log-part-icon {
+  width: 16px;
+  height: 16px;
+  vertical-align: middle;
+}
+/* 日志类型配色 */
+.rt-log-item.info { color: #93c5fd; }
+.rt-log-item.info .rt-log-bullet { color: #93c5fd; }
+.rt-log-item.warning { color: #fbbf24; }
+.rt-log-item.warning .rt-log-bullet { color: #fbbf24; }
+.rt-log-item.victory { color: #4ade80; }
+.rt-log-item.victory .rt-log-bullet { color: #4ade80; }
+.rt-log-item.defeat { color: #f87171; }
+.rt-log-item.defeat .rt-log-bullet { color: #f87171; }
+.rt-log-item.enemy-boss { color: #f87171; }
+.rt-log-item.enemy-boss .rt-log-bullet { color: #f87171; }
+.rt-log-item.drop { color: #fbbf24; }
+.rt-log-item.drop .rt-log-bullet { color: #fbbf24; }
+.rt-log-item.reward-equipment { color: #fbbf24; }
+.rt-log-item.reward-equipment .rt-log-bullet { color: #fbbf24; }
 
 /* 挂机统计 */
 .idle-summary {
