@@ -4,7 +4,7 @@
 // 掉落表与「决策 2」一致；分解返货币遵循"净 sink"（返量低于直掉期望）。
 import {
   affixPool, getAffixesForSlot, rollQualityTier, rollAffixQualityValue, inferAffixQualityTier
-} from './buildSystem'
+} from './buildSystem.js'
 
 // 词缀数量上限（镜像 equipment.js reforgeConfig.affixMaxCount，避免反向依赖 equipment → 本模块）
 const AFFIX_MAX_BY_RARITY = { common: 1, uncommon: 2, rare: 3, epic: 4, legendary: 5, mythic: 6 }
@@ -57,6 +57,20 @@ function findAffixDef(affix) {
 function availableNewAffixDefs(eq) {
   const existing = new Set((eq.affixes || []).map(a => a.id))
   return affixPool.filter(a => a.slots.includes(eq.slot) && !existing.has(a.id))
+}
+
+// 凝律石升档成本：随档位递增（Playtest Sim C 修正——避免 craft 过于线性廉价）
+// 从 currentTier 升一档所需凝律石数量：越高档越贵，T2→T1 最贵；全 T1 毕业约 40+ 凝律石（≈20 小时定向挂机）
+export function lawStoneCost(currentTier) {
+  return ({ 6: 1, 5: 2, 4: 3, 3: 4, 2: 5 })[currentTier] || 1
+}
+// 计算使用某货币的成本（默认 1；凝律石按目标词缀当前档位递增）
+export function getCraftCost(currencyId, eq, targetAffixId) {
+  if (currencyId === 'law_stone') {
+    const af = (eq.affixes || []).find(a => a.id === targetAffixId)
+    if (af) return lawStoneCost(af.qualityTier || 4)
+  }
+  return 1
 }
 
 // 凝律石：指定词缀提升一档（重 roll 该档数值）

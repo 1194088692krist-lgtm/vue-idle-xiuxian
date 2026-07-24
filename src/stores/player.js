@@ -5,7 +5,7 @@ import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pill
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
-import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards } from '../plugins/craftCurrency'
+import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
@@ -1347,17 +1347,21 @@ export const usePlayerStore = defineStore('player', {
       if (!equip) return { success: false, message: '装备不存在' }
       if (equip.corrupted && currencyId !== 'blood_sigil') return { success: false, message: '已腐化装备不可再 craft' }
       // 锁灵符特殊：解锁免费，仅"锁定"消耗 1 个
+      let cost = 1
       if (currencyId === 'lock_rune') {
         const af = (equip.affixes || []).find(a => a.id === targetAffixId)
         if (!af) return { success: false, message: '词缀不存在' }
-        if (!af.locked && !this.consumeCraftCurrency(currencyId, 1)) return { success: false, message: `${craftCurrencies[currencyId]?.name}不足` }
+        if (af.locked) cost = 0 // 解锁免费
       } else {
-        if (!this.consumeCraftCurrency(currencyId, 1)) return { success: false, message: `${craftCurrencies[currencyId]?.name}不足` }
+        cost = getCraftCost(currencyId, equip, targetAffixId) // 凝律石等按档位递增
+      }
+      if (cost > 0 && !this.consumeCraftCurrency(currencyId, cost)) {
+        return { success: false, message: `${craftCurrencies[currencyId]?.name}不足（需 ${cost} 个）` }
       }
       const result = applyCraftCurrency(equip, currencyId, targetAffixId, { allowEmpty: !!this.allowRiskyAnnul })
       if (!result.success) {
         // 失败则退回货币（除血祭已腐化的情况）
-        if (currencyId !== 'blood_sigil') this.gainCraftCurrency(currencyId, 1)
+        if (currencyId !== 'blood_sigil' && cost > 0) this.gainCraftCurrency(currencyId, cost)
         return result
       }
       // 血祭碎裂：移除装备
