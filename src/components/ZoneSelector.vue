@@ -588,20 +588,12 @@
       </div>
     </Teleport>
 
-    <!-- 全屏立绘查看器 -->
-    <Teleport to="body">
-      <div v-if="showAvatarViewer" class="avatar-fullscreen" @click="closeAvatarViewer">
-        <img
-          v-if="avatarViewerMember && getCharacterAvatar(avatarViewerMember)"
-          :src="getCharacterAvatar(avatarViewerMember)"
-          class="avatar-fullscreen-img"
-          @click.stop
-        />
-        <div v-else class="avatar-fullscreen-placeholder">暂无立绘</div>
-        <div class="avatar-fullscreen-name">{{ avatarViewerMember?.name || '' }}</div>
-        <div class="avatar-fullscreen-hint">点击任意位置关闭</div>
-      </div>
-    </Teleport>
+    <!-- 全屏立绘查看器：复用 CharacterPortraitModal，支持皮肤切换 -->
+    <CharacterPortraitModal
+      v-if="showAvatarViewer && avatarViewerMember"
+      :character="avatarViewerMember"
+      @close="closeAvatarViewer"
+    />
 
     <!-- BOSS 挑战面板 -->
     <Teleport to="body">
@@ -923,6 +915,7 @@ import { useIdleSystem } from '../composables/useIdleSystem'
 import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
 import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
+import CharacterPortraitModal from './CharacterPortraitModal.vue'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
 import { getPillsByZone } from '../plugins/pills'
