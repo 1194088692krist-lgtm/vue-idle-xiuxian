@@ -1065,24 +1065,29 @@ function getLateZoneMult(zoneId) {
 
 function createBossEnemy(bossData, effectiveZone) {
   const secretLv = effectiveZone.difficulty
-  // boss 基础 stats 现已与 recommendedStats（凶险档）量级对齐，
-  // 再按 enemyScale 缩放：游历0.30/试炼0.60/凶险1.00/绝境1.60/灭世2.50
-  // 这样灭世档 boss 是凶险档的 2.5 倍，避免高难度档仍被秒杀。
-  // 应用 BOSS_POWER_MULTIPLIER（1.8 倍）+ 后期秘境额外倍率（LATE_ZONE_ENEMY_MULT）
+  // 平衡修复（v2）：BOSS 的 HP/DEF/ATK 三维解耦，避免秒杀
+  //   - HP/DEF 用 totalBossMult（保证战斗长度和破防需求）
+  //   - ATK 基于 zone.recommendedStats.health 设计，让推荐属性玩家能扛 5-7 回合
+  //     原 ATK 用 totalBossMult 导致冰凰 ATK=46800 ≈ 推荐血量 24000 的 2 倍，一回合秒杀
   const scale = effectiveZone.enemyScale || 1
   const lateMult = getLateZoneMult(effectiveZone.id)
   const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult
   const scaledHealth = Math.floor(bossData.stats.health * scale * totalBossMult)
-  const scaledAttack = Math.floor(bossData.stats.attack * scale * totalBossMult)
   const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale * totalBossMult)
   const scaledSpeed = Math.floor((bossData.stats.speed || 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
+  // BOSS 攻击力：基于推荐血量的固定比例，后期秘境温和增长
+  // 凶险档每回合打推荐血量玩家约 15-18%（5-7 回合击杀），给玩家反击时间
+  // boss 间差异体现在 HP/DEF/速度/技能上，攻击力同图统一以保证数值可控
+  const recHealth = (effectiveZone.recommendedStats?.health || bossData.stats.health * 0.1) * scale
+  const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
+  const bossAtkRatio = 0.18
+  const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
   // 高难度档 boss 附加额外战斗属性，让其对高 build 玩家有真实威胁
-  // combatBoost 提升自身全部战斗属性（攻击/速度/暴击等综合）
-  const bossCombatBoost = Math.min(0.6, Math.max(0, (scale - 1) * 0.22) + (lateMult - 1) * 0.15)
-  // finalDamageBoost 提升最终伤害（独立乘区），后期秘境 boss 显著强化
-  const bossFinalDamageBoost = Math.min(0.6, 0.1 + Math.max(0, (scale - 1) * 0.22) + (lateMult - 1) * 0.18)
+  const bossCombatBoost = Math.min(0.4, Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.08)
+  // finalDamageBoost 温和化（原值过高让 boss 攻击端过强）
+  const bossFinalDamageBoost = Math.min(0.25, 0.03 + Math.max(0, (scale - 1) * 0.08) + (lateMult - 1) * 0.04)
   // finalDamageReduce 让 boss 抗打（降低承受伤害）
-  const bossFinalDamageReduce = Math.min(0.5, Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.12)
+  const bossFinalDamageReduce = Math.min(0.4, Math.max(0, (scale - 1) * 0.12) + (lateMult - 1) * 0.08)
   const baseStats = {
     health: scaledHealth,
     maxHealth: scaledHealth,
