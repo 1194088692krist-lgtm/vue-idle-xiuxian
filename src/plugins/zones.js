@@ -441,16 +441,17 @@ zones.forEach(zone => {
 
 // 各秘境灵石消耗配置（按 游历/试炼/凶险/绝境/灭世 五档）
 // 迷雾谷为基准，其余按比例
+// 通胀治理：提升中后期秘境消耗，匹配挂机产出量级（原混沌界灭世仅 1250/场 vs 产出 2.2万/场，净产出比 96%）
 const MISTY_VALLEY_COSTS = [50, 100, 150, 200, 250]
 const ZONE_COST_MULTIPLIER = {
-  forest_edge: 0,        // 青萝林：无消耗
-  misty_valley: 1,       // 迷雾谷：基准
-  phoenix_cave: 1.2,     // 凤凰窟
-  dragon_abyss: 1.5,     // 龙渊
-  ghost_wasteland: 1.8,  // 鬼荒原
-  ice_palace: 2,         // 冰雪宫
-  immortal_ruins: 3,     // 仙墟
-  chaos_realm: 5         // 混沌界
+  forest_edge: 0,        // 青萝林：无消耗（新手图保留）
+  misty_valley: 1,       // 迷雾谷：基准 250
+  phoenix_cave: 1.2,     // 凤凰窟：300
+  dragon_abyss: 1.5,     // 龙渊：375
+  ghost_wasteland: 2,    // 鬼荒原：500（原1.8）
+  ice_palace: 3,         // 冰雪宫：750（原2）
+  immortal_ruins: 5,     // 仙墟：1250（原3）
+  chaos_realm: 10        // 混沌界：2500（原5，提升一倍以回收通胀）
 }
 
 // 为每张秘境生成内置的 5 档难度（八图全开，minLevel 统一为 1）

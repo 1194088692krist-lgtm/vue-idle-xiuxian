@@ -93,16 +93,31 @@ export const calculateTotalExpToLevel = (level) => {
 
 export const calculateBreakthroughCost = (level) => {
   const phase = getPhaseByLevel(level)
-  const phaseMultiplier = {
-    early: 1,
-    mid: 3,
-    late: 10,
-    endgame: 30
-  }[phase.name]
-  
-  const spiritStones = Math.floor(100 * Math.pow(1.3, level - 1))
-  const cultivation = calculateLevelExp(level) * 2
-  
+
+  // 灵石成本曲线（修正通胀根因：原 1.3^level × phaseMult 在 endgame 自爆到 10^17 不可达）
+  // 新曲线：分段增长，确保 endgame 可达但昂贵，匹配挂机产出速率
+  // - early (1-27)：100 × 1.25^level，前期快速成长，约 100~2万
+  // - mid   (28-45)：3 × 100 × level^1.8，中期线性增长，约 3万~100万
+  // - late  (46-72)：10 × 200 × level^2.2，后期多项式，约 100万~5000万
+  // - endgame (73-126)：50 × level^2.8，终局可达但累计需长期挂机，约 800万~2亿
+  let spiritStones
+  if (level >= 73) {
+    // endgame：纯多项式，level 73 ≈ 800万、level 100 ≈ 5000万、level 126 ≈ 2亿（累计约 30亿）
+    spiritStones = Math.floor(50 * Math.pow(level, 2.8))
+  } else if (level >= 46) {
+    // late：多项式
+    spiritStones = Math.floor(10 * 200 * Math.pow(level, 2.2))
+  } else if (level >= 28) {
+    // mid：温和多项式
+    spiritStones = Math.floor(3 * 100 * Math.pow(level, 1.8))
+  } else {
+    // early：指数但基数小，前期快速成长
+    spiritStones = Math.floor(100 * Math.pow(1.25, level - 1))
+  }
+
+  // 修为成本：保持温和，避免双重指数压力
+  const cultivation = Math.floor(calculateLevelExp(level) * 2 * (level >= 73 ? 5 : (level >= 46 ? 3 : 1)))
+
   const requiredMaterials = []
   if (level % 9 === 0) {
     const bossMaterial = getBossMaterialForLevel(level)
@@ -110,10 +125,10 @@ export const calculateBreakthroughCost = (level) => {
       requiredMaterials.push({ ...bossMaterial, amount: 1 })
     }
   }
-  
+
   return {
-    spiritStones: spiritStones * phaseMultiplier,
-    cultivation: cultivation * phaseMultiplier,
+    spiritStones,
+    cultivation,
     materials: requiredMaterials
   }
 }

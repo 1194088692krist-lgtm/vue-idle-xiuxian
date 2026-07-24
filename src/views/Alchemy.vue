@@ -37,6 +37,14 @@
           <span class="tab-icon">♻️</span>
           <span class="tab-label">回炉转生</span>
         </div>
+        <div
+          class="furnace-tab"
+          :class="{ active: activeTab === 'shop' }"
+          @click="switchToShop"
+        >
+          <span class="tab-icon">🏪</span>
+          <span class="tab-label">灵石阁</span>
+        </div>
       </div>
 
       <div class="card-body">
@@ -581,6 +589,89 @@
             <p style="color: #d4a017;">当前努力值的 10% 将永久继承为天赋值加成。</p>
           </n-modal>
         </template>
+
+        <!-- ==================== 灵石阁（商店） ==================== -->
+        <template v-if="activeTab === 'shop'">
+          <div class="tips-box">
+            <InfoCircleOutlined />
+            <span>消耗品增益丹随境界定价自动变贵，是回收通胀的主力。黑市每日刷新，限量大额回收囤积灵石。</span>
+          </div>
+
+          <!-- 当前资产 + 出售折价状态 -->
+          <div class="shop-status-bar">
+            <span class="shop-balance">灵石：<b class="gold-text">{{ formatNumber(playerStore.spiritStones) }}</b></span>
+            <span class="shop-sell-tracker">本月已售装备：{{ playerStore.sellTracker?.soldCount || 0 }} 件（折率 {{ currentSellRateText }}）</span>
+            <span class="shop-active-buffs" v-if="activeBuffCount > 0">生效增益：{{ activeBuffCount }} 个</span>
+          </div>
+
+          <!-- 消耗品区 -->
+          <div class="section">
+            <h3 class="section-title">消耗品（增益丹）</h3>
+            <div class="shop-grid">
+              <div
+                v-for="item in consumableList"
+                :key="item.id"
+                class="shop-card glass-card"
+              >
+                <div class="shop-card-header">
+                  <span class="shop-icon">{{ item.icon }}</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                </div>
+                <p class="shop-desc">{{ item.description }}</p>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ formatNumber(item.price) }} 灵石</span>
+                  <button
+                    class="btn-small btn-buy"
+                    :disabled="playerStore.spiritStones < item.price"
+                    @click="buyConsumable(item.id)"
+                  >购买</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
+          <!-- 黑市区 -->
+          <div class="section">
+            <div class="black-market-header">
+              <h3 class="section-title">黑市（限量）</h3>
+              <button
+                class="btn-small btn-refresh"
+                :disabled="manualRefreshRemaining <= 0 || playerStore.spiritStones < nextRefreshCost"
+                @click="refreshBlackMarket"
+              >
+                手动刷新 ({{ BLACK_MARKET_CONFIG.manualRefreshMaxPerDay - (playerStore.shopState?.manualRefreshCount || 0) }}/{{ BLACK_MARKET_CONFIG.manualRefreshMaxPerDay }})
+                - {{ formatNumber(nextRefreshCost) }} 灵石
+              </button>
+            </div>
+            <p class="black-market-hint">下次自动刷新：{{ autoRefreshCountdown }}</p>
+            <div class="shop-grid">
+              <div
+                v-for="item in blackMarketItems"
+                :key="item.uid"
+                class="shop-card black-market-card"
+                :class="{ sold: item.sold }"
+              >
+                <div class="shop-card-header">
+                  <span class="shop-icon">{{ item.icon }}</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                  <span class="rarity-badge" :class="item.rarity">{{ rarityName(item.rarity) }}</span>
+                </div>
+                <p class="shop-desc">{{ item.description }}</p>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ formatNumber(item.price) }} 灵石</span>
+                  <button
+                    v-if="!item.sold"
+                    class="btn-small btn-buy"
+                    :disabled="playerStore.spiritStones < item.price"
+                    @click="buyBlackMarket(item.uid)"
+                  >购买</button>
+                  <span v-else class="sold-tag">已售罄</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="blackMarketItems.length === 0" class="empty-state">黑市尚未开张…</div>
+          </div>
+        </template>
       </div>
     </div>
     <div class="log-section" v-if="selectedRecipe && activeTab === 'pill'">
@@ -608,6 +699,7 @@
   } from '@ant-design/icons-vue'
   import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
+  import { BLACK_MARKET_CONFIG, getManualRefreshCost, getConsumablePrice, CONSUMABLES } from '../plugins/shopConfig'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -618,6 +710,86 @@
   const craftCount = ref(1)
   const selectedRebirthMember = ref(null)
   const showRebirthConfirm = ref(false)
+
+  // ===== 灵石阁（商店）相关 =====
+  const blackMarketItems = ref([])
+  const shopTick = ref(0) // 响应式触发，确保 shopState 变更后刷新
+
+  // 切换到商店 tab 时初始化黑市数据
+  function switchToShop() {
+    activeTab.value = 'shop'
+    loadBlackMarket()
+  }
+  function loadBlackMarket() {
+    blackMarketItems.value = playerStore.getBlackMarketItems()
+    playerStore.cleanupExpiredBuffs()
+    shopTick.value++
+  }
+  // 消耗品列表（响应式，随境界变化）
+  const consumableList = computed(() => {
+    shopTick.value // 依赖触发
+    return playerStore.getConsumableList()
+  })
+  // 当前出售折率文本
+  const currentSellRateText = computed(() => {
+    const count = playerStore.sellTracker?.soldCount || 0
+    if (count < 50) return '10%'
+    if (count < 150) return '6%'
+    if (count < 300) return '3%'
+    return '1.5%'
+  })
+  // 活跃增益数
+  const activeBuffCount = computed(() => {
+    shopTick.value
+    playerStore.cleanupExpiredBuffs()
+    return (playerStore.activeBuffs || []).length
+  })
+  // 手动刷新剩余次数
+  const manualRefreshRemaining = computed(() => {
+    shopTick.value
+    const used = playerStore.shopState?.manualRefreshCount || 0
+    return Math.max(0, BLACK_MARKET_CONFIG.manualRefreshMaxPerDay - used)
+  })
+  // 下次手动刷新成本
+  const nextRefreshCost = computed(() => {
+    shopTick.value
+    const used = playerStore.shopState?.manualRefreshCount || 0
+    return getManualRefreshCost(used)
+  })
+  // 自动刷新倒计时
+  const autoRefreshCountdown = computed(() => {
+    shopTick.value
+    const last = playerStore.shopState?.blackMarketRefreshAt || 0
+    const next = last + BLACK_MARKET_CONFIG.autoRefreshInterval
+    const remain = next - Date.now()
+    if (remain <= 0) return '即将刷新'
+    const h = Math.floor(remain / 3600000)
+    const m = Math.floor((remain % 3600000) / 60000)
+    return `${h}小时${m}分后`
+  })
+  function formatNumber(n) {
+    if (n == null) return '0'
+    return Number(n).toLocaleString()
+  }
+  function rarityName(r) {
+    const map = { common: '凡品', uncommon: '良品', rare: '中品', epic: '上品', legendary: '极品', mythic: '仙品' }
+    return map[r] || r
+  }
+  async function buyConsumable(id) {
+    const r = await playerStore.buyConsumable(id)
+    r.success ? message.success(r.message) : message.error(r.message)
+    shopTick.value++
+  }
+  async function buyBlackMarket(uid) {
+    const r = await playerStore.buyBlackMarketItem(uid)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBlackMarket()
+  }
+  async function refreshBlackMarket() {
+    const r = await playerStore.refreshBlackMarket()
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBlackMarket()
+  }
 
   // 装备锻打相关
   const forgeTab = ref('enhance')
@@ -2252,5 +2424,144 @@
   html:not(.dark) .alchemy-page .reforge-stat,
   html:not(.dark) .alchemy-page .disassemble-summary {
     color: #F5F0E8;
+  }
+
+  /* ===== 灵石阁（商店）样式 ===== */
+  .shop-status-bar {
+    display: flex;
+    gap: 16px;
+    flex-wrap: wrap;
+    padding: 10px 14px;
+    margin-bottom: 14px;
+    background: rgba(218, 165, 32, 0.08);
+    border: 1px solid rgba(218, 165, 32, 0.25);
+    border-radius: 8px;
+    font-size: 13px;
+    color: #d4c5a0;
+    align-items: center;
+  }
+  .shop-balance .gold-text,
+  .gold-text {
+    color: #FFD700;
+    font-size: 15px;
+  }
+  .shop-sell-tracker { color: #b8a888; }
+  .shop-active-buffs { color: #7ee787; }
+
+  .shop-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(220px, 1fr));
+    gap: 12px;
+    margin-top: 10px;
+  }
+  .shop-card {
+    padding: 12px;
+    border: 1px solid rgba(139, 92, 246, 0.25);
+    border-radius: 8px;
+    background: rgba(0, 0, 0, 0.25);
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    transition: border-color 0.15s ease;
+  }
+  .shop-card:hover {
+    border-color: rgba(218, 165, 32, 0.6);
+  }
+  .shop-card.sold {
+    opacity: 0.45;
+    filter: grayscale(0.6);
+  }
+  .shop-card-header {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+  }
+  .shop-icon { font-size: 22px; }
+  .shop-name {
+    font-weight: 600;
+    color: #e5e7eb;
+    flex: 1;
+  }
+  .shop-desc {
+    font-size: 12px;
+    color: #9ca3af;
+    flex: 1;
+    margin: 0;
+    min-height: 32px;
+  }
+  .shop-card-footer {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 4px;
+  }
+  .shop-price {
+    color: #FFD700;
+    font-weight: 600;
+    font-size: 13px;
+  }
+  .btn-buy {
+    background: rgba(34, 197, 94, 0.7);
+    color: #fff;
+    border: 1px solid rgba(34, 197, 94, 0.9);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: all 0.15s ease;
+  }
+  .btn-buy:hover:not(:disabled) {
+    background: rgba(34, 197, 94, 0.9);
+  }
+  .btn-buy:disabled {
+    background: rgba(100, 100, 100, 0.4);
+    color: #888;
+    cursor: not-allowed;
+    border-color: rgba(100, 100, 100, 0.4);
+  }
+  .btn-refresh {
+    background: rgba(139, 92, 246, 0.6);
+    color: #fff;
+    border: 1px solid rgba(139, 92, 246, 0.8);
+    padding: 4px 12px;
+    border-radius: 6px;
+    cursor: pointer;
+    font-size: 12px;
+  }
+  .btn-refresh:disabled {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .black-market-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    flex-wrap: wrap;
+    gap: 8px;
+  }
+  .black-market-hint {
+    font-size: 11px;
+    color: #6b7280;
+    margin: 4px 0 0;
+  }
+  .black-market-card {
+    border-color: rgba(139, 92, 246, 0.4);
+  }
+  .rarity-badge {
+    font-size: 10px;
+    padding: 1px 6px;
+    border-radius: 4px;
+    background: rgba(255, 255, 255, 0.1);
+  }
+  .rarity-badge.common { color: #9ca3af; }
+  .rarity-badge.uncommon { color: #88cc44; }
+  .rarity-badge.rare { color: #7db4ff; }
+  .rarity-badge.epic { color: #c89bff; }
+  .rarity-badge.legendary { color: #FFD700; }
+  .rarity-badge.mythic { color: #FF4500; }
+  .sold-tag {
+    color: #ef4444;
+    font-size: 12px;
+    font-style: italic;
   }
 </style>

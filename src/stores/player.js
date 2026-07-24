@@ -12,10 +12,41 @@ import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, ge
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
+import {
+  CONSUMABLES,
+  BLACK_MARKET_CONFIG,
+  PHASE_PRICE_MULT,
+  getConsumablePrice,
+  rollBlackMarketItems,
+  getManualRefreshCost
+} from '../plugins/shopConfig'
+import { getPhaseByLevel } from '../plugins/cultivationSystem'
 
 // 装备出售/分解相关常量
 // 出售折价率：出售价 = max(1, round(装备评分 * SELL_DISCOUNT_RATE)) 灵石
 const SELL_DISCOUNT_RATE = 0.1
+
+// 通胀治理：月度累计出售折价阶梯
+// 每月重置一次累计计数，当月累计出售量超过阈值后折价率阶梯下降
+// 阈值：前 50 件原价 0.1，50-150 件降至 0.06，150-300 件降至 0.03，300+ 件降至 0.015
+// 目的：斩断"挂机产装备→出售变现灵石"的无限乘数，重度玩家月度回收后变现效率衰减
+const SELL_TIER_THRESHOLDS = [
+  { upTo: 50, rate: 0.1 },      // 原价
+  { upTo: 150, rate: 0.06 },    // 降 40%
+  { upTo: 300, rate: 0.03 },    // 降 70%
+  { upTo: Infinity, rate: 0.015 } // 降 85%，重度变现玩家的地板价
+]
+function getSellDiscountRate(soldCount) {
+  for (const tier of SELL_TIER_THRESHOLDS) {
+    if (soldCount <= tier.upTo) return tier.rate
+  }
+  return SELL_TIER_THRESHOLDS[SELL_TIER_THRESHOLDS.length - 1].rate
+}
+// 获取当月 monthKey（YYYY-MM），用于跨月重置计数器
+function getCurrentMonthKey() {
+  const d = new Date()
+  return d.getFullYear() + '-' + String(d.getMonth() + 1).padStart(2, '0')
+}
 // 分解产出映射（基于品质）：强化石数量 + 洗练石数量（凡品不产洗练石）
 const EQUIPMENT_SLOTS = ['head', 'body', 'legs', 'feet', 'shoulder', 'hands', 'wrist', 'necklace', 'ring1', 'ring2', 'belt', 'artifact']
 const QUALITY_STONE_MAP = {
@@ -159,6 +190,22 @@ export const usePlayerStore = defineStore('player', {
     refinementStones: 0, // 洗练石数量
     petEssence: 0, // 灵宠精华
     petFragments: 0, // 灵宠升星碎片
+    // 通胀治理：装备出售月度累计计数器
+    // 当月累计出售装备达到一定量后，折价率阶梯下降，斩断"装备→灵石"无限变现乘数
+    // { monthKey: 'YYYY-MM', soldCount: N, lastResetTs: timestamp }
+    sellTracker: { monthKey: '', soldCount: 0, lastResetTs: 0 },
+    // 通胀治理：商店系统状态
+    shopState: {
+      blackMarketItems: [],   // 当前黑市商品列表
+      blackMarketRefreshAt: 0, // 上次刷新时间戳
+      manualRefreshCount: 0,  // 当日手动刷新次数
+      manualRefreshResetDay: 0 // 手动刷新计数重置日期（天）
+    },
+    // 通胀治理：增益丹激活状态（消耗品 shop 主力 sink）
+    // 每项 { itemId, expireAt, multiplier }
+    activeBuffs: [],
+    // 商店系统：已解锁外观/称号（黑市购买记录）
+    unlockedAppearances: [],
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
     runes: [], // 灵纹库存（M1，镶嵌用的灵纹实例数组）
@@ -1265,17 +1312,25 @@ export const usePlayerStore = defineStore('player', {
       return p
     },
     // 出售装备（获得灵石，按装备评分折价）
+    // 通胀治理：折价率随当月累计出售量阶梯下降
     async sellEquipment(equipment) {
       const index = this.items.findIndex(i => i.id === equipment.id)
       if (index === -1) {
         return { success: false, message: '装备不存在' }
       }
+      // 跨月重置计数器
+      const monthKey = getCurrentMonthKey()
+      if (this.sellTracker.monthKey !== monthKey) {
+        this.sellTracker = { monthKey, soldCount: 0, lastResetTs: Date.now() }
+      }
       const score = calculateEquipmentScore(equipment) || 0
-      const gained = Math.max(1, Math.round(score * SELL_DISCOUNT_RATE))
+      const rate = getSellDiscountRate(this.sellTracker.soldCount + 1)
+      const gained = Math.max(1, Math.round(score * rate))
       this.spiritStones += gained
+      this.sellTracker.soldCount += 1
       this.items.splice(index, 1)
       this.queueSave()
-      return { success: true, message: `成功出售装备，获得 ${gained} 灵石（评分 ${score}）` }
+      return { success: true, message: `成功出售装备，获得 ${gained} 灵石（评分 ${score}，折率 ${(rate * 100).toFixed(1)}%）` }
     },
     // 分解装备（获得强化石 / 洗练石）
     async disassembleEquipment(equipment) {
@@ -1634,6 +1689,7 @@ export const usePlayerStore = defineStore('player', {
     },
     // 批量出售装备（按当前筛选，统一折算为灵石）
     // 装备分类 → 多 slot 映射（支持 artifact/armor/accessory 分类概念）
+    // 通胀治理：折价率随当月累计出售量阶梯下降
     async batchSellEquipments(quality = null, equipmentType = null) {
       const CATEGORY_SLOTS = {
         artifact: ['artifact'],
@@ -1644,10 +1700,8 @@ export const usePlayerStore = defineStore('player', {
       const toSell = this.items.filter(item => {
         if (!isEquipmentItem(item)) return false
         if (allowedSlots) {
-          // 分类匹配：item.slot 必须在分类对应的 slot 列表内
           if (!allowedSlots.includes(item.slot)) return false
         } else if (equipmentType && equipmentType !== 'all' && item.slot !== equipmentType) {
-          // 单 slot 匹配（兼容旧调用：直接传 'head' 等具体 slot）
           return false
         }
         if (quality && item.quality !== quality) return false
@@ -1656,11 +1710,21 @@ export const usePlayerStore = defineStore('player', {
       if (toSell.length === 0) {
         return { success: false, message: '没有可出售的装备' }
       }
+      // 跨月重置计数器
+      const monthKey = getCurrentMonthKey()
+      if (this.sellTracker.monthKey !== monthKey) {
+        this.sellTracker = { monthKey, soldCount: 0, lastResetTs: Date.now() }
+      }
+      // 按累计计数逐件应用阶梯折价
       let total = 0
+      let cursor = this.sellTracker.soldCount
       toSell.forEach(eq => {
-        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * SELL_DISCOUNT_RATE))
+        cursor += 1
+        const rate = getSellDiscountRate(cursor)
+        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * rate))
       })
       this.spiritStones += total
+      this.sellTracker.soldCount += toSell.length
       const ids = new Set(toSell.map(e => e.id))
       this.items = this.items.filter(i => !ids.has(i.id))
       this.queueSave()
@@ -1670,6 +1734,7 @@ export const usePlayerStore = defineStore('player', {
       }
     },
     // 按 ID 列表批量出售装备（多选模式专用）
+    // 通胀治理：折价率随当月累计出售量阶梯下降
     async sellEquipmentsByIds(ids) {
       if (!Array.isArray(ids) || ids.length === 0) {
         return { success: false, message: '没有可出售的装备' }
@@ -1679,11 +1744,20 @@ export const usePlayerStore = defineStore('player', {
       if (toSell.length === 0) {
         return { success: false, message: '没有可出售的装备' }
       }
+      // 跨月重置计数器
+      const monthKey = getCurrentMonthKey()
+      if (this.sellTracker.monthKey !== monthKey) {
+        this.sellTracker = { monthKey, soldCount: 0, lastResetTs: Date.now() }
+      }
       let total = 0
+      let cursor = this.sellTracker.soldCount
       toSell.forEach(eq => {
-        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * SELL_DISCOUNT_RATE))
+        cursor += 1
+        const rate = getSellDiscountRate(cursor)
+        total += Math.max(1, Math.round((calculateEquipmentScore(eq) || 0) * rate))
       })
       this.spiritStones += total
+      this.sellTracker.soldCount += toSell.length
       const soldIds = new Set(toSell.map(e => e.id))
       this.items = this.items.filter(i => !soldIds.has(i.id))
       this.queueSave()
@@ -1740,6 +1814,158 @@ export const usePlayerStore = defineStore('player', {
       this.phantomCrystals += crystals
       this.queueSave()
       return { success: true, message: `成功使用 ${amount} 个妖兽核兑换 ${crystals} 幻灵结晶` }
+    },
+    // ===== 通胀治理：商店系统 =====
+    // 获取玩家当前境界阶段（用于消耗品定价缩放）
+    getShopPhaseMultiplier() {
+      const phase = getPhaseByLevel(this.level || 1)
+      return PHASE_PRICE_MULT[phase.name] || 1
+    },
+    // 获取当前可购买的消耗品列表（含动态价格）
+    getConsumableList() {
+      const mult = this.getShopPhaseMultiplier()
+      return CONSUMABLES.map(item => ({
+        ...item,
+        price: getConsumablePrice(item, mult === 1 ? 'early' : mult === 3 ? 'mid' : mult === 10 ? 'late' : 'endgame')
+      }))
+    },
+    // 购买消耗品（增益丹）：扣费 + 激活增益
+    buyConsumable(itemId) {
+      const list = this.getConsumableList()
+      const item = list.find(i => i.id === itemId)
+      if (!item) return { success: false, message: '商品不存在' }
+      if (this.spiritStones < item.price) {
+        return { success: false, message: `灵石不足，需要 ${item.price} 灵石` }
+      }
+      this.spiritStones -= item.price
+      // 激活增益（一次性 bossLuckyDrop 单独处理，持续型写入 activeBuffs）
+      if (item.effect.type === 'bossLuckyDrop') {
+        // 一次性效果：标记到下次 BOSS 战使用
+        if (!Array.isArray(this.activeBuffs)) this.activeBuffs = []
+        this.activeBuffs.push({
+          itemId: item.id,
+          expireAt: Date.now() + 24 * 3600 * 1000, // 24 小时内必须用掉
+          type: item.effect.type,
+          multiplier: item.effect.multiplier
+        })
+      } else {
+        if (!Array.isArray(this.activeBuffs)) this.activeBuffs = []
+        this.activeBuffs.push({
+          itemId: item.id,
+          expireAt: Date.now() + item.effect.duration * 1000,
+          type: item.effect.type,
+          multiplier: item.effect.multiplier
+        })
+      }
+      this.queueSave()
+      return { success: true, message: `购买 ${item.name} 成功，消耗 ${item.price} 灵石` }
+    },
+    // 清理过期增益
+    cleanupExpiredBuffs() {
+      if (!Array.isArray(this.activeBuffs)) return
+      const now = Date.now()
+      this.activeBuffs = this.activeBuffs.filter(b => b.expireAt > now)
+    },
+    // 获取某类型活跃增益的总倍率（供挂机系统查询）
+    getBuffMultiplier(type) {
+      this.cleanupExpiredBuffs()
+      if (!Array.isArray(this.activeBuffs)) return 0
+      return this.activeBuffs
+        .filter(b => b.type === type)
+        .reduce((sum, b) => sum + b.multiplier, 0)
+    },
+    // 消耗一次性增益（如 bossLuckyDrop，使用后移除一条）
+    consumeBuff(type) {
+      if (!Array.isArray(this.activeBuffs)) return false
+      const idx = this.activeBuffs.findIndex(b => b.type === type)
+      if (idx >= 0) {
+        this.activeBuffs.splice(idx, 1)
+        this.queueSave()
+        return true
+      }
+      return false
+    },
+    // ===== 黑市系统 =====
+    // 获取当前黑市商品列表（自动检测是否需要刷新）
+    getBlackMarketItems() {
+      const now = Date.now()
+      const state = this.shopState || { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      // 每日重置手动刷新计数
+      const today = Math.floor(now / (24 * 3600 * 1000))
+      if (state.manualRefreshResetDay !== today) {
+        state.manualRefreshCount = 0
+        state.manualRefreshResetDay = today
+      }
+      // 自动刷新（超过间隔）
+      if (now - state.blackMarketRefreshAt >= BLACK_MARKET_CONFIG.autoRefreshInterval || state.blackMarketItems.length === 0) {
+        state.blackMarketItems = rollBlackMarketItems()
+        state.blackMarketRefreshAt = now
+      }
+      this.shopState = state
+      return state.blackMarketItems
+    },
+    // 手动刷新黑市（消耗灵石，价格递增）
+    refreshBlackMarket() {
+      const now = Date.now()
+      const state = this.shopState || { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      const today = Math.floor(now / (24 * 3600 * 1000))
+      if (state.manualRefreshResetDay !== today) {
+        state.manualRefreshCount = 0
+        state.manualRefreshResetDay = today
+      }
+      if (state.manualRefreshCount >= BLACK_MARKET_CONFIG.manualRefreshMaxPerDay) {
+        return { success: false, message: `今日手动刷新次数已用尽（上限 ${BLACK_MARKET_CONFIG.manualRefreshMaxPerDay} 次）` }
+      }
+      const cost = getManualRefreshCost(state.manualRefreshCount)
+      if (this.spiritStones < cost) {
+        return { success: false, message: `灵石不足，刷新需要 ${cost} 灵石` }
+      }
+      this.spiritStones -= cost
+      state.blackMarketItems = rollBlackMarketItems()
+      state.blackMarketRefreshAt = now
+      state.manualRefreshCount += 1
+      this.shopState = state
+      this.queueSave()
+      return { success: true, message: `黑市已刷新，消耗 ${cost} 灵石` }
+    },
+    // 购买黑市商品
+    buyBlackMarketItem(uid) {
+      const items = this.getBlackMarketItems()
+      const idx = items.findIndex(i => i.uid === uid)
+      if (idx < 0) return { success: false, message: '商品不存在或已下架' }
+      const item = items[idx]
+      if (item.sold) return { success: false, message: '该商品已售罄' }
+      if (this.spiritStones < item.price) {
+        return { success: false, message: `灵石不足，需要 ${item.price} 灵石` }
+      }
+      // 发放奖励
+      if (item.grant) {
+        const g = item.grant
+        if (g.kind === 'craftCurrency') {
+          if (!this.craftCurrencies) this.craftCurrencies = {}
+          this.craftCurrencies[g.id] = (this.craftCurrencies[g.id] || 0) + g.amount
+        } else if (g.kind === 'material') {
+          if (!Array.isArray(this.materials)) this.materials = []
+          this.gainMaterial({ id: g.id, name: item.name.replace(/ ×\d+$/, ''), kind: 'boss_material', quality: 'mythic' })
+          for (let i = 1; i < g.amount; i++) {
+            this.gainMaterial({ id: g.id, name: item.name.replace(/ ×\d+$/, ''), kind: 'boss_material', quality: 'mythic' })
+          }
+        } else if (g.kind === 'resource') {
+          if (g.id === 'petEssence') this.petEssence += g.amount
+        }
+      }
+      // 外观/称号：记入 unlockedAppearances
+      if (item.type === 'appearance' || item.type === 'title') {
+        if (!Array.isArray(this.unlockedAppearances)) this.unlockedAppearances = []
+        if (!this.unlockedAppearances.includes(item.id)) {
+          this.unlockedAppearances.push(item.id)
+        }
+      }
+      this.spiritStones -= item.price
+      items[idx].sold = true
+      this.shopState.blackMarketItems = items
+      this.queueSave()
+      return { success: true, message: `成功购买 ${item.name}，消耗 ${item.price} 灵石` }
     },
     // 消耗 BOSS 挑战券（按 id 删除指定数量，从后往前删避免索引错位）
     consumeBossTicket(ticketId, count) {
