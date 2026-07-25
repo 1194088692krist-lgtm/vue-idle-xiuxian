@@ -3145,13 +3145,21 @@ function runOfflineEncounter(zone, diff, count) {
   s.regenerateSpirit()
   if (s.spiritStones < diff.spiritCost) return false
   s.spiritStones -= diff.spiritCost
-  // s.baseAttributes 已含 装备+套装+灵宠 加成（recomputeAttributes 统一烘焙），无需再叠加
-  const pAtk = s.baseAttributes.attack
-  const pHp = s.baseAttributes.health
-  // 离线胜率同样以 Build 匹配度为基准（兼容旧数值，做平滑过渡）
-  // 改为无量纲比例公式：避免不同秘境 recommendedStats 量级差异导致系数失效
+  // 修复：原实现用 s.buildStrength（玩家单人 Build）与按队伍总 Build 标定的 recommendedBuild 比较，
+  // 导致 3 人队伍时 ratio 被错算成 ~1/3，winChance 被 clamp 到 0.05 下限 → 95% 失败率。
+  // 现统一使用 getTeamTotalBuild()（与 UI buildRatio 口径一致），无队伍时回退到单人 Build。
+  const teamBuild = (typeof s.getTeamTotalBuild === 'function') ? s.getTeamTotalBuild() : (s.buildStrength || 1)
+  // 队伍有效属性聚合：取所有出战成员的 attack/health 之和（与推荐值标定口径一致）
+  let pAtk = s.baseAttributes.attack
+  let pHp = s.baseAttributes.health
+  const team = (typeof s.getTeamMembersDetail === 'function') ? s.getTeamMembersDetail() : []
+  if (team.length > 0) {
+    pAtk = team.reduce((sum, m) => sum + ((m.stats && m.stats.attack) || 0), 0)
+    pHp = team.reduce((sum, m) => sum + ((m.stats && m.stats.health) || 0), 0)
+  }
+  // 胜率公式：以队伍总 Build 匹配度为主，叠加属性比修正
   const recBuild = diff.recommendedBuild || 1
-  const ratio = (s.buildStrength || 1) / recBuild
+  const ratio = teamBuild / recBuild
   const recAtk = Math.max(1, diff.recommendedStats.attack)
   const recHp = Math.max(1, diff.recommendedStats.health)
   const atkRatio = pAtk / recAtk - 1
