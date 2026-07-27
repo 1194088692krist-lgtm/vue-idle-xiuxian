@@ -739,6 +739,7 @@
               size="small"
               style="width: 140px;"
             />
+            <button class="btn-small btn-outline" @click="pillConsumeCount = selectedPill?.count || 1">一键拉满</button>
           </div>
           <div class="detail-row">
             <span>说明</span>

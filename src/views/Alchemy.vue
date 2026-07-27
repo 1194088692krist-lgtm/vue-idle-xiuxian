@@ -128,6 +128,7 @@
               <div class="craft-count-row">
                 <span class="craft-count-label">炼制数量</span>
                 <n-input-number v-model:value="craftCount" :min="1" :max="maxCraftCount" :disabled="maxCraftCount <= 1" style="width: 120px;" />
+                <button class="btn-small btn-outline" :disabled="maxCraftCount <= 1" @click="craftCount = maxCraftCount">一键拉满</button>
               </div>
               <button
                 class="btn btn-primary craft-button"

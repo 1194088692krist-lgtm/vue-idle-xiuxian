@@ -653,9 +653,14 @@ onMounted(() => {
 }
 
 .title-version {
-  font-size: 11px;
-  color: #8B7355;
+  font-size: 13px;
+  font-weight: bold;
+  color: #FFD700;
   letter-spacing: 2px;
+  text-shadow:
+    0 1px 2px rgba(0, 0, 0, 0.8),
+    0 0 8px rgba(255, 215, 0, 0.4);
+  margin-top: 4px;
 }
 
 /* ===== 登录/注册面板 ===== */

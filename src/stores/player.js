@@ -1189,7 +1189,12 @@ export const usePlayerStore = defineStore('player', {
     addCultivationToPool(amount) {
       const numAmount = Number(amount)
       if (!Number.isFinite(numAmount) || numAmount <= 0) return
-      this.cultivationPool = (this.cultivationPool || 0) + numAmount
+      // 经验必须为整数：bonus（悟道丹 expGain 加成）是小数时会产生浮点数，
+      // 累积后变成 14171.26400000113 之类的脏数据，"一键拉满"会把小数分给角色。
+      // 这里统一 Math.floor，保证公共池始终是整数。
+      const intAmount = Math.floor(numAmount)
+      if (intAmount <= 0) return
+      this.cultivationPool = (this.cultivationPool || 0) + intAmount
       this.queueSave()
     },
     // 尝试突破
@@ -3184,9 +3189,14 @@ export const usePlayerStore = defineStore('player', {
     },
     // 从公共池分配修为给角色
     allocateCultivationToMember(memberId, amount) {
-      const numAmount = Number(amount)
+      const numAmount = Math.floor(Number(amount))
       if (!Number.isFinite(numAmount) || numAmount <= 0) {
         return { success: false, message: '无效的修为数量' }
+      }
+      // 防御：历史脏数据可能让 cultivationPool 残留小数（如 14171.264），
+      // 分配时把池子也取整，避免把小数塞进 member.experience。
+      if (!Number.isInteger(this.cultivationPool)) {
+        this.cultivationPool = Math.floor(this.cultivationPool || 0)
       }
       if (!this.cultivationPool || this.cultivationPool < numAmount) {
         return { success: false, message: '公共修为池不足' }
