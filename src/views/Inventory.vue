@@ -139,7 +139,7 @@
               class="btn-small"
               :class="{ active: isMaterialSelectMode }"
               @click="toggleMaterialSelectMode"
-              :disabled="filteredMaterials.length === 0"
+              :disabled="sellableMaterialsCount === 0"
             >
               {{ isMaterialSelectMode ? '取消多选' : '多选卖出' }}
             </button>
@@ -183,10 +183,16 @@
               <div class="card-body">
                 <p>{{ mat.description }}</p>
                 <div class="material-meta">
-                  <span class="material-kind">{{ getMaterialKindName(mat.kind) }}</span>
-                  <span class="material-price">
+                  <span class="material-kind">
+                    {{ getMaterialKindName(mat.kind) }}
+                    <span v-if="mat.virtual" class="material-virtual-tag">只读</span>
+                  </span>
+                  <span class="material-price" v-if="!mat.virtual">
                     单价 {{ getMaterialUnitPrice(mat) }} 灵石
                     <span class="material-total">总价 {{ getMaterialTotalPrice(mat) }} 灵石</span>
+                  </span>
+                  <span class="material-price" v-else>
+                    不可出售 · {{ mat.usage }}
                   </span>
                 </div>
               </div>
@@ -834,7 +840,8 @@
     { key: 'core', label: '妖核' },
     { key: 'special', label: '奇遇' },
     { key: 'boss_material', label: 'BOSS素材' },
-    { key: 'boss_ticket', label: '挑战券' }
+    { key: 'boss_ticket', label: '挑战券' },
+    { key: 'other', label: '其他资源' }
   ]
   const selectedMaterialCategory = ref('all')
 
@@ -851,10 +858,69 @@
     return Object.values(map)
   })
 
-  const filteredMaterials = computed(() => {
-    if (selectedMaterialCategory.value === 'all') return groupedMaterials.value
-    return groupedMaterials.value.filter(m => m.kind === selectedMaterialCategory.value)
+  // 其他资源：存于独立计数器的资源（洗练石/工艺货币/灵纹/幻灵结晶/灵宠碎片）。
+  // 背包"素材"原本只读 playerStore.materials，导致这些资源在背包里完全看不见——
+  // 玩家分解装备看到"获得强化石+洗练石"，却只能在背包找到强化石，洗练石凭空消失。
+  // 这里把它们作为只读虚拟条目并入素材视图，让玩家在一处看到全部拥有物。
+  const virtualResources = computed(() => {
+    const list = []
+    const ps = playerStore
+    if (ps.refinementStones > 0) {
+      list.push({
+        id: 'reforge_stone', name: '洗练石', kind: 'refinement',
+        quality: 'rare', description: '分解装备获得，用于装备洗练（重 roll 词缀数值）',
+        count: ps.refinementStones, virtual: true, usage: '炼器 → 洗练'
+      })
+    }
+    if (ps.craftCurrencies) {
+      for (const [cid, n] of Object.entries(ps.craftCurrencies)) {
+        if (n > 0) {
+          const def = craftCurrencies[cid]
+          list.push({
+            id: cid, name: def?.name || cid, kind: 'craft_currency',
+            quality: 'rare', description: def?.desc || '工艺货币，用于装备打造/点化',
+            count: n, virtual: true, usage: '炼器 → 点化/打造'
+          })
+        }
+      }
+    }
+    for (const r of (ps.runes || [])) {
+      const el = RUNE_ELEMENTS[r.element]
+      list.push({
+        id: r.id, name: r.name || r.id, kind: 'rune',
+        quality: r.rarity || 'rare',
+        description: `五行·${el?.name || '?'}　灵纹，用于装备镶嵌`,
+        count: 1, virtual: true, usage: '炼器 → 镶嵌'
+      })
+    }
+    if (ps.phantomCrystals > 0) {
+      list.push({
+        id: 'phantom_crystal', name: '幻灵结晶', kind: 'phantom',
+        quality: 'epic', description: '用于抽取幻灵（抽卡）',
+        count: ps.phantomCrystals, virtual: true, usage: '幻灵阁 → 抽取'
+      })
+    }
+    if (ps.petFragments > 0) {
+      list.push({
+        id: 'pet_fragment', name: '灵宠碎片', kind: 'pet_fragment',
+        quality: 'rare', description: '用于灵宠升星',
+        count: ps.petFragments, virtual: true, usage: '灵宠 → 升星'
+      })
+    }
+    return list
   })
+
+  const allMaterialEntries = computed(() => [...groupedMaterials.value, ...virtualResources.value])
+
+  const filteredMaterials = computed(() => {
+    const cat = selectedMaterialCategory.value
+    if (cat === 'all') return allMaterialEntries.value
+    if (cat === 'other') return virtualResources.value
+    return allMaterialEntries.value.filter(m => m.kind === cat)
+  })
+
+  // 可出售（真实素材）数量：虚拟条目不可出售，多选卖出按钮据此禁用
+  const sellableMaterialsCount = computed(() => filteredMaterials.value.filter(m => !m.virtual).length)
 
   const currentMaterialPage = ref(1)
   const materialPageSize = ref(12)
@@ -893,7 +959,12 @@
     core: '妖核',
     special: '奇遇素材',
     boss_material: 'BOSS素材',
-    boss_ticket: '挑战券'
+    boss_ticket: '挑战券',
+    refinement: '洗练石',
+    craft_currency: '工艺货币',
+    rune: '灵纹',
+    phantom: '幻灵结晶',
+    pet_fragment: '灵宠碎片'
   }
 
   const MATERIAL_PRICE_MAP = {
@@ -946,6 +1017,7 @@
   const isMaterialSelected = (mat) => selectedMaterialIds.value.includes(mat.id)
 
   const toggleMaterialSelect = (mat) => {
+    if (mat.virtual) return
     const idx = selectedMaterialIds.value.indexOf(mat.id)
     if (idx >= 0) {
       selectedMaterialIds.value.splice(idx, 1)
@@ -957,6 +1029,10 @@
   }
 
   const handleMaterialClick = (mat) => {
+    if (mat.virtual) {
+      message.info(`${mat.name}：${mat.usage || '该资源不可在背包出售'}`)
+      return
+    }
     if (isMaterialSelectMode.value) {
       toggleMaterialSelect(mat)
     } else {
@@ -2677,6 +2753,18 @@
     margin-top: 4px;
     font-size: 11px;
     color: #C9C4BA;
+  }
+
+  .material-virtual-tag {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 6px;
+    font-size: 10px;
+    line-height: 15px;
+    color: #fff;
+    background: #6b7cff;
+    vertical-align: middle;
   }
 
   .material-meta {
