@@ -8,7 +8,7 @@ import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEq
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
 import { getSkillsForBreakthrough } from '../plugins/skills'
-import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel } from '../plugins/cultivationSystem'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
@@ -26,7 +26,7 @@ import {
   rollBlackMarketItems,
   getManualRefreshCost,
   getSeekMaterialPrice
-} from '../plugins/shopConfig'
+, BOUNTY_CONFIG, rollBountyBoard, getBountyRerollCost, BARTER_CONFIG, getBarterTargets } from '../plugins/shopConfig'
 import { getPhaseByLevel } from '../plugins/cultivationSystem'
 
 // 装备出售/分解相关常量
@@ -1972,6 +1972,109 @@ export const usePlayerStore = defineStore('player', {
       st.purchases[runeId] = (st.purchases[runeId] || 0) + 1
       this.queueSave()
       return { success: true, message: `成功兑换灵纹·${item.name}，消耗 ${item.price} 灵石` }
+    },
+
+
+    // ===== 觅宝/悬赏·兑券（P2-A）：挑战券 → 定向稀缺资源 =====
+    _ensureBountyDayState() {
+      const today = Math.floor(Date.now() / 86400000)
+      if (!this.shopState) this.shopState = {}
+      if (!this.shopState.bounty || this.shopState.bounty.day !== today) {
+        this.shopState.bounty = { day: today, rerollCount: 0, slots: rollBountyBoard(this.level || 1) }
+      }
+      return this.shopState.bounty
+    },
+    getBountyCatalog() {
+      const b = this._ensureBountyDayState()
+      const owned = {}
+      for (const m of (this.materials || [])) {
+        if (m.kind === 'boss_ticket') owned[m.id] = (owned[m.id] || 0) + 1
+      }
+      const items = (b.slots || []).map(s => ({
+        ...s,
+        ticketOwned: owned[s.ticketId] || 0,
+        canClaim: !s.claimed && (owned[s.ticketId] || 0) >= s.ticketCost
+      }))
+      return {
+        items,
+        rerollCount: b.rerollCount,
+        rerollMax: BOUNTY_CONFIG.rerollMaxPerDay,
+        rerollCost: getBountyRerollCost(b.rerollCount)
+      }
+    },
+    buyBounty(uid) {
+      const b = this._ensureBountyDayState()
+      const slot = (b.slots || []).find(s => s.uid === uid)
+      if (!slot) return { success: false, message: '悬赏不存在' }
+      if (slot.claimed) return { success: false, message: '该悬赏已领取' }
+      const owned = (this.materials || []).filter(m => m.kind === 'boss_ticket' && m.id === slot.ticketId).length
+      if (owned < slot.ticketCost) return { success: false, message: `挑战券不足，需要 ${slot.ticketCost} 张（${slot.ticketName}）` }
+      const res = this.consumeBossTicket(slot.ticketId, slot.ticketCost)
+      if (!res.success) return res
+      if (slot.grantKind === 'boss_material') this.gainMaterial({ id: slot.grantId, name: slot.grantName, kind: 'boss_material', quality: 'mythic' })
+      else if (slot.grantKind === 'craft_currency') this.gainCraftCurrency(slot.grantId, 1)
+      else {
+        const def = runes.find(r => r.id === slot.grantId)
+        if (def) this.gainRune({ ...def, uid: `shop_${Date.now()}_${Math.floor(Math.random() * 1e6)}` })
+      }
+      slot.claimed = true
+      this.queueSave()
+      return { success: true, message: `完成悬赏，获得 ${slot.grantName}` }
+    },
+    rerollBountyBoard() {
+      const b = this._ensureBountyDayState()
+      if (b.rerollCount >= BOUNTY_CONFIG.rerollMaxPerDay) return { success: false, message: '今日悬赏刷新次数已用尽' }
+      const cost = getBountyRerollCost(b.rerollCount)
+      if (this.spiritStones < cost) return { success: false, message: `灵石不足，刷新需要 ${cost}` }
+      this.spiritStones -= cost
+      b.rerollCount += 1
+      b.slots = rollBountyBoard(this.level || 1)
+      this.queueSave()
+      return { success: true, message: '悬赏榜已刷新' }
+    },
+
+    // ===== 易物（P2-B）：多余 ore ↔ 稀缺 boss_material =====
+    _consumeMaterialKind(kind, id, count) {
+      let need = count
+      for (let i = (this.materials || []).length - 1; i >= 0 && need > 0; i--) {
+        if (this.materials[i].kind === kind && this.materials[i].id === id) {
+          this.materials.splice(i, 1)
+          need--
+        }
+      }
+      return need === 0
+    },
+    getBarterCatalog() {
+      const phase = getPhaseByLevel(this.level || 1).name
+      const st = this._ensureShopDailyState('barter')
+      const used = Object.values(st.purchases).reduce((a, b) => a + b, 0)
+      const oreOwned = (this.materials || []).filter(m => m.kind === 'ore' && m.id === BARTER_CONFIG.oreId).length
+      const items = getBarterTargets(this.level || 1).map(t => {
+        const bought = st.purchases[t.id] || 0
+        const remaining = Math.max(0, BARTER_CONFIG.perTargetDailyCap - bought)
+        const stonePremium = Math.round(getSeekMaterialPrice(t.id, phase) * BARTER_CONFIG.stonePremiumMult)
+        return {
+          ...t, oreId: BARTER_CONFIG.oreId, oreOwned, stonePremium, remaining,
+          canBuy: remaining > 0 && used < BARTER_CONFIG.globalDailyCap && oreOwned >= t.oreCost && this.spiritStones >= stonePremium
+        }
+      })
+      return { items, globalUsed: used, globalCap: BARTER_CONFIG.globalDailyCap, oreId: BARTER_CONFIG.oreId }
+    },
+    buyBarter(targetId) {
+      const cat = this.getBarterCatalog()
+      const item = cat.items.find(i => i.id === targetId)
+      if (!item) return { success: false, message: '该易物目标不存在或未解锁' }
+      if (item.remaining <= 0) return { success: false, message: '今日该目标易物已达上限' }
+      if (cat.globalUsed >= cat.globalCap) return { success: false, message: '今日易物总次数已用尽' }
+      if (item.oreOwned < item.oreCost) return { success: false, message: `矿料不足，需要 ${item.oreCost} 个 ${item.oreId}` }
+      if (this.spiritStones < item.stonePremium) return { success: false, message: `灵石不足，需要 ${item.stonePremium}` }
+      if (!this._consumeMaterialKind('ore', BARTER_CONFIG.oreId, item.oreCost)) return { success: false, message: '矿料扣除失败' }
+      this.spiritStones -= item.stonePremium
+      this.gainMaterial({ id: targetId, name: item.name, kind: 'boss_material', quality: 'mythic' })
+      const st = this._ensureShopDailyState('barter')
+      st.purchases[targetId] = (st.purchases[targetId] || 0) + 1
+      this.queueSave()
+      return { success: true, message: `易物成功：以 ${item.oreCost} ${item.oreId} + ${item.stonePremium} 灵石 换得 ${item.name}` }
     },
 
     // ===== 黑市系统 =====

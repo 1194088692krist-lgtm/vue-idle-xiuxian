@@ -683,6 +683,62 @@
             </div>
           </div>
 
+          <!-- 觅宝/悬赏区（挑战券 → 定向稀缺资源） -->
+          <div class="section">
+            <div class="black-market-header">
+              <h3 class="section-title">觅宝/悬赏（挑战券兑稀缺）</h3>
+              <button
+                class="btn-small btn-refresh"
+                :disabled="bountyCatalog.rerollCount >= bountyCatalog.rerollMax || playerStore.spiritStones < bountyCatalog.rerollCost"
+                @click="rerollBounty"
+              >刷新悬赏 ({{ bountyCatalog.rerollMax - bountyCatalog.rerollCount }}/{{ bountyCatalog.rerollMax }}) - {{ formatNumber(bountyCatalog.rerollCost) }} 灵石</button>
+            </div>
+            <p class="section-hint">消耗专属挑战券，保底换得该秘境定向稀缺资源（BOSS素材/工艺货币/灵纹）；每日限量，用于清 surplus 券。</p>
+            <div class="shop-grid">
+              <div v-for="item in bountyCatalog.items" :key="item.uid" class="shop-card bounty-card" :class="{ claimed: item.claimed }">
+                <div class="shop-card-header">
+                  <span class="shop-icon">🎟️</span>
+                  <span class="shop-name">{{ item.ticketName }}</span>
+                  <span v-if="item.claimed" class="rarity-badge claimed-tag">已领</span>
+                </div>
+                <p class="shop-desc">上交 {{ item.ticketCost }} 张 → 获得 {{ item.grantName }}（{{ item.grantKind === 'boss_material' ? 'BOSS素材' : item.grantKind === 'craft_currency' ? '工艺货币' : '灵纹' }}）</p>
+                <div class="seek-meta">
+                  <span>持有券：{{ item.ticketOwned }}</span>
+                  <span>需：{{ item.ticketCost }}</span>
+                </div>
+                <div class="shop-card-footer">
+                  <span class="shop-price">消耗 {{ item.ticketCost }} 挑战券</span>
+                  <button class="btn-small btn-buy" :disabled="!item.canClaim || item.claimed" @click="buyBounty(item.uid)">领取</button>
+                </div>
+              </div>
+            </div>
+            <div v-if="bountyCatalog.items.length === 0" class="empty-state">暂无可接悬赏。</div>
+          </div>
+
+          <!-- 易物区（多余 ore ↔ 稀缺 boss_material） -->
+          <div class="section">
+            <h3 class="section-title">易物（矿料换 BOSS 素材）</h3>
+            <p class="section-hint">以盈余矿料（{{ barterCatalog.oreId }}）为主、少量灵石为辅，定向换取已解锁秘境的 BOSS 素材；每日限量。</p>
+            <div class="shop-grid">
+              <div v-for="item in barterCatalog.items" :key="item.id" class="shop-card barter-card">
+                <div class="shop-card-header">
+                  <span class="shop-icon">⛏️</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                </div>
+                <p class="shop-desc">{{ item.description }}</p>
+                <div class="seek-meta">
+                  <span>矿料：{{ item.oreOwned }}/{{ item.oreCost }}</span>
+                  <span>今日余：{{ item.remaining }}</span>
+                </div>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ item.oreCost }} 矿料 + {{ formatNumber(item.stonePremium) }} 灵石</span>
+                  <button class="btn-small btn-buy" :disabled="!item.canBuy" @click="buyBarter(item.id)">易物</button>
+                </div>
+              </div>
+            </div>
+            <div v-if="barterCatalog.items.length === 0" class="empty-state">尚未解锁任何秘境 BOSS 素材，先去突破吧。</div>
+          </div>
+
           <!-- 黑市区 -->
           <div class="section">
             <div class="black-market-header">
@@ -775,6 +831,8 @@
     loadSeek()
     loadCraft()
     loadRune()
+    loadBounty()
+    loadBarter()
   }
   function loadBlackMarket() {
     blackMarketItems.value = playerStore.getBlackMarketItems()
@@ -852,6 +910,35 @@
     loadRune()
     shopTick.value++
   }
+  // 觅宝/悬赏目录与购买
+  const bountyCatalog = ref({ items: [], rerollCount: 0, rerollMax: 0, rerollCost: 0 })
+  function loadBounty() {
+    bountyCatalog.value = playerStore.getBountyCatalog()
+  }
+  async function buyBounty(uid) {
+    const r = await playerStore.buyBounty(uid)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBounty()
+    shopTick.value++
+  }
+  async function rerollBounty() {
+    const r = await playerStore.rerollBountyBoard()
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBounty()
+    shopTick.value++
+  }
+  // 易物目录与购买
+  const barterCatalog = ref({ items: [], globalUsed: 0, globalCap: 0, oreId: '' })
+  function loadBarter() {
+    barterCatalog.value = playerStore.getBarterCatalog()
+  }
+  async function buyBarter(id) {
+    const r = await playerStore.buyBarter(id)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBarter()
+    shopTick.value++
+  }
+
   function runeStatLabel(item) {
     const map = { attack: '攻击%', health: '生命%', defense: '防御%', speed: '速度',
       healBoost: '治疗%', critDamageBoost: '暴伤%', finalDamageBoost: '增伤%',

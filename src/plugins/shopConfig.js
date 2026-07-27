@@ -5,7 +5,9 @@
 //   故商店改以「需求驱动、以物易物为主灵石为辅、每项服务落真实系统」为原则。
 // 当前 P0 范围：修死代码（增益符消耗品从未进入战斗结算，纯死代码）+ 上线「求材」定向 BOSS 素材兑换。
 
-import { BOSS_MATERIALS } from './cultivationSystem'
+import { BOSS_MATERIALS, BOSS_TICKETS } from './cultivationSystem'
+import { craftCurrencies } from './craftCurrency'
+import { runes } from './runes'
 
 // 境界阶段 → 价格倍率（自动匹配玩家进度，让 endgame 价格自动变贵）
 export const PHASE_PRICE_MULT = {
@@ -123,6 +125,92 @@ export const RUNE_EXCHANGE_CONFIG = {
 export function getRunePrice(runeId, phaseName) {
   const base = RUNE_BASE_PRICE[runeId] || 0
   return Math.round(base * (PHASE_PRICE_MULT[phaseName] || 1))
+}
+
+
+// ===== 觅宝/悬赏·兑券（P2-A）：挑战券 → 定向稀缺资源（与「求材」同构） =====
+// 进度门控：仅已解锁秘境的挑战券与对应稀缺资源
+// 以券易物：消耗 boss_ticket（复用 consumeBossTicket），保底给 1 个该秘境定向稀缺资源
+// 每日软限：悬赏榜每日刷新 K 条，每条限兑 1 次（清 surplus 券，不替代刷本）
+export const BOUNTY_CONFIG = {
+  boardSize: 3,                 // 每日悬赏条数 [PLACEHOLDER]
+  ticketCostMin: 3,             // 单条悬赏挑战券成本下限 [PLACEHOLDER]
+  ticketCostMax: 8,             // 上限 [PLACEHOLDER]
+  rerollBaseCost: 20000,        // 手动刷新悬赏榜灵石成本（首回）[PLACEHOLDER]
+  rerollGrowth: 2,              // 每次刷新 ×2 [PLACEHOLDER]
+  rerollMaxPerDay: 3,
+  grantPool: ['boss_material', 'craft_currency', 'rune']
+}
+function _bountyPick(arr) {
+  if (!arr || !arr.length) return null
+  return arr[Math.floor(Math.random() * arr.length)]
+}
+function _bountyRandomZone(level) {
+  const zones = Object.keys(ZONE_UNLOCK_LEVEL).filter(z => (level || 1) >= ZONE_UNLOCK_LEVEL[z])
+  return _bountyPick(zones)
+}
+// 生成悬赏榜：每条绑定一个具体挑战券，grant = 该券所属秘境的定向稀缺资源
+export function rollBountyBoard(level) {
+  const zp = CRAFT_ZONE_PROGRESS(level || 1)
+  const slots = []
+  for (let i = 0; i < BOUNTY_CONFIG.boardSize; i++) {
+    const zone = _bountyRandomZone(level)
+    if (!zone) continue
+    const ticket = _bountyPick(BOSS_TICKETS[zone] || [])
+    if (!ticket) continue
+    const grantKind = _bountyPick(BOUNTY_CONFIG.grantPool)
+    let grantId = null, grantName = ''
+    if (grantKind === 'boss_material') {
+      const m = _bountyPick(BOSS_MATERIALS[zone] || [])
+      if (m) { grantId = m.id; grantName = m.name }
+    } else if (grantKind === 'craft_currency') {
+      const cu = _bountyPick(Object.values(craftCurrencies).filter(cu => (cu.dropZoneMin || 0) <= zp))
+      if (cu) { grantId = cu.id; grantName = cu.name }
+    } else {
+      const r = _bountyPick(runes.filter(r => r.rarity !== 'epic' || zp >= RUNE_EXCHANGE_CONFIG.epicUnlockZone))
+      if (r) { grantId = r.id; grantName = r.name }
+    }
+    if (!grantId) continue
+    const zoneIdx = Object.keys(ZONE_UNLOCK_LEVEL).indexOf(zone) + 1
+    const ticketCost = BOUNTY_CONFIG.ticketCostMin +
+      Math.floor(Math.random() * (BOUNTY_CONFIG.ticketCostMax - BOUNTY_CONFIG.ticketCostMin + 1)) + (zoneIdx - 1)
+    slots.push({
+      uid: `bty_${Date.now()}_${i}_${Math.floor(Math.random() * 1e4)}`,
+      zone, ticketId: ticket.id, ticketName: ticket.name,
+      grantKind, grantId, grantName, ticketCost, claimed: false
+    })
+  }
+  return slots
+}
+export function getBountyRerollCost(currentCount) {
+  return Math.round(BOUNTY_CONFIG.rerollBaseCost * Math.pow(BOUNTY_CONFIG.rerollGrowth, currentCount))
+}
+
+// ===== 易物（P2-B）：多余 ore ↔ 稀缺 boss_material（以物易物为主、灵石为辅） =====
+// 进度门控：仅已解锁秘境的 boss_material 作为易出目标
+// 以 abundant ore（iron_essence）为主要代价 + 小额灵石溢价；每日软限
+export const BARTER_CONFIG = {
+  oreId: 'iron_essence',        // 易物主要代价（玩家常盈余的普通矿料）
+  oreCostBase: 20,              // 易出 1 个 boss_material 所需 ore 基数 [PLACEHOLDER]
+  oreCostPerTier: 8,            // 按目标秘境 tier 递增 [PLACEHOLDER]
+  stonePremiumMult: 0.15,       // 灵石溢价 = 该素材求材价 × 此系数（小额）[PLACEHOLDER]
+  perTargetDailyCap: 1,
+  globalDailyCap: 4
+}
+export function getBarterOreCost(tier) {
+  return BARTER_CONFIG.oreCostBase + (tier - 1) * BARTER_CONFIG.oreCostPerTier
+}
+// 易物目录：已解锁秘境的全部 boss_material（与求材同口径，代价为 ore + 小额石）
+export function getBarterTargets(level) {
+  const out = []
+  for (const [zone, mats] of Object.entries(BOSS_MATERIALS)) {
+    if ((level || 1) < (ZONE_UNLOCK_LEVEL[zone] || Infinity)) continue
+    const tier = Object.keys(ZONE_UNLOCK_LEVEL).indexOf(zone) + 1
+    for (const m of mats) {
+      out.push({ id: m.id, name: m.name, description: m.description, zone, tier, oreCost: getBarterOreCost(tier) })
+    }
+  }
+  return out
 }
 
 // ===== 黑市：限量随机刷新的高价商品（大额回收 + 装饰/收藏） =====
