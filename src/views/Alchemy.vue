@@ -596,33 +596,40 @@
           <div class="shop-status-bar">
             <span class="shop-balance">灵石：<b class="gold-text">{{ formatNumber(playerStore.spiritStones) }}</b></span>
             <span class="shop-sell-tracker">本月已售装备：{{ playerStore.sellTracker?.soldCount || 0 }} 件（折率 {{ currentSellRateText }}）</span>
-            <span class="shop-active-buffs" v-if="activeBuffCount > 0">生效增益：{{ activeBuffCount }} 个</span>
           </div>
 
-          <!-- 消耗品区 -->
+          <!-- 求材区（定向 BOSS 素材兑换） -->
           <div class="section">
-            <h3 class="section-title">消耗品（增益丹）</h3>
+            <h3 class="section-title">求材（定向素材兑换）</h3>
+            <p class="section-hint">仅开放已通关秘境的 BOSS 素材；溢价定价、每日限量，用于突破 / 强化「解卡」。</p>
             <div class="shop-grid">
               <div
-                v-for="item in consumableList"
+                v-for="item in seekCatalog"
                 :key="item.id"
-                class="shop-card glass-card"
+                class="shop-card seek-card"
+                :class="{ needed: item.neededForBreakthrough }"
               >
                 <div class="shop-card-header">
-                  <span class="shop-icon">{{ item.icon }}</span>
+                  <span class="shop-icon">🔩</span>
                   <span class="shop-name">{{ item.name }}</span>
+                  <span v-if="item.neededForBreakthrough" class="rarity-badge needed-tag">即将突破</span>
                 </div>
                 <p class="shop-desc">{{ item.description }}</p>
+                <div class="seek-meta">
+                  <span>持有：{{ item.owned }}</span>
+                  <span>今日余：{{ item.remaining }}</span>
+                </div>
                 <div class="shop-card-footer">
                   <span class="shop-price">{{ formatNumber(item.price) }} 灵石</span>
                   <button
                     class="btn-small btn-buy"
-                    :disabled="playerStore.spiritStones < item.price"
-                    @click="buyConsumable(item.id)"
-                  >购买</button>
+                    :disabled="!item.canBuy"
+                    @click="buySeek(item.id)"
+                  >兑换</button>
                 </div>
               </div>
             </div>
+            <div v-if="seekCatalog.length === 0" class="empty-state">尚未解锁任何秘境 BOSS 素材，先去突破吧。</div>
           </div>
 
           <!-- 黑市区 -->
@@ -694,7 +701,7 @@
   } from '@ant-design/icons-vue'
   import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
-  import { BLACK_MARKET_CONFIG, getManualRefreshCost, getConsumablePrice, CONSUMABLES } from '../plugins/shopConfig'
+  import { BLACK_MARKET_CONFIG, getManualRefreshCost } from '../plugins/shopConfig'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -714,17 +721,17 @@
   function switchToShop() {
     activeTab.value = 'shop'
     loadBlackMarket()
+    loadSeek()
   }
   function loadBlackMarket() {
     blackMarketItems.value = playerStore.getBlackMarketItems()
-    playerStore.cleanupExpiredBuffs()
     shopTick.value++
   }
-  // 消耗品列表（响应式，随境界变化）
-  const consumableList = computed(() => {
-    shopTick.value // 依赖触发
-    return playerStore.getConsumableList()
-  })
+  // 求材目录（响应式，随境界/持有/配额变化）
+  const seekCatalog = ref([])
+  function loadSeek() {
+    seekCatalog.value = playerStore.getSeekCatalog().items
+  }
   // 当前出售折率文本
   const currentSellRateText = computed(() => {
     const count = playerStore.sellTracker?.soldCount || 0
@@ -732,12 +739,6 @@
     if (count < 150) return '6%'
     if (count < 300) return '3%'
     return '1.5%'
-  })
-  // 活跃增益数
-  const activeBuffCount = computed(() => {
-    shopTick.value
-    playerStore.cleanupExpiredBuffs()
-    return (playerStore.activeBuffs || []).length
   })
   // 手动刷新剩余次数
   const manualRefreshRemaining = computed(() => {
@@ -770,9 +771,10 @@
     const map = { common: '凡品', uncommon: '良品', rare: '中品', epic: '上品', legendary: '极品', mythic: '仙品' }
     return map[r] || r
   }
-  async function buyConsumable(id) {
-    const r = await playerStore.buyConsumable(id)
+  async function buySeek(id) {
+    const r = await playerStore.buySeekMaterial(id)
     r.success ? message.success(r.message) : message.error(r.message)
+    loadSeek()
     shopTick.value++
   }
   async function buyBlackMarket(uid) {

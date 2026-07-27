@@ -1,58 +1,11 @@
-// 通胀治理：商店系统配置
-// 设计目标：作为可循环、不可毕业、随进度递增的灵石回收主战场
-// 商品类型：消耗品（高频 sink） + 黑市限量（大额回收）
-// 定价锚点：灭世档单场期望产出 ~2.2万灵石，30分钟约 60-120 场，时产 50-100万
+// 灵石阁（商店）配置
+// 设计定位：作为「补缺枢纽」而非「回收 Sink」
+//   原「通胀治理 / 灵石回收」假设（endgame 灵石通胀需回收）经核实不成立——
+//   实测 endgame 突破成本反倒稀缺（单次 800万-2亿，累计约 30亿），灵石不是溢出而是瓶颈。
+//   故商店改以「需求驱动、以物易物为主灵石为辅、每项服务落真实系统」为原则。
+// 当前 P0 范围：修死代码（增益符消耗品从未进入战斗结算，纯死代码）+ 上线「求材」定向 BOSS 素材兑换。
 
-// ===== 消耗品：高频可重复购买的增益丹 =====
-// 价格按玩家境界 phaseMultiplier 缩放，自动匹配产出量级
-// 效果持续 1 小时（对应一次完整挂机）
-export const CONSUMABLES = [
-  {
-    id: 'buff_attack',
-    name: '攻伐符',
-    description: '下次挂机期间角色攻击力 +20%，持续 1 小时',
-    icon: '⚔️',
-    effect: { type: 'attack', multiplier: 0.2, duration: 3600 }, // duration 秒
-    basePrice: 8000,   // 基础价，× phaseMultiplier 后约 1.6万-32万
-    category: 'combat'
-  },
-  {
-    id: 'buff_drop',
-    name: '寻宝符',
-    description: '下次挂机期间装备/素材掉率 +15%，持续 1 小时',
-    icon: '🍀',
-    effect: { type: 'dropRate', multiplier: 0.15, duration: 3600 },
-    basePrice: 12000,
-    category: 'fortune'
-  },
-  {
-    id: 'buff_exp',
-    name: '悟道符',
-    description: '下次挂机期间修为获取 +30%，持续 1 小时',
-    icon: '📖',
-    effect: { type: 'expGain', multiplier: 0.3, duration: 3600 },
-    basePrice: 10000,
-    category: 'cultivation'
-  },
-  {
-    id: 'buff_stone',
-    name: '聚财符',
-    description: '下次挂机期间灵石掉落 +25%，持续 1 小时',
-    icon: '💰',
-    effect: { type: 'spiritStoneRate', multiplier: 0.25, duration: 3600 },
-    basePrice: 15000,
-    category: 'fortune'
-  },
-  {
-    id: 'lucky_charm',
-    name: '强运符',
-    description: '下次 BOSS 战必掉高一档品质素材（一次性消耗）',
-    icon: '🌟',
-    effect: { type: 'bossLuckyDrop', multiplier: 1, duration: 0 }, // 一次性
-    basePrice: 50000,
-    category: 'fortune'
-  }
-]
+import { BOSS_MATERIALS } from './cultivationSystem'
 
 // 境界阶段 → 价格倍率（自动匹配玩家进度，让 endgame 价格自动变贵）
 export const PHASE_PRICE_MULT = {
@@ -62,8 +15,63 @@ export const PHASE_PRICE_MULT = {
   endgame: 25
 }
 
-// ===== 黑市：限量随机刷新的高价商品（大额回收） =====
-// 每日自动刷新一次，可手动刷新（灵石消耗递增）
+// ===== 求材：定向 BOSS 素材兑换（补缺枢纽核心服务） =====
+// 三重约束：
+//   1) 进度门控：仅开放「玩家已解锁秘境」的 BOSS 素材（见 ZONE_UNLOCK_LEVEL）
+//   2) 溢价定价：终价 = 基础价 × 境界倍率，基础价已内含溢价 ≈ 公平刷本机会成本 ×(1+α)
+//   3) 数量软限：单素材/每日上限，保护 BOSS 循环（求材用于「解卡」，不替代刷本）
+// 溢价系数 α ∈ [0.3, 0.6]，当前取 0.45；全部数值 [PLACEHOLDER]，待 playtest 校准。
+
+// 各秘境首现突破等级（进度门控依据：玩家 level >= 此值即解锁该秘境素材）
+export const ZONE_UNLOCK_LEVEL = {
+  forest_edge: 9,
+  misty_valley: 18,
+  phoenix_cave: 27,
+  dragon_abyss: 36,
+  ghost_wasteland: 45,
+  ice_palace: 54,
+  immortal_ruins: 63,
+  chaos_realm: 72
+}
+
+// 求材基础价（early 参考；×PHASE_PRICE_MULT 后为终价）—— 已内含溢价，[PLACEHOLDER]
+//   参考锚点：灭世档单场期望产出 ~2.2万灵石，BOSS 掉率 7%-18%
+//   → 单素材公平刷本机会成本约 13万-31万（endgame）。下表 endgame 终价明显高于此，即「溢价」。
+export const SEEK_BASE_PRICE = {
+  forest_edge: 8000,     // endgame 终价 ≈ 20万
+  misty_valley: 11000,   // ≈ 27.5万
+  phoenix_cave: 15000,   // ≈ 37.5万
+  dragon_abyss: 22000,   // ≈ 55万
+  ghost_wasteland: 30000,// ≈ 75万
+  ice_palace: 42000,     // ≈ 105万
+  immortal_ruins: 58000, // ≈ 145万
+  chaos_realm: 80000     // ≈ 200万
+}
+
+export const SEEK_CONFIG = {
+  premiumAlpha: 0.45,            // [PLACEHOLDER] 溢价系数，区间 [0.3, 0.6]
+  perMaterialDailyCap: 2,        // 单素材每日兑换上限（保护 BOSS 循环）
+  globalDailyCap: 6              // 每日求材总次数上限（保护 BOSS 循环）
+}
+
+// 素材 id → 所属秘境（由 BOSS_MATERIALS 反向推导，单一数据源，避免硬编码映射漂移）
+const MATERIAL_ZONE = {}
+for (const [zone, list] of Object.entries(BOSS_MATERIALS)) {
+  for (const m of list) MATERIAL_ZONE[m.id] = zone
+}
+export function getSeekMaterialZone(materialId) {
+  return MATERIAL_ZONE[materialId] || null
+}
+// 求材定价：基础价(按秘境) × 境界倍率
+export function getSeekMaterialPrice(materialId, phaseName) {
+  const zone = getSeekMaterialZone(materialId)
+  if (!zone) return 0
+  const base = SEEK_BASE_PRICE[zone] || 0
+  return Math.round(base * (PHASE_PRICE_MULT[phaseName] || 1))
+}
+
+// ===== 黑市：限量随机刷新的高价商品（大额回收 + 装饰/收藏） =====
+// 注：原「混沌核心盲盒」已移除——定向 BOSS 素材改由「求材」提供，避免随机盲盒与补缺定位冲突。
 export const BLACK_MARKET_POOL = [
   // 稀有外观/幻化（纯装饰，不影响数值，高价回收）
   {
@@ -97,7 +105,7 @@ export const BLACK_MARKET_POOL = [
     priceRange: [1500000, 3000000], // 150万-300万，重度玩家月度目标
     stock: 1
   },
-  // 大额工艺货币包（补缺 + 回收）
+  // 大额工艺货币包（补缺 + 回收，对应 P1「点化」支柱）
   {
     id: 'pack_law_stone',
     name: '凝律石 ×3',
@@ -120,18 +128,6 @@ export const BLACK_MARKET_POOL = [
     stock: 2,
     grant: { kind: 'craftCurrency', id: 'chaos_sand', amount: 2 }
   },
-  // BOSS 素材盲盒（缓解卡关）
-  {
-    id: 'pack_boss_material',
-    name: '混沌核心 ×2',
-    description: '高阶 BOSS 素材，突破卡关利器',
-    icon: '🔥',
-    type: 'material',
-    rarity: 'legendary',
-    priceRange: [300000, 500000],
-    stock: 1,
-    grant: { kind: 'material', id: 'chaos_core', amount: 2 }
-  },
   // 灵宠精华大包
   {
     id: 'pack_pet_essence',
@@ -153,11 +149,6 @@ export const BLACK_MARKET_CONFIG = {
   manualRefreshBaseCost: 10000,          // 首次手动刷新 1万灵石
   manualRefreshGrowth: 3,                // 每次刷新价格 ×3 递增
   manualRefreshMaxPerDay: 5              // 每日最多手动刷新 5 次
-}
-
-// 计算消耗品当前价格（按玩家境界缩放）
-export function getConsumablePrice(item, phaseMultiplier) {
-  return Math.round(item.basePrice * (PHASE_PRICE_MULT[phaseMultiplier] || 1))
 }
 
 // 从黑市池随机抽取 N 件商品（带价格随机）

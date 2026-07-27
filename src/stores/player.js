@@ -8,17 +8,19 @@ import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEq
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS } from '../plugins/runes'
 import { getSkillsForBreakthrough } from '../plugins/skills'
-import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial } from '../plugins/cultivationSystem'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import {
-  CONSUMABLES,
   BLACK_MARKET_CONFIG,
   PHASE_PRICE_MULT,
-  getConsumablePrice,
+  ZONE_UNLOCK_LEVEL,
+  SEEK_BASE_PRICE,
+  SEEK_CONFIG,
   rollBlackMarketItems,
-  getManualRefreshCost
+  getManualRefreshCost,
+  getSeekMaterialPrice
 } from '../plugins/shopConfig'
 import { getPhaseByLevel } from '../plugins/cultivationSystem'
 
@@ -1822,69 +1824,70 @@ export const usePlayerStore = defineStore('player', {
       return PHASE_PRICE_MULT[phase.name] || 1
     },
     // 获取当前可购买的消耗品列表（含动态价格）
-    getConsumableList() {
-      const mult = this.getShopPhaseMultiplier()
-      return CONSUMABLES.map(item => ({
-        ...item,
-        price: getConsumablePrice(item, mult === 1 ? 'early' : mult === 3 ? 'mid' : mult === 10 ? 'late' : 'endgame')
-      }))
-    },
-    // 购买消耗品（增益丹）：扣费 + 激活增益
-    buyConsumable(itemId) {
-      const list = this.getConsumableList()
-      const item = list.find(i => i.id === itemId)
-      if (!item) return { success: false, message: '商品不存在' }
-      if (this.spiritStones < item.price) {
-        return { success: false, message: `灵石不足，需要 ${item.price} 灵石` }
+    // ===== 求材：定向 BOSS 素材兑换（补缺枢纽核心服务） =====
+    // 进度门控 + 溢价定价 + 数量软限，详见 shopConfig.js
+    _ensureSeekDayState() {
+      const today = Math.floor(Date.now() / 86400000)
+      if (!this.shopState) this.shopState = {}
+      if (!this.shopState.seek || this.shopState.seek.day !== today) {
+        this.shopState.seek = { purchases: {}, day: today }
       }
+      return this.shopState.seek
+    },
+    // 下一次突破（level%9==0）所需 BOSS 素材 id（需求指示用）
+    _seekNextBreakthroughMaterialId() {
+      const lv = this.level || 1
+      const nextMul = Math.ceil((lv + 1) / 9) * 9
+      const m = getBossMaterialForLevel(nextMul)
+      return m ? m.id : null
+    },
+    // 求材目录：仅含已解锁秘境的 BOSS 素材，含价格/持有/需求/剩余配额
+    getSeekCatalog() {
+      const phase = getPhaseByLevel(this.level || 1)
+      const phaseName = phase.name
+      const seek = this._ensureSeekDayState()
+      const purchases = seek.purchases || {}
+      const globalUsed = Object.values(purchases).reduce((a, b) => a + b, 0)
+      const nextBtMat = this._seekNextBreakthroughMaterialId()
+      const catalog = []
+      for (const [zone, mats] of Object.entries(BOSS_MATERIALS)) {
+        if ((this.level || 1) < (ZONE_UNLOCK_LEVEL[zone] || Infinity)) continue // 进度门控
+        for (const m of mats) {
+          const owned = (this.materials || []).filter(x => x.kind === 'boss_material' && x.id === m.id).length
+          const bought = purchases[m.id] || 0
+          const remaining = Math.max(0, SEEK_CONFIG.perMaterialDailyCap - bought)
+          const price = getSeekMaterialPrice(m.id, phaseName)
+          catalog.push({
+            id: m.id,
+            name: m.name,
+            description: m.description,
+            zone,
+            owned,
+            price,
+            remaining,
+            neededForBreakthrough: m.id === nextBtMat,
+            canBuy: remaining > 0 && globalUsed < SEEK_CONFIG.globalDailyCap && this.spiritStones >= price
+          })
+        }
+      }
+      return { items: catalog, globalUsed, globalCap: SEEK_CONFIG.globalDailyCap }
+    },
+    // 兑换指定 BOSS 素材（扣灵石 + 入背包 + 记配额）
+    buySeekMaterial(materialId) {
+      const cat = this.getSeekCatalog()
+      const item = cat.items.find(i => i.id === materialId)
+      if (!item) return { success: false, message: '该素材尚未解锁或不存在' }
+      if (item.remaining <= 0) return { success: false, message: '今日该素材兑换已达上限' }
+      if (cat.globalUsed >= cat.globalCap) return { success: false, message: '今日求材兑换总次数已用尽' }
+      if (this.spiritStones < item.price) return { success: false, message: `灵石不足，需要 ${item.price}` }
       this.spiritStones -= item.price
-      // 激活增益（一次性 bossLuckyDrop 单独处理，持续型写入 activeBuffs）
-      if (item.effect.type === 'bossLuckyDrop') {
-        // 一次性效果：标记到下次 BOSS 战使用
-        if (!Array.isArray(this.activeBuffs)) this.activeBuffs = []
-        this.activeBuffs.push({
-          itemId: item.id,
-          expireAt: Date.now() + 24 * 3600 * 1000, // 24 小时内必须用掉
-          type: item.effect.type,
-          multiplier: item.effect.multiplier
-        })
-      } else {
-        if (!Array.isArray(this.activeBuffs)) this.activeBuffs = []
-        this.activeBuffs.push({
-          itemId: item.id,
-          expireAt: Date.now() + item.effect.duration * 1000,
-          type: item.effect.type,
-          multiplier: item.effect.multiplier
-        })
-      }
+      this.gainMaterial({ id: materialId, name: item.name, kind: 'boss_material', quality: 'mythic' })
+      const seek = this._ensureSeekDayState()
+      seek.purchases[materialId] = (seek.purchases[materialId] || 0) + 1
       this.queueSave()
-      return { success: true, message: `购买 ${item.name} 成功，消耗 ${item.price} 灵石` }
+      return { success: true, message: `成功兑换 ${item.name}，消耗 ${item.price} 灵石` }
     },
-    // 清理过期增益
-    cleanupExpiredBuffs() {
-      if (!Array.isArray(this.activeBuffs)) return
-      const now = Date.now()
-      this.activeBuffs = this.activeBuffs.filter(b => b.expireAt > now)
-    },
-    // 获取某类型活跃增益的总倍率（供挂机系统查询）
-    getBuffMultiplier(type) {
-      this.cleanupExpiredBuffs()
-      if (!Array.isArray(this.activeBuffs)) return 0
-      return this.activeBuffs
-        .filter(b => b.type === type)
-        .reduce((sum, b) => sum + b.multiplier, 0)
-    },
-    // 消耗一次性增益（如 bossLuckyDrop，使用后移除一条）
-    consumeBuff(type) {
-      if (!Array.isArray(this.activeBuffs)) return false
-      const idx = this.activeBuffs.findIndex(b => b.type === type)
-      if (idx >= 0) {
-        this.activeBuffs.splice(idx, 1)
-        this.queueSave()
-        return true
-      }
-      return false
-    },
+
     // ===== 黑市系统 =====
     // 获取当前黑市商品列表（自动检测是否需要刷新）
     getBlackMarketItems() {
