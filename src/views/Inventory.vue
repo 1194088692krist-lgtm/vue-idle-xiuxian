@@ -628,7 +628,7 @@
           出售（获得 {{ sellPreview }} 灵石）
         </button>
         <button class="btn-small btn-info" @click="disassembleCurrentEquipment">
-          分解（获得强化石 / 洗练石）
+          分解（获得强化石 / 高级洗炼石）
         </button>
         <button class="btn-small" @click="showSellDisassemble = false">返回</button>
       </div>
@@ -858,18 +858,18 @@
     return Object.values(map)
   })
 
-  // 其他资源：存于独立计数器的资源（洗练石/工艺货币/灵纹/幻灵结晶/灵宠碎片）。
+  // 其他资源：存于独立计数器的资源（高级洗炼石/工艺货币/灵纹/幻灵结晶/灵宠碎片）。
   // 背包"素材"原本只读 playerStore.materials，导致这些资源在背包里完全看不见——
-  // 玩家分解装备看到"获得强化石+洗练石"，却只能在背包找到强化石，洗练石凭空消失。
+  // 玩家分解装备看到"获得强化石+高级洗炼石"，却只能在背包找到强化石，高级洗炼石凭空消失。
   // 这里把它们作为只读虚拟条目并入素材视图，让玩家在一处看到全部拥有物。
   const virtualResources = computed(() => {
     const list = []
     const ps = playerStore
     if (ps.refinementStones > 0) {
       list.push({
-        id: 'virt_reforge_stone', name: '洗练石', kind: 'refinement',
-        quality: 'rare', description: '分解装备获得，用于装备洗练（重 roll 词缀数值）',
-        count: ps.refinementStones, virtual: true, usage: '炼器 → 洗练'
+        id: 'virt_reforge_stone', name: '高级洗炼石', kind: 'refinement',
+        quality: 'legendary', description: '八卦炉大洗练消耗（可改变词条种类并冲击高数值）；获得难度介于高级强化石与至尊强化石之间',
+        count: ps.refinementStones, virtual: true, usage: '八卦炉 → 大洗练'
       })
     }
     if (ps.craftCurrencies) {
@@ -907,7 +907,7 @@
         count: ps.petFragments, virtual: true, usage: '灵宠 → 升星'
       })
     }
-    // 同名去重：若多个虚拟条目显示名相同（如“洗练石”同时存在于洗练计数器与工艺货币两处），
+    // 同名去重：若多个虚拟条目显示名相同（如“洗练石”同时存在于工艺洗练石与同名工艺货币两处），
     // 对后者追加区分后缀，避免背包出现看似重复、且难以辨认的条目。
     const seenNames = {}
     for (const e of list) {
@@ -971,7 +971,7 @@
     special: '奇遇素材',
     boss_material: 'BOSS素材',
     boss_ticket: '挑战券',
-    refinement: '洗练石',
+    refinement: '高级洗炼石',
     craft_currency: '工艺货币',
     rune: '灵纹',
     phantom: '幻灵结晶',
@@ -1119,7 +1119,7 @@
       case 'enhanceRate':
         return `强化成功率 +${(effect.value * 100).toFixed(0)}%`
       case 'reforgeSafe':
-        return `洗练保底 ${Math.max(1, Math.round(effect.value))} 次`
+        return `大洗练保底 ${Math.max(1, Math.round(effect.value))} 次`
       case 'healBattle':
         return `战斗回血 ${(effect.value * 100).toFixed(0)}% 最大生命`
       case 'cleanse':

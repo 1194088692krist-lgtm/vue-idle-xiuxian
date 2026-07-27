@@ -655,10 +655,16 @@
     if (dungeonState.floor % 10 === 0) {
       playerStore.dungeonBossKills++
     } else if (dungeonState.floor % 5 === 0) {
-      // 增加洗练石
-      playerStore.refinementStones += playerStore.dungeonDifficulty
+      // 高级洗炼石（大洗练）：仅在难度≥5 掉落，量少且低于高级强化石
+      // 获得难度介于高级强化石（zone 5）与至尊强化石（boss/legendary）之间
+      if (playerStore.dungeonDifficulty >= 5) {
+        const amount = Math.max(1, Math.floor((playerStore.dungeonDifficulty - 3) / 2))
+        playerStore.refinementStones += amount
+        message.success(`获得了${amount}颗高级洗炼石`)
+      } else {
+        message.info('难度不足，未掉落高级洗炼石（需难度≥5）')
+      }
       playerStore.dungeonEliteKills++
-      message.success(`获得了${playerStore.dungeonDifficulty}颗洗练石`)
     }
     // 更新最高层数记录
     if (dungeonState.floor > playerStore.dungeonHighestFloor) {

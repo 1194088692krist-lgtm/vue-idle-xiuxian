@@ -13,6 +13,9 @@ dist-ssr
 docs
 *.local
 
+# pnpm 本地缓存（不应进入仓库）
+.pnpm-store/
+
 # Editor directories and files
 .vscode/*
 !.vscode/extensions.json

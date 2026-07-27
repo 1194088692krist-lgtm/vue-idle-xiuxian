@@ -313,14 +313,14 @@
             <template v-if="forgeTab === 'reforge'">
               <template v-if="selectedForgeEquip">
                 <div class="section forge-actions-section">
-                  <h3 class="section-title">洗练方式</h3>
+                  <h3 class="section-title">大洗练方式</h3>
                   <div class="reforge-mode">
                     <button
                       class="btn-primary"
                       :class="{ active: reforgeMode === 'all' }"
                       @click="reforgeMode = 'all'"
                     >
-                      全部洗练
+                      全部大洗练
                     </button>
                     <button
                       class="btn-info"
@@ -328,7 +328,7 @@
                       :disabled="Object.keys(cleanAffixStats).length === 0"
                       @click="reforgeMode = 'single'"
                     >
-                      {{ Object.keys(cleanAffixStats).length === 0 ? '无可用词条' : '单条洗练' }}
+                      {{ Object.keys(cleanAffixStats).length === 0 ? '无可用词条' : '单条大洗练' }}
                     </button>
                   </div>
                 </div>
@@ -336,7 +336,7 @@
                 <template v-if="reforgeMode === 'single'">
                   <div class="section forge-actions-section">
                     <h3 class="section-title">选择词条</h3>
-                    <div v-if="Object.keys(cleanAffixStats).length === 0" class="empty-state">该装备无可洗练词条</div>
+                    <div v-if="Object.keys(cleanAffixStats).length === 0" class="empty-state">该装备无可大洗练词条</div>
                     <div v-else class="stat-select">
                       <button
                         v-for="(val, key) in cleanAffixStats"
@@ -352,10 +352,10 @@
                 </template>
 
                 <div class="section forge-actions-section">
-                  <h3 class="section-title">洗练消耗</h3>
+                  <h3 class="section-title">大洗练消耗</h3>
                   <div class="cost-list">
                     <div class="cost-item">
-                      <span class="cost-name">洗练石</span>
+                      <span class="cost-name">高级洗炼石</span>
                       <span class="cost-value" :class="{ insufficient: playerStore.refinementStones < reforgeConfig.costPerAttempt }">
                         {{ playerStore.refinementStones || 0 }} / {{ reforgeConfig.costPerAttempt }}
                       </span>
@@ -378,13 +378,13 @@
                     :disabled="!canReforge(selectedForgeEquip)"
                     @click="handleReforge"
                   >
-                    洗练
+                    大洗练
                   </button>
                 </div>
 
                 <template v-if="reforgeResult">
                   <div class="section forge-actions-section">
-                    <h3 class="section-title">洗练结果</h3>
+                    <h3 class="section-title">大洗练结果</h3>
                     <div class="reforge-result glass-card">
                       <div class="reforge-compare">
                         <div class="reforge-old">
@@ -1070,7 +1070,7 @@
       case 'enhanceRate':
         return { label: '强化成功率', value: `+${(e.value * 100).toFixed(0)}%` }
       case 'reforgeSafe':
-        return { label: '洗练保底', value: `${Math.max(1, Math.round(e.value))} 次` }
+        return { label: '大洗练保底', value: `${Math.max(1, Math.round(e.value))} 次` }
       case 'healBattle':
         return { label: '战斗回血', value: `恢复最大生命值 ${(e.value * 100).toFixed(0)}%` }
       case 'cleanse':
@@ -1298,7 +1298,7 @@
     selectedForgeEquip.value = equip
     selectedReforgeStat.value = null
     reforgeResult.value = null
-    // 若新装备无可用词条，自动切回全部洗练
+    // 若新装备无可用词条，自动切回全部大洗练
     if (reforgeMode.value === 'single' && Object.keys(cleanAffixStats.value).length === 0) {
       reforgeMode.value = 'all'
     }
@@ -1454,7 +1454,7 @@
     if (!selectedForgeEquip.value || !reforgeResult.value) return
     const result = playerStore.reforgeEquipmentConfirm(selectedForgeEquip.value, reforgeResult.value.newStats)
     if (result.success) {
-      message.success('洗练完成！')
+      message.success('大洗练完成！')
       reforgeResult.value = null
       selectedReforgeStat.value = null
     } else {

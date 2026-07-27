@@ -194,7 +194,7 @@ export const usePlayerStore = defineStore('player', {
     spiritStones: 0, // 灵石数量
     phantomCrystals: 0, // 幻灵结晶数量
     reinforceStones: 0, // 强化石数量
-    refinementStones: 0, // 洗练石数量
+    refinementStones: 0, // 高级洗炼石数量（八卦炉大洗练消耗；难度介于高级强化石与至尊强化石之间）
     petEssence: 0, // 灵宠精华
     petFragments: 0, // 灵宠升星碎片
     // 通胀治理：装备出售月度累计计数器
@@ -220,7 +220,7 @@ export const usePlayerStore = defineStore('player', {
     permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 永久属性加成（洗髓/锻骨丹）
     breakthroughBonus: 0, // 突破成功率加成（如 0.1 = +10%，下次突破消耗）
     enhanceBonus: 0, // 装备强化成功率加成（下次强化消耗）
-    reforgeSafeCharges: 0, // 洗练保底次数（定灵丹，洗练时不降属性）
+    reforgeSafeCharges: 0, // 大洗练保底次数（定灵丹，大洗练时不降属性）
     battlePills: [], // 战斗中可使用的丹药（疗伤/解厄），每项 {uid,type,value,...}
     pillEffects: [], // 临时增益（悟道丹 expGain / 寻宝丹 dropRate，带 expiry）
     items: [], // 物品库存
@@ -1382,7 +1382,7 @@ export const usePlayerStore = defineStore('player', {
       if (rewards.common_enhance_stone) parts.push(`普通强化石×${rewards.common_enhance_stone}`)
       if (rewards.advanced_enhance_stone) parts.push(`高级强化石×${rewards.advanced_enhance_stone}`)
       if (rewards.supreme_enhance_stone) parts.push(`至尊强化石×${rewards.supreme_enhance_stone}`)
-      if (rewards.reforge_stone) parts.push(`洗练石×${rewards.reforge_stone}`)
+      if (rewards.reforge_stone) parts.push(`高级洗炼石×${rewards.reforge_stone}`)
       Object.entries(currencyRewards).forEach(([cid, n]) => parts.push(`${craftCurrencies[cid]?.name || cid}×${n}`))
       return { success: true, message: `分解成功，获得 ${parts.join('、')}` }
     },
@@ -1618,7 +1618,7 @@ export const usePlayerStore = defineStore('player', {
         this.reforgeSafeCharges = Math.max(0, this.reforgeSafeCharges - 1)
       }
       this.queueSave()
-      return { success: true, message: '洗练成功' }
+      return { success: true, message: '大洗练成功' }
     },
     reforgeEquipmentPreview(equipment, mode = 'all', targetStat = null) {
       let targetEquip = equipment
@@ -1634,7 +1634,7 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '装备不存在' }
       }
       if (this.refinementStones < reforgeConfig.costPerAttempt) {
-        return { success: false, message: '洗练石不足' }
+        return { success: false, message: '高级洗炼石不足' }
       }
       if (mode === 'single' && !targetStat) {
         return { success: false, message: '请选择要洗练的词条' }
@@ -1688,11 +1688,11 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '装备不存在' }
       }
       if (this.refinementStones < reforgeConfig.costPerAttempt) {
-        return { success: false, message: '洗练石不足' }
+        return { success: false, message: '高级洗炼石不足' }
       }
       targetEquip.stats = { ...newStats }
       this.queueSave()
-      return { success: true, message: '洗练成功' }
+      return { success: true, message: '大洗练成功' }
     },
     // 批量出售装备（按当前筛选，统一折算为灵石）
     // 装备分类 → 多 slot 映射（支持 artifact/armor/accessory 分类概念）
@@ -2801,7 +2801,7 @@ export const usePlayerStore = defineStore('player', {
             const oldVal = member.reforgeSafeCharges || 0
             if (!member.reforgeSafeCharges) member.reforgeSafeCharges = 0
             member.reforgeSafeCharges += Math.max(1, Math.round(effect.value))
-            changes.push({ stat: '洗练保底', old: oldVal, new: member.reforgeSafeCharges, delta: Math.max(1, Math.round(effect.value)) })
+            changes.push({ stat: '大洗练保底', old: oldVal, new: member.reforgeSafeCharges, delta: Math.max(1, Math.round(effect.value)) })
             break
           }
         }

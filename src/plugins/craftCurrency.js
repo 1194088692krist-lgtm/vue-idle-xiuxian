@@ -11,7 +11,7 @@ const AFFIX_MAX_BY_RARITY = { common: 1, uncommon: 2, rare: 3, epic: 4, legendar
 
 // 货币定义（needTarget：是否需要在 craft 面板指定一条词缀）
 export const craftCurrencies = {
-  refine_stone: { id: 'refine_stone', name: '洗练石', dropZoneMin: 1, weight: 50, needTarget: false, desc: '重 roll 全部词缀数值（保留种类/档位，尊重锁定）' },
+  refine_stone: { id: 'refine_stone', name: '洗练石', dropZoneMin: 1, weight: 50, needTarget: false, desc: '小洗炼：小幅调整全部词缀数值（保留种类/档位，尊重锁定；效果较弱）' },
   lock_rune: { id: 'lock_rune', name: '锁灵符', dropZoneMin: 2, weight: 20, needTarget: true, desc: '锁定/解锁指定词缀，后续 roll 中不被改动' },
   chaos_sand: { id: 'chaos_sand', name: '重铸灵砂', dropZoneMin: 3, weight: 8, needTarget: false, desc: '清空并重生成全部词缀（尊重锁定）' },
   divine_stone: { id: 'divine_stone', name: '点化石', dropZoneMin: 4, weight: 6, needTarget: false, desc: '只重 roll 现有词缀数值（保留种类/档位，尊重锁定）' },
@@ -96,6 +96,24 @@ export function rerollAffixValues(eq) {
   return { success: true, message: `重 roll 了 ${list.length} 条词缀数值` }
 }
 
+// 洗练石（小洗炼）：仅小幅调整词缀数值（保留 60% 旧值 + 40% 新 roll），效果较弱
+// 与八卦炉「大洗练」区分：小洗炼不动词条种类/档位，只做温和数值微调
+export function smallRerollAffixValues(eq) {
+  const list = (eq.affixes || []).filter(a => !a.locked)
+  if (list.length === 0) return { success: false, message: '无可调整的词缀（均已锁定）' }
+  list.forEach(af => {
+    const def = findAffixDef(af)
+    if (def) {
+      const fresh = rollAffixQualityValue(def, af.qualityTier || 4)
+      const blended = af.value * 0.6 + fresh * 0.4
+      af.value = af.valueType === 'percent'
+        ? Number(blended.toFixed(3))
+        : Math.max(1, Math.round(blended))
+    }
+  })
+  return { success: true, message: `小洗炼调整了 ${list.length} 条词缀数值` }
+}
+
 // 重铸灵砂：重生成全部词缀（保留锁定词缀）
 export function rerollAllAffixes(eq) {
   const locked = (eq.affixes || []).filter(a => a.locked)
@@ -172,7 +190,7 @@ export function applyCraftCurrency(eq, currencyId, targetAffixId = null, opts = 
   if (!eq || typeof eq !== 'object') return { success: false, message: '无效的装备' }
   if (eq.corrupted && currencyId !== 'blood_sigil') return { success: false, message: '已腐化装备不可再 craft' }
   switch (currencyId) {
-    case 'refine_stone': return rerollAffixValues(eq)
+    case 'refine_stone': return smallRerollAffixValues(eq)
     case 'lock_rune': return toggleAffixLock(eq, targetAffixId)
     case 'chaos_sand': return rerollAllAffixes(eq)
     case 'divine_stone': return rerollAffixValues(eq)

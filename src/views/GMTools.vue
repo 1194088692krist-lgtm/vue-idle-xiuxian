@@ -2132,14 +2132,14 @@ const giftResourceFields = [
   { key: 'spiritStones', label: '灵石' },
   { key: 'phantomCrystals', label: '幻灵结晶' },
   { key: 'reinforceStones', label: '强化石' },
-  { key: 'refinementStones', label: '洗练石' },
+  { key: 'refinementStones', label: '高级洗炼石' },
   { key: 'petEssence', label: '灵宠精华' }
 ]
 const giftMaterialFields = [
   { id: 'common_enhance_stone', name: '普通强化石' },
   { id: 'advanced_enhance_stone', name: '高级强化石' },
   { id: 'supreme_enhance_stone', name: '至尊强化石' },
-  { id: 'reforge_stone', name: '洗练石' }
+  { id: 'reforge_stone', name: '高级洗炼石' }
 ]
 const giftForm = ref({
   username: '',

@@ -159,6 +159,22 @@
     font-size: 13px;
   }
 
+  /* 版本号标签：大版本号 + 版本名，突出显示 */
+  /* 此前缺少该规则，<p> 默认黑字在深色玻璃卡上几乎不可见——这就是首页"没显示版本号"的根因 */
+  .version-tag {
+    margin: 6px 0 0;
+    font-size: 13px;
+    font-weight: bold;
+    letter-spacing: 1px;
+    color: var(--color-accent-gold, #FFD700);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
+    display: inline-block;
+    padding: 3px 10px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.18), rgba(139, 69, 19, 0.12));
+    border: 1px solid rgba(218, 165, 32, 0.35);
+  }
+
   .card-body {
     flex: 1;
     display: flex;

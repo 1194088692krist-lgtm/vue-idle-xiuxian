@@ -28,12 +28,12 @@ const enhanceConfig = {
   enhanceMult: 1.2
 }
 
-// 洗练配置
+// 大洗练配置（八卦炉，消耗「高级洗炼石」；效果较强，可改变词条种类并冲击高数值）
 const reforgeConfig = {
-  costPerAttempt: 10,
+  costPerAttempt: 5,
   minVariation: -0.3,
   maxVariation: 0.3,
-  newStatChance: 0.3,
+  newStatChance: 0.4,
   affixMaxCount: {
     common: 1,
     uncommon: 2,
@@ -269,7 +269,7 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     return { success: false, message: '无效的装备' }
   }
   if (playerReforgeStones < reforgeConfig.costPerAttempt) {
-    return { success: false, message: '洗练石不足' }
+    return { success: false, message: '高级洗炼石不足' }
   }
   const availableStats = reforgeableStats[equipment.type] || reforgeableStats.artifact
   const rarity = equipment.rarity || 'common'
@@ -369,12 +369,13 @@ function reforgeEquipment(equipment, playerReforgeStones, confirmNewStats = true
     const minFloor = isPercent ? baseRange[0] * 0.5 : 1
     let newValue = getRandomValueInRange(baseRange, minFloor, isPercent)
 
-    const delta = reforgeSafe ? Math.random() * 0.3 : Math.random() * 0.6 - 0.3
+    // 大洗练：正向偏置更强（保底时 0~+40%，非保底 -20%~+60%），上限更高
+    const delta = reforgeSafe ? Math.random() * 0.4 : Math.random() * 0.8 - 0.2
     newValue = newValue * (1 + delta)
     newValue = clampToStatCap(currentStat, newValue)
 
     const baseMin = baseRange[0] * 0.7
-    const baseMax = baseRange[1] * 1.3
+    const baseMax = baseRange[1] * 1.5
     newValue = Math.max(baseMin, Math.min(newValue, baseMax))
 
     // 百分比词条保证最小值 > 0，且不低于该品质基础下限的 50%
@@ -437,13 +438,14 @@ function disassembleEquipment(equipment) {
   let advancedStones = 0
   let supremeStones = 0
   let reforgeStones = 0
+  // 高级洗炼石（大洗练）返量低于高级强化石——介于高级强化石与至尊强化石之间
   const rarityRewards = {
     common: { common: 1, reforge: 0 },
-    uncommon: { common: 2, reforge: 1 },
-    rare: { common: 4, advanced: 1, reforge: 2 },
-    epic: { common: 6, advanced: 2, reforge: 3 },
-    legendary: { common: 8, advanced: 4, reforge: 5 },
-    mythic: { common: 10, advanced: 6, reforge: 8 }
+    uncommon: { common: 2, reforge: 0 },
+    rare: { common: 4, advanced: 1, reforge: 1 },
+    epic: { common: 6, advanced: 2, reforge: 1 },
+    legendary: { common: 8, advanced: 4, reforge: 2 },
+    mythic: { common: 10, advanced: 6, reforge: 3 }
   }
   const rewards = rarityRewards[rarity] || rarityRewards.common
   commonStones += rewards.common || 0

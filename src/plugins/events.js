@@ -85,10 +85,11 @@ export const events = [
     effect: (s, ctx) => {
       const mult = ctx.zone?.difficulty || 1
       const enhanceStones = Math.max(2, Math.floor(3 * mult))
-      const reforgeStones = Math.max(1, Math.floor(mult / 2))
+      // 高级洗炼石：仅难度≥5 给予，量少（介于高级强化石与至尊强化石之间）
+      const reforgeStones = mult >= 5 ? Math.max(1, Math.floor((mult - 3) / 3)) : 0
       s.reinforceStones = (s.reinforceStones || 0) + enhanceStones
       s.refinementStones = (s.refinementStones || 0) + reforgeStones
-      ctx.showMessage('success', `[锻造师传承]获得 ${enhanceStones} 强化石 + ${reforgeStones} 洗练石`)
+      ctx.showMessage('success', `[锻造师传承]获得 ${enhanceStones} 强化石${reforgeStones > 0 ? ` + ${reforgeStones} 高级洗炼石` : ''}`)
     }
   },
   {
