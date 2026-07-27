@@ -10,11 +10,15 @@ import { craftCurrencies } from './craftCurrency'
 import { runes } from './runes'
 
 // 境界阶段 → 价格倍率（自动匹配玩家进度，让 endgame 价格自动变贵）
+// 境界阶段 → 价格倍率（自动匹配玩家进度，让 endgame 价格自动变贵）
+// 修复：原键为 early/mid/late/endgame，但调用点传入 getPhaseByLevel().name（中文：前期/中期/后期/终局），
+//       导致 PHASE_PRICE_MULT[中文] 恒为 undefined → 倍率永远回退 ×1，endgame 25× 溢价从未生效。
+//       现改为中文键，与 CULTIVATION_PHASES[].name 对齐（影响 P0 求材 / P1 兑币兑纹 / P2 易物灵石溢价）。
 export const PHASE_PRICE_MULT = {
-  early: 1,
-  mid: 3,
-  late: 10,
-  endgame: 25
+  '前期': 1,
+  '中期': 3,
+  '后期': 10,
+  '终局': 25
 }
 
 // ===== 求材：定向 BOSS 素材兑换（补缺枢纽核心服务） =====
@@ -133,11 +137,12 @@ export function getRunePrice(runeId, phaseName) {
 // 以券易物：消耗 boss_ticket（复用 consumeBossTicket），保底给 1 个该秘境定向稀缺资源
 // 每日软限：悬赏榜每日刷新 K 条，每条限兑 1 次（清 surplus 券，不替代刷本）
 export const BOUNTY_CONFIG = {
-  boardSize: 3,                 // 每日悬赏条数 [PLACEHOLDER]
-  ticketCostMin: 3,             // 单条悬赏挑战券成本下限 [PLACEHOLDER]
-  ticketCostMax: 8,             // 上限 [PLACEHOLDER]
-  rerollBaseCost: 20000,        // 手动刷新悬赏榜灵石成本（首回）[PLACEHOLDER]
-  rerollGrowth: 2,              // 每次刷新 ×2 [PLACEHOLDER]
+  boardSize: 3,                 // 每日悬赏条数 [v1 校准]：与求材(6)/兑纹(4)错位——悬赏为「清盈余券」轻量服务，3 条足够
+  ticketCostMin: 3,             // 单条票耗下限(顶端秘境=tier1) [v1 校准]：挂机击杀BOSS 30%×1~2 期望0.45张/杀；低等级youli(0.1)券偏紧，3为可积累下限
+  ticketCostMax: 8,             // 上限(顶端秘境=tier1) [v1 校准]：真实区间 = [min+(tier-1), max+(tier-1)]
+  topZoneBias: 0.7,             // [v1 校准]：70% 概率抽「当前顶端秘境」券(玩家正在刷、盈余券集中于此)，避免高等级板全要历史秘境券而不可领
+  rerollBaseCost: 20000,        // 首刷灵石成本 [v1 校准]：early 阶段有意义；endgame 相对突破成本极小，作便利项
+  rerollGrowth: 2,              // 每次刷新 ×2 [v1 校准]：2万→4万→8万→16万（每日上限 3 次）
   rerollMaxPerDay: 3,
   grantPool: ['boss_material', 'craft_currency', 'rune']
 }
@@ -147,6 +152,10 @@ function _bountyPick(arr) {
 }
 function _bountyRandomZone(level) {
   const zones = Object.keys(ZONE_UNLOCK_LEVEL).filter(z => (level || 1) >= ZONE_UNLOCK_LEVEL[z])
+  if (!zones.length) return null
+  // 偏向当前顶端秘境：玩家此刻正在该秘境挂机，盈余挑战券集中于此；
+  // 余下概率随机抽已解锁秘境（消耗历史券 / 提供多样性）
+  if (Math.random() < (BOUNTY_CONFIG.topZoneBias || 0)) return zones[zones.length - 1]
   return _bountyPick(zones)
 }
 // 生成悬赏榜：每条绑定一个具体挑战券，grant = 该券所属秘境的定向稀缺资源
@@ -172,6 +181,7 @@ export function rollBountyBoard(level) {
     }
     if (!grantId) continue
     const zoneIdx = Object.keys(ZONE_UNLOCK_LEVEL).indexOf(zone) + 1
+    // 真实票耗区间 = [ticketCostMin + (tier-1), ticketCostMax + (tier-1)]：tier1=3~8 … tier8=10~15
     const ticketCost = BOUNTY_CONFIG.ticketCostMin +
       Math.floor(Math.random() * (BOUNTY_CONFIG.ticketCostMax - BOUNTY_CONFIG.ticketCostMin + 1)) + (zoneIdx - 1)
     slots.push({
@@ -190,10 +200,10 @@ export function getBountyRerollCost(currentCount) {
 // 进度门控：仅已解锁秘境的 boss_material 作为易出目标
 // 以 abundant ore（iron_essence）为主要代价 + 小额灵石溢价；每日软限
 export const BARTER_CONFIG = {
-  oreId: 'iron_essence',        // 易物主要代价（玩家常盈余的普通矿料）
-  oreCostBase: 20,              // 易出 1 个 boss_material 所需 ore 基数 [PLACEHOLDER]
-  oreCostPerTier: 8,            // 按目标秘境 tier 递增 [PLACEHOLDER]
-  stonePremiumMult: 0.15,       // 灵石溢价 = 该素材求材价 × 此系数（小额）[PLACEHOLDER]
+  oreId: 'iron_essence',        // 易物主要代价（玩家常盈余的普通矿料，materials.js chance 0.35 富余）
+  oreCostBase: 20,              // 易出 1 个 boss_material 所需 ore 基数 [v1 校准]：铁精为 common 矿盈余，20 为轻量门槛（每日至多 4 次 → ≤304）
+  oreCostPerTier: 8,            // 按目标秘境 tier 递增 [v1 校准]：tier1→20 … tier8→76，高秘境素材更稀缺故 ore 门槛更高
+  stonePremiumMult: 0.15,       // 灵石溢价=该素材求材价×此系数(小额) [v1 校准]：以物易物为主、灵石为辅；终价含境界倍率(修复后生效)
   perTargetDailyCap: 1,
   globalDailyCap: 4
 }
