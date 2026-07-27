@@ -867,7 +867,7 @@
     const ps = playerStore
     if (ps.refinementStones > 0) {
       list.push({
-        id: 'reforge_stone', name: '洗练石', kind: 'refinement',
+        id: 'virt_reforge_stone', name: '洗练石', kind: 'refinement',
         quality: 'rare', description: '分解装备获得，用于装备洗练（重 roll 词缀数值）',
         count: ps.refinementStones, virtual: true, usage: '炼器 → 洗练'
       })
@@ -877,7 +877,7 @@
         if (n > 0) {
           const def = craftCurrencies[cid]
           list.push({
-            id: cid, name: def?.name || cid, kind: 'craft_currency',
+            id: 'virt_' + cid, name: def?.name || cid, kind: 'craft_currency',
             quality: 'rare', description: def?.desc || '工艺货币，用于装备打造/点化',
             count: n, virtual: true, usage: '炼器 → 点化/打造'
           })
@@ -887,7 +887,7 @@
     for (const r of (ps.runes || [])) {
       const el = RUNE_ELEMENTS[r.element]
       list.push({
-        id: r.id, name: r.name || r.id, kind: 'rune',
+        id: 'virt_' + (r.id || r.name), name: r.name || r.id, kind: 'rune',
         quality: r.rarity || 'rare',
         description: `五行·${el?.name || '?'}　灵纹，用于装备镶嵌`,
         count: 1, virtual: true, usage: '炼器 → 镶嵌'
@@ -895,17 +895,28 @@
     }
     if (ps.phantomCrystals > 0) {
       list.push({
-        id: 'phantom_crystal', name: '幻灵结晶', kind: 'phantom',
+        id: 'virt_phantom_crystal', name: '幻灵结晶', kind: 'phantom',
         quality: 'epic', description: '用于抽取幻灵（抽卡）',
         count: ps.phantomCrystals, virtual: true, usage: '幻灵阁 → 抽取'
       })
     }
     if (ps.petFragments > 0) {
       list.push({
-        id: 'pet_fragment', name: '灵宠碎片', kind: 'pet_fragment',
+        id: 'virt_pet_fragment', name: '灵宠碎片', kind: 'pet_fragment',
         quality: 'rare', description: '用于灵宠升星',
         count: ps.petFragments, virtual: true, usage: '灵宠 → 升星'
       })
+    }
+    // 同名去重：若多个虚拟条目显示名相同（如“洗练石”同时存在于洗练计数器与工艺货币两处），
+    // 对后者追加区分后缀，避免背包出现看似重复、且难以辨认的条目。
+    const seenNames = {}
+    for (const e of list) {
+      if (seenNames[e.name]) {
+        const qual = e.kind === 'craft_currency' ? '（工艺）' : `（${e.kind}）`
+        e.name = e.name + qual
+      } else {
+        seenNames[e.name] = true
+      }
     }
     return list
   })
