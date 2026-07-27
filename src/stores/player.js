@@ -3351,7 +3351,9 @@ export const usePlayerStore = defineStore('player', {
       if (!member) return { success: false, message: '成员不存在' }
       if (!member.equippedPet) return { success: false, message: '该角色没有装备灵宠' }
       const pet = member.equippedPet
-      this.items.push(pet)
+      // 防御：若背包中已存在同一灵宠（理论不应发生），避免重复持有
+      const alreadyInBag = this.items.some(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')
+      if (!alreadyInBag) this.items.push(pet)
       member.equippedPet = null
       this.queueSave()
       return { success: true, message: `${pet.name} 已卸下` }
@@ -3413,8 +3415,16 @@ export const usePlayerStore = defineStore('player', {
           unequippedCount++
         }
       }
+      // 一并卸下灵宠并归还背包，避免“一键卸下”后灵宠仍被占用而看似丢失
+      if (member.equippedPet) {
+        const pet = member.equippedPet
+        const alreadyInBag = this.items.some(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')
+        if (!alreadyInBag) this.items.push(pet)
+        member.equippedPet = null
+        unequippedCount++
+      }
       this.queueSave()
-      return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件装备` }
+      return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件物品` }
     },
     // 灵兽放生（报恩返还培养素养 + 素材 + 升星碎片）
     releasePet(petUid) {
