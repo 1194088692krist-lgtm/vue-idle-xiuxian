@@ -50,8 +50,12 @@ export const useAuthStore = defineStore('auth', {
     logout() {
       this.token = ''
       this.user = null
+      // 同时退出开发者模式：否则 devMode 仍为 true 会使 isLoggedIn 持续为真，
+      // 表现为“开发者模式免登录后无法退出登录”
+      this.devMode = false
       localStorage.removeItem(TOKEN_KEY)
       localStorage.removeItem(USER_KEY)
+      localStorage.removeItem(DEV_KEY)
     },
     authHeaders() {
       return this.token ? { Authorization: `Bearer ${this.token}` } : {}
