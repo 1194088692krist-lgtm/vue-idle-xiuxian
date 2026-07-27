@@ -70,6 +70,61 @@ export function getSeekMaterialPrice(materialId, phaseName) {
   return Math.round(base * (PHASE_PRICE_MULT[phaseName] || 1))
 }
 
+
+// ===== 点化·兑币：定向工艺货币兑换（与「求材」同构） =====
+// 进度门控：仅开放玩家已 farm 到的秘境货币（c.dropZoneMin <= 秘境进度序号）
+// 溢价定价 + 数量软限，保护「刷本掉货币」主循环
+// 秘境进度序号：由突破等级反推（与求材同源：forest_edge:9→zone1 … chaos_realm:72→zone8）
+export const CRAFT_ZONE_PROGRESS = (level) => {
+  if (level >= 63) return 8
+  if (level >= 54) return 7
+  if (level >= 45) return 6
+  if (level >= 36) return 5
+  if (level >= 27) return 4
+  if (level >= 18) return 3
+  if (level >= 9) return 2
+  return 1
+}
+// 兑币基础价（early 参考，×PHASE_PRICE_MULT 为终价）—— [PLACEHOLDER]
+//   参考：工艺货币 zone 掉落率 CRAFT_DROP_CHANCE_BY_ZONE 0.10-0.36（×难度 drop），单次挂机期望 0-1 个
+//   公平成本 ≈ 单货币期望挂机场数 × 单场灵石；下表已含溢价（endgame 终价见注释）
+export const CRAFT_BASE_PRICE = {
+  refine_stone: 3000,    // endgame ≈ 7.5万（最常用、量大）
+  lock_rune: 6000,      // ≈ 15万
+  chaos_sand: 12000,    // ≈ 30万
+  divine_stone: 15000,  // ≈ 37.5万
+  exalt_stone: 25000,   // ≈ 62.5万（bossOnly）
+  law_stone: 30000,     // ≈ 75万（升档核心）
+  annul_dew: 35000,     // ≈ 87.5万（bossOnly）
+  blood_sigil: 60000    // ≈ 150万（zone6 rare，腐化）
+}
+export const CRAFT_EXCHANGE_CONFIG = {
+  premiumAlpha: 0.45,          // [PLACEHOLDER] 溢价系数 [0.3, 0.6]
+  perCurrencyDailyCap: 3,      // 单货币每日兑换上限
+  globalDailyCap: 10           // 每日兑币总次数上限
+}
+export function getCraftCurrencyPrice(currencyId, phaseName) {
+  const base = CRAFT_BASE_PRICE[currencyId] || 0
+  return Math.round(base * (PHASE_PRICE_MULT[phaseName] || 1))
+}
+
+// ===== 开纹·兑纹：定向灵纹兑换（与「求材」同构） =====
+// 灵纹当前随机掉落（getRandomRune），无定向获取路径；商店补「指定灵纹」出口
+// 进度门控：epic 灵纹需秘境进度 >=4（mid），rare 全程开放
+export const RUNE_BASE_PRICE = {
+  rune_fire_atk: 8000, rune_water_hp: 8000, rune_metal_def: 8000, rune_wood_spd: 8000, rune_earth_hp: 8000,
+  rune_fire_crit: 16000, rune_water_heal: 16000, rune_metal_pen: 16000, rune_wood_dodge: 16000, rune_earth_res: 16000
+}
+export const RUNE_EXCHANGE_CONFIG = {
+  epicUnlockZone: 4,           // epic 灵纹解锁所需秘境进度序号
+  perRuneDailyCap: 1,          // 单灵纹每日兑换上限（保稀缺）
+  globalDailyCap: 4            // 每日兑纹总次数上限
+}
+export function getRunePrice(runeId, phaseName) {
+  const base = RUNE_BASE_PRICE[runeId] || 0
+  return Math.round(base * (PHASE_PRICE_MULT[phaseName] || 1))
+}
+
 // ===== 黑市：限量随机刷新的高价商品（大额回收 + 装饰/收藏） =====
 // 注：原「混沌核心盲盒」已移除——定向 BOSS 素材改由「求材」提供，避免随机盲盒与补缺定位冲突。
 export const BLACK_MARKET_POOL = [

@@ -6,7 +6,7 @@ import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
-import { getRuneStats, getRandomRune, RUNE_ELEMENTS } from '../plugins/runes'
+import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
@@ -18,6 +18,11 @@ import {
   ZONE_UNLOCK_LEVEL,
   SEEK_BASE_PRICE,
   SEEK_CONFIG,
+  CRAFT_ZONE_PROGRESS,
+  CRAFT_EXCHANGE_CONFIG,
+  RUNE_EXCHANGE_CONFIG,
+  getCraftCurrencyPrice,
+  getRunePrice,
   rollBlackMarketItems,
   getManualRefreshCost,
   getSeekMaterialPrice
@@ -1886,6 +1891,87 @@ export const usePlayerStore = defineStore('player', {
       seek.purchases[materialId] = (seek.purchases[materialId] || 0) + 1
       this.queueSave()
       return { success: true, message: `成功兑换 ${item.name}，消耗 ${item.price} 灵石` }
+    },
+
+
+    // ===== 点化·兑币：定向工艺货币兑换（补缺枢纽） =====
+    _ensureShopDailyState(key) {
+      const today = Math.floor(Date.now() / 86400000)
+      if (!this.shopState) this.shopState = {}
+      if (!this.shopState[key] || this.shopState[key].day !== today) {
+        this.shopState[key] = { purchases: {}, day: today }
+      }
+      return this.shopState[key]
+    },
+    getCraftCatalog() {
+      const phase = getPhaseByLevel(this.level || 1).name
+      const zp = CRAFT_ZONE_PROGRESS(this.level || 1)
+      const st = this._ensureShopDailyState('craft')
+      const used = Object.values(st.purchases).reduce((a, b) => a + b, 0)
+      const items = Object.values(craftCurrencies)
+        .filter(cu => (cu.dropZoneMin || 0) <= zp)
+        .map(cu => {
+          const bought = st.purchases[cu.id] || 0
+          const remaining = Math.max(0, CRAFT_EXCHANGE_CONFIG.perCurrencyDailyCap - bought)
+          const price = getCraftCurrencyPrice(cu.id, phase)
+          return {
+            id: cu.id, name: cu.name, desc: cu.desc, rarity: cu.rarity, bossOnly: !!cu.bossOnly,
+            owned: (this.craftCurrencies && this.craftCurrencies[cu.id]) || 0,
+            price, remaining,
+            canBuy: remaining > 0 && used < CRAFT_EXCHANGE_CONFIG.globalDailyCap && this.spiritStones >= price
+          }
+        })
+      return { items, globalUsed: used, globalCap: CRAFT_EXCHANGE_CONFIG.globalDailyCap }
+    },
+    buyCraftCurrency(currencyId) {
+      const cat = this.getCraftCatalog()
+      const item = cat.items.find(i => i.id === currencyId)
+      if (!item) return { success: false, message: '该货币尚未解锁或不存在' }
+      if (item.remaining <= 0) return { success: false, message: '今日该货币兑换已达上限' }
+      if (cat.globalUsed >= cat.globalCap) return { success: false, message: '今日兑币总次数已用尽' }
+      if (this.spiritStones < item.price) return { success: false, message: `灵石不足，需要 ${item.price}` }
+      this.spiritStones -= item.price
+      this.gainCraftCurrency(currencyId, 1)
+      const st = this._ensureShopDailyState('craft')
+      st.purchases[currencyId] = (st.purchases[currencyId] || 0) + 1
+      this.queueSave()
+      return { success: true, message: `成功兑换 ${item.name}，消耗 ${item.price} 灵石` }
+    },
+    getRuneCatalog() {
+      const phase = getPhaseByLevel(this.level || 1).name
+      const zp = CRAFT_ZONE_PROGRESS(this.level || 1)
+      const st = this._ensureShopDailyState('rune')
+      const used = Object.values(st.purchases).reduce((a, b) => a + b, 0)
+      const items = runes.map(r => {
+        const unlocked = r.rarity !== 'epic' || zp >= RUNE_EXCHANGE_CONFIG.epicUnlockZone
+        const bought = st.purchases[r.id] || 0
+        const remaining = unlocked ? Math.max(0, RUNE_EXCHANGE_CONFIG.perRuneDailyCap - bought) : 0
+        const price = getRunePrice(r.id, phase)
+        return {
+          id: r.id, name: r.name, element: r.element, stat: r.stat,
+          value: r.value, valueType: r.valueType, rarity: r.rarity,
+          owned: (this.runes || []).filter(x => x.id === r.id).length,
+          price, remaining, unlocked,
+          canBuy: unlocked && remaining > 0 && used < RUNE_EXCHANGE_CONFIG.globalDailyCap && this.spiritStones >= price
+        }
+      })
+      return { items, globalUsed: used, globalCap: RUNE_EXCHANGE_CONFIG.globalDailyCap }
+    },
+    buyRune(runeId) {
+      const cat = this.getRuneCatalog()
+      const item = cat.items.find(i => i.id === runeId)
+      if (!item) return { success: false, message: '该灵纹不存在' }
+      if (!item.unlocked) return { success: false, message: '该灵纹尚未解锁（需更高秘境进度）' }
+      if (item.remaining <= 0) return { success: false, message: '今日该灵纹兑换已达上限' }
+      if (cat.globalUsed >= cat.globalCap) return { success: false, message: '今日兑纹总次数已用尽' }
+      if (this.spiritStones < item.price) return { success: false, message: `灵石不足，需要 ${item.price}` }
+      this.spiritStones -= item.price
+      const def = runes.find(r => r.id === runeId)
+      this.gainRune({ ...def, uid: `shop_${Date.now()}_${Math.floor(Math.random() * 1e6)}` })
+      const st = this._ensureShopDailyState('rune')
+      st.purchases[runeId] = (st.purchases[runeId] || 0) + 1
+      this.queueSave()
+      return { success: true, message: `成功兑换灵纹·${item.name}，消耗 ${item.price} 灵石` }
     },
 
     // ===== 黑市系统 =====

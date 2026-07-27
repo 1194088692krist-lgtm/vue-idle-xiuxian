@@ -632,6 +632,57 @@
             <div v-if="seekCatalog.length === 0" class="empty-state">尚未解锁任何秘境 BOSS 素材，先去突破吧。</div>
           </div>
 
+
+          <!-- 点化区（定向工艺货币兑换） -->
+          <div class="section">
+            <h3 class="section-title">点化（定向工艺货币）</h3>
+            <p class="section-hint">仅开放已farm到的秘境货币；溢价定价、每日限量，用于词缀升档/重铸「补缺」。</p>
+            <div class="shop-grid">
+              <div v-for="item in craftCatalog" :key="item.id" class="shop-card craft-card" :class="{ boss: item.bossOnly }">
+                <div class="shop-card-header">
+                  <span class="shop-icon">⚗️</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                  <span v-if="item.bossOnly" class="rarity-badge boss-tag">BOSS</span>
+                </div>
+                <p class="shop-desc">{{ item.desc }}</p>
+                <div class="seek-meta">
+                  <span>持有：{{ item.owned }}</span>
+                  <span>今日余：{{ item.remaining }}</span>
+                </div>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ formatNumber(item.price) }} 灵石</span>
+                  <button class="btn-small btn-buy" :disabled="!item.canBuy" @click="buyCraft(item.id)">兑换</button>
+                </div>
+              </div>
+            </div>
+            <div v-if="craftCatalog.length === 0" class="empty-state">尚未farm到任何工艺货币秘境。</div>
+          </div>
+
+          <!-- 开纹区（定向灵纹兑换） -->
+          <div class="section">
+            <h3 class="section-title">开纹（定向灵纹）</h3>
+            <p class="section-hint">灵纹随机掉落，商店补「指定灵纹」出口；epic 灵纹需更高秘境进度。</p>
+            <div class="shop-grid">
+              <div v-for="item in runeCatalog" :key="item.id" class="shop-card rune-card" :class="{ locked: !item.unlocked, epic: item.rarity==='epic' }">
+                <div class="shop-card-header">
+                  <span class="shop-icon">🔯</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                  <span class="rarity-badge" :class="item.rarity">{{ item.rarity==='epic' ? '极品' : '稀有' }}</span>
+                </div>
+                <p class="shop-desc">{{ runeStatLabel(item) }}</p>
+                <div class="seek-meta">
+                  <span>持有：{{ item.owned }}</span>
+                  <span v-if="item.unlocked">今日余：{{ item.remaining }}</span>
+                  <span v-else class="locked-tag">未解锁</span>
+                </div>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ item.unlocked ? formatNumber(item.price) + ' 灵石' : '—' }}</span>
+                  <button class="btn-small btn-buy" :disabled="!item.canBuy" @click="buyRune(item.id)">兑换</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 黑市区 -->
           <div class="section">
             <div class="black-market-header">
@@ -722,6 +773,8 @@
     activeTab.value = 'shop'
     loadBlackMarket()
     loadSeek()
+    loadCraft()
+    loadRune()
   }
   function loadBlackMarket() {
     blackMarketItems.value = playerStore.getBlackMarketItems()
@@ -776,6 +829,35 @@
     r.success ? message.success(r.message) : message.error(r.message)
     loadSeek()
     shopTick.value++
+  }
+  // 点化·兑币目录与购买
+  const craftCatalog = ref([])
+  function loadCraft() {
+    craftCatalog.value = playerStore.getCraftCatalog().items
+  }
+  async function buyCraft(id) {
+    const r = await playerStore.buyCraftCurrency(id)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadCraft()
+    shopTick.value++
+  }
+  // 开纹·兑纹目录与购买
+  const runeCatalog = ref([])
+  function loadRune() {
+    runeCatalog.value = playerStore.getRuneCatalog().items
+  }
+  async function buyRune(id) {
+    const r = await playerStore.buyRune(id)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadRune()
+    shopTick.value++
+  }
+  function runeStatLabel(item) {
+    const map = { attack: '攻击%', health: '生命%', defense: '防御%', speed: '速度',
+      healBoost: '治疗%', critDamageBoost: '暴伤%', finalDamageBoost: '增伤%',
+      dodgeRate: '闪避%', finalDamageReduce: '减伤%' }
+    const label = map[item.stat] || item.stat
+    return item.valueType === 'flat' ? `${label} +${item.value}` : `${label} ${Math.round(item.value * 100)}%`
   }
   async function buyBlackMarket(uid) {
     const r = await playerStore.buyBlackMarketItem(uid)
