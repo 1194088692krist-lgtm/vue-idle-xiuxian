@@ -7,7 +7,7 @@
         <div class="title-ornament top">✦ ✦ ✦</div>
         <div class="title-main">修仙问道</div>
         <div class="title-sub">Idle Cultivation</div>
-        <div class="title-version">v1.1.0</div>
+        <div class="title-version">v{{ GAME_VERSION }} · {{ GAME_VERSION_NAME }}</div>
         <div class="title-ornament bottom">✦ ✦ ✦</div>
       </div>
 
@@ -233,6 +233,7 @@ import { useMessage, useDialog } from 'naive-ui'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
 import { loadTheme } from '../plugins/theme'
+import { GAME_VERSION, GAME_VERSION_NAME } from '../plugins/version'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
