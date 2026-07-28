@@ -437,7 +437,7 @@
 </template>
 
 <script setup>
-import { usePlayerStore } from '../stores/player'
+import { usePlayerStore, computePetMultiplier } from '../stores/player'
 import { ref, computed, watch } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats, getEffortCap } from '../plugins/characters'
@@ -732,6 +732,8 @@ const getMemberFinalStats = (member) => {
   const base = getMemberBaseStats(member)
   const equipBonus = getMemberEquipBonus(member)
   const petBonus = getMemberPetBonus(member)
+  // 灵宠百分比倍率（与 store recomputeAttributes 一致，含品质基础加成保底）
+  const petMult = getMemberPetMult(member)
   const final = {}
   const allKeys = new Set([...Object.keys(base), ...Object.keys(equipBonus), ...Object.keys(petBonus)])
   allKeys.forEach(k => {
@@ -740,7 +742,12 @@ const getMemberFinalStats = (member) => {
     const eFlat = equipBonus[k] || 0
     const ePct = equipBonus['__pct_' + k] || 0
     const p = petBonus[k] || 0
-    final[k] = (b + eFlat + p) * (1 + ePct)
+    let val = (b + eFlat + p) * (1 + ePct)
+    // 四项基础属性额外乘以灵宠百分比倍率（与 player.recomputeAttributes 步骤5 一致）
+    if (['attack', 'health', 'defense', 'speed'].includes(k)) {
+      val = val * petMult
+    }
+    final[k] = val
   })
   return final
 }
@@ -750,12 +757,14 @@ const buildStatRows = (member, keys) => {
   const equipBonus = getMemberEquipBonus(member)
   const petBonus = getMemberPetBonus(member)
   const final = getMemberFinalStats(member)
+  const petMult = getMemberPetMult(member)
   return keys.map(k => {
     const b = base[k] || 0
     const eFlat = equipBonus[k] || 0
     const ePct = equipBonus['__pct_' + k] || 0
     const p = petBonus[k] || 0
-    const totalBonus = (b + eFlat + p) * (1 + ePct) - b
+    // 最终值已含灵宠百分比倍率；delta = final - base
+    const totalBonus = final[k] - b
     return {
       key: k,
       name: STAT_NAMES[k] || k,
@@ -782,24 +791,10 @@ const specialStats = computed(() => {
   return buildStatRows(selectedMember.value, ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost'])
 })
 
-// 计算灵宠百分比加成倍率（与 store.recomputeAttributes 的 petMut 公式一致）
-// 用于「灵宠加成」面板展示，确保面板显示的百分比 = 实际生效的百分比
+// 计算灵宠百分比加成倍率（使用 store 共享函数 computePetMultiplier，确保面板显示 = 实际生效）
 const getMemberPetMult = (member) => {
   if (!member || !member.equippedPet) return 1
-  const pet = member.equippedPet
-  const qualityMultiplier =
-    {
-      divine: 2.0,
-      celestial: 1.8,
-      mystic: 1.6,
-      spiritual: 1.4,
-      mortal: 1.2
-    }[pet.rarity] || 1.2
-  const starGrowth = 0.01 * qualityMultiplier
-  const levelGrowth = 0.02 * qualityMultiplier
-  const starMult = Math.pow(1 + starGrowth, pet.star || 0)
-  const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
-  return starMult * levelMult
+  return computePetMultiplier(member.equippedPet)
 }
 
 const petBonusStats = computed(() => {

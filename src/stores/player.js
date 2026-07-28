@@ -70,6 +70,34 @@ const QUALITY_STONE_MAP = {
 // 严格排除 pet/material 等非装备类型
 const isEquipmentItem = item => !!item && item.type !== 'pet' && item.type !== 'material' && (item.type === 'equipment' || (item.slot && EQUIPMENT_SLOTS.includes(item.slot)))
 
+// ===== 灵宠加成倍率计算（单一真相源，供 store + 两个视图共用） =====
+// 公式：petMult = 1 + qualityBaseBonus + compoundGrowth
+//   qualityBaseBonus  品质基础加成（即使 level=1 star=0 也生效，保底不为 0）
+//   compoundGrowth     复利成长（starMult * levelMult - 1，随升星/升级增长）
+//   starGrowth  = 0.01 * qualityMultiplier（神品 2%/星）
+//   levelGrowth = 0.02 * qualityMultiplier（神品 4%/级，= 2 × 升星）
+// 示例（divine）：
+//   lvl1  star0 → 1 + 0.15 + 0    = 1.15  (+15%)
+//   lvl30 star5 → 1 + 0.15 + 2.45 = 3.60  (+260%)
+const PET_QUALITY_BASE_BONUS = {
+  divine: 0.15, celestial: 0.12, mystic: 0.09, spiritual: 0.06, mortal: 0.03
+}
+const PET_QUALITY_MULTIPLIER = {
+  divine: 2.0, celestial: 1.8, mystic: 1.6, spiritual: 1.4, mortal: 1.2
+}
+// 计算出战灵宠的属性倍率（attack/health/defense/speed 通用）
+export function computePetMultiplier(pet) {
+  if (!pet) return 1
+  const qualityMultiplier = PET_QUALITY_MULTIPLIER[pet.rarity] || 1.2
+  const baseBonus = PET_QUALITY_BASE_BONUS[pet.rarity] || 0.03
+  const starGrowth = 0.01 * qualityMultiplier
+  const levelGrowth = 0.02 * qualityMultiplier
+  const starMult = Math.pow(1 + starGrowth, pet.star || 0)
+  const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
+  const compoundGrowth = starMult * levelMult - 1
+  return 1 + baseBonus + compoundGrowth
+}
+
 // 云同步节流计时器（模块级，不进入存档）
 let cloudSyncTimer = null
 
@@ -2523,27 +2551,10 @@ export const usePlayerStore = defineStore('player', {
         }
       })
       // 5) 出战灵宠百分比加成：复利成长倍率，乘到最终 baseAttributes 上
-      // 与 Inventory.vue 的 getPetBonus 公式完全一致，确保面板显示的百分比 = 实际生效的百分比
-      // 公式：petMult = (1+starGrowth)^star * (1+levelGrowth)^(level-1)
-      //   starGrowth  = 0.01 * qualityMultiplier（神品 2%/星）
-      //   levelGrowth = 0.02 * qualityMultiplier（神品 4%/级，= 2 × 升星）
-      // 灵宠扁平属性已在步骤1并入裸身基线（低等级时有效），此处额外按复利百分比放大玩家最终属性
+      // 使用共享函数 computePetMultiplier，确保 store / Inventory.vue / Cultivation.vue 三处公式完全一致
+      // 灵宠扁平属性已在步骤1并入裸身基线（低等级时有效），此处额外按百分比放大玩家最终属性
       if (this.activePet) {
-        const pet = this.activePet
-        const qualityMultiplier =
-          {
-            divine: 2.0,
-            celestial: 1.8,
-            mystic: 1.6,
-            spiritual: 1.4,
-            mortal: 1.2
-          }[pet.rarity] || 1.2
-        const starGrowth = 0.01 * qualityMultiplier // 每星成长率
-        const levelGrowth = 0.02 * qualityMultiplier // 每级成长率（= 2 × 升星）
-        // 复利累计：(1+starGrowth)^star * (1+levelGrowth)^(level-1)
-        const starMult = Math.pow(1 + starGrowth, pet.star || 0)
-        const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
-        const petMult = starMult * levelMult
+        const petMult = computePetMultiplier(this.activePet)
         // 扁平属性按倍率放大（attack/health/defense/speed）
         this.baseAttributes.attack = Math.floor(this.baseAttributes.attack * petMult)
         this.baseAttributes.health = Math.floor(this.baseAttributes.health * petMult)
@@ -3279,7 +3290,11 @@ export const usePlayerStore = defineStore('player', {
       let petScore = 0
       if (character.equippedPet) {
         const ca = character.equippedPet.combatAttributes || {}
+        // 扁平属性贡献
         petScore = (ca.attack || 0) * 8 + (ca.health || 0) * 0.8 + (ca.defense || 0) * 5 + (ca.speed || 0) * 12
+        // 百分比倍率贡献：灵宠 petMult 放大了角色基础属性，贡献 = charBaseScore × (petMult - 1)
+        const petMult = computePetMultiplier(character.equippedPet)
+        petScore += charBaseScore * (petMult - 1)
       }
       let setScore = 0
       const activeSets = getActiveSetBonuses(artifacts)

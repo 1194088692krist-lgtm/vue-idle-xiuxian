@@ -1,5 +1,5 @@
 import { ref, computed } from 'vue'
-import { usePlayerStore } from '../stores/player'
+import { usePlayerStore, computePetMultiplier } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugins/combat'
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
@@ -2293,6 +2293,12 @@ function buildMemberCombatStats(member) {
     finalDamage += pca.attack || 0
     finalDefense += pca.defense || 0
     finalSpeed += pca.speed || 0
+    // 灵宠百分比倍率：四项基础属性乘以 petMult（与 store recomputeAttributes 一致）
+    const petMult = computePetMultiplier(pet)
+    finalHealth = Math.floor(finalHealth * petMult)
+    finalDamage = Math.floor(finalDamage * petMult)
+    finalDefense = Math.floor(finalDefense * petMult)
+    finalSpeed = Math.floor(finalSpeed * petMult)
   }
 
   const stats = {
@@ -3317,6 +3323,12 @@ function buildTeamMemberState(member, s) {
     finalAttack += pca.attack || 0
     finalDefense += pca.defense || 0
     finalSpeed += pca.speed || 0
+    // 灵宠百分比倍率：四项基础属性乘以 petMult（与 store recomputeAttributes 一致）
+    const petMult = computePetMultiplier(pet)
+    finalHealth = Math.floor(finalHealth * petMult)
+    finalAttack = Math.floor(finalAttack * petMult)
+    finalDefense = Math.floor(finalDefense * petMult)
+    finalSpeed = Math.floor(finalSpeed * petMult)
   }
 
   // 确保角色有技能（兼容旧存档）
