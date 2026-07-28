@@ -514,6 +514,28 @@ export const usePlayerStore = defineStore('player', {
                   m.maxExperience = Math.floor(m.maxExperience)
                 }
               })
+              // 迁移：技能系统从 5 流派(role-based)重构为 10 元素宗派(school-based)
+              // 检测老技能ID前缀(wg_/as_/hl_/gd_/tc_)，按角色 skillSchool 重新分配新技能
+              const OLD_SKILL_PREFIXES = ['wg_', 'as_', 'hl_', 'gd_', 'tc_']
+              for (const m of this.sectMembers) {
+                if (!m) continue
+                const memberSchool = m.skillSchool || m.school || 'sword'
+                const hasOldSkills = Array.isArray(m.skills) && m.skills.some(s =>
+                  s && s.id && OLD_SKILL_PREFIXES.some(p => s.id.startsWith(p))
+                )
+                if (hasOldSkills || !Array.isArray(m.skills) || m.skills.length === 0) {
+                  // 按角色宗门重新分配：初始技能 + 已突破等级对应的所有技能
+                  const newSkills = getInitialSkills(memberSchool)
+                  for (let bt = 1; bt <= (m.breakThrough || 0); bt++) {
+                    const btSkills = getSkillsForBreakthrough(memberSchool, bt)
+                    newSkills.push(...btSkills)
+                  }
+                  m.skills = deduplicateSkills(newSkills)
+                  // 重置 equippedSkills，自动装备前3个主动技能
+                  const activeSkills = m.skills.filter(s => s.type === 'active')
+                  m.equippedSkills = activeSkills.slice(0, 3).map(s => s.id)
+                }
+              }
             }
             // 迁移：旧版灵草库存并入统一素材库（kind='herb'），随后移除遗留 herbs 键
             if (Array.isArray(this.$state.herbs)) {

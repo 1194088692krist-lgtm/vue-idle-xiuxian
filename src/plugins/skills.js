@@ -963,8 +963,10 @@ export const getSkillSchoolByRole = (role) => {
 }
 
 // 新增：根据角色的 school 字段获取技能宗门
+// 兼容 school（模板字段）和 skillSchool（生成角色对象字段）
 export const getSkillSchoolByCharacter = (character) => {
-  return character?.school || 'sword'
+  if (!character) return 'sword'
+  return character.school || character.skillSchool || 'sword'
 }
 
 // getInitialSkills 现以宗门 key（如 'ice'）为参数
