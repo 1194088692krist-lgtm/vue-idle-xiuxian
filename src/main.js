@@ -27,12 +27,36 @@ if ('serviceWorker' in navigator && import.meta.env.PROD) {
     navigator.serviceWorker.register('./sw.js', { scope: './' })
       .catch(err => console.warn('[SW] 注册失败：', err.message))
   })
-  // 修复：监听 SW 更新，新 SW 接管后自动刷新页面。
-  // 否则用户浏览器永远停留在旧 JS（旧 bug 不会消失），即使新代码已部署。
-  let refreshing = false
-  navigator.serviceWorker.addEventListener('controllerchange', () => {
-    if (refreshing) return
-    refreshing = true
-    window.location.reload()
+  // 修复（严重 bug）：原实现监听 SW controllerchange 后无条件 window.location.reload()，
+  // 导致每次站点部署后所有在线玩家页面被强制刷新，挂机中断、存档可能丢失。
+  // 改为：不自动 reload，仅提示用户「有新版本」，由用户主动刷新。
+  // 新版本会在下次自然进入页面时生效（SW 已 skipWaiting 接管，旧 JS 仍在内存跑完当前会话）。
+  // 这样挂机中的玩家不会被中断，玩家可在挂机结束后自行刷新获取新版本。
+  navigator.serviceWorker.addEventListener('message', (event) => {
+    if (event.data && event.data.type === 'SW_UPDATED') {
+      // 仅提示一次，避免重复弹窗
+      if (window.__swUpdateNotified) return
+      window.__swUpdateNotified = true
+      console.info('[SW] 检测到新版本，将在下次启动时生效。如需立即更新请手动刷新页面。')
+      // 非阻塞提示：不使用 alert/confirm，避免打断挂机
+      try {
+        const banner = document.createElement('div')
+        banner.textContent = '游戏有新版本，下次启动自动生效（当前挂机不受影响）'
+        banner.style.cssText = [
+          'position:fixed', 'bottom:16px', 'left:50%', 'transform:translateX(-50%)',
+          'background:rgba(0,0,0,0.85)', 'color:#FFD700', 'padding:10px 20px',
+          'border-radius:8px', 'font-size:13px', 'z-index:99999',
+          'box-shadow:0 4px 12px rgba(0,0,0,0.4)', 'max-width:90vw', 'text-align:center',
+          'pointer-events:none', 'opacity:0', 'transition:opacity 0.4s'
+        ].join(';')
+        document.body.appendChild(banner)
+        requestAnimationFrame(() => { banner.style.opacity = '1' })
+        // 6s 后自动消失
+        setTimeout(() => {
+          banner.style.opacity = '0'
+          setTimeout(() => banner.remove(), 400)
+        }, 6000)
+      } catch (e) { /* DOM 操作失败则静默，仅 console 提示 */ }
+    }
   })
 }
