@@ -1835,9 +1835,9 @@ export const usePlayerStore = defineStore('player', {
       this.recallPet()
       return this.deployPet(pet)
     },
-    // 幻灵结晶兑换（50灵石 = 1幻灵结晶）
+    // 幻灵结晶兑换（200灵石 = 1幻灵结晶）
     exchangeCrystals(amount) {
-      const cost = amount * 50
+      const cost = amount * 200
       if (this.spiritStones < cost) {
         return { success: false, message: `灵石不足，需要 ${cost} 灵石` }
       }
@@ -3028,9 +3028,9 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
     },
-    // 灵石兑换升星碎片（200灵石 = 1碎片，比幻灵结晶 50:1 更贵，保持稀缺）
+    // 灵石兑换升星碎片（1000灵石 = 1碎片，比幻灵结晶 200:1 更贵，保持稀缺）
     exchangePetFragments(amount) {
-      const cost = amount * 200
+      const cost = amount * 1000
       if (this.spiritStones < cost) {
         return { success: false, message: `灵石不足，需要 ${cost} 灵石` }
       }

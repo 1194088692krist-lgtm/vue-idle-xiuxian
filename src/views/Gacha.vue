@@ -69,13 +69,13 @@
         <div class="crystal-exchange">
           <div class="exchange-info">
             <span class="label">灵石 → 幻灵结晶</span>
-            <span class="rate">50 灵石 = 1 幻灵结晶</span>
+            <span class="rate">200 灵石 = 1 幻灵结晶</span>
           </div>
           <div class="exchange-actions">
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 500" @click="exchangeCrystals(10)">兑换10</button>
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 2500" @click="exchangeCrystals(50)">兑换50</button>
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 5000" @click="exchangeCrystals(100)">兑换100</button>
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 50000" @click="exchangeCrystals(1000)">兑换1000</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 2000" @click="exchangeCrystals(10)">兑换10</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 10000" @click="exchangeCrystals(50)">兑换50</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 20000" @click="exchangeCrystals(100)">兑换100</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 200000" @click="exchangeCrystals(1000)">兑换1000</button>
           </div>
         </div>
 
@@ -95,12 +95,12 @@
         <div class="crystal-exchange pet-fragment-exchange">
           <div class="exchange-info">
             <span class="label">灵石 → 升星碎片</span>
-            <span class="rate">200 灵石 = 1 升星碎片（持有 {{ playerStore.petFragments }} 个）</span>
+            <span class="rate">1000 灵石 = 1 升星碎片（持有 {{ playerStore.petFragments }} 个）</span>
           </div>
           <div class="exchange-actions">
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 2000" @click="exchangePetFragments(10)">兑换10</button>
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 10000" @click="exchangePetFragments(50)">兑换50</button>
-            <button class="btn btn-info" :disabled="playerStore.spiritStones < 20000" @click="exchangePetFragments(100)">兑换100</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 10000" @click="exchangePetFragments(10)">兑换10</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 50000" @click="exchangePetFragments(50)">兑换50</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 100000" @click="exchangePetFragments(100)">兑换100</button>
           </div>
         </div>
 
