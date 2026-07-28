@@ -46,16 +46,31 @@ watch(bossKillEvent, (evt) => {
   if (!evt || !evt.ts) return
   // 设置开关关闭则不触发
   if (!playerStore.bossKillAnimation) return
-  // 查找击杀者
-  const memberId = evt.killerMemberId
+
+  // 立绘来源角色选择：
+  // 1. 若用户在立绘弹窗设置了 bossKillCharacterId，优先用该固定角色
+  // 2. 否则跟随斩杀者（最后一击者），找不到则回退队长，再回退随机队伍成员
   let member = null
-  if (memberId) {
-    member = playerStore.sectMembers.find(m => m.id === memberId)
+  const fixedCharId = playerStore.bossKillCharacterId
+  if (fixedCharId) {
+    member = playerStore.sectMembers.find(m => (m.templateId || m.id) === fixedCharId)
   }
-  // 兜底：找不到成员时取队长
-  if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
-    const captainId = playerStore.teamMembers[0]
-    member = playerStore.sectMembers.find(m => m.id === captainId)
+  if (!member) {
+    // 跟随斩杀者
+    const memberId = evt.killerMemberId
+    if (memberId) {
+      member = playerStore.sectMembers.find(m => m.id === memberId)
+    }
+    // 兜底1：队长
+    if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
+      const captainId = playerStore.teamMembers[0]
+      member = playerStore.sectMembers.find(m => m.id === captainId)
+    }
+    // 兜底2：随机队伍成员（避免总是第一人）
+    if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
+      const randomId = playerStore.teamMembers[Math.floor(Math.random() * playerStore.teamMembers.length)]
+      member = playerStore.sectMembers.find(m => m.id === randomId)
+    }
   }
   if (!member) return
 

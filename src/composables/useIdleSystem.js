@@ -2625,8 +2625,10 @@ async function executeRound(effectiveZone) {
       const attackerPlayer = players.find(pl => pl.name === r.attacker)
       const defenderPlayer = players.find(pl => pl.name === r.defender)
       const isPlayerAttacker = !!attackerPlayer
-      // 记录最后一次造成伤害的玩家攻击者（敌人未死前）
-      if (isPlayerAttacker && attackerPlayer && !r.isDodged && enemy.currentHealth > 0) {
+      // 追踪最后一次有效攻击的玩家攻击者（用于击杀BOSS立绘突入）
+      // 修复：原条件 enemy.currentHealth > 0 永远不成立（executeTurn 内部已把 enemy 打死），
+      // 导致致命一击者永远不被记录，回退到 players[0] 队长，表现为"总是第一人斩杀"
+      if (isPlayerAttacker && attackerPlayer && !r.isDodged) {
         lastPlayerAttacker = attackerPlayer
       }
 

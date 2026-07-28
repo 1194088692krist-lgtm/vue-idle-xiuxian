@@ -951,6 +951,8 @@
         </div>
       </div>
     </Teleport>
+    <!-- 击杀BOSS立绘突入演出：独立于 BattleStage 的 v-if，挂机/挑战全程可触发 -->
+    <BossKillCinematic />
   </div>
 </template>
 
@@ -963,6 +965,7 @@ import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../
 import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
 import CharacterPortraitModal from './CharacterPortraitModal.vue'
+import BossKillCinematic from './BossKillCinematic.vue'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
 import { getPillsByZone } from '../plugins/pills'

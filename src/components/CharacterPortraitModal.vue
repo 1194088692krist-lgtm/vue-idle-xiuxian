@@ -69,6 +69,21 @@
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
             <div class="char-stars-large">{{ '⭐'.repeat(character.star || 1) }}</div>
+            <!-- 设为击杀动画立绘：固定用此角色当前选中皮肤作为击杀BOSS演出立绘 -->
+            <button
+              class="set-kill-portrait-btn"
+              :class="{ active: isCurrentKillPortrait }"
+              @click.stop="setAsKillPortrait"
+            >
+              {{ isCurrentKillPortrait ? '✓ 已设为击杀动画立绘' : '设为击杀动画立绘' }}
+            </button>
+            <button
+              v-if="playerStore.bossKillCharacterId"
+              class="set-kill-portrait-btn reset"
+              @click.stop="resetKillPortrait"
+            >
+              恢复跟随斩杀者
+            </button>
           </div>
         </div>
       </div>
@@ -260,6 +275,30 @@ const nextSkin = () => {
   if (!canSwitch.value) return
   currentSkin.value = currentSkin.value === maxSkinIndex.value ? 0 : currentSkin.value + 1
   avatarLoaded.value = false
+}
+
+// ===== 设为击杀动画立绘 =====
+// 角色ID：templateId 优先，回退 id
+const characterId = computed(() => (props.character && (props.character.templateId || props.character.id)) || null)
+// 当前角色+当前皮肤是否已被设为击杀动画立绘
+const isCurrentKillPortrait = computed(() => {
+  if (!characterId.value) return false
+  return playerStore.bossKillCharacterId === characterId.value && playerStore.bossKillSkinIndex === currentSkin.value
+})
+// 设为击杀动画立绘：固定用此角色当前选中皮肤
+const setAsKillPortrait = () => {
+  if (!characterId.value) return
+  playerStore.bossKillCharacterId = characterId.value
+  playerStore.bossKillSkinIndex = currentSkin.value
+  localStorage.setItem('bossKillCharacterId', characterId.value)
+  localStorage.setItem('bossKillSkinIndex', currentSkin.value)
+  playerStore.saveData()
+}
+// 恢复跟随斩杀者：清空固定角色，动画用实际最后一击者的立绘
+const resetKillPortrait = () => {
+  playerStore.bossKillCharacterId = null
+  localStorage.removeItem('bossKillCharacterId')
+  playerStore.saveData()
 }
 
 onBeforeUnmount(() => {
@@ -459,6 +498,37 @@ onBeforeUnmount(() => {
 .char-stars-large {
   font-size: 22px;
   letter-spacing: 4px;
+}
+.set-kill-portrait-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(255, 215, 0, 0.15);
+  border: 1px solid rgba(255, 215, 0, 0.5);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.set-kill-portrait-btn:hover {
+  background: rgba(255, 215, 0, 0.3);
+  border-color: #FFD700;
+}
+.set-kill-portrait-btn.active {
+  background: rgba(255, 215, 0, 0.35);
+  border-color: #FFD700;
+  color: #FFD700;
+  font-weight: bold;
+}
+.set-kill-portrait-btn.reset {
+  margin-left: 8px;
+  padding: 8px 16px;
+  font-size: 13px;
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.3);
+}
+.set-kill-portrait-btn.reset:hover {
+  background: rgba(255, 255, 255, 0.15);
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }

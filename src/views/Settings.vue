@@ -111,19 +111,9 @@
           <p class="setting-hint">
             击杀BOSS时，最后一击者的立绘从左下突入、中心旋转、右上消失，纯CSS动画对挂机性能无负担。
           </p>
-          <div v-if="playerStore.bossKillAnimation" class="setting-input-group" style="margin-top: 8px;">
-            <label class="setting-label" style="margin: 0; font-size: 13px;">动画立绘：</label>
-            <button
-              v-for="i in 4"
-              :key="i"
-              class="btn btn-small"
-              :class="playerStore.bossKillSkinIndex === (i - 1) ? 'btn-primary' : 'btn-outline'"
-              @click="setBossKillSkinIndex(i - 1)"
-              style="margin-left: 4px;"
-            >
-              {{ ['原立绘', '皮肤1', '皮肤2', '皮肤3'][i - 1] }}
-            </button>
-          </div>
+          <p class="setting-hint">
+            立绘选择：在「人物」页点击任意角色立绘打开欣赏弹窗，切换到喜欢的皮肤后点「设为击杀动画立绘」即可固定使用该立绘；不设置则默认跟随斩杀者（最后一击者）。
+          </p>
         </div>
 
         <!-- 危险操作 -->
@@ -796,12 +786,6 @@
   const toggleBossKillAnimation = () => {
     playerStore.bossKillAnimation = !playerStore.bossKillAnimation
     localStorage.setItem('bossKillAnimation', playerStore.bossKillAnimation)
-    playerStore.saveData()
-  }
-  // 选择击杀动画使用的立绘索引（0=原立绘 1-3=皮肤1-3）
-  const setBossKillSkinIndex = (idx) => {
-    playerStore.bossKillSkinIndex = idx
-    localStorage.setItem('bossKillSkinIndex', idx)
     playerStore.saveData()
   }
 
