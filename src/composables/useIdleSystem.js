@@ -3000,8 +3000,14 @@ async function runIdleEncounter() {
       // BOSS 被击杀：标记通过核心挑战（用于结算「最后 1/5 能否击杀 BOSS」）
       if (bossSpawned.value && victory) {
         bossDefeated.value = true
-        // 发出击杀事件：触发立绘突入动画（由 BattleStage/挂机界面 watch bossKillEvent）
-        const killer = lastPlayerAttacker || players.find(p => p.currentHealth > 0) || players[0]
+        // 发出击杀事件：触发立绘突入动画（由 BossKillCinematic watch bossKillEvent）
+        // 修复：原引用 lastPlayerAttacker / players 为 executeRound 局部变量，本作用域不可见，
+        // 抛 ReferenceError 被 try/catch 静默吞掉，导致 bossKillEvent 永不赋值、立绘动画不显示，
+        // 且连带跳过后续 bossSpawned 复位与奖励发放。改为使用 roundResult.lastPlayerAttacker
+        // 与 encounter.players（与手动 BOSS 挑战路径 line 1594 写法一致）
+        const killer = roundResult.lastPlayerAttacker
+          || encounter.players.find(p => p.currentHealth > 0)
+          || encounter.players[0]
         bossKillEvent.value = {
           killerMemberId: killer?.memberId || null,
           killerName: killer?.name || '',
