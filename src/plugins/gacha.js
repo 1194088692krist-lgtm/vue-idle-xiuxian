@@ -131,6 +131,29 @@ const resourceRewards = [
   { type: 'pet_essence', amount: [5, 20] }
 ]
 
+// 灵宠池专用资源奖励（用于灵宠池十连「剩余格子」填充）
+// 单格上限：碎片/精华/结晶 ≤ 50，灵石 ≤ 1000
+const petPoolResourceRewards = [
+  { type: 'pet_fragment', amount: [10, 50] },
+  { type: 'pet_essence', amount: [10, 50] },
+  { type: 'phantom_crystal', amount: [10, 50] },
+  { type: 'spirit_stone', amount: [200, 1000] }
+]
+
+// 灵宠池专用资源奖励生成（供 doPetPoolMultiGacha 填充剩余格子使用）
+const generatePetPoolResource = () => {
+  const reward = petPoolResourceRewards[Math.floor(Math.random() * petPoolResourceRewards.length)]
+  const amount = Math.floor(Math.random() * (reward.amount[1] - reward.amount[0] + 1)) + reward.amount[0]
+  return { type: reward.type, amount }
+}
+
+// 灵宠池保底间隔：连续 5 次十连抽未获得仙品灵宠，第 5 次必出
+export const PET_POOL_PITY_INTERVAL = 5
+// 灵宠池每轮十连最多获得的灵宠数
+export const PET_POOL_MAX_PETS = 2
+// 灵宠池仙品（celestial + divine）基础概率
+export const PET_POOL_CELESTIAL_RATE = 0.10
+
 // 根据权重随机选择品质
 const pickByWeight = (qualityMap) => {
   const entries = Object.entries(qualityMap)
@@ -419,6 +442,153 @@ export const doMultiGacha = (poolType, count, playerLevel = 1, pityState = null)
   if (pityState) {
     pityState.fiveStarPity = localPity.fiveStarPity
     pityState.fourStarPity = localPity.fourStarPity
+  }
+
+  return results
+}
+
+// 生成指定稀有度的灵宠（celestial 或 divine），仅用于灵宠池保底
+const generatePetWithRarity = (playerLevel, rarityKey) => {
+  const rarityInfo = petRarities[rarityKey] || petRarities.celestial
+  const nameBaseIdx = Math.floor(Math.random() * petNameParts.length)
+  const nameBase = petNameParts[nameBaseIdx]
+  const name = `${nameBase}·${rarityInfo.name}`
+  const description = petDescriptions[Math.floor(Math.random() * petDescriptions.length)]
+  const templateId = `pet_kind_${String(nameBaseIdx + 1).padStart(2, '0')}`
+  const rarityMultiplier = { mortal: 1, spiritual: 1.5, mystic: 2, celestial: 3, divine: 5 }
+  const multiplier = rarityMultiplier[rarityKey] || 3
+  const levelBonus = 1 + (playerLevel - 1) * 0.05
+  const combatAttributes = {
+    attack: Math.round((5 + Math.random() * 10) * multiplier * levelBonus),
+    health: Math.round((30 + Math.random() * 50) * multiplier * levelBonus),
+    defense: Math.round((3 + Math.random() * 8) * multiplier * levelBonus),
+    speed: Math.round((2 + Math.random() * 5) * multiplier * levelBonus),
+    critRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    comboRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    counterRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    stunRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    dodgeRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    vampireRate: Math.min(0.5, Math.round((0.01 + Math.random() * 0.03) * multiplier * 100) / 100),
+    critResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    comboResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    counterResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    stunResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    dodgeResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    vampireResist: Math.min(0.5, Math.round((0.01 + Math.random() * 0.02) * multiplier * 100) / 100),
+    healBoost: 0,
+    critDamageBoost: 0,
+    critDamageReduce: 0,
+    finalDamageBoost: 0,
+    finalDamageReduce: 0,
+    combatBoost: 0,
+    resistanceBoost: 0
+  }
+  return {
+    id: `pet_${Date.now()}_${Math.random().toString(36).slice(2, 8)}`,
+    name, type: 'pet', description,
+    rarity: rarityKey, level: 1, star: 0,
+    templateId, currentSkin: 0, combatAttributes
+  }
+}
+
+// 灵宠池十连抽（专用于 pet 池）
+// 规则：
+//  1. 每轮最多 2 只灵宠，剩余格子填充资源（碎片/精华/结晶/灵石，有上限）
+//  2. 仙品（celestial + divine）基础概率 10%（其中 divine 占 1/5）
+//  3. 连续 5 次十连抽未获得仙品灵宠，第 5 次必出一只仙品
+//  4. pityState.petPity 跨调用累计；抽出仙品时归零
+//  5. 单抽走 doGacha（保持原行为）；此函数仅用于灵宠池九连
+export const doPetPoolMultiGacha = (count, playerLevel = 1, pityState = null) => {
+  const results = []
+  const localPity = pityState && typeof pityState.petPity === 'number' ? pityState.petPity : 0
+  let petPity = localPity
+  let petCount = 0
+  let celestialDroppedThisRound = false
+
+  // 第一阶段：决定本轮要不要出仙品保底
+  let forceCelestialAt = -1
+  if (petPity + 1 >= PET_POOL_PITY_INTERVAL) {
+    // 本轮必出一只仙品（在某个灵宠格子强制出）
+    forceCelestialAt = Math.floor(Math.random() * count)
+  }
+
+  for (let i = 0; i < count; i++) {
+    // 已达到灵宠上限，剩余格子填充资源
+    if (petCount >= PET_POOL_MAX_PETS) {
+      results.push({ category: 'resource', item: generatePetPoolResource() })
+      continue
+    }
+
+    // 强制保底格子：必出仙品
+    if (i === forceCelestialAt) {
+      const rarityKey = Math.random() < 0.2 ? 'divine' : 'celestial'
+      results.push({ category: 'pet', item: generatePetWithRarity(playerLevel, rarityKey) })
+      petCount++
+      celestialDroppedThisRound = true
+      petPity = 0
+      continue
+    }
+
+    // 普通格子：10% 概率出仙品灵宠
+    if (Math.random() < PET_POOL_CELESTIAL_RATE) {
+      const rarityKey = Math.random() < 0.2 ? 'divine' : 'celestial'
+      results.push({ category: 'pet', item: generatePetWithRarity(playerLevel, rarityKey) })
+      petCount++
+      celestialDroppedThisRound = true
+      petPity = 0
+      continue
+    }
+
+    // 70% 概率出普通灵宠（mystic / spiritual / mortal）
+    if (Math.random() < 0.7) {
+      const normalRarities = {
+        mystic: petRarities.mystic,
+        spiritual: petRarities.spiritual,
+        mortal: petRarities.mortal
+      }
+      const rarityInfo = pickByWeight(normalRarities)
+      const pet = generatePet(playerLevel)
+      pet.rarity = rarityInfo.key
+      const nameBaseIdx = Math.floor(Math.random() * petNameParts.length)
+      pet.name = `${petNameParts[nameBaseIdx]}·${rarityInfo.name}`
+      pet.templateId = `pet_kind_${String(nameBaseIdx + 1).padStart(2, '0')}`
+      results.push({ category: 'pet', item: pet })
+      petCount++
+      continue
+    }
+
+    // 剩余：填充资源
+    results.push({ category: 'resource', item: generatePetPoolResource() })
+  }
+
+  // 若本轮本应保底但循环中未触发（例如所有灵宠格子已被 MAX_PETS 占满而错过 forceCelestialAt）
+  // 则把已出灵宠中的第一只替换为仙品，确保保底必生效
+  if (forceCelestialAt >= 0 && !celestialDroppedThisRound) {
+    const petIndices = results
+      .map((r, idx) => (r && r.category === 'pet') ? idx : -1)
+      .filter(idx => idx >= 0)
+    if (petIndices.length > 0) {
+      const replaceIdx = petIndices[0]
+      const rarityKey = Math.random() < 0.2 ? 'divine' : 'celestial'
+      results[replaceIdx] = { category: 'pet', item: generatePetWithRarity(playerLevel, rarityKey) }
+      celestialDroppedThisRound = true
+      petPity = 0
+    } else {
+      // 极端情况：本轮连 1 只灵宠都没出，强制补一只仙品（突破 MAX_PETS 限制）
+      results.push({ category: 'pet', item: generatePetWithRarity(playerLevel, 'celestial') })
+      celestialDroppedThisRound = true
+      petPity = 0
+    }
+  }
+
+  // 若本轮未出仙品，保底计数 +1
+  if (!celestialDroppedThisRound) {
+    petPity += 1
+  }
+
+  // 同步回 pityState
+  if (pityState) {
+    pityState.petPity = petPity
   }
 
   return results
