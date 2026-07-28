@@ -73,17 +73,36 @@ const skillFadeDelay = computed(() => {
 // 整体淡出 class：在 skillCastEvent watch 内通过 nextTick 触发，避免初始化误触发
 const skillFadeClass = ref('')
 
-// ===== 技能属性色映射：按技能名关键词推断属性，未匹配时用金色（中性） =====
-// 修仙主题属性：火→红、雷→黄、冰→青、剑气→金、毒→紫、土→褐、风→绿
+// ===== 技能属性色映射：按技能名关键词推断属性色 =====
+// 修仙主题属性配色，覆盖 11 大属性系，确保每个技能都有契合的视觉效果
+// 排序即优先级：多属性关键词技能按靠前的系匹配（如"光暗交织"归暗系）
 const SKILL_COLOR_MAP = [
-  { keys: ['火', '焰', '焚', '炽', '炎', '烛'], color: '#FF5252', flash: 'rgba(255, 82, 82, 0.4)', glow: 'radial-gradient(circle, rgba(255, 82, 82, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
+  // 暗系（最高优先级，避免"光暗交织"误归光系）：暗紫/黑紫，阴冷深邃
+  { keys: ['暗', '影', '夜', '幽', '冥', '煞', '魔', '鬼', '魂', '噬', '阴'], color: '#7E1FA2', flash: 'rgba(126, 31, 162, 0.4)', glow: 'radial-gradient(circle, rgba(126, 31, 162, 0.5) 0%, rgba(48, 12, 64, 0.3) 40%, transparent 70%)' },
+  // 火系：烈焰红橙
+  { keys: ['火', '焰', '焚', '炽', '炎', '烛', '爆'], color: '#FF5252', flash: 'rgba(255, 82, 82, 0.4)', glow: 'radial-gradient(circle, rgba(255, 82, 82, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
+  // 雷系：明黄电光
   { keys: ['雷', '电', '霆', '霹雳', '震'], color: '#FFEB3B', flash: 'rgba(255, 235, 59, 0.4)', glow: 'radial-gradient(circle, rgba(255, 235, 59, 0.5) 0%, rgba(255, 193, 7, 0.2) 40%, transparent 70%)' },
+  // 冰系：寒冰青蓝（排在剑系前，"寒霜剑意"归冰）
   { keys: ['冰', '雪', '霜', '寒', '凛'], color: '#4FC3F7', flash: 'rgba(79, 195, 247, 0.4)', glow: 'radial-gradient(circle, rgba(79, 195, 247, 0.5) 0%, rgba(38, 198, 218, 0.2) 40%, transparent 70%)' },
-  { keys: ['剑', '刀', '锋', '剑气', '斩', '劈'], color: '#FFD700', flash: 'rgba(255, 215, 0, 0.4)', glow: 'radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
+  // 毒系：幽毒紫绿
   { keys: ['毒', '蛊', '腐', '蚀'], color: '#AB47BC', flash: 'rgba(171, 71, 188, 0.4)', glow: 'radial-gradient(circle, rgba(171, 71, 188, 0.5) 0%, rgba(74, 20, 140, 0.2) 40%, transparent 70%)' },
-  { keys: ['土', '山', '岳', '岩', '石'], color: '#8D6E63', flash: 'rgba(141, 110, 99, 0.4)', glow: 'radial-gradient(circle, rgba(141, 110, 99, 0.5) 0%, rgba(78, 52, 46, 0.2) 40%, transparent 70%)' },
-  { keys: ['风', '云', '气', '御'], color: '#66BB6A', flash: 'rgba(102, 187, 106, 0.4)', glow: 'radial-gradient(circle, rgba(102, 187, 106, 0.5) 0%, rgba(46, 125, 50, 0.2) 40%, transparent 70%)' },
-  { keys: ['佛', '禅', '金光', '圣'], color: '#FFE082', flash: 'rgba(255, 224, 130, 0.4)', glow: 'radial-gradient(circle, rgba(255, 224, 130, 0.6) 0%, rgba(255, 152, 0, 0.2) 40%, transparent 70%)' }
+  // 木系（治疗/自然/生命）：青翠绿（与风系区分用更深青绿）
+  { keys: ['木', '藤', '根', '愈', '养', '治', '疗', '复', '生', '命', '自然'], color: '#26A69A', flash: 'rgba(38, 166, 154, 0.4)', glow: 'radial-gradient(circle, rgba(38, 166, 154, 0.5) 0%, rgba(0, 105, 92, 0.2) 40%, transparent 70%)' },
+  // 剑系：锋金灿金
+  { keys: ['剑', '刀', '锋', '斩', '劈', '刃', '刺', '舞'], color: '#FFD700', flash: 'rgba(255, 215, 0, 0.4)', glow: 'radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
+  // 土系：厚土褐黄
+  { keys: ['土', '山', '岳', '岩', '石', '泰坦', '铁壁', '盾', '护', '防', '守', '不破', '磐石'], color: '#8D6E63', flash: 'rgba(141, 110, 99, 0.4)', glow: 'radial-gradient(circle, rgba(141, 110, 99, 0.5) 0%, rgba(78, 52, 46, 0.2) 40%, transparent 70%)' },
+  // 风系：疾风翠绿
+  { keys: ['风', '云', '气', '御', '疾', '动', '灵'], color: '#66BB6A', flash: 'rgba(102, 187, 106, 0.4)', glow: 'radial-gradient(circle, rgba(102, 187, 106, 0.5) 0%, rgba(46, 125, 50, 0.2) 40%, transparent 70%)' },
+  // 水/波系：流水青
+  { keys: ['水', '波', '潮', '涌', '渊', '海'], color: '#29B6F6', flash: 'rgba(41, 182, 246, 0.4)', glow: 'radial-gradient(circle, rgba(41, 182, 246, 0.5) 0%, rgba(13, 71, 161, 0.2) 40%, transparent 70%)' },
+  // 光/佛/圣系：圣金光
+  { keys: ['佛', '禅', '金光', '圣', '光', '阳', '神'], color: '#FFE082', flash: 'rgba(255, 224, 130, 0.4)', glow: 'radial-gradient(circle, rgba(255, 224, 130, 0.6) 0%, rgba(255, 152, 0, 0.2) 40%, transparent 70%)' },
+  // 战/力/狂系：战神赤红（战士类技能专属）
+  { keys: ['战', '狂', '暴', '重击', '处决', '天罚', '主宰', '威慑', '吼'], color: '#E53935', flash: 'rgba(229, 57, 53, 0.4)', glow: 'radial-gradient(circle, rgba(229, 57, 53, 0.5) 0%, rgba(127, 0, 0, 0.2) 40%, transparent 70%)' },
+  // 阵法系：玄机青灰（阵法类技能专属）
+  { keys: ['阵', '迷', '迟', '陷阱', '静止', '幸运', '增幅'], color: '#78909C', flash: 'rgba(120, 144, 156, 0.4)', glow: 'radial-gradient(circle, rgba(120, 144, 156, 0.5) 0%, rgba(38, 50, 56, 0.2) 40%, transparent 70%)' }
 ]
 const DEFAULT_COLOR = { color: '#DAA520', flash: 'rgba(218, 165, 32, 0.4)', glow: 'radial-gradient(circle, rgba(218, 165, 32, 0.5) 0%, transparent 70%)' }
 
