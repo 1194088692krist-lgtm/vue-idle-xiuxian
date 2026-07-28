@@ -47,9 +47,11 @@
 
 <script setup>
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
 
 const { skillCastEvent } = useIdleSystem()
+const route = useRoute()
 
 const show = ref(false)
 const skillName = ref('')
@@ -112,6 +114,8 @@ function scheduleAutoHide() {
 
 watch(skillCastEvent, (evt) => {
   if (!evt || !evt.ts || !evt.isBoss) return
+  // 仅在探索挂机页显示技能演出：切到背包/炼丹等其他页面时不弹特效
+  if (route.path !== '/exploration') return
   // 全局冷却：3 秒内不重复触发（不同技能也不打断上一个演出）
   if (evt.ts - lastCastTs < CAST_COOLDOWN_MS) return
   // 同技能冷却：6 秒内同名不重复（避免每回合都弹同一个技能）
@@ -135,6 +139,15 @@ watch(skillCastEvent, (evt) => {
   nextTick(() => { skillFadeClass.value = 'skill-fade-out' })
   scheduleAutoHide()
 }, { deep: true })
+
+// 监听路由变化：特效播放中途切走到其他页面时立即隐藏
+watch(() => route.path, (newPath) => {
+  if (newPath !== '/exploration' && show.value) {
+    show.value = false
+    skillFadeClass.value = ''
+    if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
+  }
+})
 
 onUnmounted(() => {
   if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }

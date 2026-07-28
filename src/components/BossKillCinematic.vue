@@ -58,6 +58,7 @@
 
 <script setup>
 import { ref, watch, computed, nextTick, onUnmounted } from 'vue'
+import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
@@ -65,6 +66,7 @@ import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, get
 
 const { bossKillEvent } = useIdleSystem()
 const playerStore = usePlayerStore()
+const route = useRoute()
 
 const show = ref(false)
 const portraitUrl = ref(null)
@@ -177,6 +179,23 @@ onUnmounted(() => {
   clearPendingTimers()
 })
 
+// 监听路由变化：特效播放中途切走到其他页面时立即隐藏
+// 用户期望切走即不显示战斗特效，避免残留演出遮挡其他页面
+watch(() => route.path, (newPath) => {
+  if (newPath !== '/exploration' && show.value) {
+    show.value = false
+    portraitUrl.value = null
+    petShow.value = false
+    petPortraitUrl.value = null
+    // 连击状态也一并清空
+    comboLabel.value = ''
+    comboClass.value = ''
+    if (comboTimerId) { clearTimeout(comboTimerId); comboTimerId = null }
+    if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
+    if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
+  }
+})
+
 // ===== 兜底隐藏：动画结束后或超时后强制隐藏，防止 animationend 未触发导致 show 卡死 =====
 // 斩杀文案逐字砸入后停留 3.5s 才淡出，整体时延长，需更长兜底；多次击杀时重新计时
 let hideTimerId = null
@@ -201,6 +220,12 @@ watch(bossKillEvent, (evt) => {
   console.log('[BossKillCinematic] watch 触发', evt)
   if (!evt || !evt.ts) {
     console.warn('[BossKillCinematic] 事件无效，跳过', evt)
+    return
+  }
+  // 仅在探索挂机页显示斩杀演出：切换到背包/炼丹等其他页面时不弹特效
+  // 避免打断玩家在其他页面的操作，挂机仍正常进行只是不显示视觉演出
+  if (route.path !== '/exploration') {
+    console.log('[BossKillCinematic] 非探索页，跳过演出', route.path)
     return
   }
   // 设置开关关闭则不触发
