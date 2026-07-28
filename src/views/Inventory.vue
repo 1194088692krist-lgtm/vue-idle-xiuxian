@@ -1485,12 +1485,14 @@
     }
   }
 
-  // 升星灵宠
+  // 升星灵宠（升星后保持详情弹窗打开，便于连续升星 / 查看属性变化）
   const evolvePet = pet => {
     const result = playerStore.evolvePet(pet)
     if (result.success) {
       message.success(result.message)
-      showPetModal.value = false
+      // 重新从 store 拉取最新灵宠对象，确保 selectedPet 引用同步（响应式属性刷新）
+      const freshPet = playerStore.items.find(item => item.id === pet.id)
+      if (freshPet) selectedPet.value = freshPet
     } else {
       message.error(result.message)
     }
