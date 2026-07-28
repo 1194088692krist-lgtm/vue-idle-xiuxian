@@ -782,20 +782,44 @@ const specialStats = computed(() => {
   return buildStatRows(selectedMember.value, ['critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost'])
 })
 
+// 计算灵宠百分比加成倍率（与 store.recomputeAttributes 的 petMut 公式一致）
+// 用于「灵宠加成」面板展示，确保面板显示的百分比 = 实际生效的百分比
+const getMemberPetMult = (member) => {
+  if (!member || !member.equippedPet) return 1
+  const pet = member.equippedPet
+  const qualityMultiplier =
+    {
+      divine: 2.0,
+      celestial: 1.8,
+      mystic: 1.6,
+      spiritual: 1.4,
+      mortal: 1.2
+    }[pet.rarity] || 1.2
+  const starGrowth = 0.01 * qualityMultiplier
+  const levelGrowth = 0.02 * qualityMultiplier
+  const starMult = Math.pow(1 + starGrowth, pet.star || 0)
+  const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
+  return starMult * levelMult
+}
+
 const petBonusStats = computed(() => {
-  if (!selectedMember.value) return []
-  const petBonus = getMemberPetBonus(selectedMember.value)
-  const stats = []
-  for (const k of ['attack','health','defense','speed','critRate','comboRate','counterRate','stunRate','dodgeRate','vampireRate','critResist','comboResist','counterResist','stunResist','dodgeResist','vampireResist','healBoost','critDamageBoost','critDamageReduce','finalDamageBoost','finalDamageReduce','combatBoost','resistanceBoost']) {
-    if (petBonus[k]) {
-      stats.push({
-        key: k,
-        name: STAT_NAMES[k] || k,
-        value: isPercentStat(k) ? (petBonus[k] * 100).toFixed(1) + '%' : Math.floor(petBonus[k])
-      })
-    }
-  }
-  return stats
+  if (!selectedMember.value || !selectedMember.value.equippedPet) return []
+  const petMult = getMemberPetMult(selectedMember.value)
+  const totalGrowth = petMult - 1 // 倍率转换为加成百分比
+  if (totalGrowth <= 0) return []
+  const pet = selectedMember.value.equippedPet
+  const petLevel = pet.level || 1
+  const petStar = pet.star || 0
+  const petRarityName = petRarities[pet.rarity]?.name || pet.rarity || ''
+  const pctStr = `${(totalGrowth * 100).toFixed(1)}%`
+  const label = `${pctStr} (${petRarityName} Lv.${petLevel} ★${petStar})`
+  // 灵宠对四项基础属性提供统一的复利百分比加成（与 Inventory 详情页显示一致）
+  return [
+    { key: 'attack', name: '攻击', value: label },
+    { key: 'health', name: '生命', value: label },
+    { key: 'defense', name: '防御', value: label },
+    { key: 'speed', name: '速度', value: label }
+  ]
 })
 
 // 方法

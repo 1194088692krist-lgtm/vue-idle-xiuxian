@@ -326,6 +326,8 @@ export const usePlayerStore = defineStore('player', {
     gachaFiveStarPity: 0,
     // 人物池四星保底计数器（跨抽奖累计，抽出四星或以上时归零）
     gachaFourStarPity: 0,
+    // 灵宠池仙品保底计数器（跨十连累计，连续 5 次十连未出仙品则第 5 次必出）
+    petGachaPity: 0,
     // 挂机探索状态
     idleExploration: {
       isActive: false,
@@ -2520,23 +2522,28 @@ export const usePlayerStore = defineStore('player', {
           }
         }
       })
-      // 5) 出战灵宠百分比加成：基于 star/level/rarity 计算倍率，乘到最终 baseAttributes 上
-      // 修复「灵宠扁平属性直接相加，后期玩家数值高后贡献微乎其微」的问题
-      // 灵宠扁平属性已在步骤1并入裸身基线（低等级时有效），此处额外按百分比放大玩家最终属性
+      // 5) 出战灵宠百分比加成：复利成长倍率，乘到最终 baseAttributes 上
+      // 与 Inventory.vue 的 getPetBonus 公式完全一致，确保面板显示的百分比 = 实际生效的百分比
+      // 公式：petMult = (1+starGrowth)^star * (1+levelGrowth)^(level-1)
+      //   starGrowth  = 0.01 * qualityMultiplier（神品 2%/星）
+      //   levelGrowth = 0.02 * qualityMultiplier（神品 4%/级，= 2 × 升星）
+      // 灵宠扁平属性已在步骤1并入裸身基线（低等级时有效），此处额外按复利百分比放大玩家最终属性
       if (this.activePet) {
         const pet = this.activePet
-        const qualityBonusMap = {
-          divine: 0.15, celestial: 0.12, mystic: 0.09, spiritual: 0.06, mortal: 0.03
-        }
-        const starBonusPerQuality = {
-          divine: 0.02, celestial: 0.01, mystic: 0.01, spiritual: 0.01, mortal: 0.01
-        }
-        const baseBonus = qualityBonusMap[pet.rarity] || 0
-        const starBonus = (pet.star || 0) * (starBonusPerQuality[pet.rarity] || 0)
-        const levelBonus = ((pet.level || 1) - 1) * (baseBonus * 0.1)
-        const phase = Math.floor((pet.star || 0) / 5)
-        const phaseBonus = phase * (baseBonus * 0.5)
-        const petMult = 1 + baseBonus + starBonus + levelBonus + phaseBonus
+        const qualityMultiplier =
+          {
+            divine: 2.0,
+            celestial: 1.8,
+            mystic: 1.6,
+            spiritual: 1.4,
+            mortal: 1.2
+          }[pet.rarity] || 1.2
+        const starGrowth = 0.01 * qualityMultiplier // 每星成长率
+        const levelGrowth = 0.02 * qualityMultiplier // 每级成长率（= 2 × 升星）
+        // 复利累计：(1+starGrowth)^star * (1+levelGrowth)^(level-1)
+        const starMult = Math.pow(1 + starGrowth, pet.star || 0)
+        const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
+        const petMult = starMult * levelMult
         // 扁平属性按倍率放大（attack/health/defense/speed）
         this.baseAttributes.attack = Math.floor(this.baseAttributes.attack * petMult)
         this.baseAttributes.health = Math.floor(this.baseAttributes.health * petMult)

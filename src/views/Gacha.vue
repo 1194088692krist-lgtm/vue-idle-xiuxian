@@ -263,6 +263,7 @@
     doGacha,
     doMultiGacha,
     doMultiGachaWithPity,
+    doPetPoolMultiGacha,
     equipmentTypeNames,
     petRarities,
     equipmentQualities
@@ -420,15 +421,24 @@
     playerStore.phantomCrystals -= cost
     // 人物池/综合池：传入持久化保底计数（跨调用累计）
     const isCharPool = currentPool.value === 'character' || currentPool.value === 'all'
+    const isPetPool = currentPool.value === 'pet'
     const pityState = isCharPool
       ? { fiveStarPity: playerStore.gachaFiveStarPity, fourStarPity: playerStore.gachaFourStarPity }
-      : null
-    const fn = isCharPool ? doMultiGachaWithPity : doMultiGacha
-    const results = fn(currentPool.value, 9, playerStore.level, pityState)
+      : (isPetPool ? { petPity: playerStore.petGachaPity } : null)
+    // 灵宠池走专用十连抽（保底 + 上限 + 资源填充）；人物池走保底版；其他走普通版
+    let results
+    if (isPetPool) {
+      results = doPetPoolMultiGacha(9, playerStore.level, pityState)
+    } else {
+      const fn = isCharPool ? doMultiGachaWithPity : doMultiGacha
+      results = fn(currentPool.value, 9, playerStore.level, pityState)
+    }
     // 同步回 store
     if (isCharPool && pityState) {
       playerStore.gachaFiveStarPity = pityState.fiveStarPity
       playerStore.gachaFourStarPity = pityState.fourStarPity
+    } else if (isPetPool && pityState) {
+      playerStore.petGachaPity = pityState.petPity
     }
     results.forEach(r => grantReward(r))
     gachaResults.value = results
@@ -453,6 +463,9 @@
       const fhp = playerStore.gachaFourStarPity
       if (fp >= 40) pityHint = `（五星保底${50 - fp}抽）`
       else if (fhp >= 3) pityHint = `（四星保底${5 - fhp}抽）`
+    } else if (isPetPool) {
+      const pp = playerStore.petGachaPity
+      if (pp >= 3) pityHint = `（仙品保底${5 - pp}轮十连）`
     }
     showMessage('success', `九连祈福完成：${parts.join('，')}${pityHint}`)
     // 十连中抽到4星/5星人物自动弹出立绘（取最高星级）
