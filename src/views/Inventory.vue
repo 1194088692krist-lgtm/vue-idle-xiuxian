@@ -570,12 +570,13 @@
             <div class="rune-picker-list">
               <span
                 v-for="r in playerRunes"
-                :key="r.uid"
+                :key="r.id || r.name"
                 class="rune-chip"
-                :class="'re-' + r.element"
-                @click="doSocketRune(r.uid)"
+                :class="['re-' + r.element, { 'rune-chip-disabled': r.count <= 0 }]"
+                @click="r.count > 0 && doSocketRune(r)"
               >
                 {{ r.name }}<em>{{ runeStatDesc(r) }}</em>
+                <span class="rune-count">×{{ r.count }}</span>
               </span>
             </div>
             <button class="btn-small" @click="socketingSlot = null">取消</button>
@@ -1843,7 +1844,21 @@
 
   // ===== 灵纹镶嵌（M1）=====
   const socketingSlot = ref(null)
-  const playerRunes = computed(() => playerStore.runes || [])
+  // 灵纹选择列表：按种类（id）聚合，同种类只显示一次并附带持有数量
+  // 避免持有大量同名灵纹时选择弹窗过长、混乱
+  const playerRunes = computed(() => {
+    const all = playerStore.runes || []
+    const aggMap = {}
+    for (const r of all) {
+      const rid = r.id || r.name
+      if (!aggMap[rid]) {
+        aggMap[rid] = { ...r, count: 0, _uids: [] }
+      }
+      aggMap[rid].count++
+      aggMap[rid]._uids.push(r.uid)
+    }
+    return Object.values(aggMap).filter(r => r.count > 0)
+  })
   const runeSynergyList = computed(() => (selectedEquipment.value ? getRuneSynergy(selectedEquipment.value) : []))
   const onRuneSlotClick = idx => {
     const r = selectedEquipment.value?.runes?.[idx]
@@ -1853,7 +1868,10 @@
     const res = playerStore.unsocketRune(selectedEquipment.value.id, idx)
     if (res.success) message.success(res.message); else message.error(res.message)
   }
-  const doSocketRune = uid => {
+  // 镶嵌：传入聚合后的符文对象，从中取一个可用 uid 进行镶嵌
+  const doSocketRune = runeAgg => {
+    const uid = runeAgg && Array.isArray(runeAgg._uids) && runeAgg._uids[0]
+    if (!uid) { message.error('该灵纹已用完'); return }
     const res = playerStore.socketRune(selectedEquipment.value.id, socketingSlot.value, uid)
     if (res.success) { message.success(res.message); socketingSlot.value = null } else message.error(res.message)
   }
@@ -2792,6 +2810,9 @@
   }
   .rune-chip:hover { transform: translateY(-1px); }
   .rune-chip em { font-style: normal; opacity: 0.75; margin-left: 4px; font-size: 11px; }
+  .rune-chip .rune-count { margin-left: 6px; font-weight: bold; color: #FFD700; font-size: 11px; }
+  .rune-chip-disabled { opacity: 0.4; cursor: not-allowed; }
+  .rune-chip-disabled:hover { transform: none; }
   .rune-hint { font-size: 12px; opacity: 0.6; margin: 4px 0; }
 
   .set-bonus-section {

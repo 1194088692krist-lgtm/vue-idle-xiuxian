@@ -6,10 +6,22 @@
 export const DIFFICULTY_TEMPLATES = [
   { key: 'youli',     label: '游历', color: '#32CD32', scale: 0.30, rmMul: 0.6, cost: 10,  drop: 1.0 },
   { key: 'shilian',   label: '试炼', color: '#1E90FF', scale: 0.60, rmMul: 0.9, cost: 25, drop: 1.15 },
-  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 80, drop: 1.3 },
+  { key: 'xiongxian', label: '凶险', color: '#9932CC', scale: 1.00, rmMul: 1.2, cost: 80,  drop: 1.3 },
   { key: 'juejing',   label: '绝境', color: '#FF8C00', scale: 1.60, rmMul: 1.8, cost: 200, drop: 1.5 },
   { key: 'mieshi',    label: '灭世', color: '#B22222', scale: 2.50, rmMul: 2.8, cost: 500, drop: 1.8 }
 ]
+
+// 最后 3 张图（冰雪宫/仙墟/混沌界）额外挂载的 3 个高级难度档
+// 每档只对最后 3 张图生效，匹配高级装备/素材产出
+// 第 3 档（天道）的 BOSS 掉落直接产出 +3~6 强化的仙品/神品装备
+export const ADVANCED_DIFFICULTY_TEMPLATES = [
+  { key: 'lunhui',  label: '轮回', color: '#8A2BE2', scale: 4.00,  rmMul: 4.0,  cost: 1500, drop: 2.2 },
+  { key: 'tianjie', label: '天劫', color: '#DC143C', scale: 7.00,  rmMul: 6.0,  cost: 4000, drop: 2.8 },
+  { key: 'tiandao', label: '天道', color: '#FFD700', scale: 12.00, rmMul: 10.0, cost: 10000, drop: 3.5, highGradeDrop: true }
+]
+
+// 标记哪些秘境可以解锁高级难度档（仅最后 3 张图）
+export const ZONES_WITH_ADVANCED_DIFFICULTY = ['ice_palace', 'immortal_ruins', 'chaos_realm']
 
 // 各秘境「凶险(标准档)」对应的 Build 强度推荐值（基础属性，决定能否稳定挂机通关）
 // 平衡修复（v2）：配合 getCharacterBuildStrength 权重调整（主属性权重提高、人物占比 40%→55%），
@@ -21,9 +33,9 @@ const ZONE_BUILD_BASE = {
   phoenix_cave: 80000,
   dragon_abyss: 200000,
   ghost_wasteland: 800000,
-  ice_palace: 1500000,
-  immortal_ruins: 4000000,
-  chaos_realm: 18000000
+  ice_palace: 6000000,
+  immortal_ruins: 18000000,
+  chaos_realm: 120000000
 }
 
 // Build 强度参考阶梯（区间）：极品中的极品过于稀有，故给玩家一个“可达成的上限”参考
@@ -296,7 +308,7 @@ export const zones = [
         name: '冰凰',
         description: '镇守冰雪宫的上古神兽，一身冰系神通出神入化',
         traits: ['冰冻', '冰系AOE'],
-        stats: { attack: 24000, health: 200000, defense: 5600, speed: 25 },
+        stats: { attack: 90000, health: 750000, defense: 22000, speed: 30 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1200, 3000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'feet' },
@@ -309,7 +321,7 @@ export const zones = [
         name: '冰封古魔',
         description: '被封印万年的上古魔修，实力深不可测',
         traits: ['时间减速', '封印技能'],
-        stats: { attack: 28000, health: 240000, defense: 6800, speed: 18 },
+        stats: { attack: 110000, health: 900000, defense: 28000, speed: 25 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [1500, 3750] },
           { type: 'equipment', chance: 0.1167, rarity: ['legendary', 'mythic'], slot: 'belt' },
@@ -325,7 +337,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.02, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 8000, health: 24000 }
+    recommendedStats: { attack: 30000, health: 90000 }
   },
   {
     id: 'immortal_ruins',
@@ -345,7 +357,7 @@ export const zones = [
         name: '仙墟守护者',
         description: '上古仙人留下的守护者，拥有仙人之威',
         traits: ['仙术攻击', '领域压制'],
-        stats: { attack: 60000, health: 500000, defense: 14000, speed: 28 },
+        stats: { attack: 300000, health: 3000000, defense: 65000, speed: 35 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [2250, 6000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'artifact' },
@@ -358,7 +370,7 @@ export const zones = [
         name: '堕落仙君',
         description: '曾经的仙人，堕入魔道后更加强大',
         traits: ['魔仙双修', '变身'],
-        stats: { attack: 70000, health: 600000, defense: 16000, speed: 22 },
+        stats: { attack: 350000, health: 3500000, defense: 80000, speed: 28 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [3000, 7500] },
           { type: 'equipment', chance: 0.1333, rarity: ['legendary', 'mythic'], slot: 'ring2' },
@@ -374,7 +386,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1067, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.0167, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 20000, health: 60000 }
+    recommendedStats: { attack: 90000, health: 270000 }
   },
   {
     id: 'chaos_realm',
@@ -394,7 +406,7 @@ export const zones = [
         name: '混沌主宰',
         description: '混沌界的至高存在，一念可生灭万物',
         traits: ['法则扭曲', '全属性攻击'],
-        stats: { attack: 210000, health: 1800000, defense: 50000, speed: 32 },
+        stats: { attack: 2000000, health: 20000000, defense: 400000, speed: 40 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [4500, 12000] },
           { type: 'equipment', chance: 0.15, rarity: ['legendary', 'mythic'], slot: 'artifact' },
@@ -407,7 +419,7 @@ export const zones = [
         name: '天道化身',
         description: '天道在混沌中的投影，代表着至高法则',
         traits: ['因果律', '无法闪避'],
-        stats: { attack: 250000, health: 2200000, defense: 60000, speed: 38 },
+        stats: { attack: 2500000, health: 25000000, defense: 500000, speed: 50 },
         drops: [
           { type: 'spirit_stone', chance: 0.8, amount: [7500, 22500] },
           { type: 'equipment', chance: 0.1333, rarity: ['mythic'], slot: 'artifact' },
@@ -423,7 +435,7 @@ export const zones = [
       { type: 'equipment', chance: 0.1167, rarity: ['legendary', 'mythic'], name: '装备' },
       { type: 'pet', chance: 0.02, rarity: ['celestial', 'divine'], name: '灵宠' }
     ],
-    recommendedStats: { attack: 70000, health: 210000 }
+    recommendedStats: { attack: 600000, health: 1800000 }
   }
 ]
 
@@ -476,6 +488,26 @@ zones.forEach(zone => {
     },
     recommendedBuild: Math.max(1, Math.round(baseBuild * t.scale))
   }))
+  // 最后 3 张图额外挂载 3 个高级难度档（轮回/天劫/天道）
+  if (ZONES_WITH_ADVANCED_DIFFICULTY.includes(zone.id)) {
+    const advDifficulties = ADVANCED_DIFFICULTY_TEMPLATES.map((t, idx) => ({
+      key: t.key,
+      label: t.label,
+      color: t.color,
+      difficulty: DIFFICULTY_TEMPLATES.length + idx + 1,
+      spiritCost: Math.round(t.cost * costMult),
+      rewardMultiplier: Math.round(baseRM * t.rmMul * 100) / 100,
+      enemyScale: t.scale,
+      dropBonus: t.drop,
+      highGradeDrop: !!t.highGradeDrop,   // 标记：天道档 BOSS 掉落直接产 +3~6 仙品/神品装备
+      recommendedStats: {
+        attack: Math.max(1, Math.round(baseAtk * t.scale)),
+        health: Math.max(1, Math.round(baseHp * t.scale))
+      },
+      recommendedBuild: Math.max(1, Math.round(baseBuild * t.scale))
+    }))
+    zone.difficulties = zone.difficulties.concat(advDifficulties)
+  }
   // 八图全开：移除等级锁
   zone.minLevel = 1
 })

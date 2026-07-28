@@ -362,7 +362,10 @@ export const getBossEncounterChance = (difficultyKey) => {
     shilian: 0.25,   // 试炼：25%
     xiongxian: 0.50, // 凶险：50%
     juejing: 0.75,   // 绝境：75%
-    mieshi: 0.90     // 灭世：90%
+    mieshi: 0.90,    // 灭世：90%
+    lunhui: 1.00,    // 轮回：必出 BOSS
+    tianjie: 1.00,   // 天劫：必出 BOSS
+    tiandao: 1.00    // 天道：必出 BOSS
   }
   return chances[difficultyKey] || 0
 }

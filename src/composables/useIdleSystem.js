@@ -901,7 +901,8 @@ function buildEffectiveZone(zone, diff) {
     difficultyColor: diff.color,
     enemyScale: diff.enemyScale,
     dropBonus: diff.dropBonus,
-    difficulty: diff.difficulty
+    difficulty: diff.difficulty,
+    highGradeDrop: !!diff.highGradeDrop  // 高级难度档标记：天道档 BOSS 掉落直接产 +3~6 仙品/神品装备
   }
 }
 
@@ -936,7 +937,7 @@ function getEquipName(slot, rarity, setId = null) {
   return `${nameBase}·${qualityName}`
 }
 
-function generateEquipment(rarity, effectiveZone) {
+function generateEquipment(rarity, effectiveZone, options = {}) {
   const slot = SLOTS[Math.floor(Math.random() * SLOTS.length)]
   const mult = RARITY_MULT[rarity] || 1
   const ilvl = computeIlvl(effectiveZone)
@@ -946,6 +947,25 @@ function generateEquipment(rarity, effectiveZone) {
   if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
     const availableSets = setBonuses.filter(s => s.pieces.includes(slot))
     if (availableSets.length > 0) setId = availableSets[Math.floor(Math.random() * availableSets.length)].id
+  }
+  // 可选：指定初始强化等级（高级难度档 BOSS 掉落用，直接产出 +N 强化装备）
+  let enhanceLevel = 0
+  if (typeof options.enhanceLevel === 'number') {
+    enhanceLevel = Math.max(0, Math.min(12, options.enhanceLevel))
+  } else if (Array.isArray(options.enhanceLevel) && options.enhanceLevel.length === 2) {
+    const [min, max] = options.enhanceLevel
+    enhanceLevel = Math.max(0, Math.min(12, Math.floor(min + Math.random() * (max - min + 1))))
+  }
+  // 基础属性
+  let attack = Math.floor(effectiveZone.recommendedStats.attack * 0.22 * mult)
+  let health = Math.floor(effectiveZone.recommendedStats.health * 0.16 * mult)
+  let defense = Math.floor(effectiveZone.recommendedStats.attack * 0.13 * mult)
+  // 预先应用强化倍率（与 enhanceEquipment 主函数一致，每级 ×1.2）
+  if (enhanceLevel > 0) {
+    const enhanceMult = Math.pow(1.2, enhanceLevel)
+    attack = Math.floor(attack * enhanceMult)
+    health = Math.floor(health * enhanceMult)
+    defense = Math.floor(defense * enhanceMult)
   }
   return {
     id: Date.now() + Math.random(),
@@ -959,14 +979,14 @@ function generateEquipment(rarity, effectiveZone) {
     sockets,       // M1 新增：灵纹槽数（按品质 0~3）
     runes: new Array(sockets).fill(null), // M1 新增：灵纹镶嵌位（与槽数等长，null 表示空槽）
     stats: {
-      attack: Math.floor(effectiveZone.recommendedStats.attack * 0.22 * mult),
-      health: Math.floor(effectiveZone.recommendedStats.health * 0.16 * mult),
-      defense: Math.floor(effectiveZone.recommendedStats.attack * 0.13 * mult),
+      attack,
+      health,
+      defense,
       speed: Math.floor(8 * mult)
     },
     affixes,
     setId,
-    enhanceLevel: 0,
+    enhanceLevel,
     value: Math.floor(50 * effectiveZone.difficulty * mult)
   }
 }
@@ -1056,14 +1076,14 @@ function createPlayerEntity() {
 const BOSS_POWER_MULTIPLIER = 1.2
 
 // 后期秘境额外强化系数（小怪与 BOSS 共用）
-// 平衡修复：温和化后期强化曲线，避免数值膨胀过快导致脱节
+// 难度提升：最后 3 张图大幅强化，避免玩家轻松毕业
 const LATE_ZONE_ENEMY_MULT = {
   phoenix_cave: 1.10,
   dragon_abyss: 1.20,
   ghost_wasteland: 1.35,
-  ice_palace: 1.50,
-  immortal_ruins: 1.70,
-  chaos_realm: 2.00
+  ice_palace: 3.00,
+  immortal_ruins: 4.50,
+  chaos_realm: 8.00
 }
 
 // 获取秘境的后期强化倍率（前期秘境返回 1，无影响）
@@ -1132,20 +1152,24 @@ function createBossEnemy(bossData, effectiveZone) {
 function generateBossEnemies(effectiveZone, difficultyKey) {
   const bosses = []
   if (!effectiveZone.bosses || effectiveZone.bosses.length === 0) return bosses
-  
+
   const bossChance = getBossEncounterChance(difficultyKey)
   if (Math.random() >= bossChance) return bosses
-  
+
   let bossCount = 1
   if (['xiongxian', 'juejing', 'mieshi'].includes(difficultyKey)) {
     bossCount = Math.random() < 0.5 ? 1 : 2
+  } else if (['lunhui', 'tianjie'].includes(difficultyKey)) {
+    bossCount = 2   // 高级难度档固定出 2 个 BOSS
+  } else if (difficultyKey === 'tiandao') {
+    bossCount = 3   // 天道档固定出 3 个 BOSS，最大化高级装备产出
   }
-  
+
   for (let i = 0; i < bossCount; i++) {
     const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
     bosses.push(createBossEnemy(bossData, effectiveZone))
   }
-  
+
   return bosses
 }
 
@@ -1735,7 +1759,13 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
           const idx = rw.rarity.indexOf(rarity)
           if (idx >= 0 && idx < rw.rarity.length - 1) rarity = rw.rarity[idx + 1]
         }
-        const equip = generateEquipment(rarity, effectiveZone)
+        // 高级难度档（天道）BOSS 掉落直接产出 +3~6 强化的仙品/神品装备
+        // 限制：仅 BOSS 且装备品质为 legendary/mythic 时才应用高强化
+        const equipOptions = {}
+        if (isBoss && effectiveZone.highGradeDrop && (rarity === 'legendary' || rarity === 'mythic')) {
+          equipOptions.enhanceLevel = [3, 6]
+        }
+        const equip = generateEquipment(rarity, effectiveZone, equipOptions)
         s.items.push(equip); s.itemsFound++
         runStats.value.equipment++
         const info = rarityInfo[rarity] || rarityInfo.common

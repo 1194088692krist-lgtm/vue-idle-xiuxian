@@ -2,29 +2,30 @@
 import { getEnhanceBossMaterial, getReforgeBossMaterial } from './cultivationSystem'
 
 // 强化等级配置
+// 调整：降低成功率、提高灵石/强化石/BOSS 素材消耗，让强化系统更稀有
 const enhanceConfig = {
   maxLevel: 12,
-  baseSuccessRate: 0.9,
+  baseSuccessRate: 0.7,          // 基础成功率 90% → 70%
   lockLevels: [4, 8],
-  spiritStoneBaseCost: 100,
-  spiritStoneGrowth: 1.5,
+  spiritStoneBaseCost: 300,      // 灵石基础消耗 100 → 300
+  spiritStoneGrowth: 1.8,        // 灵石成长率 1.5 → 1.8
   stoneCosts: {
-    1: { type: 'common_enhance_stone', count: 5 },
-    2: { type: 'common_enhance_stone', count: 10 },
-    3: { type: 'common_enhance_stone', count: 20 },
-    4: { type: 'common_enhance_stone', count: 40 },
-    5: { type: 'advanced_enhance_stone', count: 5 },
-    6: { type: 'advanced_enhance_stone', count: 10 },
-    7: { type: 'advanced_enhance_stone', count: 20 },
-    8: { type: 'advanced_enhance_stone', count: 40 },
-    9: { type: 'supreme_enhance_stone', count: 1 },
-    10: { type: 'supreme_enhance_stone', count: 2 },
-    11: { type: 'supreme_enhance_stone', count: 4 },
-    12: { type: 'supreme_enhance_stone', count: 8 }
+    1: { type: 'common_enhance_stone', count: 10 },
+    2: { type: 'common_enhance_stone', count: 20 },
+    3: { type: 'common_enhance_stone', count: 40 },
+    4: { type: 'common_enhance_stone', count: 80 },
+    5: { type: 'advanced_enhance_stone', count: 10 },
+    6: { type: 'advanced_enhance_stone', count: 20 },
+    7: { type: 'advanced_enhance_stone', count: 40 },
+    8: { type: 'advanced_enhance_stone', count: 80 },
+    9: { type: 'supreme_enhance_stone', count: 2 },
+    10: { type: 'supreme_enhance_stone', count: 4 },
+    11: { type: 'supreme_enhance_stone', count: 8 },
+    12: { type: 'supreme_enhance_stone', count: 16 }
   },
-  // 12 阶强化每阶需对应难度 BOSS 素材 1 个（+1 对应青萝林狼王素材）
+  // 12 阶强化每阶需对应难度 BOSS 素材 2 个（原 1 个）
   // bossMaterialCount = 每阶所需 BOSS 素材数量
-  bossMaterialCount: 1,
+  bossMaterialCount: 2,
   enhanceMult: 1.2
 }
 
@@ -439,25 +440,28 @@ function disassembleEquipment(equipment) {
   let supremeStones = 0
   let reforgeStones = 0
   // 高级洗炼石（大洗练）返量低于高级强化石——介于高级强化石与至尊强化石之间
+  // 调整：上品及以上装备分解给的强化石数量大幅减少，让强化石系统更稀有
   const rarityRewards = {
     common: { common: 1, reforge: 0 },
-    uncommon: { common: 2, reforge: 0 },
-    rare: { common: 4, advanced: 1, reforge: 1 },
-    epic: { common: 6, advanced: 2, reforge: 1 },
-    legendary: { common: 8, advanced: 4, reforge: 2 },
-    mythic: { common: 10, advanced: 6, reforge: 3 }
+    uncommon: { common: 1, reforge: 0 },
+    rare: { common: 2, advanced: 1, reforge: 1 },
+    epic: { common: 3, advanced: 1, reforge: 1 },
+    legendary: { common: 4, advanced: 2, reforge: 1 },
+    mythic: { common: 6, advanced: 3, reforge: 2 }
   }
   const rewards = rarityRewards[rarity] || rarityRewards.common
   commonStones += rewards.common || 0
   advancedStones += rewards.advanced || 0
   reforgeStones += rewards.reforge || 0
   if (rarity === 'legendary') {
-    if (Math.random() < 0.3) {
-      supremeStones += Math.floor(Math.random() * 2) + 1
+    if (Math.random() < 0.15) {
+      supremeStones += 1   // 仙品 15% 概率额外 1 颗至尊强化石（原 30% 1~2 颗）
     }
   }
   if (rarity === 'mythic') {
-    supremeStones += Math.floor(Math.random() * 3) + 1
+    if (Math.random() < 0.4) {
+      supremeStones += 1   // 神品 40% 概率 1 颗至尊强化石（原必出 1~3 颗）
+    }
   }
   return {
     success: true,
