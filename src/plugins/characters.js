@@ -1,6 +1,6 @@
 import { reactive } from 'vue'
 import { GameDB } from '../stores/db'
-import { getInitialSkills, getSkillSchoolByRole, skillSchools } from './skills'
+import { getInitialSkills, getSkillSchoolByCharacter, skillSchools } from './skills'
 
 export const characterSchools = {
   sword: { name: '剑宗', color: '#4169E1', icon: '🗡️' },
@@ -404,10 +404,10 @@ export function generateCharacterById(charId) {
     effortValue: 0,
     rebirthCount: 0,
     breakThrough: 0,
-    skillSchool: getSkillSchoolByRole(template.role),
-    skillSchoolName: skillSchools[getSkillSchoolByRole(template.role)]?.name || '',
-    skillSchoolIcon: skillSchools[getSkillSchoolByRole(template.role)]?.icon || '',
-    skills: getInitialSkills(template.role),
+    skillSchool: template.school || 'sword',
+    skillSchoolName: skillSchools[template.school || 'sword']?.name || '',
+    skillSchoolIcon: skillSchools[template.school || 'sword']?.icon || '',
+    skills: getInitialSkills(template.school || 'sword'),
     level: 1,
     experience: 0,
     maxExperience: 100,

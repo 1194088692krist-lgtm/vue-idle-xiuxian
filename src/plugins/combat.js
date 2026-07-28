@@ -53,35 +53,35 @@ class CombatStats {
     let isCombo = false
     let isVampire = false
     let isStun = false
-    // 计算暴击（考虑目标的抗暴击）
-    const finalCritRate = Math.max(
+    // 计算暴击（考虑目标的抗暴击，封顶 1.0）
+    const finalCritRate = Math.min(1, Math.max(
       0,
       this.critRate * (1 + this.combatBoost) -
         (target ? target.stats.critResist * (1 + target.stats.resistanceBoost) : 0)
-    )
+    ))
     if (Math.random() < finalCritRate) {
       damage *= 1.5 + this.critDamageBoost
       isCrit = true
     }
-    // 计算连击（考虑目标的抗连击）
-    const finalComboRate = Math.max(
+    // 计算连击（考虑目标的抗连击，封顶 1.0）
+    const finalComboRate = Math.min(1, Math.max(
       0,
       this.comboRate * (1 + this.combatBoost) - (target ? target.stats.comboResist : 0)
-    )
+    ))
     if (Math.random() < finalComboRate) {
       damage *= 1.3
       isCombo = true
     }
-    // 计算吸血（考虑目标的抗吸血）
-    const finalVampireRate = Math.max(
+    // 计算吸血（考虑目标的抗吸血，封顶 1.0）
+    const finalVampireRate = Math.min(1, Math.max(
       0,
       this.vampireRate * (1 + this.combatBoost) - (target ? target.stats.vampireResist : 0)
-    )
+    ))
     if (Math.random() < finalVampireRate) {
       isVampire = true
     }
-    // 计算眩晕（考虑目标的抗眩晕）
-    const finalStunRate = Math.max(0, this.stunRate * (1 + this.combatBoost) - (target ? target.stats.stunResist : 0))
+    // 计算眩晕（考虑目标的抗眩晕，封顶 1.0）
+    const finalStunRate = Math.min(1, Math.max(0, this.stunRate * (1 + this.combatBoost) - (target ? target.stats.stunResist : 0)))
     if (Math.random() < finalStunRate) {
       isStun = true
     }
@@ -146,8 +146,8 @@ class CombatEntity {
     for (const buff of [...this.buffs]) {
       if (buff.duration > 0) {
         if (buff.type === 'damage_over_time') {
-          const dmg = Math.min(this.currentHealth, Math.max(1, buff.value))
-          this.currentHealth -= dmg
+          const dmg = Math.min(this.currentHealth, Math.max(1, Math.floor(buff.value)))
+          this.currentHealth = Math.max(0, Math.floor(this.currentHealth - dmg))
           totalDamage += dmg
         }
         buff.duration--
@@ -168,13 +168,13 @@ class CombatEntity {
     if (Math.random() < actualDodgeRate) {
       return { dodged: true, damage: 0 }
     }
-    // 计算实际伤害
-    const reducedDamage = this.stats.calculateDamageReduction(amount)
-    this.currentHealth = Math.max(0, this.currentHealth - reducedDamage)
+    // 计算实际伤害（取整，避免 HP 出现小数尾）
+    const reducedDamage = Math.floor(this.stats.calculateDamageReduction(amount))
+    this.currentHealth = Math.max(0, Math.floor(this.currentHealth - reducedDamage))
     // 计算反击（考虑攻击方的抗反击）
     let isCounter = false
     if (source) {
-      const finalCounterRate = Math.max(0, this.stats.counterRate - source.stats.counterResist)
+      const finalCounterRate = Math.max(0, Math.min(1, this.stats.counterRate - source.stats.counterResist))
       if (Math.random() < finalCounterRate) {
         isCounter = true
       }
@@ -190,8 +190,8 @@ class CombatEntity {
   // 恢复生命值
   heal(amount) {
     const oldHealth = this.currentHealth
-    this.currentHealth = Math.min(this.stats.maxHealth, this.currentHealth + amount)
-    return this.currentHealth - oldHealth
+    this.currentHealth = Math.min(this.stats.maxHealth, Math.floor(this.currentHealth + amount))
+    return Math.floor(this.currentHealth - oldHealth)
   }
   // 添加效果
   addEffect(effect) {

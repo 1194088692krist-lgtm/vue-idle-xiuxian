@@ -10,7 +10,7 @@ import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
-import { getInitialSkills, deduplicateSkills } from '../plugins/skills'
+import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
@@ -1827,7 +1827,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
   
   // 升星碎片：难度3以上有概率掉落，难度越高概率越大
-  if (diff >= 3 && Math.random() < (diff - 2) * 0.15) {
+  if (diff >= 3 && Math.random() < Math.min(1, (diff - 2) * 0.15)) {
     const fragMult = isBoss ? BOSS_REWARD_MULT : 1
     const fragmentAmount = Math.floor((1 + Math.random() * diff) * fragMult)
     s.petFragments += fragmentAmount
@@ -1836,7 +1836,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
 
   // 工艺货币掉落（M0-B）：按图序+难度触发，从已解锁货币池按权重抽 1 个（决策 2）
   const craftZoneIdx = ZONE_INDEX[effectiveZone.id] || 1
-  const craftDropChance = (CRAFT_DROP_CHANCE_BY_ZONE[craftZoneIdx] || 0) * (effectiveZone.dropBonus || 1)
+  const craftDropChance = Math.min(1, (CRAFT_DROP_CHANCE_BY_ZONE[craftZoneIdx] || 0) * (effectiveZone.dropBonus || 1))
   if (Math.random() < craftDropChance) {
     const cur = pickCraftCurrency(craftZoneIdx, isBoss)
     if (cur) {
@@ -3541,12 +3541,26 @@ function buildTeamMemberState(member, s) {
   }
 
   // 确保角色有技能（兼容旧存档）
+  // 迁移：检测老技能ID前缀(wg_/as_/hl_/gd_/tc_)，替换为基于 school 的新技能
+  const OLD_SKILL_PREFIXES = ['wg_', 'as_', 'hl_', 'gd_', 'tc_']
+  const memberSchool = getSkillSchoolByCharacter(member)
   let memberSkills = member.skills
-  if (!memberSkills || memberSkills.length === 0) {
-    memberSkills = getInitialSkills(member.role)
+  const hasOldSkills = Array.isArray(memberSkills) && memberSkills.some(s =>
+    s && s.id && OLD_SKILL_PREFIXES.some(p => s.id.startsWith(p))
+  )
+  if (hasOldSkills || !memberSkills || memberSkills.length === 0) {
+    // 按角色 school 重新分配技能：初始技能 + 已突破等级对应的所有技能
+    memberSkills = getInitialSkills(memberSchool)
+    for (let bt = 1; bt <= (member.breakThrough || 0); bt++) {
+      const btSkills = getSkillsForBreakthrough(memberSchool, bt)
+      memberSkills.push(...btSkills)
+    }
     member.skills = memberSkills
+    // 重置 equippedSkills，自动装备前3个主动技能
+    const activeSkills = memberSkills.filter(s => s.type === 'active')
+    member.equippedSkills = activeSkills.slice(0, 3).map(s => s.id)
   }
-  // 防御性去重：清理老存档遗留的重复技能（如初始/突破重叠产生的两套相同技能）
+  // 防御性去重：清理老存档遗留的重复技能
   memberSkills = deduplicateSkills(memberSkills)
   member.skills = memberSkills
 

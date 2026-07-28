@@ -881,12 +881,12 @@ export const usePlayerStore = defineStore('player', {
       if (typeof encryptedBlob !== 'string' || !encryptedBlob) {
         throw new Error('存档数据为空，无法上传')
       }
-      // 体积预检：Cloudflare Pages Functions 默认 body 上限约 100MB，D1 单行建议不超 1MB
-      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，此处用 1.5MB 作为安全阈值
-      const SIZE_LIMIT = 1.5 * 1024 * 1024
+      // 体积预检：Cloudflare Pages Functions 默认 body 上限约 100MB，D1 单行建议不超 5MB
+      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，此处用 5MB 作为安全阈值
+      const SIZE_LIMIT = 5 * 1024 * 1024
       const payloadSize = new Blob([encryptedBlob]).size
       if (payloadSize > SIZE_LIMIT) {
-        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 1.5MB），请清理部分宗门成员或装备后重试`)
+        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 5MB），请清理部分宗门成员或装备后重试`)
       }
       let lastErr = null
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -3327,8 +3327,9 @@ export const usePlayerStore = defineStore('player', {
       growAttr(member.combatAttributes)
       growAttr(member.combatResistance)
       growAttr(member.specialAttributes)
-      // 突破获得新技能（每突破一次获得2个）
-      const newSkills = getSkillsForBreakthrough(member.role, member.breakThrough)
+      // 突破获得新技能（每突破一次获得2个，按角色 school 分配）
+      const memberSchool = member.school || member.skillSchool || 'sword'
+      const newSkills = getSkillsForBreakthrough(memberSchool, member.breakThrough)
       if (newSkills.length > 0) {
         if (!member.skills) member.skills = []
         // 修复重复技能 bug：push 前按 skill.id 去重，避免老存档已有重复 + 新突破再叠加

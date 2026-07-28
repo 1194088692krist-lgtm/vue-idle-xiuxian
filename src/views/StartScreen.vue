@@ -544,6 +544,14 @@ const enterDevMode = async () => {
 onMounted(() => {
   loadTheme()
   loadSlots()
+  // 进入游戏时默认尝试全屏（需用户手势触发，监听首次点击）
+  const tryFullscreen = () => {
+    if (!document.fullscreenElement) {
+      document.documentElement.requestFullscreen().catch(() => {})
+    }
+    document.removeEventListener('click', tryFullscreen)
+  }
+  document.addEventListener('click', tryFullscreen)
 })
 </script>
 
