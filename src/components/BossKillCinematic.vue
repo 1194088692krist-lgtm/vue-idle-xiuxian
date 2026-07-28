@@ -35,8 +35,7 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：count（一杀）在立绘左侧，text（成语）在立绘右侧 -->
-      <!-- 两者绝对定位，不与立绘 flex 布局冲突，可稍微与立绘重叠没关系 -->
+      <!-- 连击特效：count（一杀）在立绘左侧垂直行文，text（成语）在立绘右侧垂直行文 -->
       <div
         v-if="comboText"
         :key="`combo-${animKey}`"
@@ -44,7 +43,13 @@
         :class="comboClass"
         :style="{ animationDelay: comboFadeDelay + 's', '--combo-font-size': comboFontSize }"
       >
-        <div class="combo-count">{{ comboCount }}</div>
+        <div class="combo-count">
+          <span
+            v-for="(ch, i) in comboCountChars"
+            :key="i"
+            :style="{ animationDelay: (i * 0.1) + 's' }"
+          >{{ ch }}</span>
+        </div>
         <div class="combo-text">
           <span
             v-for="(ch, i) in comboTextChars"
@@ -91,8 +96,9 @@ const comboCount = ref('')
 const comboText = ref('')
 const comboClass = ref('')
 // 逐字显示：将 text 拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
-// count 行不逐字（小字标签，整体淡入即可）
 const comboTextChars = computed(() => Array.from(comboText.value || ''))
+// count 也拆字竖排：每个字单独 span，逐字淡入
+const comboCountChars = computed(() => Array.from(comboCount.value || ''))
 // 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
 // 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.45 + 停留 1.2
 const comboFadeDelay = computed(() => {
@@ -100,16 +106,16 @@ const comboFadeDelay = computed(() => {
   if (n === 0) return 0
   return (n - 1) * 0.18 + 0.45 + 1.2
 })
-// 字号自适应：仅针对 text 行，字数越多字号越小
-// 用户要求一杀等文字大一点：≤4字 提到 72px，后续梯度同步放大
-// ≤4字 → 72px，5字 → 60px，6-7字 → 50px，8-10字 → 40px，10+字 → 32px
+// 字号自适应：仅针对 text 行（竖排），字数越多字号越小，避免竖排过高超出屏幕
+// 竖排时每字占一行，10字 + gap 会很高，需要更激进的字号缩减
+// ≤4字 → 68px，5字 → 56px，6-7字 → 46px，8-10字 → 36px，10+字 → 28px
 const comboFontSize = computed(() => {
   const n = comboTextChars.value.length
-  if (n <= 4) return 'clamp(52px, 9vw, 72px)'
-  if (n === 5) return 'clamp(44px, 7.5vw, 60px)'
-  if (n <= 7) return 'clamp(36px, 6vw, 50px)'
-  if (n <= 10) return 'clamp(28px, 5vw, 40px)'
-  return 'clamp(22px, 4vw, 32px)'
+  if (n <= 4) return 'clamp(48px, 8vw, 68px)'
+  if (n === 5) return 'clamp(40px, 6.5vw, 56px)'
+  if (n <= 7) return 'clamp(32px, 5.5vw, 46px)'
+  if (n <= 10) return 'clamp(26px, 4.5vw, 36px)'
+  return 'clamp(20px, 3.5vw, 28px)'
 })
 
 // ===== 连击系统：中文斩杀文案库 =====
@@ -625,9 +631,8 @@ const onPetAnimEnd = () => {
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
-/* ===== 连击特效：count（一杀）在立绘左侧，text（成语）在立绘右侧 ===== */
-/* 外层 .kill-combo：透明容器，撑满全屏，只负责整体淡出
-   count 与 text 各自绝对定位到屏幕中线左右两侧，立绘在中间 flex 居中 */
+/* ===== 连击特效：count（一杀）在立绘左侧垂直行文，text（成语）在立绘右侧垂直行文 ===== */
+/* 外层 .kill-combo：透明容器，撑满全屏，只负责整体淡出 */
 .kill-combo {
   position: absolute;
   inset: 0;
@@ -640,57 +645,66 @@ const onPetAnimEnd = () => {
   0%, 99% { opacity: 1; }
   100% { opacity: 0; }
 }
-/* count（一杀）：绝对定位在屏幕中线左侧，垂直居中
-   与立绘左侧重叠一些没关系，立绘本身有 z-index 在上层 */
+/* count（一杀）：绝对定位在立绘左侧，垂直居中，纵向排列每个字 */
 .combo-count {
   position: absolute;
   top: 50%;
-  /* 左侧：距离屏幕中线 22vw（立绘宽约 30vw 的一半），落在立绘左缘外侧 */
-  left: calc(50% - 22vw);
+  /* 左侧：距离屏幕左缘 8vw，落在立绘左缘外侧
+     立绘宽 min(60vw,440px) 居中，左缘约在 50%-30vw=20vw 处，8vw 在其外侧 */
+  left: 8vw;
   transform: translateY(-50%);
+  /* 纵向排列：每个字一行，居中对齐 */
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
-  /* 一杀等文字大一点、刚硬：72px 粗体 */
-  font-size: clamp(48px, 8vw, 72px);
+  font-size: clamp(40px, 6.5vw, 64px);
   font-weight: 900;
-  letter-spacing: 6px;
-  line-height: 1.2;
-  white-space: nowrap;
+  line-height: 1;
   opacity: 0;
   animation: combo-count-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  /* 刚硬描边：四方向粗黑描边 + 立体投影 */
   text-shadow:
     -3px -3px 0 rgba(0, 0, 0, 0.95),
     3px -3px 0 rgba(0, 0, 0, 0.95),
     -3px 3px 0 rgba(0, 0, 0, 0.95),
     3px 3px 0 rgba(0, 0, 0, 0.95),
-    4px 4px 0 rgba(0, 0, 0, 0.8),
-    5px 5px 0 rgba(0, 0, 0, 0.6);
+    4px 4px 0 rgba(0, 0, 0, 0.8);
+}
+/* count 的每个字 span：逐字淡入 */
+.combo-count span {
+  display: block;
+  opacity: 0;
+  animation: combo-count-char-in 0.4s ease-out forwards;
+}
+@keyframes combo-count-char-in {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 0.92; transform: translateY(0); }
 }
 @keyframes combo-count-in {
-  0% { opacity: 0; transform: translate(-12px, -50%) scale(1.3); }
+  0% { opacity: 0; transform: translate(-12px, -50%) scale(1.2); }
   60% { opacity: 1; transform: translate(0, -50%) scale(0.95); }
   100% { opacity: 1; transform: translate(0, -50%) scale(1); }
 }
-/* text 行：绝对定位在屏幕中线右侧，垂直居中，横向排列单字 */
+/* text 行：绝对定位在立绘右侧，垂直居中，纵向排列单字 */
 .combo-text {
   position: absolute;
   top: 50%;
-  /* 右侧：距离屏幕中线 22vw，落在立绘右缘外侧 */
-  left: calc(50% + 22vw);
+  /* 右侧：距离屏幕右缘 8vw，落在立绘右缘外侧 */
+  right: 8vw;
   transform: translateY(-50%);
+  /* 纵向排列：每个字一行 */
   display: flex;
-  flex-wrap: nowrap;
-  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒 */
-  gap: 16px;
-  white-space: nowrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 12px;
 }
 .combo-char {
-  display: inline-block;
+  display: block;
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
   font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
-  letter-spacing: 0;
-  line-height: 1.4;
+  line-height: 1;
   opacity: 0;
   /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影 */
   animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;

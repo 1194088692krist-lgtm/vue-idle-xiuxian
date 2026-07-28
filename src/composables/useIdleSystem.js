@@ -471,8 +471,10 @@ const activePillBuffList = computed(() => {
   })
 })
 
-// 在线每场遭遇间隔：2.5 秒（怪物死亡后寻怪2-3秒再进入下次战斗，节奏紧凑）
-const ENCOUNTER_INTERVAL = 2500
+// 在线每场遭遇间隔：5 秒
+// 用户要求 BOSS 战斗无论是否秒杀，一轮最少 5 秒，让斩杀特效完整显示、战斗更有感觉
+// 2.5 秒间隔会让特效（立绘 1.8s + 灵宠 1s 延迟 + 逐字砸入 + 停留）来不及播完就进下一场
+const ENCOUNTER_INTERVAL = 5000
 // 回合内动画延时：等待 BattleStage 播完当前回合的所有动作（攻击/buff/回复/技能/战场情况），
 // 每动作 1 秒(ACTION_DELAY)，3玩家队伍约 3-4 动作/回合，故等待约 3.5 秒让动画播完再进入下一回合，
 // 避免回合切换太快导致人物抖动频闪
@@ -1666,9 +1668,10 @@ async function runBossChallenge(zoneId, bossId, count) {
     // 战斗结束：仅置 inProgress=false，保留 enemy/players 让 BattleStage 显示胜负 badge
     currentEncounter.value = { ...currentEncounter.value, inProgress: false }
 
-    // 间隔 1.5s 让玩家看本场结算，再进入下一场（最后一场不延迟）
+    // 场次间隔 5s：让斩杀特效（立绘+灵宠+逐字文案+停留）完整播完再进下一场
+    // 与挂机 ENCOUNTER_INTERVAL 一致，保证 BOSS 战节奏统一
     if (i < count - 1 && !teamMemberStates.value.every(ms => ms.hp <= 0)) {
-      await new Promise(resolve => setTimeout(resolve, 1500))
+      await new Promise(resolve => setTimeout(resolve, 5000))
     }
   }
 
