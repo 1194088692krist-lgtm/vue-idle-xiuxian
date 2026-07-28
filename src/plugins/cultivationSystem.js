@@ -156,15 +156,18 @@ export const BOSS_MATERIALS = {
   ],
   ice_palace: [
     { id: 'ice_crystal', name: '冰晶', description: '万年不化的冰晶' },
-    { id: 'frozen_core', name: '冰封核心', description: '蕴含极寒之力的核心' }
+    { id: 'frozen_core', name: '冰封核心', description: '蕴含极寒之力的核心' },
+    { id: 'frost_dragon_scale', name: '玄冰龙鳞', description: '玄冰祖龙的鳞片，蕴含极寒龙威' }
   ],
   immortal_ruins: [
     { id: 'immortal_fragment', name: '仙人碎片', description: '仙人遗留的碎片' },
-    { id: 'divine_essence', name: '神性精华', description: '神明之力的碎片' }
+    { id: 'divine_essence', name: '神性精华', description: '神明之力的碎片' },
+    { id: 'ancient_immortal_marrow', name: '太古仙髓', description: '太古仙人的精华髓液，蕴含大道之韵' }
   ],
   chaos_realm: [
     { id: 'chaos_crystal', name: '混沌水晶', description: '混沌之力凝聚的水晶' },
-    { id: 'void_essence', name: '虚空精华', description: '来自虚空的神秘力量' }
+    { id: 'void_essence', name: '虚空精华', description: '来自虚空的神秘力量' },
+    { id: 'primordial_chaos_essence', name: '原始混沌精血', description: '混沌未开之前的本源精血，蕴含创世之力' }
   ]
 }
 
@@ -309,6 +312,15 @@ export const ZONE_BOSSES = {
       attackMultiplier: 50,
       dropMaterial: 'frozen_core',
       dropChance: 0.07
+    },
+    {
+      id: 'ice_boss_3',
+      name: '玄冰祖龙',
+      description: '沉睡于冰雪宫深处的远古冰龙',
+      hpMultiplier: 80,
+      attackMultiplier: 60,
+      dropMaterial: 'frost_dragon_scale',
+      dropChance: 0.05
     }
   ],
   immortal_ruins: [
@@ -329,6 +341,15 @@ export const ZONE_BOSSES = {
       attackMultiplier: 80,
       dropMaterial: 'divine_essence',
       dropChance: 0.06
+    },
+    {
+      id: 'immortal_boss_3',
+      name: '太古仙人',
+      description: '仙墟深处残留的太古仙人遗念',
+      hpMultiplier: 130,
+      attackMultiplier: 100,
+      dropMaterial: 'ancient_immortal_marrow',
+      dropChance: 0.04
     }
   ],
   chaos_realm: [
@@ -349,6 +370,15 @@ export const ZONE_BOSSES = {
       attackMultiplier: 170,
       dropMaterial: 'void_essence',
       dropChance: 0.05
+    },
+    {
+      id: 'chaos_boss_3',
+      name: '原始混沌',
+      description: '混沌未开之前的本源存在',
+      hpMultiplier: 260,
+      attackMultiplier: 220,
+      dropMaterial: 'primordial_chaos_essence',
+      dropChance: 0.03
     }
   ]
 }
@@ -388,6 +418,24 @@ export const getBossMaterialByBossId = (zoneId, bossId) => {
   return getBossMaterialByZoneIndex(zoneId, idx)
 }
 
+// BOSS 素材按对应 BOSS 强度定价：baseValue = (hpMultiplier + attackMultiplier) × 50
+// 强 BOSS 的素材更稀有更值钱，出售价自动反映 BOSS 强度，无需为每个素材手动维护单价。
+// 价格曲线（×50 系数下）：
+//   forest_edge  ~400、misty_valley ~650、phoenix_cave ~1200、dragon_abyss ~2100、
+//   ghost_wasteland ~3500、ice_palace ~5250-7000、immortal_ruins ~8500-11500、
+//   chaos_realm ~17500-24000（每秘境第 3 个 BOSS 最强，素材单价最高）
+const _MATERIAL_BOSS_LOC = {}
+for (const [zone, list] of Object.entries(BOSS_MATERIALS)) {
+  list.forEach((m, i) => { _MATERIAL_BOSS_LOC[m.id] = { zone, index: i } })
+}
+export const getBossMaterialBaseValue = (materialId) => {
+  const loc = _MATERIAL_BOSS_LOC[materialId]
+  if (!loc) return 0
+  const boss = ZONE_BOSSES[loc.zone]?.[loc.index]
+  if (!boss) return 0
+  return Math.round((boss.hpMultiplier + boss.attackMultiplier) * 50)
+}
+
 // BOSS 挑战券：每个 BOSS 对应一种专属挑战券，仅在挂机该 BOSS 所在秘境时按 ~30% 概率获得 1~2 张
 // 挑战券 id 命名与 zones.js 中 bossId 保持一致（前缀 `ticket_` + bossId），便于解析与展示
 export const BOSS_TICKETS = {
@@ -413,15 +461,18 @@ export const BOSS_TICKETS = {
   ],
   ice_palace: [
     { id: 'ticket_ice_boss_1', name: '冰凰挑战券', description: '挑战冰凰的入场凭证，仅在冰雪宫挂机有概率获得' },
-    { id: 'ticket_ice_boss_2', name: '冰封古魔挑战券', description: '挑战冰封古魔的入场凭证，仅在冰雪宫挂机有概率获得' }
+    { id: 'ticket_ice_boss_2', name: '冰封古魔挑战券', description: '挑战冰封古魔的入场凭证，仅在冰雪宫挂机有概率获得' },
+    { id: 'ticket_ice_boss_3', name: '玄冰祖龙挑战券', description: '挑战玄冰祖龙的入场凭证，仅在冰雪宫挂机有概率获得' }
   ],
   immortal_ruins: [
     { id: 'ticket_immortal_boss_1', name: '仙墟守护者挑战券', description: '挑战仙墟守护者的入场凭证，仅在仙墟挂机有概率获得' },
-    { id: 'ticket_immortal_boss_2', name: '堕落仙君挑战券', description: '挑战堕落仙君的入场凭证，仅在仙墟挂机有概率获得' }
+    { id: 'ticket_immortal_boss_2', name: '堕落仙君挑战券', description: '挑战堕落仙君的入场凭证，仅在仙墟挂机有概率获得' },
+    { id: 'ticket_immortal_boss_3', name: '太古仙人挑战券', description: '挑战太古仙人遗念的入场凭证，仅在仙墟挂机有概率获得' }
   ],
   chaos_realm: [
     { id: 'ticket_chaos_boss_1', name: '混沌主宰挑战券', description: '挑战混沌主宰的入场凭证，仅在混沌界挂机有概率获得' },
-    { id: 'ticket_chaos_boss_2', name: '天道化身挑战券', description: '挑战天道化身的入场凭证，仅在混沌界挂机有概率获得' }
+    { id: 'ticket_chaos_boss_2', name: '天道化身挑战券', description: '挑战天道化身的入场凭证，仅在混沌界挂机有概率获得' },
+    { id: 'ticket_chaos_boss_3', name: '原始混沌挑战券', description: '挑战原始混沌本源的入场凭证，仅在混沌界挂机有概率获得' }
   ]
 }
 

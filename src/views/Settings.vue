@@ -79,6 +79,23 @@
           </p>
         </div>
 
+        <!-- 移动端下拉刷新锁定 -->
+        <div class="setting-row">
+          <label class="setting-label">移动端下拉刷新</label>
+          <div class="setting-input-group">
+            <button
+              class="btn"
+              :class="playerStore.disablePullToRefresh ? 'btn-success' : 'btn-outline'"
+              @click="togglePullToRefresh"
+            >
+              {{ playerStore.disablePullToRefresh ? '已锁定（推荐，避免误触刷新丢存档）' : '已开启（恢复浏览器原生下拉刷新）' }}
+            </button>
+          </div>
+          <p class="setting-hint">
+            移动端浏览器在页面顶部下拉会触发整页刷新，可能造成未保存进度丢失。默认锁定可避免误触；如需使用浏览器原生下拉刷新可关闭此项。
+          </p>
+        </div>
+
         <!-- 危险操作 -->
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
@@ -735,6 +752,13 @@
   const toggleDynamicPortrait = () => {
     playerStore.dynamicPortrait = !playerStore.dynamicPortrait
     localStorage.setItem('dynamicPortrait', playerStore.dynamicPortrait)
+    playerStore.saveData()
+  }
+
+  const togglePullToRefresh = () => {
+    playerStore.disablePullToRefresh = !playerStore.disablePullToRefresh
+    localStorage.setItem('disablePullToRefresh', playerStore.disablePullToRefresh)
+    playerStore.updateHtmlPullToRefresh(playerStore.disablePullToRefresh)
     playerStore.saveData()
   }
 

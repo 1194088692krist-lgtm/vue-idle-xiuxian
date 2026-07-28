@@ -301,7 +301,7 @@ export const zones = [
     spiritCost: 50,
     rewardMultiplier: 5.0,
     image: '/assets/zones/zone_ice_palace.png',
-    monsters: ['远古妖龙'],
+    monsters: ['远古妖龙', '寒冰幽魂', '雪女'],
     bosses: [
       {
         id: 'ice_boss_1',
@@ -328,6 +328,20 @@ export const zones = [
           { type: 'cultivation', chance: 0.5, amount: [2000, 5000] }
         ],
         dropRateBonus: 1.65
+      },
+      {
+        id: 'ice_boss_3',
+        name: '玄冰祖龙',
+        description: '沉睡于冰雪宫深处的远古冰龙，龙息可冻结时空',
+        traits: ['冰封领域', '龙威压制'],
+        stats: { attack: 130000, health: 1100000, defense: 35000, speed: 22 },
+        drops: [
+          { type: 'spirit_stone', chance: 0.85, amount: [1800, 4500] },
+          { type: 'equipment', chance: 0.18, rarity: ['legendary', 'mythic'], slot: 'shoulder' },
+          { type: 'pet', chance: 0.02, rarity: ['celestial', 'divine'] },
+          { type: 'cultivation', chance: 0.45, amount: [2500, 6500] }
+        ],
+        dropRateBonus: 1.8
       }
     ],
     rewards: [
@@ -350,7 +364,7 @@ export const zones = [
     spiritCost: 50,
     rewardMultiplier: 7.0,
     image: '/assets/zones/zone_immortal_ruins.png',
-    monsters: ['远古妖龙'],
+    monsters: ['远古妖龙', '仙灵剑修', '堕仙残魂'],
     bosses: [
       {
         id: 'immortal_boss_1',
@@ -377,6 +391,20 @@ export const zones = [
           { type: 'cultivation', chance: 0.4, amount: [5000, 12000] }
         ],
         dropRateBonus: 1.75
+      },
+      {
+        id: 'immortal_boss_3',
+        name: '太古仙人',
+        description: '仙墟深处残留的太古仙人遗念，一道神念便可碎裂虚空',
+        traits: ['太古仙法', '虚空裂痕'],
+        stats: { attack: 420000, health: 4200000, defense: 95000, speed: 32 },
+        drops: [
+          { type: 'spirit_stone', chance: 0.85, amount: [3600, 9000] },
+          { type: 'equipment', chance: 0.2, rarity: ['legendary', 'mythic'], slot: 'necklace' },
+          { type: 'pet', chance: 0.025, rarity: ['divine'] },
+          { type: 'cultivation', chance: 0.4, amount: [6000, 15000] }
+        ],
+        dropRateBonus: 1.85
       }
     ],
     rewards: [
@@ -399,7 +427,7 @@ export const zones = [
     spiritCost: 50,
     rewardMultiplier: 10.0,
     image: '/assets/zones/zone_chaos_realm.png',
-    monsters: ['远古妖龙'],
+    monsters: ['远古妖龙', '混沌兽', '虚空魔灵'],
     bosses: [
       {
         id: 'chaos_boss_1',
@@ -426,6 +454,20 @@ export const zones = [
           { type: 'cultivation', chance: 0.3, amount: [10000, 30000] }
         ],
         dropRateBonus: 2.0
+      },
+      {
+        id: 'chaos_boss_3',
+        name: '原始混沌',
+        description: '混沌未开之前的本源存在，超越一切法则的至高之灵',
+        traits: ['创世之息', '万法归一'],
+        stats: { attack: 3200000, health: 32000000, defense: 650000, speed: 45 },
+        drops: [
+          { type: 'spirit_stone', chance: 0.9, amount: [12000, 30000] },
+          { type: 'equipment', chance: 0.25, rarity: ['mythic'], slot: 'artifact' },
+          { type: 'pet', chance: 0.03, rarity: ['divine'] },
+          { type: 'cultivation', chance: 0.35, amount: [15000, 40000] }
+        ],
+        dropRateBonus: 2.1
       }
     ],
     rewards: [

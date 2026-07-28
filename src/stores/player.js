@@ -9,7 +9,7 @@ import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCra
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
 import { petNameParts } from '../plugins/gacha'
 import { getSkillsForBreakthrough } from '../plugins/skills'
-import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS } from '../plugins/cultivationSystem'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS, getBossMaterialBaseValue } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
@@ -122,6 +122,9 @@ export const usePlayerStore = defineStore('player', {
     isDarkMode: localStorage.getItem('darkMode') === 'true',
     // 立绘动态效果开关（点击立绘时加载并播放视频），默认开启
     dynamicPortrait: localStorage.getItem('dynamicPortrait') !== 'false',
+    // 移动端下拉刷新开关：默认锁定（true=禁用下拉刷新，避免误触刷新页面丢存档）
+    // 用户可在设置中关闭以恢复原生下拉刷新行为
+    disablePullToRefresh: localStorage.getItem('disablePullToRefresh') !== 'false',
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
@@ -463,6 +466,15 @@ export const usePlayerStore = defineStore('player', {
         htmlEl.classList.remove('dark')
       }
     },
+    // 同步「禁用下拉刷新」状态到 <html> 标签（CSS 通过 .disable-pull-refresh 类控制 overscroll-behavior）
+    updateHtmlPullToRefresh(disabled) {
+      const htmlEl = document.documentElement
+      if (disabled) {
+        htmlEl.classList.add('disable-pull-refresh')
+      } else {
+        htmlEl.classList.remove('disable-pull-refresh')
+      }
+    },
     // 初始化玩家数据
     async initializePlayer() {
       try {
@@ -654,9 +666,14 @@ export const usePlayerStore = defineStore('player', {
       this.isDarkMode = savedDarkMode === null ? true : savedDarkMode === 'true'
       // 同步暗黑模式状态到HTML标签
       this.updateHtmlDarkMode(this.isDarkMode)
+      // 同步下拉刷新锁定状态到HTML标签
+      this.updateHtmlPullToRefresh(this.disablePullToRefresh)
       // 初始化动态立绘设置：默认开启
       const dynPortrait = localStorage.getItem('dynamicPortrait')
       this.dynamicPortrait = dynPortrait === null ? true : dynPortrait === 'true'
+      // 初始化移动端下拉刷新设置：默认锁定（true），用户主动关闭才为 false
+      const ptrSaved = localStorage.getItem('disablePullToRefresh')
+      this.disablePullToRefresh = ptrSaved === null ? true : ptrSaved === 'true'
       // 初始化GM模式设置
       const gmMode = localStorage.getItem('isGMMode')
       if (gmMode !== null) {
@@ -1346,10 +1363,17 @@ export const usePlayerStore = defineStore('player', {
       const sellCount = Math.min(count, totalCount)
       let pricePerUnit = 0
       const priceMap = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, mythic: 400 }
-      for (const m of this.materials) {
-        if (m.kind === kind && m.id === materialId) {
-          pricePerUnit = priceMap[m.quality] || 5
-          break
+      // BOSS 素材按对应 BOSS 强度定价（getBossMaterialBaseValue 由 hpMult+atkMult 推导）
+      // 其余素材沿用品质折价表
+      if (kind === 'boss_material') {
+        pricePerUnit = getBossMaterialBaseValue(materialId) || priceMap.mythic
+      }
+      if (!pricePerUnit) {
+        for (const m of this.materials) {
+          if (m.kind === kind && m.id === materialId) {
+            pricePerUnit = priceMap[m.quality] || 5
+            break
+          }
         }
       }
       let removed = 0

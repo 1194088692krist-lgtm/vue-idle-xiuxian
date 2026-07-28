@@ -1268,7 +1268,6 @@ function grantBossMaterialDrops(enemy, zoneId) {
       kind: 'boss_material',
       quality: 'rare',
       description: materialDef.description,
-      baseValue: 80,
       source: 'boss'
     }
     s.gainMaterial(materialItem)

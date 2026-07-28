@@ -810,6 +810,7 @@
   import { craftCurrencies } from '../plugins/craftCurrency'
   import { getRuneSynergy, RUNE_ELEMENTS, getRuneStats } from '../plugins/runes'
   import { getPetThumbnail } from '../plugins/pets'
+  import { getBossMaterialBaseValue } from '../plugins/cultivationSystem'
   import PetPortraitModal from '../components/PetPortraitModal.vue'
 
   // 移动端适配
@@ -1100,7 +1101,11 @@
   })
 
   const materialPriceMap = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, mythic: 400 }
-  const getMaterialPrice = (mat) => materialPriceMap[mat.quality] || 5
+  // BOSS 素材按对应 BOSS 强度定价（hpMult+atkMult 派生），其余素材沿用品质折价表
+  const getMaterialPrice = (mat) => {
+    if (mat.kind === 'boss_material') return getBossMaterialBaseValue(mat.id) || materialPriceMap.mythic
+    return materialPriceMap[mat.quality] || 5
+  }
 
   const increaseSellCount = (mat) => {
     const cur = materialSellCounts.value[mat.id] || 1

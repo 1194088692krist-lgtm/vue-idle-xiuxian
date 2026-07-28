@@ -88,6 +88,16 @@ body {
   background: transparent;
 }
 
+/* 移动端下拉刷新锁定：默认启用（避免误触刷新丢存档） */
+/* 当 <html> 带 .disable-pull-refresh 类时，禁用页面顶端的下拉刷新行为 */
+/* overscroll-behavior: contain 会阻止滚动链向父级传播，从而禁用浏览器原生下拉刷新 */
+html.disable-pull-refresh,
+html.disable-pull-refresh body {
+  overscroll-behavior-y: contain;
+  /* iOS Safari 兼容 */
+  -webkit-overflow-scrolling: touch;
+}
+
 ::-webkit-scrollbar {
   width: 8px;
   height: 8px;

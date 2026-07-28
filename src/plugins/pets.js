@@ -63,7 +63,11 @@ export async function loadPetSkinsManifest() {
     })
     .then(map => {
       if (map && typeof map === 'object') {
-        Object.entries(map).forEach(([id, count]) => { petSkinMap[id] = count })
+        Object.entries(map).forEach(([id, count]) => {
+          // 过滤内部元数据字段（如 _version），避免被误识别为灵宠 id
+          if (id.startsWith('_')) return
+          petSkinMap[id] = count
+        })
       }
     })
     .catch(e => console.warn('[petSkins] 加载 pets/skins.json 失败，灵宠皮肤切换不可用:', e.message))

@@ -195,7 +195,11 @@ export async function loadSkinsManifest() {
     })
     .then(map => {
       if (map && typeof map === 'object') {
-        Object.entries(map).forEach(([id, count]) => { skinMap[id] = count })
+        Object.entries(map).forEach(([id, count]) => {
+          // 过滤内部元数据字段（如 _version），避免被误识别为角色 id
+          if (id.startsWith('_')) return
+          skinMap[id] = count
+        })
       }
     })
     .catch(e => console.warn('[skins] 加载 skins.json 失败，皮肤切换不可用:', e.message))

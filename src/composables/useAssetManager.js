@@ -7,6 +7,66 @@ import { ref, computed } from 'vue'
 
 const USER_CACHE = 'user-assets' // 客户端主动预下载的 cache 名（SW cacheFirst 会优先查它）
 
+// 资源版本号机制：
+// skins.json / pets/skins.json 顶部带 _version 字段。
+// 当服务器版本与 localStorage 中存的 lastAssetVersion 不一致时（说明皮肤资源已更新），
+// 强制删除所有 skin 立绘缓存条目，让 downloadOne 重新下载。
+// 这能确保「一键下载」按钮真正覆盖错误的旧 skin3 立绘，避免缓存命中导致无法修复。
+const SKIN_VERSION_KEY = 'lastAssetVersion'
+
+// 判断 URL 是否为皮肤立绘（强制更新时按此模式匹配删除缓存）
+function isSkinAssetUrl(url) {
+  return /\/(portraits|pets)\/[^/]*_skin\d+\.(jpg|jpeg|png|webp)$/i.test(url)
+}
+
+// 检查资源版本号是否变化；变化时清除所有 skin 立绘缓存，确保旧 skin3 不再出现
+async function checkAssetVersionAndInvalidate(cache) {
+  try {
+    const [skinsRes, petSkinsRes] = await Promise.all([
+      fetch(urlFromPath('./portraits/skins.json'), { cache: 'no-store' }),
+      fetch(urlFromPath('./pets/skins.json'), { cache: 'no-store' })
+    ])
+    let serverVersion = ''
+    if (skinsRes.ok) {
+      const data = await skinsRes.json()
+      serverVersion = data._version || ''
+    }
+    if (petSkinsRes.ok) {
+      const data = await petSkinsRes.json()
+      // 两个清单共用同一个版本号；取并集
+      const v2 = data._version || ''
+      if (v2 && serverVersion && v2 !== serverVersion) {
+        // 不一致时取较新者作为本地基准（理论上应该一致，此处兜底）
+        serverVersion = v2 > serverVersion ? v2 : serverVersion
+      } else if (!serverVersion) {
+        serverVersion = v2
+      }
+    }
+    if (!serverVersion) return // 服务器未声明版本号，跳过
+    const localVersion = localStorage.getItem(SKIN_VERSION_KEY) || ''
+    if (localVersion === serverVersion) return // 版本一致，无需清理
+    // 版本不一致：删除所有 skin 立绘缓存条目
+    const keys = await caches.keys()
+    let deleted = 0
+    for (const k of keys) {
+      const c = await caches.open(k)
+      const reqs = await c.keys()
+      for (const req of reqs) {
+        if (isSkinAssetUrl(req.url || '')) {
+          await c.delete(req)
+          deleted++
+        }
+      }
+    }
+    if (deleted > 0) {
+      console.log(`[useAssetManager] 资源版本变化（${localVersion || '∅'} → ${serverVersion}），已清除 ${deleted} 个旧 skin 立绘缓存`)
+    }
+    localStorage.setItem(SKIN_VERSION_KEY, serverVersion)
+  } catch (e) {
+    console.warn('[useAssetManager] 版本号检测失败，跳过缓存清理:', e.message)
+  }
+}
+
 // 状态
 const isDownloading = ref(false)
 const isCleaning = ref(false)
@@ -233,6 +293,8 @@ export async function downloadAllAssets() {
       throw new Error('当前浏览器不支持 Cache Storage API')
     }
     const cache = await caches.open(USER_CACHE)
+    // 检查资源版本号；若变化则先删除所有 skin 立绘缓存，确保旧 skin3 被强制覆盖
+    await checkAssetVersionAndInvalidate(cache)
     // 并发 6 路下载
     const concurrency = 6
     let cursor = 0
