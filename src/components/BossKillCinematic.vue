@@ -456,6 +456,8 @@ const onPetAnimEnd = () => {
 .kill-text {
   position: absolute;
   bottom: 12%;
+  left: 50%;
+  transform: translateX(-50%);
   text-align: center;
   color: #FFD700;
   text-shadow: 0 0 12px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(0, 0, 0, 0.8);
@@ -473,10 +475,10 @@ const onPetAnimEnd = () => {
   margin-top: 4px;
 }
 @keyframes text-anim {
-  0% { opacity: 0; transform: translateY(20px); }
-  40% { opacity: 1; transform: translateY(0); }
-  75% { opacity: 1; }
-  100% { opacity: 0; transform: translateY(-10px); }
+  0% { opacity: 0; transform: translate(-50%, 20px); }
+  40% { opacity: 1; transform: translate(-50%, 0); }
+  75% { opacity: 1; transform: translate(-50%, 0); }
+  100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
 /* ===== 连击特效：逐字砸入出现，全部到齐后整体一起消失 ===== */
@@ -484,12 +486,12 @@ const onPetAnimEnd = () => {
    内层 .combo-char：仅负责逐字砸入出现，不独立 out（避免边出现边消失） */
 .kill-combo {
   position: absolute;
-  top: 16%;
+  top: 10%;
   right: 6%;
   display: flex;
   flex-wrap: wrap;
   justify-content: flex-end;
-  max-width: 60vw;
+  max-width: 42vw;  /* 限制宽度避免两排过宽与底部 kill-text 重合 */
   gap: 2px;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算 */
   opacity: 1;
