@@ -2620,6 +2620,7 @@ async function executeRound(effectiveZone) {
 
   // 收集 executeTurn 结果到 combatStats 和 roundLog
   let lastPlayerAttacker = null  // 追踪最后一击的玩家攻击者（用于击杀BOSS立绘突入）
+  let killBlowAttacker = null    // 精确追踪致命一击者（defenderHP 降为 0 的那次攻击的攻击者）
   if (turnResult && turnResult.results) {
     for (const r of turnResult.results) {
       const attackerPlayer = players.find(pl => pl.name === r.attacker)
@@ -2630,6 +2631,11 @@ async function executeRound(effectiveZone) {
       // 导致致命一击者永远不被记录，回退到 players[0] 队长，表现为"总是第一人斩杀"
       if (isPlayerAttacker && attackerPlayer && !r.isDodged) {
         lastPlayerAttacker = attackerPlayer
+      }
+      // 精确追踪致命一击：玩家攻击 enemy 且非闪避，且 defenderHP 降为 0（或以下）
+      // 这是真正的斩杀者，优先于 lastPlayerAttacker 使用
+      if (isPlayerAttacker && attackerPlayer && !r.isDodged && r.defenderHP <= 0) {
+        killBlowAttacker = attackerPlayer
       }
 
       // 更新 combatStats
@@ -2740,7 +2746,7 @@ async function executeRound(effectiveZone) {
         cs.enemyFinalHP = Math.round(enemy.currentHealth)
       }
     }
-    return { finished: true, victory: battleStatus.victory, lastPlayerAttacker }
+    return { finished: true, victory: battleStatus.victory, lastPlayerAttacker: killBlowAttacker || lastPlayerAttacker }
   }
 
   return { finished: false }

@@ -28,7 +28,7 @@
 </template>
 
 <script setup>
-import { ref, watch } from 'vue'
+import { ref, watch, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
@@ -49,27 +49,26 @@ watch(bossKillEvent, (evt) => {
 
   // 立绘来源角色选择：
   // 1. 若用户在立绘弹窗设置了 bossKillCharacterId，优先用该固定角色
-  // 2. 否则跟随斩杀者（最后一击者），找不到则回退队长，再回退随机队伍成员
+  // 2. 否则跟随斩杀者（致命一击者），找不到则随机队伍成员（避免总是第一人）
   let member = null
   const fixedCharId = playerStore.bossKillCharacterId
   if (fixedCharId) {
     member = playerStore.sectMembers.find(m => (m.templateId || m.id) === fixedCharId)
   }
   if (!member) {
-    // 跟随斩杀者
+    // 跟随斩杀者（致命一击者）
     const memberId = evt.killerMemberId
     if (memberId) {
       member = playerStore.sectMembers.find(m => m.id === memberId)
     }
-    // 兜底1：队长
+    // 兜底：从存活队伍成员中随机选一个（避免总是第一人）
     if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
-      const captainId = playerStore.teamMembers[0]
-      member = playerStore.sectMembers.find(m => m.id === captainId)
-    }
-    // 兜底2：随机队伍成员（避免总是第一人）
-    if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
-      const randomId = playerStore.teamMembers[Math.floor(Math.random() * playerStore.teamMembers.length)]
-      member = playerStore.sectMembers.find(m => m.id === randomId)
+      const aliveMembers = playerStore.teamMembers
+        .map(id => playerStore.sectMembers.find(m => m.id === id))
+        .filter(m => m && m.id)
+      if (aliveMembers.length > 0) {
+        member = aliveMembers[Math.floor(Math.random() * aliveMembers.length)]
+      }
     }
   }
   if (!member) return
@@ -87,10 +86,22 @@ watch(bossKillEvent, (evt) => {
   if (!url) url = getCharacterAvatar(member, 'full')
   if (!url) return
 
-  portraitUrl.value = url
-  killerName.value = evt.killerName || member.name || ''
-  bossName.value = evt.bossName || ''
-  show.value = true
+  // 多场连打时（手动BOSS挑战count>1），上一次动画可能还在播放
+  // 先重置 show 让 <img> 卸载，nextTick 后再设 true 重新触发 CSS animation
+  if (show.value) {
+    show.value = false
+    nextTick(() => {
+      portraitUrl.value = url
+      killerName.value = evt.killerName || member.name || ''
+      bossName.value = evt.bossName || ''
+      show.value = true
+    })
+  } else {
+    portraitUrl.value = url
+    killerName.value = evt.killerName || member.name || ''
+    bossName.value = evt.bossName || ''
+    show.value = true
+  }
 }, { deep: true })
 
 const onAnimationEnd = () => {
