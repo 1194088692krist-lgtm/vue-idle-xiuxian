@@ -35,9 +35,8 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：第一行"X杀"小字标签 + 第二行成语/诗句逐字砸入 -->
-      <!-- 外层 .kill-combo 负责整体淡出（统一延迟，所有字一起消失） -->
-      <!-- count 行整体淡入，text 行逐字砸入出现 -->
+      <!-- 连击特效：count（一杀）在立绘左侧，text（成语）在立绘右侧 -->
+      <!-- 两者绝对定位，不与立绘 flex 布局冲突，可稍微与立绘重叠没关系 -->
       <div
         v-if="comboText"
         :key="`combo-${animKey}`"
@@ -102,14 +101,15 @@ const comboFadeDelay = computed(() => {
   return (n - 1) * 0.18 + 0.45 + 1.2
 })
 // 字号自适应：仅针对 text 行，字数越多字号越小
-// ≤4字 → 64px，5字 → 54px，6-7字 → 46px，8-10字 → 36px，10+字 → 28px
+// 用户要求一杀等文字大一点：≤4字 提到 72px，后续梯度同步放大
+// ≤4字 → 72px，5字 → 60px，6-7字 → 50px，8-10字 → 40px，10+字 → 32px
 const comboFontSize = computed(() => {
   const n = comboTextChars.value.length
-  if (n <= 4) return 'clamp(44px, 7.5vw, 64px)'
-  if (n === 5) return 'clamp(38px, 6.5vw, 54px)'
-  if (n <= 7) return 'clamp(32px, 5.5vw, 46px)'
-  if (n <= 10) return 'clamp(24px, 4vw, 36px)'
-  return 'clamp(18px, 3vw, 28px)'
+  if (n <= 4) return 'clamp(52px, 9vw, 72px)'
+  if (n === 5) return 'clamp(44px, 7.5vw, 60px)'
+  if (n <= 7) return 'clamp(36px, 6vw, 50px)'
+  if (n <= 10) return 'clamp(28px, 5vw, 40px)'
+  return 'clamp(22px, 4vw, 32px)'
 })
 
 // ===== 连击系统：中文斩杀文案库 =====
@@ -226,12 +226,13 @@ function getComboTier(count) {
 }
 
 // 连击锁：防止两次击杀事件几乎同时到达时，bumpCombo 交错执行导致两组文字共存
-// 场景：挂机一轮战斗可能连斩多只 BOSS，事件密集触发，nextTick 异步设置 comboLabel
-// 时第二次 bumpCombo 已把 comboLabel 清空，造成状态错乱
+// 场景：挂机一轮战斗可能连斩多只 BOSS，事件密集触发
+// 修复：完全同步设置 comboText（不用 nextTick），Vue 响应式批处理会在 tick 结束后
+// 只渲染一次；:key 绑定 animKey 确保每次都是全新 DOM 节点，旧节点被销毁不会共存
 let comboBumping = false
 function bumpCombo() {
   if (comboBumping) {
-    // 上一次还没渲染完，直接累加计数但不重复触发渲染
+    // 上一次还在渲染中，直接累加计数但不重复触发渲染
     currentCombo++
     if (comboTimerId) clearTimeout(comboTimerId)
     comboTimerId = setTimeout(() => {
@@ -246,17 +247,14 @@ function bumpCombo() {
   comboBumping = true
   currentCombo++
   const tier = getComboTier(currentCombo)
-  // 关键：先清空，让旧 .kill-combo 节点（v-if=false）立即卸载
-  // 避免旧节点响应式更新为新文案字符后，与新节点短暂共存导致"两组不同文字同时显示"
-  comboCount.value = ''
-  comboText.value = ''
-  comboClass.value = ''
-  nextTick(() => {
-    comboCount.value = tier.count
-    comboText.value = tier.text
-    comboClass.value = tier.class
-    comboBumping = false
-  })
+  // 完全同步设置：与 watch 中的 animKey++ 在同一同步执行栈内
+  // Vue 会在本次 tick 结束后批量渲染：旧节点（旧 animKey）销毁，新节点（新 animKey）创建
+  // 不会有"旧节点渲染新文案字符"的中间态
+  comboCount.value = tier.count
+  comboText.value = tier.text
+  comboClass.value = tier.class
+  // 锁在下一次宏任务（setTimeout 0）释放，确保 Vue 已完成本次渲染
+  setTimeout(() => { comboBumping = false }, 0)
   // 重置连击窗口计时器
   if (comboTimerId) clearTimeout(comboTimerId)
   comboTimerId = setTimeout(() => {
@@ -472,13 +470,9 @@ const onPetAnimEnd = () => {
 /* 人物立绘主体：左下突入→中心旋转顿帧→右上消失，纯 transform+opacity 走 GPU 合成层 */
 .kill-portrait {
   position: relative;
-  width: min(64vw, 460px);
-  max-height: 52vh; /* 减小高度，给中间偏下的连击文字让出空间 */
+  width: min(60vw, 440px);
+  max-height: 72vh; /* 正居中显示，占据中心区域 */
   object-fit: contain;
-  /* 立绘贴顶显示，避免与中间偏下的连击文字重叠
-     父容器是 align-items:center，align-self 覆盖为 flex-start 让立绘在顶部 */
-  align-self: flex-start;
-  margin-top: 4vh;
   border-radius: 12px;
   filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.7));
   animation: boss-slash 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
@@ -631,22 +625,14 @@ const onPetAnimEnd = () => {
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
-/* ===== 连击特效：第一行"X杀"小字 + 第二行成语/诗句逐字砸入 ===== */
-/* 外层 .kill-combo：负责整体淡出 + 居中定位，纵向排列 count 与 text 两行 */
+/* ===== 连击特效：count（一杀）在立绘左侧，text（成语）在立绘右侧 ===== */
+/* 外层 .kill-combo：透明容器，撑满全屏，只负责整体淡出
+   count 与 text 各自绝对定位到屏幕中线左右两侧，立绘在中间 flex 居中 */
 .kill-combo {
   position: absolute;
-  /* 中间偏下显示：立绘贴顶后下方空间充足，不遮挡立绘主体也看得清 */
-  top: 56%;
-  left: 50%;
-  transform: translateX(-50%);
-  /* 纵向排列：count 在上，text 在下 */
-  display: flex;
-  flex-direction: column;
-  align-items: center;
-  gap: 8px;
-  /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
-     外层 transform 是静态值（translateX(-50%)），不在动画中改变，不会与内层叠加
-     combo-fade-out 只控制 opacity，不触碰 transform，避免覆盖居中定位 */
+  inset: 0;
+  pointer-events: none;
+  /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算 */
   opacity: 1;
   animation: combo-fade-out 0.5s ease-in forwards;
 }
@@ -654,32 +640,48 @@ const onPetAnimEnd = () => {
   0%, 99% { opacity: 1; }
   100% { opacity: 0; }
 }
-/* count 行：小字标签，整体淡入（不逐字） */
+/* count（一杀）：绝对定位在屏幕中线左侧，垂直居中
+   与立绘左侧重叠一些没关系，立绘本身有 z-index 在上层 */
 .combo-count {
+  position: absolute;
+  top: 50%;
+  /* 左侧：距离屏幕中线 22vw（立绘宽约 30vw 的一半），落在立绘左缘外侧 */
+  left: calc(50% - 22vw);
+  transform: translateY(-50%);
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
-  font-size: clamp(20px, 3.5vw, 30px);
-  font-weight: 700;
-  letter-spacing: 8px;
-  line-height: 1;
+  /* 一杀等文字大一点、刚硬：72px 粗体 */
+  font-size: clamp(48px, 8vw, 72px);
+  font-weight: 900;
+  letter-spacing: 6px;
+  line-height: 1.2;
+  white-space: nowrap;
   opacity: 0;
-  animation: combo-count-in 0.4s ease-out forwards;
+  animation: combo-count-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  /* 刚硬描边：四方向粗黑描边 + 立体投影 */
   text-shadow:
-    -1px -1px 0 rgba(0, 0, 0, 0.9),
-    1px -1px 0 rgba(0, 0, 0, 0.9),
-    -1px 1px 0 rgba(0, 0, 0, 0.9),
-    1px 1px 0 rgba(0, 0, 0, 0.9);
+    -3px -3px 0 rgba(0, 0, 0, 0.95),
+    3px -3px 0 rgba(0, 0, 0, 0.95),
+    -3px 3px 0 rgba(0, 0, 0, 0.95),
+    3px 3px 0 rgba(0, 0, 0, 0.95),
+    4px 4px 0 rgba(0, 0, 0, 0.8),
+    5px 5px 0 rgba(0, 0, 0, 0.6);
 }
 @keyframes combo-count-in {
-  0% { opacity: 0; transform: translateY(-8px); }
-  100% { opacity: 0.9; transform: translateY(0); }
+  0% { opacity: 0; transform: translate(-12px, -50%) scale(1.3); }
+  60% { opacity: 1; transform: translate(0, -50%) scale(0.95); }
+  100% { opacity: 1; transform: translate(0, -50%) scale(1); }
 }
-/* text 行：横向排列单字容器 */
+/* text 行：绝对定位在屏幕中线右侧，垂直居中，横向排列单字 */
 .combo-text {
+  position: absolute;
+  top: 50%;
+  /* 右侧：距离屏幕中线 22vw，落在立绘右缘外侧 */
+  left: calc(50% + 22vw);
+  transform: translateY(-50%);
   display: flex;
   flex-wrap: nowrap;
-  justify-content: center;
-  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒，gap 太小相邻字笔画会侵入重叠 */
-  gap: 18px;
+  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒 */
+  gap: 16px;
   white-space: nowrap;
 }
 .combo-char {
@@ -688,14 +690,11 @@ const onPetAnimEnd = () => {
   font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
   letter-spacing: 0;
-  /* line-height >1：避免毛笔字字形上下溢出侵入相邻区域 */
   line-height: 1.4;
   opacity: 0;
   /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影 */
   animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  /* 四方向黑色粗描边 + 右下立体投影
-     不用 -webkit-text-stroke（栅格化不同步会重影）
-     不用外发光（opacity 渐变时与文字本体不同步形成光晕重影） */
+  /* 刚硬描边：四方向粗黑描边 + 立体投影 */
   text-shadow:
     -2px -2px 0 rgba(0, 0, 0, 0.95),
     2px -2px 0 rgba(0, 0, 0, 0.95),
