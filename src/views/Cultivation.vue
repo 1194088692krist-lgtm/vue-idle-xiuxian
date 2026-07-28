@@ -324,6 +324,54 @@
         <!-- 技能面板 -->
         <div class="attr-block" v-if="detailMember && detailMember.skills && detailMember.skills.length">
           <h4 class="sub-title">技能 <span v-if="detailMember.skillSchoolName">{{ detailMember.skillSchoolIcon }} {{ detailMember.skillSchoolName }}</span></h4>
+
+          <!-- 技能装备槽（3 槽位，玩家选择装备的主动技能） -->
+          <div class="skill-equip-section" v-if="getActiveSkillsForEquip(detailMember).length > 0">
+            <h5 class="equip-sub-title">技能装备 <span class="equip-hint">（点击槽位选中，再点击下方技能装备到该槽）</span></h5>
+            <div class="skill-equip-slots">
+              <div
+                v-for="slotIdx in 3"
+                :key="'slot-' + slotIdx"
+                class="skill-equip-slot"
+                :class="{
+                  selected: selectedSlotIndex === slotIdx - 1,
+                  filled: !!getEquippedSkillAtSlot(detailMember, slotIdx - 1)
+                }"
+                @click="onSlotClick(slotIdx - 1)"
+              >
+                <span class="slot-label">槽位 {{ slotIdx }}</span>
+                <template v-if="getEquippedSkillAtSlot(detailMember, slotIdx - 1)">
+                  <span class="slot-skill-name">
+                    {{ getSkillCategoryIcon(getEquippedSkillAtSlot(detailMember, slotIdx - 1).category) }}
+                    {{ getEquippedSkillAtSlot(detailMember, slotIdx - 1).name }}
+                  </span>
+                  <button class="btn-unequip" @click.stop="onUnequipSkill(detailMember, slotIdx - 1)" title="卸下">✕</button>
+                </template>
+                <span v-else class="slot-empty-text">＋ 空</span>
+              </div>
+            </div>
+
+            <!-- 已学主动技能列表：点击装备到当前选中槽位 -->
+            <div class="equip-skill-list">
+              <div
+                v-for="skill in getActiveSkillsForEquip(detailMember)"
+                :key="'equip-' + skill.id"
+                class="equip-skill-item"
+                :class="{ equipped: isSkillEquipped(detailMember, skill.id) }"
+                @click="onEquipSkill(detailMember, skill)"
+              >
+                <span class="skill-icon">{{ getSkillCategoryIcon(skill.category) }}</span>
+                <div class="skill-info">
+                  <div class="skill-name">{{ skill.name }}</div>
+                  <div class="skill-type">{{ getSkillTypeName(skill.type) }}</div>
+                </div>
+                <div class="skill-desc">{{ skill.description }}</div>
+                <span class="equip-status" v-if="isSkillEquipped(detailMember, skill.id)">已装备</span>
+                <span class="equip-status equip-btn" v-else>装备</span>
+              </div>
+            </div>
+          </div>
+
           <div class="skill-list">
             <div v-for="skill in detailMember.skills" :key="skill.id" class="skill-item" :class="skill.type">
               <div class="skill-icon">{{ getSkillCategoryIcon(skill.category) }}</div>
@@ -1064,6 +1112,55 @@ const tryManualBreakthrough = () => {
   }
   playerStore.characterEssence -= 1
   const r = playerStore.breakThroughCharacter(detailMember.value.id)
+  if (r.success) message.success(r.message)
+  else message.error(r.message)
+}
+
+// ============ 技能装备系统（3 槽位） ============
+// 当前选中的槽位索引（0/1/2），点击未装备技能时装备到此槽
+const selectedSlotIndex = ref(0)
+
+// 取该角色所有已学主动技能（被动技能不可装备）
+const getActiveSkillsForEquip = (member) => {
+  if (!member || !Array.isArray(member.skills)) return []
+  return member.skills.filter(s => s.type === 'active')
+}
+
+// 取指定槽位上已装备的技能对象
+const getEquippedSkillAtSlot = (member, slotIdx) => {
+  if (!member || !Array.isArray(member.equippedSkills)) return null
+  const skillId = member.equippedSkills[slotIdx]
+  if (!skillId) return null
+  return (member.skills || []).find(s => s.id === skillId) || null
+}
+
+// 判断某个技能是否已装备（任意槽位）
+const isSkillEquipped = (member, skillId) => {
+  if (!member || !Array.isArray(member.equippedSkills)) return false
+  return member.equippedSkills.includes(skillId)
+}
+
+// 点击槽位：选中该槽位
+const onSlotClick = (slotIdx) => {
+  selectedSlotIndex.value = slotIdx
+}
+
+// 点击技能：装备到当前选中槽位（若已在其他槽位则自动迁移）
+const onEquipSkill = (member, skill) => {
+  if (!member || !skill) return
+  if (isSkillEquipped(member, skill.id)) {
+    message.info(`${skill.name} 已装备`)
+    return
+  }
+  const r = playerStore.equipSkill(member.id, selectedSlotIndex.value, skill.id)
+  if (r.success) message.success(r.message)
+  else message.error(r.message)
+}
+
+// 卸下指定槽位的技能
+const onUnequipSkill = (member, slotIdx) => {
+  if (!member) return
+  const r = playerStore.unequipSkill(member.id, slotIdx)
   if (r.success) message.success(r.message)
   else message.error(r.message)
 }
@@ -2242,6 +2339,176 @@ watch([allMembers, teamMembers], () => {
   color: #ff9800;
   margin-top: 8px;
   text-align: center;
+}
+
+/* 技能装备系统样式 */
+.skill-equip-section {
+  margin: 10px 0 14px;
+  padding: 10px;
+  background: rgba(106, 61, 240, 0.06);
+  border: 1px solid rgba(142, 68, 255, 0.25);
+  border-radius: 8px;
+}
+
+.equip-sub-title {
+  margin: 0 0 8px;
+  font-size: 13px;
+  color: #d4c5f9;
+  font-weight: bold;
+}
+
+.equip-hint {
+  font-size: 11px;
+  color: #8b7fa8;
+  font-weight: normal;
+}
+
+.skill-equip-slots {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 6px;
+  margin-bottom: 10px;
+}
+
+.skill-equip-slot {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 4px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s ease;
+  min-height: 38px;
+}
+
+.skill-equip-slot:hover {
+  background: rgba(255, 255, 255, 0.08);
+  border-color: rgba(255, 255, 255, 0.2);
+}
+
+.skill-equip-slot.selected {
+  background: rgba(142, 68, 255, 0.18);
+  border-color: rgba(142, 68, 255, 0.6);
+  box-shadow: 0 0 8px rgba(142, 68, 255, 0.3);
+}
+
+.skill-equip-slot.filled {
+  background: rgba(76, 175, 80, 0.1);
+  border-color: rgba(76, 175, 80, 0.4);
+}
+
+.skill-equip-slot.filled.selected {
+  background: rgba(142, 68, 255, 0.22);
+  border-color: rgba(142, 68, 255, 0.7);
+}
+
+.slot-label {
+  font-size: 10px;
+  color: #8b7fa8;
+  flex-shrink: 0;
+}
+
+.slot-skill-name {
+  font-size: 12px;
+  color: #fff;
+  flex: 1;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+
+.slot-empty-text {
+  font-size: 11px;
+  color: #6b6280;
+  flex: 1;
+  text-align: right;
+}
+
+.btn-unequip {
+  background: rgba(244, 67, 54, 0.15);
+  color: #f44336;
+  border: 1px solid rgba(244, 67, 54, 0.4);
+  border-radius: 4px;
+  padding: 2px 6px;
+  font-size: 11px;
+  cursor: pointer;
+  line-height: 1;
+  transition: all 0.2s ease;
+  flex-shrink: 0;
+}
+
+.btn-unequip:hover {
+  background: rgba(244, 67, 54, 0.3);
+}
+
+.equip-skill-list {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+}
+
+.equip-skill-item {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 8px 10px;
+  background: rgba(255, 255, 255, 0.04);
+  border-radius: 6px;
+  border-left: 2px solid rgba(255, 255, 255, 0.15);
+  cursor: pointer;
+  transition: all 0.2s ease;
+}
+
+.equip-skill-item:hover {
+  background: rgba(142, 68, 255, 0.12);
+  border-left-color: rgba(142, 68, 255, 0.6);
+}
+
+.equip-skill-item.equipped {
+  opacity: 0.55;
+  background: rgba(76, 175, 80, 0.06);
+  border-left-color: rgba(76, 175, 80, 0.5);
+  cursor: default;
+}
+
+.equip-skill-item .skill-icon {
+  font-size: 18px;
+}
+
+.equip-skill-item .skill-info {
+  flex-shrink: 0;
+}
+
+.equip-skill-item .skill-name {
+  font-size: 13px;
+}
+
+.equip-skill-item .skill-desc {
+  font-size: 11px;
+  color: #aaa;
+}
+
+.equip-status {
+  font-size: 11px;
+  color: #8b7fa8;
+  padding: 2px 8px;
+  border-radius: 4px;
+  background: rgba(255, 255, 255, 0.06);
+  flex-shrink: 0;
+}
+
+.equip-status.equip-btn {
+  color: #d4c5f9;
+  background: rgba(142, 68, 255, 0.2);
+  border: 1px solid rgba(142, 68, 255, 0.4);
+  font-weight: bold;
+}
+
+.equip-skill-item:not(.equipped):hover .equip-status.equip-btn {
+  background: rgba(142, 68, 255, 0.35);
 }
 
 .breakthrough-section {

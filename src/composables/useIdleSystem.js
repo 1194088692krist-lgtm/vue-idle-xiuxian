@@ -10,7 +10,7 @@ import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
 import { getCharacterThumbnail } from '../plugins/characters'
-import { getInitialSkills } from '../plugins/skills'
+import { getInitialSkills, deduplicateSkills } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
@@ -2406,127 +2406,135 @@ function createMemberCombatEntity(member) {
 function chooseMemberAction(memberState, teamStates, enemy) {
   const role = memberState.role || 'vanguard'
   const hpPercent = memberState.hp / (memberState.maxHP || memberState.maxHealth || 1)
+  // 取已装备的主动技能（buildTeamMemberState 已经过滤，这里再防御性过滤一遍）
   const activeSkills = (memberState.skills || []).filter(s => s.type === 'active')
+  if (activeSkills.length === 0) return { type: 'attack' }
 
-  // 辅助函数：从技能效果中提取数值
   const getSkillEffectValue = (skill, key, fallback) => {
     if (!skill || !skill.effect) return fallback
     return skill.effect[key] !== undefined ? skill.effect[key] : fallback
   }
 
-  switch (role) {
-    case 'vanguard': {
-      // 血量<30%时，查找是否有攻击/Buff类技能可用
-      if (hpPercent < 0.3) {
-        const buffSkill = activeSkills.find(s => s.category === 'buff')
-        if (buffSkill) {
-          const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
-          const value = getSkillEffectValue(buffSkill, 'value', 0.2)
-          const duration = getSkillEffectValue(buffSkill, 'duration', 2)
-          return { type: 'buff', target: memberState, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
-        }
-        const damageSkill = activeSkills.find(s => s.category === 'damage')
-        if (damageSkill) {
-          return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-        }
-      }
-      // 查找伤害技能
-      const damageSkill = activeSkills.find(s => s.category === 'damage')
-      if (damageSkill) {
-        return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-      }
-      return { type: 'attack' }
+  const wounded = teamStates.filter(t => t.hp > 0 && t.hp / (t.maxHP || t.maxHealth || 1) < 0.5)
+  const weakAlly = teamStates.find(t => t.memberId !== memberState.memberId && t.hp > 0 && t.hp / (t.maxHP || 1) < 0.4)
+  const selfLowHP = hpPercent < 0.3
+
+  // 紧急优先 1：医者（herb）有伤员时优先治疗（避免队伍减员）
+  if (role === 'herb' && wounded.length > 0) {
+    const healSkill = activeSkills.find(s => s.category === 'heal' && !s.effect?.resurrect)
+    if (healSkill) {
+      wounded.sort((a, b) => (a.hp / (a.maxHP || a.maxHealth || 1)) - (b.hp / (b.maxHP || b.maxHealth || 1)))
+      const target = wounded[0]
+      const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
+      const isTeam = getSkillEffectValue(healSkill, 'target', 'single') === 'team'
+      const healAmount = Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
+      return { type: 'heal', target: isTeam ? null : target, value: Math.max(1, healAmount), skillName: healSkill.name, isTeam }
     }
-    case 'blade': {
-      // 优先使用伤害技能，尤其是高倍率的
-      const damageSkills = activeSkills.filter(s => s.category === 'damage')
-      if (damageSkills.length > 0) {
-        // 优先选择倍率最高的
-        damageSkills.sort((a, b) => (b.effect?.damagePercent || 0) - (a.effect?.damagePercent || 0))
-        return { type: 'skill_attack', skill: damageSkills[0], skillName: damageSkills[0].name }
-      }
-      return { type: 'attack' }
+  }
+
+  // 紧急优先 2：守护者（shield）有危急队友时优先护盾
+  if (role === 'shield' && weakAlly) {
+    const shieldSkill = activeSkills.find(s => s.category === 'shield')
+    if (shieldSkill) {
+      const shieldPercent = getSkillEffectValue(shieldSkill, 'shieldPercent', 1.0)
+      const duration = getSkillEffectValue(shieldSkill, 'duration', 2)
+      const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
+      return { type: 'shield', target: weakAlly, value: shieldValue, duration, skillName: shieldSkill.name }
     }
-    case 'herb': {
-      // 有队友HP<50%则优先治疗
-      const wounded = teamStates.filter(t => t.hp > 0 && t.hp / (t.maxHP || t.maxHealth || 1) < 0.5)
-      if (wounded.length > 0) {
-        wounded.sort((a, b) => (a.hp / (a.maxHP || a.maxHealth || 1)) - (b.hp / (b.maxHP || b.maxHealth || 1)))
-        const target = wounded[0]
-        // 查找治疗技能
-        const healSkill = activeSkills.find(s => s.category === 'heal')
-        if (healSkill) {
-          const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
-          const isTeam = getSkillEffectValue(healSkill, 'target', 'single') === 'team'
-          const healAmount = isTeam
-            ? Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
-            : Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
-          return { type: 'heal', target: isTeam ? null : target, value: Math.max(1, healAmount), skillName: healSkill.name, isTeam }
-        }
-        // 没有治疗技能则使用基础治疗
-        const healAmount = Math.floor((memberState.maxHP || memberState.maxHealth || 0) * 0.15)
-        return { type: 'heal', target, value: Math.max(1, healAmount) }
+  }
+
+  // 紧急优先 3：自身低血量优先使用防御类技能或自救
+  if (selfLowHP) {
+    const defensiveSkill = activeSkills.find(s =>
+      s.category === 'shield' || (s.category === 'buff' && s.effect?.stat === 'defense')
+    )
+    if (defensiveSkill) {
+      return buildActionFromSkill(defensiveSkill, memberState, teamStates, enemy, getSkillEffectValue)
+    }
+    if (role === 'herb') {
+      const healSkill = activeSkills.find(s => s.category === 'heal' && !s.effect?.resurrect)
+      if (healSkill) {
+        const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
+        const healAmount = Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
+        return { type: 'heal', target: memberState, value: Math.max(1, healAmount), skillName: healSkill.name }
       }
-      // 没有伤员时，查找Buff技能
-      const buffSkill = activeSkills.find(s => s.category === 'buff')
-      if (buffSkill) {
-        const target = teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState
-        const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
-        const value = getSkillEffectValue(buffSkill, 'value', 0.1)
-        const duration = getSkillEffectValue(buffSkill, 'duration', 3)
-        return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
+    }
+  }
+
+  // 轮询机制：确保每个已装备主动技能都有释放机会
+  // _skillRotation 是一个待释放技能 ID 队列，耗尽时按 activeSkills 顺序重新填充
+  // 这样每 N 回合（N = 主动技能数）每个技能都至少被尝试一次
+  if (!Array.isArray(memberState._skillRotation) || memberState._skillRotation.length === 0) {
+    memberState._skillRotation = activeSkills.map(s => s.id)
+  }
+  // 取队首技能 ID
+  let nextSkillId = memberState._skillRotation.shift()
+  let skill = activeSkills.find(s => s.id === nextSkillId)
+  // 防御性：若 ID 找不到（装备变更等），跳过直到找到有效技能或队列耗尽
+  while (!skill && memberState._skillRotation.length > 0) {
+    nextSkillId = memberState._skillRotation.shift()
+    skill = activeSkills.find(s => s.id === nextSkillId)
+  }
+  if (!skill) return { type: 'attack' }
+
+  return buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEffectValue)
+}
+
+// 根据技能 category 构造对应的战斗 action
+// damage → skill_attack（含 side effect 如 earthquake 的减速由 effect 字段携带，executeRound 内可读取）
+// heal/buff/debuff/control/shield → 各自分支处理
+function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEffectValue) {
+  switch (skill.category) {
+    case 'damage':
+      return { type: 'skill_attack', skill, skillName: skill.name }
+    case 'heal': {
+      const healPercent = getSkillEffectValue(skill, 'healPercent', 1.0)
+      const isTeam = getSkillEffectValue(skill, 'target', 'single') === 'team'
+      // 复活技能：仅当有阵亡队友时使用，否则降级为普通攻击避免浪费回合
+      if (skill.effect?.resurrect) {
+        const deadAlly = teamStates.find(t => t.hp <= 0)
+        if (!deadAlly) return { type: 'attack' }
+        const healAmount = Math.floor((memberState.maxHP || memberState.maxHealth || 0) * healPercent)
+        return { type: 'heal', target: deadAlly, value: Math.max(1, healAmount), skillName: skill.name, isTeam: false, revive: true }
       }
-      // 既没有治疗也没有Buff，尝试攻击
-      const damageSkill = activeSkills.find(s => s.category === 'damage')
-      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-      return { type: 'attack' }
+      const woundedAllies = teamStates.filter(t => t.hp > 0 && t.hp / (t.maxHP || t.maxHealth || 1) < 0.9)
+      const target = isTeam
+        ? null
+        : (woundedAllies.sort((a, b) => (a.hp / (a.maxHP || a.maxHealth || 1)) - (b.hp / (b.maxHP || b.maxHealth || 1)))[0] || memberState)
+      const healAmount = Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
+      return { type: 'heal', target, value: Math.max(1, healAmount), skillName: skill.name, isTeam }
+    }
+    case 'buff': {
+      const stat = getSkillEffectValue(skill, 'stat', 'attack')
+      const value = getSkillEffectValue(skill, 'value', 0.1)
+      const duration = getSkillEffectValue(skill, 'duration', 3)
+      const isTeam = getSkillEffectValue(skill, 'target', 'single') === 'team'
+      const target = isTeam
+        ? null
+        : (teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState)
+      return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: skill.name, isTeam }
+    }
+    case 'debuff': {
+      const statDebuff = getSkillEffectValue(skill, 'statDebuff', 'attack')
+      const debuffValue = getSkillEffectValue(skill, 'debuffValue', -0.2)
+      const duration = getSkillEffectValue(skill, 'duration', 2)
+      return { type: 'debuff', statDebuff: statDebuff + '_down', value: debuffValue, duration, skillName: skill.name }
+    }
+    case 'control': {
+      const duration = getSkillEffectValue(skill, 'duration', 1)
+      const isStun = !!skill.effect?.stun
+      const isConfusion = !!skill.effect?.confusion
+      const chance = getSkillEffectValue(skill, 'chance', 1.0)
+      return { type: 'control', isStun, isConfusion, duration, chance, skillName: skill.name }
     }
     case 'shield': {
-      // 有队友血量危急时，优先使用护盾/防御技能
-      const weakAlly = teamStates.find(t => t.memberId !== memberState.memberId && t.hp > 0 && t.hp / (t.maxHP || 1) < 0.4)
-      if (weakAlly) {
-        const shieldSkill = activeSkills.find(s => s.category === 'shield')
-        if (shieldSkill) {
-          return { type: 'defend', target: weakAlly, value: Math.floor((memberState.defense || 0) * 0.5), duration: 2, skillName: shieldSkill.name }
-        }
-        const buffSkill = activeSkills.find(s => s.category === 'buff')
-        if (buffSkill && Math.random() < 0.5) {
-          return { type: 'buff', target: weakAlly, buffType: 'defense_up', value: 0.15, duration: 2, skillName: buffSkill.name }
-        }
-      }
-      // 查找嘲讽/控制技能
-      const controlSkill = activeSkills.find(s => s.category === 'control')
-      if (controlSkill && Math.random() < 0.3) {
-        return { type: 'skill_attack', skill: controlSkill, skillName: controlSkill.name }
-      }
-      // 否则攻击
-      const damageSkill = activeSkills.find(s => s.category === 'damage')
-      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-      return { type: 'attack' }
-    }
-    case 'tactician': {
-      // 掌阵优先释放增益Buff
-      memberState._tacticianCooldown = (memberState._tacticianCooldown || 0) - 1
-      if (memberState._tacticianCooldown > 0) {
-        const damageSkill = activeSkills.find(s => s.category === 'damage')
-        if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-        return { type: 'attack' }
-      }
-      const buffSkill = activeSkills.find(s => s.category === 'buff')
-      if (buffSkill) {
-        memberState._tacticianCooldown = 3
-        const target = teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState
-        const stat = getSkillEffectValue(buffSkill, 'stat', 'attack')
-        const value = getSkillEffectValue(buffSkill, 'value', 0.15)
-        const duration = getSkillEffectValue(buffSkill, 'duration', 3)
-        return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: buffSkill.name }
-      }
-      const damageSkill = activeSkills.find(s => s.category === 'damage')
-      if (damageSkill) return { type: 'skill_attack', skill: damageSkill, skillName: damageSkill.name }
-      return { type: 'attack' }
+      const shieldPercent = getSkillEffectValue(skill, 'shieldPercent', 1.0)
+      const duration = getSkillEffectValue(skill, 'duration', 2)
+      const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
+      return { type: 'shield', target: memberState, value: shieldValue, duration, skillName: skill.name }
     }
     default:
-      return { type: 'attack' }
+      return { type: 'skill_attack', skill, skillName: skill.name }
   }
 }
 
@@ -2609,7 +2617,19 @@ async function executeRound(effectiveZone) {
         })
       }
     } else if (action.type === 'heal') {
-      if (action.isTeam) {
+      // 复活类治疗：目标已阵亡时将其复活并恢复生命值
+      if (action.revive) {
+        const targetEntity = players.find(pl => pl.name === action.target?.name)
+        if (targetEntity && targetEntity.currentHealth <= 0) {
+          targetEntity.currentHealth = Math.min(targetEntity.stats.maxHealth, Math.max(1, Math.floor(action.value)))
+          const cs = encounter.combatStats[p.memberId]
+          if (cs) cs.playerHeal += targetEntity.currentHealth
+          // 同步复活后血量到 teamMemberStates
+          const ms = teamMemberStates.value.find(m => m.memberId === targetEntity.memberId)
+          if (ms) ms.hp = targetEntity.currentHealth
+          roundLog.push(`💫 ${p.name}施展${action.skillName || '复活'}，${targetEntity.name}复活并恢复${targetEntity.currentHealth}点气血`)
+        }
+      } else if (action.isTeam) {
         for (const pl of players) {
           if (pl.currentHealth > 0) {
             const healed = pl.heal(action.value)
@@ -2631,10 +2651,20 @@ async function executeRound(effectiveZone) {
         roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
       }
     } else if (action.type === 'buff') {
-      const targetEntity = players.find(pl => pl.name === action.target?.name) || p
-      targetEntity.addBuff({ type: action.buffType, value: action.value, duration: action.duration, source: p.name })
-      roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，${targetEntity.name}获得${action.buffType}（持续${action.duration}回合）`)
+      // 增益技能：isTeam 时给全队加 buff，否则给目标
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (action.isTeam) {
+        for (const pl of players) {
+          if (pl.currentHealth > 0) {
+            pl.addBuff({ type: action.buffType, value: action.value, duration: action.duration, source: p.name })
+          }
+        }
+        roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，全队获得${action.buffType}（持续${action.duration}回合）`)
+      } else {
+        const targetEntity = players.find(pl => pl.name === action.target?.name) || p
+        targetEntity.addBuff({ type: action.buffType, value: action.value, duration: action.duration, source: p.name })
+        roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，${targetEntity.name}获得${action.buffType}（持续${action.duration}回合）`)
+      }
       if (isBossFight && action.skillName) {
         roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
       }
@@ -2642,6 +2672,45 @@ async function executeRound(effectiveZone) {
       const targetEntity = players.find(pl => pl.name === action.target?.name) || p
       targetEntity.addBuff({ type: 'defense_up', value: action.value, duration: action.duration, source: p.name })
       roundLog.push(`🛡️ ${p.name}施展${action.skillName || '防御'}，为${targetEntity.name}展开防御姿态，防御提升`)
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
+    } else if (action.type === 'debuff') {
+      // 减益技能：给敌人施加属性降低效果
+      enemy.addBuff({ type: action.statDebuff, value: action.value, duration: action.duration, source: p.name })
+      const debuffNameMap = { attack_down: '攻击', defense_down: '防御', speed_down: '速度', critRate_down: '暴击率', dodgeRate_down: '闪避率' }
+      const debuffName = debuffNameMap[action.statDebuff] || action.statDebuff.replace('_down', '')
+      roundLog.push(`💀 ${p.name}施展${action.skillName || '减益'}，敌人${debuffName}降低（持续${action.duration}回合）`)
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
+    } else if (action.type === 'control') {
+      // 控制技能：眩晕 / 混乱（受概率判定）
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (Math.random() <= (action.chance != null ? action.chance : 1.0)) {
+        if (action.isStun) {
+          enemy.addBuff({ type: 'stun', value: 0, duration: action.duration, source: p.name })
+          roundLog.push(`🔮 ${p.name}施展${action.skillName || '控制'}，敌人被眩晕（持续${action.duration}回合）`)
+        } else if (action.isConfusion) {
+          enemy.addBuff({ type: 'confusion', value: 0, duration: action.duration, source: p.name })
+          roundLog.push(`🔮 ${p.name}施展${action.skillName || '控制'}，敌人陷入混乱（持续${action.duration}回合）`)
+        } else {
+          enemy.addBuff({ type: 'stun', value: 0, duration: action.duration, source: p.name })
+          roundLog.push(`🔮 ${p.name}施展${action.skillName || '控制'}，敌人被控制（持续${action.duration}回合）`)
+        }
+      } else {
+        roundLog.push(`🔮 ${p.name}施展${action.skillName || '控制'}，但被敌人抵抗了`)
+      }
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
+    } else if (action.type === 'shield') {
+      // 护盾技能：给目标添加护盾 buff（吸收伤害）
+      const targetEntity = players.find(pl => pl.name === action.target?.name) || p
+      targetEntity.addBuff({ type: 'shield', value: action.value, duration: action.duration, source: p.name })
+      roundLog.push(`🛡️ ${p.name}施展${action.skillName || '护盾'}，为${targetEntity.name}添加${action.value}点护盾（持续${action.duration}回合）`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
         roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
@@ -3477,6 +3546,28 @@ function buildTeamMemberState(member, s) {
     memberSkills = getInitialSkills(member.role)
     member.skills = memberSkills
   }
+  // 防御性去重：清理老存档遗留的重复技能（如初始/突破重叠产生的两套相同技能）
+  memberSkills = deduplicateSkills(memberSkills)
+  member.skills = memberSkills
+
+  // 老存档迁移：初始化 equippedSkills，默认装备前 3 个主动技能
+  if (!Array.isArray(member.equippedSkills)) {
+    const initialActives = memberSkills.filter(s => s.type === 'active').slice(0, 3)
+    member.equippedSkills = initialActives.map(s => s.id)
+  }
+  // 过滤 equippedSkills 中无效的 ID（已不存在的技能），保留 null 占位以维持槽位结构
+  // 注意：不能 filter 掉 null，否则槽位位置会错位（如 [skill1, null, skill3] 会变成 [skill1, skill3]）
+  const validEquippedIds = member.equippedSkills.map(id =>
+    (id != null && memberSkills.some(s => s.id === id)) ? id : null
+  )
+  member.equippedSkills = validEquippedIds
+
+  // 战斗中可用的技能：已装备的主动技能 + 所有被动技能
+  // 这样 AI 只会释放玩家装备的主动技能，被动技能保留供属性/特效查询
+  const equippedActiveIds = validEquippedIds.filter(id => id != null)
+  const combatSkills = memberSkills.filter(s =>
+    s.type === 'passive' || (s.type === 'active' && equippedActiveIds.includes(s.id))
+  )
 
   return {
     memberId: member.id,
@@ -3489,7 +3580,7 @@ function buildTeamMemberState(member, s) {
     damage: finalAttack,
     defense: finalDefense,
     speed: finalSpeed,
-    skills: memberSkills,
+    skills: combatSkills,
     buildStrength: s.getCharacterBuildStrength(member)
   }
 }

@@ -523,14 +523,32 @@ export const getSkillSchoolByRole = (role) => {
 export const getInitialSkills = (role) => {
   const school = getSkillSchoolByRole(role)
   const schoolSkills = skills[school] || []
-  return schoolSkills.filter(s => s.level <= 1).map(s => ({ ...s }))
+  // 仅取 level === 1 的技能（每流派初始 2 个），避免与突破技能重叠
+  return schoolSkills.filter(s => s.level === 1).map(s => ({ ...s }))
 }
 
 export const getSkillsForBreakthrough = (role, breakThrough) => {
   const school = getSkillSchoolByRole(role)
   const schoolSkills = skills[school] || []
-  const targetLevel = breakThrough
+  // 修复重复技能 bug：突破 N 次 → 给 level N+1 的技能
+  // 初始 breakThrough=0 时已有 level 1 技能，突破到 1 时给 level 2，避免重叠
+  // 突破到 5 时给 level 6（不存在，返回空数组，本次突破不再加技能，仅属性成长）
+  const targetLevel = breakThrough + 1
   return schoolSkills.filter(s => s.level === targetLevel).map(s => ({ ...s }))
+}
+
+// 按 skill.id 去重，用于清理老存档中已存在的重复技能
+export const deduplicateSkills = (skillList) => {
+  if (!Array.isArray(skillList)) return []
+  const seen = new Set()
+  const result = []
+  for (const s of skillList) {
+    if (!s || !s.id) continue
+    if (seen.has(s.id)) continue
+    seen.add(s.id)
+    result.push(s)
+  }
+  return result
 }
 
 export const getSkillById = (skillId) => {

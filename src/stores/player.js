@@ -8,7 +8,7 @@ import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEq
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
 import { petNameParts } from '../plugins/gacha'
-import { getSkillsForBreakthrough } from '../plugins/skills'
+import { getSkillsForBreakthrough, deduplicateSkills, getInitialSkills } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS, getBossMaterialBaseValue } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
@@ -3281,6 +3281,17 @@ export const usePlayerStore = defineStore('player', {
           essence: essenceAmount
         }
       }
+      // 初始化技能装备槽（3 槽位）：默认装备前 3 个主动技能
+      // 被动技能不需要装备，自动生效；只有主动技能需要装备到槽位才能在战斗中释放
+      const SKILL_SLOT_COUNT = 3
+      if (Array.isArray(character.skills) && !Array.isArray(character.equippedSkills)) {
+        character.equippedSkills = character.skills
+          .filter(s => s.type === 'active')
+          .slice(0, SKILL_SLOT_COUNT)
+          .map(s => s.id)
+      } else if (!Array.isArray(character.equippedSkills)) {
+        character.equippedSkills = []
+      }
       this.sectMembers.push(character)
       this.queueSave()
       return { success: true, message: `成功招募${character.name}加入宗门！` }
@@ -3320,10 +3331,71 @@ export const usePlayerStore = defineStore('player', {
       const newSkills = getSkillsForBreakthrough(member.role, member.breakThrough)
       if (newSkills.length > 0) {
         if (!member.skills) member.skills = []
-        member.skills.push(...newSkills)
+        // 修复重复技能 bug：push 前按 skill.id 去重，避免老存档已有重复 + 新突破再叠加
+        member.skills = deduplicateSkills(member.skills)
+        // 过滤掉 member.skills 中已存在的 id（防御性二次保险）
+        const existingIds = new Set(member.skills.map(s => s.id))
+        const toAdd = newSkills.filter(s => !existingIds.has(s.id))
+        member.skills.push(...toAdd)
+        // 自动装备新获得的主动技能（如果 equippedSkills 还有空槽位）
+        const SKILL_SLOT_COUNT = 3
+        if (!Array.isArray(member.equippedSkills)) member.equippedSkills = []
+        for (const s of toAdd) {
+          if (s.type === 'active' && member.equippedSkills.length < SKILL_SLOT_COUNT && !member.equippedSkills.includes(s.id)) {
+            member.equippedSkills.push(s.id)
+          }
+        }
       }
       this.queueSave()
       return { success: true, message: `${member.name} 突破成功（${member.breakThrough}/5）`, breakThrough: member.breakThrough }
+    },
+    // 装备/卸下技能：玩家选择 3 个主动技能槽位
+    // slotIndex: 0/1/2，skillId: 要装备的 skill.id（必须是 member.skills 中已学的主动技能）
+    // 若该 skillId 已装备在其他槽位，会先从原槽位移除（确保同一技能不重复装备）
+    equipSkill(memberId, slotIndex, skillId) {
+      const SKILL_SLOT_COUNT = 3
+      if (slotIndex < 0 || slotIndex >= SKILL_SLOT_COUNT) {
+        return { success: false, message: '槽位无效' }
+      }
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!Array.isArray(member.skills)) member.skills = []
+      if (!Array.isArray(member.equippedSkills)) {
+        member.equippedSkills = []
+      }
+      // 校验 skillId 是该角色已学的主动技能
+      const skill = member.skills.find(s => s.id === skillId)
+      if (!skill) return { success: false, message: '未学习该技能' }
+      if (skill.type !== 'active') return { success: false, message: '仅主动技能可装备' }
+      // 确保 equippedSkills 长度至少 3（用 null 填充空槽）
+      while (member.equippedSkills.length < SKILL_SLOT_COUNT) member.equippedSkills.push(null)
+      // 若该 skillId 已在其他槽位，先清空原槽位（避免重复装备）
+      for (let i = 0; i < SKILL_SLOT_COUNT; i++) {
+        if (member.equippedSkills[i] === skillId && i !== slotIndex) {
+          member.equippedSkills[i] = null
+        }
+      }
+      // 装备到目标槽位
+      member.equippedSkills[slotIndex] = skillId
+      // 清理末尾的 null（保持数组紧凑，但保留中间的 null 表示空槽）
+      // 实际上保留 null 更便于 UI 显示空槽位，这里清理末尾的 null
+      while (member.equippedSkills.length > 0 && member.equippedSkills[member.equippedSkills.length - 1] === null) {
+        member.equippedSkills.pop()
+      }
+      this.queueSave()
+      return { success: true, message: `已装备技能：${skill.name}` }
+    },
+    // 卸下技能（清空某槽位）
+    unequipSkill(memberId, slotIndex) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      if (!Array.isArray(member.equippedSkills)) return { success: false, message: '无装备技能' }
+      if (slotIndex < 0 || slotIndex >= member.equippedSkills.length) {
+        return { success: false, message: '槽位无效' }
+      }
+      member.equippedSkills[slotIndex] = null
+      this.queueSave()
+      return { success: true, message: '已卸下技能' }
     },
     // 从宗门移除成员
     removeSectMember(memberId) {
