@@ -57,7 +57,7 @@
 </template>
 
 <script setup>
-import { ref, watch, computed, onUnmounted } from 'vue'
+import { ref, watch, computed, nextTick, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
@@ -147,8 +147,15 @@ function getComboTier(count) {
 function bumpCombo() {
   currentCombo++
   const tier = getComboTier(currentCombo)
-  comboLabel.value = tier.label
-  comboClass.value = tier.class
+  // 关键：先清空 comboLabel，让旧 .kill-combo 节点（v-if=false）立即卸载
+  // 避免旧节点响应式更新为新文案字符后，与新节点短暂共存导致"两组不同文字同时显示"
+  // 然后 nextTick 设置新值，此时旧节点已从 DOM 移除，新节点才创建
+  comboLabel.value = ''
+  comboClass.value = ''
+  nextTick(() => {
+    comboLabel.value = tier.label
+    comboClass.value = tier.class
+  })
   // 重置连击窗口计时器
   if (comboTimerId) clearTimeout(comboTimerId)
   comboTimerId = setTimeout(() => {
@@ -503,16 +510,18 @@ const onPetAnimEnd = () => {
    内层 .combo-char：仅负责逐字砸入出现（纯 translateY+opacity，无 scale/blur 避免残影） */
 .kill-combo {
   position: absolute;
-  /* 屏幕顶部居中：立绘 max-height 68vh，顶部约在 16vh
-     连击文字 top:4%，文字高度约 6vh，底部约 10vh < 16vh，不与立绘重叠 */
-  top: 4%;
+  /* 中间偏下显示：用户要求此位置，立绘贴顶后下方空间充足
+     top:58% = 58vh，文字高度约 8vh，底部约 66vh，立绘底部约 56vh，留有空隙不重叠
+     且此处不遮挡立绘主体，玩家也看得清 */
+  top: 58%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
   flex-wrap: nowrap;
   justify-content: center;
-  /* 字间距用 gap 统一控制，不用 letter-spacing（letter-spacing 会在末字后也加间距导致偏移） */
-  gap: 6px;
+  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒，gap 太小相邻字笔画会侵入重叠
+     60px 字号下 18px gap 约留出 1/3 字宽的安全间距 */
+  gap: 18px;
   white-space: nowrap;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
      注意：外层 transform 是静态值（translateX(-50%)），不在动画中改变，不会与内层叠加
@@ -532,9 +541,11 @@ const onPetAnimEnd = () => {
   /* 字号由 --combo-font-size CSS 变量控制（JS 根据字数动态计算） */
   font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
-  /* 不用 letter-spacing，间距由外层 gap 统一控制，避免末字多余间距 */
   letter-spacing: 0;
-  line-height: 1;
+  /* line-height 必须 >1：Ma Shan Zheng 毛笔字字形上下溢出字号盒
+     line-height:1 会让上下笔画侵入相邻行/字区域，造成视觉重叠
+     1.4 给字形留足安全空间 */
+  line-height: 1.4;
   opacity: 0;
   /* 逐字砸入：纯 translateY + opacity，绝对不产生 scale/blur 残影
      每字 0.45s 完成，间隔 0.18s */
