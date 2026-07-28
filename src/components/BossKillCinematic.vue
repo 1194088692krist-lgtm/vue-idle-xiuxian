@@ -128,25 +128,23 @@ watch(bossKillEvent, (evt) => {
   if (!playerStore.bossKillAnimation) return
 
   // ===== 人物立绘来源 =====
-  // 优先使用事件中的 killerMemberId（实际斩杀者）
-  // 斩杀者无法确定时，从存活队伍成员中随机选一个（兜底）
+  // 从存活队伍成员中随机选一个，确保平均分布（每人 ~33%）
+  // 旧实现优先使用 killerMemberId（实际斩杀者），但实际斩杀者往往是同一角色
+  // （最强DPS每次都补刀），导致 9/10 次都显示同一角色，无法看到其他角色的击杀立绘。
+  // 改为纯随机：三个角色都设了击杀立绘，随机播放才能让玩家都看到。
   let member = null
-  const killerId = evt.killerMemberId
-  if (killerId) {
-    // killerId 在 useIdleSystem 中等于 member.id（entity.memberId = member.id）
-    member = playerStore.sectMembers.find(m => m.id === killerId)
-      || playerStore.sectMembers.find(m => (m.templateId || m.id) === killerId)
-  }
-  if (!member) {
-    // 兜底：从队伍存活成员中随机选一个
-    if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
-      const aliveMembers = playerStore.teamMembers
-        .map(id => playerStore.sectMembers.find(m => m.id === id))
-        .filter(m => m && m.id)
-      if (aliveMembers.length > 0) {
-        member = aliveMembers[Math.floor(Math.random() * aliveMembers.length)]
-      }
+  if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
+    const aliveMembers = playerStore.teamMembers
+      .map(id => playerStore.sectMembers.find(m => m.id === id))
+      .filter(m => m && m.id)
+    if (aliveMembers.length > 0) {
+      member = aliveMembers[Math.floor(Math.random() * aliveMembers.length)]
     }
+  }
+  // 兜底：队伍为空时尝试用事件中的 killerMemberId
+  if (!member && evt.killerMemberId) {
+    member = playerStore.sectMembers.find(m => m.id === evt.killerMemberId)
+      || playerStore.sectMembers.find(m => (m.templateId || m.id) === evt.killerMemberId)
   }
   if (!member) return
 
@@ -183,7 +181,7 @@ watch(bossKillEvent, (evt) => {
   petPortraitUrl.value = null
 
   portraitUrl.value = url
-  killerName.value = evt.killerName || member.name || ''
+  killerName.value = member.name || ''
   bossName.value = evt.bossName || ''
   animKey.value++
   show.value = true
