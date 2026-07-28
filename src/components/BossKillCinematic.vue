@@ -23,12 +23,17 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
+      <!-- 连击特效：Double Kill / Triple Kill 等 -->
+      <div v-if="comboLabel" class="kill-combo" :class="comboClass">
+        <span class="combo-text">{{ comboLabel }}</span>
+        <span v-if="comboCount > 1" class="combo-count">×{{ comboCount }}</span>
+      </div>
     </div>
   </teleport>
 </template>
 
 <script setup>
-import { ref, watch, nextTick } from 'vue'
+import { ref, watch, nextTick, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
@@ -40,6 +45,51 @@ const show = ref(false)
 const portraitUrl = ref(null)
 const killerName = ref('')
 const bossName = ref('')
+const comboLabel = ref('')
+const comboClass = ref('')
+const comboCount = ref(0)
+
+// ===== 连击系统 =====
+// 连击窗口：每次击杀BOSS后 12 秒内再次击杀则连击+1，超时重置
+const COMBO_WINDOW_MS = 12000
+let comboTimerId = null
+let currentCombo = 0
+
+// 连击等级表：根据连续击杀数返回标签与样式类
+function getComboTier(count) {
+  if (count < 2) return { label: '', class: '' }
+  if (count === 2) return { label: 'DOUBLE KILL', class: 'combo-double' }
+  if (count === 3) return { label: 'TRIPLE KILL', class: 'combo-triple' }
+  if (count === 4) return { label: 'QUADRA KILL', class: 'combo-quadra' }
+  if (count === 5) return { label: 'PENTA KILL', class: 'combo-penta' }
+  if (count === 6) return { label: 'KILLING SPREE', class: 'combo-spree' }
+  if (count === 7) return { label: 'RAMPAGE', class: 'combo-rampage' }
+  if (count === 8) return { label: 'UNSTOPPABLE', class: 'combo-unstoppable' }
+  if (count === 9) return { label: 'DOMINATING', class: 'combo-dominating' }
+  if (count === 10) return { label: 'GODLIKE', class: 'combo-godlike' }
+  return { label: 'LEGENDARY', class: 'combo-legendary' }
+}
+
+function bumpCombo() {
+  currentCombo++
+  const tier = getComboTier(currentCombo)
+  comboLabel.value = tier.label
+  comboClass.value = tier.class
+  comboCount.value = currentCombo
+  // 重置连击窗口计时器
+  if (comboTimerId) clearTimeout(comboTimerId)
+  comboTimerId = setTimeout(() => {
+    currentCombo = 0
+    comboLabel.value = ''
+    comboClass.value = ''
+    comboCount.value = 0
+    comboTimerId = null
+  }, COMBO_WINDOW_MS)
+}
+
+onUnmounted(() => {
+  if (comboTimerId) clearTimeout(comboTimerId)
+})
 
 // 监听击杀事件，触发立绘突入动画
 watch(bossKillEvent, (evt) => {
@@ -47,22 +97,16 @@ watch(bossKillEvent, (evt) => {
   // 设置开关关闭则不触发
   if (!playerStore.bossKillAnimation) return
 
-  // 立绘来源角色选择：
-  // 1. 若用户在立绘弹窗设置了 bossKillCharacterId，优先用该固定角色
-  // 2. 否则跟随斩杀者（致命一击者），找不到则随机队伍成员（避免总是第一人）
+  // 立绘来源：随机播放三人中的一个（用户可为每个角色指定立绘）
+  // 优先使用 bossKillCharacterId 固定角色；否则从队伍存活成员中随机选
   let member = null
   const fixedCharId = playerStore.bossKillCharacterId
   if (fixedCharId) {
     member = playerStore.sectMembers.find(m => (m.templateId || m.id) === fixedCharId)
   }
   if (!member) {
-    // 跟随斩杀者（致命一击者）
-    const memberId = evt.killerMemberId
-    if (memberId) {
-      member = playerStore.sectMembers.find(m => m.id === memberId)
-    }
-    // 兜底：从存活队伍成员中随机选一个（避免总是第一人）
-    if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
+    // 从队伍存活成员中随机选一个
+    if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
       const aliveMembers = playerStore.teamMembers
         .map(id => playerStore.sectMembers.find(m => m.id === id))
         .filter(m => m && m.id)
@@ -78,13 +122,15 @@ watch(bossKillEvent, (evt) => {
   let url = null
   if (skinIdx > 0) {
     const skinCount = getSkinCount(member)
-    // 指定皮肤不存在（角色没那么多皮肤）则回退原立绘
     if (skinIdx <= skinCount) {
       url = getCharacterSkinUrl(member, skinIdx)
     }
   }
   if (!url) url = getCharacterAvatar(member, 'full')
   if (!url) return
+
+  // 触发连击计数
+  bumpCombo()
 
   // 多场连打时（手动BOSS挑战count>1），上一次动画可能还在播放
   // 先重置 show 让 <img> 卸载，nextTick 后再设 true 重新触发 CSS animation
@@ -240,6 +286,69 @@ const onAnimationEnd = () => {
   40% { opacity: 1; transform: translateY(0); }
   75% { opacity: 1; }
   100% { opacity: 0; transform: translateY(-10px); }
+}
+
+/* ===== 连击特效 ===== */
+/* 位置：屏幕右上角，从右侧滑入后弹跳停留，再淡出消失 */
+.kill-combo {
+  position: absolute;
+  top: 18%;
+  right: 8%;
+  display: flex;
+  align-items: baseline;
+  gap: 8px;
+  opacity: 0;
+  animation: combo-in 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  text-shadow: 0 0 16px currentColor, 0 0 32px currentColor, 0 2px 6px rgba(0, 0, 0, 0.9);
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+}
+.combo-text {
+  font-size: 42px;
+  font-weight: 900;
+  letter-spacing: 2px;
+  font-style: italic;
+}
+.combo-count {
+  font-size: 28px;
+  font-weight: 700;
+  opacity: 0.9;
+}
+@keyframes combo-in {
+  0% { opacity: 0; transform: translateX(80px) scale(0.3) rotate(-10deg); }
+  25% { opacity: 1; transform: translateX(0) scale(1.3) rotate(3deg); }
+  40% { transform: translateX(0) scale(1) rotate(-2deg); }
+  55% { transform: translateX(0) scale(1.1) rotate(1deg); }
+  70% { transform: translateX(0) scale(1) rotate(0deg); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(40px) scale(0.8) rotate(5deg); }
+}
+
+/* 连击等级配色：从蓝→紫→金→红，强度递增 */
+.combo-double { color: #4FC3F7; }        /* 浅蓝 */
+.combo-triple { color: #BA68C8; }         /* 紫 */
+.combo-quadra { color: #FFB300; }         /* 金橙 */
+.combo-penta { color: #FF6E40; }          /* 橙红 */
+.combo-spree { color: #FF5252; }          /* 红 */
+.combo-rampage { color: #FF1744; }        /* 深红 */
+.combo-unstoppable { color: #D500F9; }    /* 品红 */
+.combo-dominating { color: #00E5FF; }     /* 青蓝 */
+.combo-godlike { color: #FFD600; }        /* 金黄 */
+.combo-legendary {
+  color: #FFD600;
+  animation: combo-in-legendary 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards, legendary-glow 0.8s ease-in-out infinite alternate 1.8s;
+}
+@keyframes legendary-glow {
+  0% { text-shadow: 0 0 16px #FFD600, 0 0 32px #FF6E40, 0 2px 6px rgba(0,0,0,0.9); }
+  100% { text-shadow: 0 0 28px #FFD600, 0 0 56px #FF1744, 0 0 84px #D500F9, 0 2px 6px rgba(0,0,0,0.9); }
+}
+@keyframes combo-in-legendary {
+  0% { opacity: 0; transform: translateX(80px) scale(0.3) rotate(-10deg); }
+  25% { opacity: 1; transform: translateX(0) scale(1.4) rotate(3deg); }
+  40% { transform: translateX(0) scale(1) rotate(-2deg); }
+  55% { transform: translateX(0) scale(1.15) rotate(1deg); }
+  70% { transform: translateX(0) scale(1) rotate(0deg); }
+  85% { opacity: 1; }
+  100% { opacity: 0; transform: translateX(40px) scale(0.8) rotate(5deg); }
 }
 
 /* 尊重无障碍：减弱动画偏好下不播放演出 */
