@@ -514,20 +514,21 @@ export const usePlayerStore = defineStore('player', {
                   m.maxExperience = Math.floor(m.maxExperience)
                 }
               })
-              // 迁移：技能系统从 5 流派(role-based)重构为 10 元素宗派(school-based)
-              // 检测老技能ID前缀(wg_/as_/hl_/gd_/tc_)，按角色 skillSchool 重新分配新技能
-              const OLD_SKILL_PREFIXES = ['wg_', 'as_', 'hl_', 'gd_', 'tc_']
+              // 迁移：技能系统从单维度(school)重构为双维度(school+role)
+              // 检测非新格式({school}_{role}_N)的老技能，按角色 skillSchool+role 重新分配新技能
               for (const m of this.sectMembers) {
                 if (!m) continue
                 const memberSchool = m.skillSchool || m.school || 'sword'
+                const memberRole = m.role || 'vanguard'
+                const NEW_SKILL_ID_PATTERN = new RegExp(`^${memberSchool}_${memberRole}_\\d+$`)
                 const hasOldSkills = Array.isArray(m.skills) && m.skills.some(s =>
-                  s && s.id && OLD_SKILL_PREFIXES.some(p => s.id.startsWith(p))
+                  s && s.id && !NEW_SKILL_ID_PATTERN.test(s.id)
                 )
                 if (hasOldSkills || !Array.isArray(m.skills) || m.skills.length === 0) {
-                  // 按角色宗门重新分配：初始技能 + 已突破等级对应的所有技能
-                  const newSkills = getInitialSkills(memberSchool)
+                  // 按角色宗门+定位重新分配：初始技能 + 已突破等级对应的所有技能
+                  const newSkills = getInitialSkills(memberSchool, memberRole)
                   for (let bt = 1; bt <= (m.breakThrough || 0); bt++) {
-                    const btSkills = getSkillsForBreakthrough(memberSchool, bt)
+                    const btSkills = getSkillsForBreakthrough(memberSchool, memberRole, bt)
                     newSkills.push(...btSkills)
                   }
                   m.skills = deduplicateSkills(newSkills)
@@ -3369,9 +3370,10 @@ export const usePlayerStore = defineStore('player', {
       growAttr(member.combatAttributes)
       growAttr(member.combatResistance)
       growAttr(member.specialAttributes)
-      // 突破获得新技能（每突破一次获得2个，按角色 school 分配）
+      // 突破获得新技能（每突破一次获得2个，按角色 school+role 分配）
       const memberSchool = member.school || member.skillSchool || 'sword'
-      const newSkills = getSkillsForBreakthrough(memberSchool, member.breakThrough)
+      const memberRole = member.role || 'vanguard'
+      const newSkills = getSkillsForBreakthrough(memberSchool, memberRole, member.breakThrough)
       if (newSkills.length > 0) {
         if (!member.skills) member.skills = []
         // 修复重复技能 bug：push 前按 skill.id 去重，避免老存档已有重复 + 新突破再叠加

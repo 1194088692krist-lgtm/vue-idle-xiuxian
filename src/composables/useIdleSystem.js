@@ -3541,18 +3541,19 @@ function buildTeamMemberState(member, s) {
   }
 
   // 确保角色有技能（兼容旧存档）
-  // 迁移：检测老技能ID前缀(wg_/as_/hl_/gd_/tc_)，替换为基于 school 的新技能
-  const OLD_SKILL_PREFIXES = ['wg_', 'as_', 'hl_', 'gd_', 'tc_']
+  // 迁移：检测非新格式({school}_{role}_N)的老技能，替换为基于 school+role 的新技能
   const memberSchool = getSkillSchoolByCharacter(member)
+  const memberRole = member.role || 'vanguard'
+  const NEW_SKILL_ID_PATTERN = new RegExp(`^${memberSchool}_${memberRole}_\\d+$`)
   let memberSkills = member.skills
   const hasOldSkills = Array.isArray(memberSkills) && memberSkills.some(s =>
-    s && s.id && OLD_SKILL_PREFIXES.some(p => s.id.startsWith(p))
+    s && s.id && !NEW_SKILL_ID_PATTERN.test(s.id)
   )
   if (hasOldSkills || !memberSkills || memberSkills.length === 0) {
-    // 按角色 school 重新分配技能：初始技能 + 已突破等级对应的所有技能
-    memberSkills = getInitialSkills(memberSchool)
+    // 按角色 school+role 重新分配技能：初始技能 + 已突破等级对应的所有技能
+    memberSkills = getInitialSkills(memberSchool, memberRole)
     for (let bt = 1; bt <= (member.breakThrough || 0); bt++) {
-      const btSkills = getSkillsForBreakthrough(memberSchool, bt)
+      const btSkills = getSkillsForBreakthrough(memberSchool, memberRole, bt)
       memberSkills.push(...btSkills)
     }
     member.skills = memberSkills

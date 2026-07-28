@@ -407,7 +407,7 @@ export function generateCharacterById(charId) {
     skillSchool: template.school || 'sword',
     skillSchoolName: skillSchools[template.school || 'sword']?.name || '',
     skillSchoolIcon: skillSchools[template.school || 'sword']?.icon || '',
-    skills: getInitialSkills(template.school || 'sword'),
+    skills: getInitialSkills(template.school || 'sword', template.role || 'vanguard'),
     level: 1,
     experience: 0,
     maxExperience: 100,
