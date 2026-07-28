@@ -472,13 +472,14 @@ const onPetAnimEnd = () => {
 }
 
 /* 人物立绘主体：左下突入→中心旋转顿帧→右上消失，纯 transform+opacity 走 GPU 合成层 */
+/* 性能优化：移除 filter:drop-shadow（旋转时持续重绘），改用外层 .kill-portrait-wrap 的
+   box-shadow 光晕叠加，避免每帧 Paint */
 .kill-portrait {
   position: relative;
   width: min(60vw, 440px);
   max-height: 72vh; /* 正居中显示，占据中心区域 */
   object-fit: contain;
   border-radius: 12px;
-  filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.7));
   animation: boss-slash 3.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
   will-change: transform, opacity;
 }
@@ -511,7 +512,6 @@ const onPetAnimEnd = () => {
   max-height: 60vh;
   object-fit: contain;
   border-radius: 12px;
-  filter: drop-shadow(0 0 20px rgba(120, 220, 100, 0.7));
   animation: pet-slash 3.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
   will-change: transform, opacity;
   /* 偏右下角定位，避免与人物立绘在中心位置完全重叠 */

@@ -76,7 +76,7 @@
       <div v-else-if="skillFx === 'star'" :key="`fx-${animKey}`" class="fx-star" :style="{ '--c': skillColor }">
         <div class="star-rays">
           <div v-for="i in 8" :key="i" class="star-ray"
-            :style="{ transform: `translate(-50%, -100%) rotate(${(i - 1) * 45}deg)`, background: `linear-gradient(to top, transparent, ${skillColor})`, animationDelay: `${(i - 1) * 0.05}s` }"></div>
+            :style="{ '--rot': `${(i - 1) * 45}deg`, background: `linear-gradient(to top, transparent, ${skillColor})`, animationDelay: `${(i - 1) * 0.05}s` }"></div>
         </div>
         <div class="star-core" :style="{ background: glowBg }"></div>
       </div>
@@ -442,10 +442,11 @@ onUnmounted(() => {
   position: absolute;
   bottom: 0;
   width: 3px;
-  height: 0;
+  height: 55vh;
   background: var(--c);
   opacity: 0;
   transform-origin: bottom;
+  transform: scaleY(0);
   animation: vine-grow 1.6s ease-out forwards;
   will-change: opacity, transform;
 }
@@ -460,10 +461,10 @@ onUnmounted(() => {
   animation: leaf-bloom 0.5s ease-out 1s forwards;
 }
 @keyframes vine-grow {
-  0% { opacity: 0; height: 0; }
+  0% { opacity: 0; transform: scaleY(0); }
   20% { opacity: 1; }
-  70% { opacity: 1; height: 55vh; }
-  100% { opacity: 0; height: 55vh; }
+  70% { opacity: 1; transform: scaleY(1); }
+  100% { opacity: 0; transform: scaleY(1); }
 }
 @keyframes leaf-bloom {
   0% { opacity: 0; transform: scale(0) rotate(0); }
@@ -510,19 +511,21 @@ onUnmounted(() => {
   position: absolute;
   bottom: 0;
   width: 0;
-  height: 0;
+  height: 35vh;
   border-left: 18px solid transparent;
   border-right: 18px solid transparent;
-  border-bottom: 0 solid var(--c);
+  border-bottom: 35vh solid var(--c);
   opacity: 0;
+  transform-origin: bottom;
+  transform: scaleY(0);
   animation: spike-rise 1.2s ease-out forwards;
   will-change: opacity, transform;
 }
 @keyframes spike-rise {
-  0% { opacity: 0; border-bottom-width: 0; transform: translateY(20px); }
+  0% { opacity: 0; transform: scaleY(0) translateY(20px); }
   30% { opacity: 1; }
-  60% { opacity: 1; border-bottom-width: 35vh; transform: translateY(0); }
-  100% { opacity: 0; border-bottom-width: 35vh; transform: translateY(-10px); }
+  60% { opacity: 1; transform: scaleY(1) translateY(0); }
+  100% { opacity: 0; transform: scaleY(1) translateY(-10px); }
 }
 
 /* 风系：旋转龙卷风圈（4 层椭圆环旋转） */
@@ -585,16 +588,17 @@ onUnmounted(() => {
   top: 0;
   left: 0;
   width: 3px;
-  height: 0;
+  height: 50vmin;
   transform-origin: bottom center;
+  transform: translate(-50%, -100%) rotate(var(--rot, 0deg)) scaleY(0);
   opacity: 0;
   animation: star-ray-anim 0.8s ease-out forwards;
   will-change: opacity, transform;
 }
 @keyframes star-ray-anim {
-  0% { opacity: 0; height: 0; }
-  40% { opacity: 1; height: 35vmin; }
-  100% { opacity: 0; height: 50vmin; }
+  0% { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rot, 0deg)) scaleY(0); }
+  40% { opacity: 1; transform: translate(-50%, -100%) rotate(var(--rot, 0deg)) scaleY(0.7); }
+  100% { opacity: 0; transform: translate(-50%, -100%) rotate(var(--rot, 0deg)) scaleY(1); }
 }
 .star-core {
   position: absolute;
