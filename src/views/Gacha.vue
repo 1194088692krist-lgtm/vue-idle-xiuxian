@@ -312,7 +312,9 @@
     spirit_stone: '灵石',
     reinforce_stone: '强化石',
     refinement_stone: '洗练石',
-    pet_essence: '灵宠精华'
+    pet_essence: '灵宠精华',
+    pet_fragment: '灵宠碎片',
+    phantom_crystal: '幻灵结晶'
   }
 
   // 新手福利领取：20,000 幻灵结晶 + 10,000 灵石
@@ -362,6 +364,12 @@
         case 'pet_essence':
           playerStore.petEssence += item.amount
           break
+        case 'pet_fragment':
+          playerStore.petFragments += item.amount
+          break
+        case 'phantom_crystal':
+          playerStore.phantomCrystals += item.amount
+          break
       }
     }
   }
@@ -385,19 +393,35 @@
     playerStore.phantomCrystals -= cost
     // 人物池/综合池：传入持久化保底计数
     const isCharPool = currentPool.value === 'character' || currentPool.value === 'all'
+    const isPetPool = currentPool.value === 'pet'
     const pityState = isCharPool
       ? { fiveStarPity: playerStore.gachaFiveStarPity, fourStarPity: playerStore.gachaFourStarPity }
-      : null
-    const result = doGacha(currentPool.value, playerStore.level, pityState)
+      : (isPetPool ? { petPity: playerStore.petGachaPity } : null)
+    // 灵宠池单抽走专用逻辑（限制出灵宠概率、10%仙品、累计保底）；其他池走通用单抽
+    let result
+    if (isPetPool) {
+      const petResults = doPetPoolMultiGacha(1, playerStore.level, pityState)
+      result = petResults[0]
+    } else {
+      result = doGacha(currentPool.value, playerStore.level, pityState)
+    }
     if (!result) return
     // 同步回 store
     if (isCharPool && pityState) {
       playerStore.gachaFiveStarPity = pityState.fiveStarPity
       playerStore.gachaFourStarPity = pityState.fourStarPity
+    } else if (isPetPool && pityState) {
+      playerStore.petGachaPity = pityState.petPity
     }
     grantReward(result)
     gachaResults.value = [result]
-    showMessage('success', `祈福获得：${getRewardName(result)}`)
+    // 灵宠池单抽保底进度提示
+    let singleHint = ''
+    if (isPetPool) {
+      const pp = playerStore.petGachaPity
+      if (pp >= 3) singleHint = `（仙品保底${5 - pp}抽）`
+    }
+    showMessage('success', `祈福获得：${getRewardName(result)}${singleHint}`)
     // 抽到4星/5星人物自动弹出立绘
     if (result.category === 'character' && result.item.star >= 4) {
       selectedCharacter.value = result.item
@@ -456,6 +480,8 @@
     if (summary.reinforce_stone) parts.push(`强化石奖励×${summary.reinforce_stone}`)
     if (summary.refinement_stone) parts.push(`洗练石奖励×${summary.refinement_stone}`)
     if (summary.pet_essence) parts.push(`灵宠精华奖励×${summary.pet_essence}`)
+    if (summary.pet_fragment) parts.push(`灵宠碎片奖励×${summary.pet_fragment}`)
+    if (summary.phantom_crystal) parts.push(`幻灵结晶奖励×${summary.phantom_crystal}`)
     // 提示保底进度
     let pityHint = ''
     if (isCharPool) {
