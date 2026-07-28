@@ -30,6 +30,14 @@ const selectedZone = ref(null)
 const selectedDifficultyKey = ref('xiongxian')
 const isIdling = ref(false)
 const logs = ref([])                 // 挂机日志（仅内存，不写入存档）
+// 日志自增 id：用于 v-for 稳定 key，避免 slice 截断后 index key 错位导致 DOM 全量 patch 跳动
+let logIdCounter = 0
+// 日志截断：用 splice 原地截断保留数组引用，避免 slice 重赋值导致 v-for 全量重渲染
+function trimLogs(maxLen = 400) {
+  if (logs.value.length > maxLen) {
+    logs.value.splice(0, logs.value.length - maxLen)
+  }
+}
 const idleEncounterCount = ref(0)
 const idleProgress = ref(0)
 const idleTimeRemaining = ref('')
@@ -730,7 +738,7 @@ const showPendingLog = () => {
       logs.value.push(next)
     }
     firstPendingLogTime = 0
-    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    if (logs.value.length > 400) trimLogs()
     if (logDisplayTimer) {
       clearInterval(logDisplayTimer)
       logDisplayTimer = null
@@ -741,21 +749,21 @@ const showPendingLog = () => {
   const next = pendingLogs.value.shift()
   if (next) {
     logs.value.push(next)
-    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    if (logs.value.length > 400) trimLogs()
   }
 }
 
 function addLog(type, text, detail = null, avatar = null, parts = null) {
   if (!isIdling.value) {
-    logs.value.push({ type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
-    if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+    logs.value.push({ id: ++logIdCounter, type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
+    if (logs.value.length > 400) trimLogs()
     return
   }
 
   if (pendingLogs.value.length === 0) {
     firstPendingLogTime = Date.now()
   }
-  pendingLogs.value.push({ type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
+  pendingLogs.value.push({ id: ++logIdCounter, type, text, detail, avatar, parts, time: new Date().toLocaleTimeString() })
 
   if (!logDisplayTimer) {
     showPendingLog()
@@ -772,7 +780,7 @@ const flushAllPendingLogs = () => {
     const next = pendingLogs.value.shift()
     logs.value.push(next)
   }
-  if (logs.value.length > 400) logs.value = logs.value.slice(-400)
+  if (logs.value.length > 400) trimLogs()
 }
 
 // 将装备/灵宠的基础数据格式化为日志明细子行
@@ -3387,13 +3395,13 @@ function startIdle(durationMinutes) {
   // 每次开始挂机都重置为满血（新的一轮挂机 = 全新队伍状态）
   teamMemberStates.value = team.map(member => buildTeamMemberState(member, s))
   
-  logs.value.push({ type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
-  logs.value.push({ type: 'info', text: `🚀 出战阵容：${team.map(m => m.name).join('、') || '无成员'}`, time: new Date().toLocaleTimeString() })
+  logs.value.push({ id: ++logIdCounter, type: 'info', text: `开始挂机探索【${selectedZone.value.name}·${diff.label}】，预计 ${durationMinutes} 分钟，每 ${ENCOUNTER_INTERVAL / 1000} 秒一场遭遇`, time: new Date().toLocaleTimeString() })
+  logs.value.push({ id: ++logIdCounter, type: 'info', text: `🚀 出战阵容：${team.map(m => m.name).join('、') || '无成员'}`, time: new Date().toLocaleTimeString() })
   const match = Math.round(buildRatio.value * 100)
   if (buildRatio.value < 1) {
-    logs.value.push({ type: 'warning', text: `⚠️ 队伍 Build 强度（${Math.round(playerBuildStrength.value)}）低于推荐值（${Math.round(currentRecommendedBuild.value)}），匹配度 ${match}%，成员气血可能不支、挂机或提前力竭。`, time: new Date().toLocaleTimeString() })
+    logs.value.push({ id: ++logIdCounter, type: 'warning', text: `⚠️ 队伍 Build 强度（${Math.round(playerBuildStrength.value)}）低于推荐值（${Math.round(currentRecommendedBuild.value)}），匹配度 ${match}%，成员气血可能不支、挂机或提前力竭。`, time: new Date().toLocaleTimeString() })
   } else {
-    logs.value.push({ type: 'info', text: `🛡️ Build 匹配度 ${match}%，队伍气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
+    logs.value.push({ id: ++logIdCounter, type: 'info', text: `🛡️ Build 匹配度 ${match}%，队伍气血充盈，可稳定挂机。`, time: new Date().toLocaleTimeString() })
   }
   startIdleTimers()
   // 立即触发首场遭遇，消除 setInterval 的 10 秒首延迟：点击挂机开始即弹出实时战斗界面
@@ -3467,14 +3475,14 @@ function finishIdle() {
   idleTimeRemaining.value = '已完成'
   
   if (foundEquipment.value.length > 0) {
-    logs.value.push({ type: 'reward-equipment', text: `🎁 获得装备：${foundEquipment.value.map(e => `${e.name}(${e.rarity})`).join('、')}`, time: new Date().toLocaleTimeString() })
+    logs.value.push({ id: ++logIdCounter, type: 'reward-equipment', text: `🎁 获得装备：${foundEquipment.value.map(e => `${e.name}(${e.rarity})`).join('、')}`, time: new Date().toLocaleTimeString() })
   }
-  
+
   if (logs.value.length) {
     const tail = allDead
       ? `挂机因全队力竭提前终止！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
       : `挂机结束！共探索 ${idleEncounterCount.value} 次，胜 ${runStats.value.victories} / 败 ${runStats.value.defeats}`
-    logs.value.push({ type: 'info', text: tail, time: new Date().toLocaleTimeString() })
+    logs.value.push({ id: ++logIdCounter, type: 'info', text: tail, time: new Date().toLocaleTimeString() })
   }
 }
 
@@ -3515,7 +3523,7 @@ async function catchUpMissedEncounters({ forceFinish = false } = {}) {
     const tip = missed > toCatch
       ? `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，补算最近 ${toCatch} 场……`
       : `⏳ 后台/息屏期间漏掉 ${missed} 场遭遇，正在补算……`
-    logs.value.push({ type: 'info', text: tip, time: new Date().toLocaleTimeString() })
+    logs.value.push({ id: ++logIdCounter, type: 'info', text: tip, time: new Date().toLocaleTimeString() })
     const baseCount = idleState.encounterCount
     catchUpInProgress = true
     try {

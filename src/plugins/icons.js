@@ -68,7 +68,7 @@ export const REWARD_ICON_MAP = {
   pet_fragment: getIconUrl('reward_mat_pet_fragment.png'),
   phantom_crystal: getIconUrl('reward_mat_phantom_crystal.png'),
   monster: getIconUrl('reward_monster.png'),
-  spirit_stone: getIconUrl('reward_eq_default.png'),
-  cultivation: getIconUrl('reward_eq_default.png'),
+  spirit_stone: getIconUrl('reward_spirit_stone.png'),
+  cultivation: getIconUrl('reward_cultivation.png'),
   fortune: getIconUrl('reward_eq_default.png')
 }

@@ -148,8 +148,8 @@
           <div class="battle-log-modal-body" ref="fullLogBody">
             <div v-if="!realtimeLogEntries.length" class="empty-log-tip">暂无日志，挂机开始后即会实时累积……</div>
             <div
-              v-for="(log, idx) in realtimeLogEntries"
-              :key="idx"
+              v-for="log in realtimeLogEntries"
+              :key="log.id"
               class="rt-log-item"
               :class="log.type"
             >
