@@ -47,7 +47,7 @@
           <span
             v-for="(ch, i) in comboCountChars"
             :key="i"
-            :style="{ animationDelay: (i * 0.1) + 's' }"
+            :style="{ animationDelay: (i * 0.2) + 's' }"
           >{{ ch }}</span>
         </div>
         <div class="combo-text">
@@ -55,7 +55,7 @@
             v-for="(ch, i) in comboTextChars"
             :key="i"
             class="combo-char"
-            :style="{ animationDelay: (i * 0.18) + 's' }"
+            :style="{ animationDelay: (i * 0.36) + 's' }"
           >{{ ch }}</span>
         </div>
       </div>
@@ -99,12 +99,12 @@ const comboClass = ref('')
 const comboTextChars = computed(() => Array.from(comboText.value || ''))
 // count 也拆字竖排：每个字单独 span，逐字淡入
 const comboCountChars = computed(() => Array.from(comboCount.value || ''))
-// 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
-// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.45 + 停留 1.2
+// 整体淡出延迟：等所有字逐字砸入完成 + 停留后，整体一起消失
+// 时长全部延长为原两倍：逐字间隔 0.18→0.36，入场 0.45→0.9，停留 1.2→2.4
 const comboFadeDelay = computed(() => {
   const n = comboTextChars.value.length
   if (n === 0) return 0
-  return (n - 1) * 0.18 + 0.45 + 1.2
+  return (n - 1) * 0.36 + 0.9 + 2.4
 })
 // 字号自适应：仅针对 text 行（竖排），字数越多字号越小，避免竖排过高超出屏幕
 // 竖排时每字占一行，10字 + gap 会很高，需要更激进的字号缩减
@@ -302,12 +302,11 @@ watch(() => route.path, (newPath) => {
 })
 
 // ===== 兜底隐藏：动画结束后或超时后强制隐藏，防止 animationend 未触发导致 show 卡死 =====
-// 斩杀文案逐字砸入后停留 3.5s 才淡出，整体时延长，需更长兜底；多次击杀时重新计时
+// 时长全部延长为原两倍后，兜底时长同步翻倍
 let hideTimerId = null
 function scheduleAutoHide() {
   if (hideTimerId) clearTimeout(hideTimerId)
-  // 人物立绘 1.8s + 灵宠 1s 延迟 + 1.8s ≈ 4.6s，但斩杀文案最后一字砸入后停留 3.5s + 0.5s 淡出
-  // 10 字诗句最后一字 delay ≈ 9*0.18 + 0.55 + 3.5 + 0.5 ≈ 6.2s，给 8s 兜底
+  // 立绘 3.6s + 灵宠 2s 延迟 + 3.6s ≈ 9.2s，文案最后一字 delay ≈ 9*0.36+0.9+2.4+1.0 ≈ 7.5s，给 16s 兜底
   hideTimerId = setTimeout(() => {
     if (show.value) {
       show.value = false
@@ -316,7 +315,7 @@ function scheduleAutoHide() {
       petPortraitUrl.value = null
     }
     hideTimerId = null
-  }, 8000)
+  }, 16000)
 }
 
 // 监听击杀事件，触发立绘突入动画
@@ -426,15 +425,14 @@ function schedulePetPortrait() {
   if (!petUrl) petUrl = getPetAvatar(pet, 'full')
   if (!petUrl) return
 
-  // 1s 延迟：人物立绘先弹出，1s 后灵宠从另一侧弹出
-  // 两者出现/消失相差约 1s，避免动画过于拖沓
+  // 2s 延迟（原 1s 翻倍）：人物立绘先弹出，2s 后灵宠从另一侧弹出
   petDelayTimer = setTimeout(() => {
     petPortraitUrl.value = petUrl
     petName.value = pet.name || ''
     petAnimKey.value++
     petShow.value = true
     petDelayTimer = null
-  }, 1000)
+  }, 2000)
 }
 
 const onPortraitAnimEnd = () => {
@@ -481,7 +479,7 @@ const onPetAnimEnd = () => {
   object-fit: contain;
   border-radius: 12px;
   filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.7));
-  animation: boss-slash 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation: boss-slash 3.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
   will-change: transform, opacity;
 }
 
@@ -505,8 +503,8 @@ const onPetAnimEnd = () => {
 }
 
 /* 灵宠立绘：右下突入→中心顿帧→左上消失，与人物立绘轨迹镜像对称
-   - 与人物立绘相差约 1s 出现（由 JS setTimeout(1000) 控制）
-   - 动画时长同为 1.8s，确保整体节奏紧凑不拖沓 */
+   - 与人物立绘相差约 2s 出现（由 JS setTimeout(2000) 控制）
+   - 动画时长 3.6s（原 1.8s 翻倍） */
 .kill-pet-portrait {
   position: absolute;
   width: min(50vw, 360px);
@@ -514,7 +512,7 @@ const onPetAnimEnd = () => {
   object-fit: contain;
   border-radius: 12px;
   filter: drop-shadow(0 0 20px rgba(120, 220, 100, 0.7));
-  animation: pet-slash 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  animation: pet-slash 3.6s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
   will-change: transform, opacity;
   /* 偏右下角定位，避免与人物立绘在中心位置完全重叠 */
   right: 8%;
@@ -561,7 +559,7 @@ const onPetAnimEnd = () => {
   border-radius: 50%;
   background: radial-gradient(circle, rgba(255, 215, 0, 0.45) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%);
   opacity: 0;
-  animation: glow-anim 1.8s ease-out forwards;
+  animation: glow-anim 3.6s ease-out forwards;
 }
 @keyframes glow-anim {
   0% { opacity: 0; transform: scale(0.5); }
@@ -580,9 +578,9 @@ const onPetAnimEnd = () => {
   box-shadow: 0 0 8px #FFD700;
   opacity: 0;
 }
-.p1 { left: 30%; top: 40%; animation: particle-1 1.8s ease-out forwards; }
-.p2 { left: 60%; top: 50%; animation: particle-2 1.8s ease-out forwards; }
-.p3 { left: 50%; top: 30%; animation: particle-3 1.8s ease-out forwards; }
+.p1 { left: 30%; top: 40%; animation: particle-1 3.6s ease-out forwards; }
+.p2 { left: 60%; top: 50%; animation: particle-2 3.6s ease-out forwards; }
+.p3 { left: 50%; top: 30%; animation: particle-3 3.6s ease-out forwards; }
 
 @keyframes particle-1 {
   0% { opacity: 0; transform: translate(0, 0) scale(0.5); }
@@ -612,7 +610,7 @@ const onPetAnimEnd = () => {
   color: #FFD700;
   text-shadow: 0 0 12px rgba(0, 0, 0, 0.9), 0 2px 4px rgba(0, 0, 0, 0.8);
   opacity: 0;
-  animation: text-anim 1.8s ease-out forwards;
+  animation: text-anim 3.6s ease-out forwards;
 }
 .kill-subtitle {
   font-size: 18px;
@@ -639,7 +637,7 @@ const onPetAnimEnd = () => {
   pointer-events: none;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算 */
   opacity: 1;
-  animation: combo-fade-out 0.5s ease-in forwards;
+  animation: combo-fade-out 1s ease-in forwards;
 }
 @keyframes combo-fade-out {
   0%, 99% { opacity: 1; }
@@ -663,7 +661,7 @@ const onPetAnimEnd = () => {
   font-weight: 900;
   line-height: 1;
   opacity: 0;
-  animation: combo-count-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  animation: combo-count-in 1s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
   text-shadow:
     -3px -3px 0 rgba(0, 0, 0, 0.95),
     3px -3px 0 rgba(0, 0, 0, 0.95),
@@ -675,7 +673,7 @@ const onPetAnimEnd = () => {
 .combo-count span {
   display: block;
   opacity: 0;
-  animation: combo-count-char-in 0.4s ease-out forwards;
+  animation: combo-count-char-in 0.8s ease-out forwards;
 }
 @keyframes combo-count-char-in {
   0% { opacity: 0; transform: translateY(-8px); }
@@ -706,8 +704,9 @@ const onPetAnimEnd = () => {
   font-weight: 900;
   line-height: 1;
   opacity: 0;
-  /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影 */
-  animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影
+     时长 0.9s（原 0.45s 翻倍），逐字间隔也同步翻倍 0.36s */
+  animation: combo-char-in 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
   /* 刚硬描边：四方向粗黑描边 + 立体投影 */
   text-shadow:
     -2px -2px 0 rgba(0, 0, 0, 0.95),
@@ -749,7 +748,7 @@ const onPetAnimEnd = () => {
    注意：不再有 combo-char-out，由外层 .kill-combo 统一淡出 */
 .combo-legendary { color: #FFD600; }
 .combo-legendary .combo-char {
-  animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
+  animation: combo-char-in 0.9s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
              legendary-glow 0.8s ease-in-out infinite alternate 0.6s;
 }
 @keyframes legendary-glow {
