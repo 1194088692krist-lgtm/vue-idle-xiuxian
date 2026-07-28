@@ -2898,6 +2898,11 @@ async function runIdleEncounter() {
         }
         enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
         enemy = enemyData.mainEnemy
+        // 普通遭遇也可能随机刷出 BOSS（generateZoneEnemy 按难度概率生成）
+        // 必须同步标记 isBossEncounter，否则奖励与立绘演出都按普通怪处理
+        if (enemyData.hasBoss || enemy.tier === 'boss') {
+          isBossEncounter = true
+        }
         idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
       }
       enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
@@ -3004,7 +3009,11 @@ async function runIdleEncounter() {
       let loss = 0
       let roleEffects = []
       // BOSS 被击杀：标记通过核心挑战（用于结算「最后 1/5 能否击杀 BOSS」）
-      if (bossSpawned.value && victory) {
+      // 触发条件：显式 BOSS 遭遇（bossSpawned）或普通遭遇中的 BOSS 敌人（enemy.tier === 'boss'）
+      // 修复：generateZoneEnemy 在普通遭遇中也有概率生成 BOSS，旧逻辑只检测 bossSpawned.value，
+      // 导致大量随机 BOSS 击杀时立绘不弹出。
+      const isBossEnemy = bossSpawned.value || enemy?.tier === 'boss'
+      if (isBossEnemy && victory) {
         bossDefeated.value = true
         // 发出击杀事件：触发立绘突入动画（由 BossKillCinematic watch bossKillEvent）
         // 修复：原引用 lastPlayerAttacker / players 为 executeRound 局部变量，本作用域不可见，
