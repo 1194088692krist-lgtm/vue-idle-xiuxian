@@ -136,6 +136,15 @@
 
             <!-- 击杀BOSS立绘演出：全局挂载，任意页面挂机/挑战击杀BOSS都能弹出 -->
             <BossKillCinematic />
+            <!-- 突破境界演出：全局挂载，监听 breakthroughCount 变化自动触发 -->
+            <BreakthroughEffect
+              :visible="breakthroughVisible"
+              :realm-name="breakthroughRealmName"
+              :realm-color="breakthroughRealmColor"
+              @complete="breakthroughVisible = false"
+            />
+            <!-- 技能释放全屏特写演出：仅 BOSS 战中释放技能时触发 -->
+            <SkillCinematic />
           </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -170,6 +179,9 @@ import { useIdleSystem } from './composables/useIdleSystem'
 import { initCharacterDefs } from './plugins/characters'
 import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
+import BossKillCinematic from './components/BossKillCinematic.vue'
+import BreakthroughEffect from './components/BreakthroughEffect.vue'
+import SkillCinematic from './components/SkillCinematic.vue'
 
   // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）
   const lightThemeOverrides = {
@@ -217,6 +229,13 @@ import SaveButton from './components/SaveButton.vue'
   const stonesRaf = ref(null)
   const cultivationRaf = ref(null)
   const crystalsRaf = ref(null)
+
+  // ===== 突破境界演出状态 =====
+  // 监听 playerStore.breakthroughCount 变化自动触发，配合 realmColors 取对应境界色
+  const breakthroughVisible = ref(false)
+  const breakthroughRealmName = ref('')
+  const breakthroughRealmColor = ref('#DAA520')
+  let lastBreakthroughCount = -1 // 初始 -1，避免首次加载存档时误触发
 
   const isStartScreen = computed(() => route.path === '/')
 
@@ -316,6 +335,23 @@ import SaveButton from './components/SaveButton.vue'
 
   watch(() => playerStore.phantomCrystals, val => {
     animateValue(animatedCrystals, val, 500, crystalsRaf)
+  })
+
+  // 突破演出：监听 breakthroughCount 变化（玩家境界突破成功 +1）
+  // 首次加载存档时 lastBreakthroughCount 初始化为当前值，避免误触发
+  watch(() => playerStore.breakthroughCount, (count) => {
+    if (lastBreakthroughCount < 0) {
+      lastBreakthroughCount = count
+      return
+    }
+    if (count <= lastBreakthroughCount) return
+    lastBreakthroughCount = count
+    // 取当前境界名与对应颜色
+    const realmInfo = getRealmName(playerStore.level)
+    breakthroughRealmName.value = realmInfo?.name || playerStore.realm || ''
+    // realmColors 数组按 level-1 取色（index 0 对应 level 1）
+    breakthroughRealmColor.value = realmColors[playerStore.level - 1] || '#DAA520'
+    breakthroughVisible.value = true
   })
 
   watch(() => playerStore.isGMMode, () => {

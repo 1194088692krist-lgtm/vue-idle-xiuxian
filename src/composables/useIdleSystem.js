@@ -31,6 +31,9 @@ const selectedDifficultyKey = ref('xiongxian')
 // 击杀BOSS事件总线：击杀时写入 { killerMemberId, killerName, bossName, zoneId, ts }
 // BattleStage/挂机界面 watch 此 ref 触发立绘突入动画
 const bossKillEvent = ref(null)
+// 技能释放事件总线：技能攻击时写入 { skillName, casterName, isBoss, ts }
+// SkillCinematic watch 此 ref 触发技能名全屏特写演出（仅 BOSS 战触发，避免普通战斗喧宾夺主）
+const skillCastEvent = ref(null)
 const isIdling = ref(false)
 const logs = ref([])                 // 挂机日志（仅内存，不写入存档）
 // 日志自增 id：用于 v-for 稳定 key，避免 slice 截断后 index key 错位导致 DOM 全量 patch 跳动
@@ -2589,6 +2592,18 @@ async function executeRound(effectiveZone) {
       p.stats.damage = Math.floor(p.stats.damage * damagePercent)
       p._skillName = action.skillName
       attackingPlayers.push(p)
+      // 发出技能释放事件：触发 SkillCinematic 全屏特写演出
+      // 仅 BOSS 战触发（手动 BOSS 挑战 / 挂机 BOSS 出现），避免普通战斗频繁打断节奏
+      // 每个技能每场战斗只触发一次（同名同 caster 去重，由组件侧做冷却避免重复弹出）
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        skillCastEvent.value = {
+          skillName: action.skillName,
+          casterName: p.name,
+          isBoss: true,
+          ts: Date.now()
+        }
+      }
     } else if (action.type === 'heal') {
       if (action.isTeam) {
         for (const pl of players) {
@@ -3815,6 +3830,7 @@ export function useIdleSystem() {
     bossSpawned,
     bossDefeated,
     bossKillEvent,
+    skillCastEvent,
     bossSpawnRound,
     bossTimeRemaining,
     bossRoundsCleared,

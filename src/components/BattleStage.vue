@@ -1,7 +1,23 @@
 <template>
-  <div v-if="encounter && encounter.players && encounter.players.length && encounter.enemy" class="battle-stage" ref="stageRef">
+  <div
+    v-if="encounter && encounter.players && encounter.players.length && encounter.enemy"
+    class="battle-stage"
+    :class="{ 'impact-punch': impactPunch }"
+    ref="stageRef"
+  >
     <!-- 暴击屏幕震动层 -->
     <div v-if="screenShake" class="screen-shake" :class="screenShake"></div>
+
+    <!-- 暴击刀光：全屏白色斜劈 + 局部白闪，强化暴击与非暴击的视觉差距 -->
+    <div
+      v-if="critSlash.show"
+      :key="`cs-${critSlash.key}`"
+      class="crit-slash-layer"
+      aria-hidden="true"
+    >
+      <div class="crit-slash-line"></div>
+      <div class="crit-flash-radial"></div>
+    </div>
 
     <!-- 顶部回合信息 -->
     <div class="stage-header">
@@ -9,6 +25,27 @@
       <span v-if="effectBadge" class="effect-badge" :class="effectBadge.cls">{{ effectBadge.text }}</span>
       <span v-if="!encounter.inProgress && encounter.enemy.currentHealth <= 0" class="result-badge victory">胜利</span>
       <span v-else-if="!encounter.inProgress" class="result-badge defeat">败北</span>
+    </div>
+
+    <!-- 胜负全屏演出：胜利金光斜射+大字砸下，败北暗化 vignette+大字砸下 -->
+    <div
+      v-if="resultCinematic.show"
+      :key="`rc-${resultCinematic.key}`"
+      class="result-cinematic"
+      :class="`result-cinematic-${resultCinematic.type}`"
+      aria-hidden="true"
+    >
+      <!-- 胜利：4 道金光斜射 -->
+      <template v-if="resultCinematic.type === 'victory'">
+        <div class="victory-ray r1"></div>
+        <div class="victory-ray r2"></div>
+        <div class="victory-ray r3"></div>
+        <div class="victory-ray r4"></div>
+      </template>
+      <!-- 大字砸下：胜利/败北 -->
+      <div class="result-cinematic-text" :class="resultCinematic.type">
+        {{ resultCinematic.type === 'victory' ? '胜  利' : '败  北' }}
+      </div>
     </div>
 
     <!-- 战斗舞台 -->
@@ -24,6 +61,11 @@
           <div class="avatar-wrap">
             <img v-if="m.avatar" :src="m.avatar" class="fighter-avatar" :alt="m.name" decoding="async" />
             <div v-else class="fighter-avatar placeholder">{{ (m.name || '?')[0] }}</div>
+            <!-- 灵宠助战灵光环绕：当前出战队伍有灵宠时显示，2 颗灵光呼吸脉冲 -->
+            <div v-if="hasPetAssist" class="pet-aura" aria-hidden="true">
+              <span class="pet-aura-orb o1"></span>
+              <span class="pet-aura-orb o2"></span>
+            </div>
             <div v-if="stunTarget === 'member-' + m.memberId" class="stun-stars">💫</div>
             <div v-if="frozenTarget === 'member-' + m.memberId" class="frozen-overlay"></div>
             <div v-if="burningTargets.includes('member-' + m.memberId)" class="burn-overlay"></div>
@@ -205,11 +247,17 @@
 <script setup>
 import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem.js'
+import { usePlayerStore } from '../stores/player.js'
 import { getMonsterAvatarSync, monsterManifestVersion } from '../plugins/monsters'
 
 const props = defineProps({
   encounter: { type: Object, default: null }
 })
+
+const playerStore = usePlayerStore()
+// 灵宠助战标识：当前出战队伍有灵宠时，给所有队员头像旁加灵光环绕
+// 灵宠非独立队员（属性合并到角色），通过此视觉装饰让玩家感知灵宠助战
+const hasPetAssist = computed(() => !!playerStore.activePet)
 
 // 完整战斗日志累积源：挂机时跨所有遭遇，从挂机开始累积到当前（非当前回合）
 // 现已切换回旧版「实时战斗日志」系统（logs/displayLogs），保留时间戳与彩色分类
@@ -239,6 +287,20 @@ const dodgeGhost = reactive({ show: false, avatar: '', name: '', style: {} })
 
 // 掉落动画
 const dropOrb = reactive({ show: false, rarity: '', emoji: '' })
+
+// 胜负全屏演出：战斗结束时触发（胜利金光斜射/败北暗化 vignette + 大字砸下）
+// resultKey 用作 :key 强制重建 DOM 让 CSS 动画可靠重启（与 BossKillCinematic 同模式）
+const resultCinematic = ref({ show: false, type: '', key: 0 })
+let resultHideTimer = null
+let lastInProgress = false
+
+// 暴击刀光：暴击时全屏斜劈白光 + 局部白闪，强化暴击与非暴击的视觉差距
+// critSlashKey 用作 :key 强制重建 DOM 让动画可靠重启
+const critSlash = ref({ show: false, key: 0 })
+let critSlashTimer = null
+// 高伤冲击：伤害≥目标最大HP 30% 时给舞台加冲击效果（短暂放大+亮度提升，模拟"慢镜头"冲击感）
+const impactPunch = ref(false)
+let impactPunchTimer = null
 
 // 日志
 const showFullLog = ref(false)
@@ -465,6 +527,18 @@ function showEvent(e) {
     effectBadge.value = { text: '暴击！', cls: 'badge-crit' }
     screenShake.value = 'shake-strong'
     setTimeout(() => { if (screenShake.value === 'shake-strong') screenShake.value = '' }, 500)
+    // 暴击刀光：全屏白色斜劈 + 局部白闪，强化暴击冲击力
+    // 通过 :key 递增强制重建 DOM，让 CSS 动画每次暴击都从 0% 重新播放
+    critSlash.value = { show: true, key: Date.now() }
+    if (critSlashTimer) clearTimeout(critSlashTimer)
+    // 刀光动画 0.3s 后清除
+    critSlashTimer = setTimeout(() => { critSlash.value.show = false; critSlashTimer = null }, 350)
+    // 高伤冲击（伤害≥目标最大HP 30%）：舞台短暂放大+亮度提升，模拟慢镜头冲击感
+    if (ratio >= 0.3) {
+      impactPunch.value = true
+      if (impactPunchTimer) clearTimeout(impactPunchTimer)
+      impactPunchTimer = setTimeout(() => { impactPunch.value = false; impactPunchTimer = null }, 200)
+    }
   }
   if (e.isCombo) effectBadge.value = effectBadge.value || { text: '连击！', cls: 'badge-combo' }
   if (e.isStun) {
@@ -525,6 +599,26 @@ watch(() => props.encounter, (nc) => {
   clearTransient()
   roundWatched.value = nc ? (nc.round || 0) : 0
 }, { immediate: true })
+
+// 监听 inProgress 变化：true → false 时触发胜负全屏演出
+// lastInProgress 防御 inProgress 在同一 tick 内多次切换导致重复触发
+watch(() => props.encounter?.inProgress, (now) => {
+  if (lastInProgress && now === false && props.encounter) {
+    const isVictory = (props.encounter.enemy?.currentHealth ?? 0) <= 0
+    resultCinematic.value = {
+      show: true,
+      type: isVictory ? 'victory' : 'defeat',
+      key: Date.now()
+    }
+    if (resultHideTimer) clearTimeout(resultHideTimer)
+    // 演出时长 1.8s，2s 后自动隐藏
+    resultHideTimer = setTimeout(() => {
+      resultCinematic.value.show = false
+      resultHideTimer = null
+    }, 2000)
+  }
+  lastInProgress = !!now
+})
 
 // 监听回合推进：先结算、再实时反馈本回合结果
 watch(() => props.encounter?.round, (newRound) => {
@@ -639,6 +733,177 @@ onUnmounted(() => {
 }
 .result-badge.victory { background: rgba(34, 197, 94, 0.3); color: #4ade80; }
 .result-badge.defeat { background: rgba(239, 68, 68, 0.3); color: #f87171; }
+
+/* ===== 胜负全屏演出：覆盖整个战斗舞台，2s 自动隐藏 ===== */
+.result-cinematic {
+  position: absolute;
+  inset: 0;
+  z-index: 50;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* 胜利：金色光晕底色 + 4 道金光斜射 */
+.result-cinematic-victory {
+  background: radial-gradient(circle, rgba(255, 215, 0, 0.18) 0%, transparent 70%);
+  animation: rc-fade 1.8s ease-out forwards;
+}
+/* 败北：暗化 vignette（中心稍亮，四周暗角） */
+.result-cinematic-defeat {
+  background: radial-gradient(circle, rgba(0, 0, 0, 0.2) 30%, rgba(0, 0, 0, 0.85) 100%);
+  animation: rc-fade 1.8s ease-out forwards;
+}
+@keyframes rc-fade {
+  0% { opacity: 0; }
+  15% { opacity: 1; }
+  75% { opacity: 1; }
+  100% { opacity: 0; }
+}
+/* 胜利金光：4 道斜射光线从中心射出 */
+.victory-ray {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6px;
+  height: 80vmin;
+  background: linear-gradient(to top, transparent, rgba(255, 215, 0, 0.9), transparent);
+  transform-origin: bottom center;
+  opacity: 0;
+  animation: rc-ray 1.5s ease-out forwards;
+}
+.r1 { transform: translate(-50%, -100%) rotate(45deg); animation-delay: 0s; }
+.r2 { transform: translate(-50%, -100%) rotate(135deg); animation-delay: 0.1s; }
+.r3 { transform: translate(-50%, -100%) rotate(225deg); animation-delay: 0.2s; }
+.r4 { transform: translate(-50%, -100%) rotate(315deg); animation-delay: 0.3s; }
+@keyframes rc-ray {
+  0% { opacity: 0; height: 20vmin; }
+  40% { opacity: 1; height: 90vmin; }
+  100% { opacity: 0; height: 110vmin; }
+}
+/* 大字砸下：从上方砸下 + 缩放过冲 + 发光 */
+.result-cinematic-text {
+  position: relative;
+  z-index: 10;
+  font-size: clamp(48px, 10vw, 96px);
+  font-weight: 900;
+  letter-spacing: 12px;
+  opacity: 0;
+  transform: translateY(-80px) scale(2);
+  animation: rc-text-drop 1.6s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+.result-cinematic-text.victory {
+  color: #FFD700;
+  text-shadow: 0 0 20px #FFD700, 0 0 40px #FFA500, 0 4px 8px rgba(0, 0, 0, 0.8);
+}
+.result-cinematic-text.defeat {
+  color: #DC2626;
+  text-shadow: 0 0 20px #DC2626, 0 0 40px #7F1D1D, 0 4px 8px rgba(0, 0, 0, 0.9);
+}
+@keyframes rc-text-drop {
+  0% { opacity: 0; transform: translateY(-80px) scale(2); filter: blur(8px); }
+  35% { opacity: 1; transform: translateY(0) scale(0.9); filter: blur(0); }
+  50% { transform: translateY(0) scale(1.1); }
+  65% { transform: translateY(0) scale(1); }
+  80% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(-15px) scale(1); }
+}
+
+/* ===== 暴击刀光差异化：暴击时全屏斜劈白光 + 局部白闪 ===== */
+.crit-slash-layer {
+  position: absolute;
+  inset: 0;
+  z-index: 45;
+  pointer-events: none;
+  overflow: hidden;
+}
+/* 斜劈刀光：白色斜线从右上扫到左下，0.2s 完成 */
+.crit-slash-line {
+  position: absolute;
+  top: -10%;
+  left: -20%;
+  width: 140%;
+  height: 30%;
+  background: linear-gradient(115deg, transparent 35%, rgba(255, 255, 255, 0.95) 49%, rgba(255, 255, 255, 1) 50%, rgba(255, 255, 255, 0.95) 51%, transparent 65%);
+  opacity: 0;
+  transform: translateY(-100%) rotate(-15deg);
+  filter: blur(2px) drop-shadow(0 0 12px rgba(255, 255, 255, 0.8));
+  animation: crit-slash-sweep 0.3s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+}
+@keyframes crit-slash-sweep {
+  0% { opacity: 0; transform: translateY(-100%) rotate(-15deg); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translateY(140%) rotate(-15deg); }
+}
+/* 局部白闪：中心径向白光闪一下，模拟"被打中位置爆光" */
+.crit-flash-radial {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 60vmin;
+  height: 60vmin;
+  border-radius: 50%;
+  background: radial-gradient(circle, rgba(255, 255, 255, 0.85) 0%, rgba(255, 220, 200, 0.4) 30%, transparent 60%);
+  opacity: 0;
+  transform: translate(-50%, -50%) scale(0.4);
+  animation: crit-flash-pop 0.25s ease-out forwards;
+}
+@keyframes crit-flash-pop {
+  0% { opacity: 0; transform: translate(-50%, -50%) scale(0.4); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scale(1.1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scale(1.4); }
+}
+/* 高伤冲击：舞台短暂放大+亮度提升，模拟"慢镜头"冲击感 */
+.battle-stage.impact-punch {
+  transform: scale(1.025);
+  filter: brightness(1.25) contrast(1.05);
+  transition: transform 0.06s ease-out, filter 0.06s ease-out;
+}
+
+/* ===== 灵宠助战灵光环绕：当前出战队伍有灵宠时，给所有队员头像旁加 2 颗呼吸灵光 ===== */
+.pet-aura {
+  position: absolute;
+  inset: -4px;
+  pointer-events: none;
+  z-index: 5;
+}
+.pet-aura-orb {
+  position: absolute;
+  width: 8px;
+  height: 8px;
+  border-radius: 50%;
+  background: radial-gradient(circle, #FFD700 0%, rgba(255, 215, 0, 0.6) 50%, transparent 70%);
+  box-shadow: 0 0 8px #FFD700, 0 0 14px rgba(255, 215, 0, 0.6);
+  opacity: 0.85;
+}
+/* 灵光 1：左上→右下环绕（圆形轨迹，3s 一圈） */
+.pet-aura-orb.o1 {
+  top: 0;
+  left: 50%;
+  animation: pet-aura-orbit-1 3s linear infinite;
+}
+/* 灵光 2：右下→左上环绕（与 o1 错相 1.5s） */
+.pet-aura-orb.o2 {
+  bottom: 0;
+  left: 50%;
+  animation: pet-aura-orbit-2 3s linear infinite;
+  animation-delay: 1.5s;
+}
+@keyframes pet-aura-orbit-1 {
+  0%   { transform: translate(-50%, 0) scale(0.8); opacity: 0.4; top: 0; }
+  25%  { transform: translate(40px, 20px) scale(1.1); opacity: 1; top: 20%; }
+  50%  { transform: translate(0, 40px) scale(0.9); opacity: 0.7; top: 80%; }
+  75%  { transform: translate(-40px, 20px) scale(1.1); opacity: 1; top: 20%; }
+  100% { transform: translate(-50%, 0) scale(0.8); opacity: 0.4; top: 0; }
+}
+@keyframes pet-aura-orbit-2 {
+  0%   { transform: translate(-50%, 0) scale(0.8); opacity: 0.4; bottom: 0; }
+  25%  { transform: translate(-40px, -20px) scale(1.1); opacity: 1; bottom: 20%; }
+  50%  { transform: translate(0, -40px) scale(0.9); opacity: 0.7; bottom: 80%; }
+  75%  { transform: translate(40px, -20px) scale(1.1); opacity: 1; bottom: 20%; }
+  100% { transform: translate(-50%, 0) scale(0.8); opacity: 0.4; bottom: 0; }
+}
 
 .stage-arena {
   display: flex;

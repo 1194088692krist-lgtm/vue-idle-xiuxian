@@ -176,10 +176,10 @@ watch(bossKillEvent, (evt) => {
   }
 
   // ===== 人物立绘来源 =====
-  // 从存活队伍成员中随机选一个，确保平均分布（每人 ~33%）
+  // 按出战人数均分播放概率：3 人 → 各 1/3，2 人 → 各 1/2，1 人 → 100%
   // 旧实现优先使用 killerMemberId（实际斩杀者），但实际斩杀者往往是同一角色
   // （最强DPS每次都补刀），导致 9/10 次都显示同一角色，无法看到其他角色的击杀立绘。
-  // 改为纯随机：三个角色都设了击杀立绘，随机播放才能让玩家都看到。
+  // 改为纯随机：Math.floor(Math.random() * N) 在 N 个出战人物中均匀取一个，自然均分概率。
   let member = null
   if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
     const aliveMembers = playerStore.teamMembers
@@ -239,9 +239,14 @@ watch(bossKillEvent, (evt) => {
 }, { deep: true })
 
 // ===== 灵宠立绘：人物立绘弹出 1s 后从另一侧弹出 =====
+// 触发概率：每次人物立绘播放时，仅 30% 概率同时播放该出战人物的灵宠立绘
+// （避免每次击杀都强制弹出灵宠，节奏过于喧宾夺主；30% 让灵宠出现保持新鲜感）
+const PET_PORTRAIT_CHANCE = 0.3
 function schedulePetPortrait() {
   const pet = playerStore.activePet
   if (!pet) return
+  // 30% 概率才播放灵宠立绘；未命中则本次不弹出灵宠
+  if (Math.random() > PET_PORTRAIT_CHANCE) return
   // 灵宠立绘 URL（按灵宠自己的击杀立绘设置取皮肤，未设默认原立绘）
   const petKey = getPetTemplateId(pet)
   const petSkinIdx = Number(playerStore.petKillSkins?.[petKey]) || 0
