@@ -85,11 +85,11 @@ const comboClass = ref('')
 // 逐字显示：将文案拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
 const comboLabelChars = computed(() => Array.from(comboLabel.value || ''))
 // 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
-// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.5 + 停留 1.2
+// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.45 + 停留 1.2
 const comboFadeDelay = computed(() => {
   const n = comboLabelChars.value.length
   if (n === 0) return 0
-  return (n - 1) * 0.18 + 0.5 + 1.2
+  return (n - 1) * 0.18 + 0.45 + 1.2
 })
 // 字号自适应：字数越多字号越小，保证单排居中显示不超出屏幕
 // 细化梯度：5字单独一档（比6-7字更大），让五字诗句也突出美观
@@ -493,72 +493,72 @@ const onPetAnimEnd = () => {
 }
 
 /* ===== 连击特效：逐字砸入出现，全部到齐后整体一起消失 ===== */
-/* 外层 .kill-combo：负责整体淡出（animation-delay 由 JS 按"最后一字入场完成+停留"计算）
-   内层 .combo-char：仅负责逐字砸入出现，不独立 out（避免边出现边消失） */
+/* 外层 .kill-combo：负责整体淡出 + 居中定位
+   内层 .combo-char：仅负责逐字砸入出现（纯 translateY+opacity，无 scale/blur 避免残影） */
 .kill-combo {
   position: absolute;
-  /* 屏幕上方居中：独立于底部击杀文案与中心立绘，避免视觉重叠 */
-  top: 16%;
-  left: 0;
-  right: 0;
+  /* 屏幕上方居中：宽度自适应内容，整体水平居中
+     用 left:50% + translateX(-50%) 而非 left:0;right:0，避免容器撑满 100vw 导致字间距松散 */
+  top: 14%;
+  left: 50%;
+  transform: translateX(-50%);
   display: flex;
-  flex-wrap: nowrap;     /* 单排显示，避免 5/7 字换行不美观 */
+  flex-wrap: nowrap;
   justify-content: center;
-  gap: 2px;
+  /* 字间距用 gap 统一控制，不用 letter-spacing（letter-spacing 会在末字后也加间距导致偏移） */
+  gap: 6px;
+  white-space: nowrap;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
-     注意：外层只控制 opacity，不用 transform，避免与内层 .combo-char 的 transform 叠加造成重影 */
+     注意：外层 transform 是静态值（translateX(-50%)），不在动画中改变，不会与内层叠加
+     combo-fade-out 只控制 opacity，不触碰 transform，避免覆盖居中定位 */
   opacity: 1;
   animation: combo-fade-out 0.5s ease-in forwards;
 }
 @keyframes combo-fade-out {
-  /* 前段保持 opacity:1 不动，到延迟时间才开始淡出
-     避免"字还没逐个砸入，整体就开始变透明"导致的重影 */
+  /* 前段保持 opacity:1 不动，到延迟时间才开始淡出 */
   0%, 99% { opacity: 1; }
   100% { opacity: 0; }
 }
 .combo-char {
   display: inline-block;
-  /* 坚实有力字体：Ma Shan Zheng 毛笔楷书（项目已加载），回退到系统楷体/黑体 */
+  /* 坚实有力字体：Ma Shan Zheng 毛笔楷书，回退到系统楷体/黑体 */
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
-  /* 字号由 --combo-font-size CSS 变量控制（JS 根据字数动态计算）
-     字数越多字号越小，保证单排显示不超出屏幕 */
+  /* 字号由 --combo-font-size CSS 变量控制（JS 根据字数动态计算） */
   font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
-  letter-spacing: 4px;
+  /* 不用 letter-spacing，间距由外层 gap 统一控制，避免末字多余间距 */
+  letter-spacing: 0;
+  line-height: 1;
   opacity: 0;
-  /* 逐字砸入：干脆的一次过冲，避免多次 scale 波动产生残影
-     每字 0.5s 完成，间隔 0.18s 让用户看清每个字
-     注意：不再有 out 动画，由外层 .kill-combo 统一淡出 */
-  animation: combo-char-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  /* 坚实有力：全部用 text-shadow 模拟描边+立体投影+外发光
-     不用 -webkit-text-stroke（动画时与 text-shadow 栅格化不同步会重影）
-     顺序：四方向黑色描边(模拟粗描边) → 立体投影(右下) → 外发光(本色)
-     发光范围收窄，避免动画时大范围光晕残影 */
+  /* 逐字砸入：纯 translateY + opacity，绝对不产生 scale/blur 残影
+     每字 0.45s 完成，间隔 0.18s */
+  animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+  /* 坚实有力：四方向黑色粗描边 + 右下立体投影
+     不用 -webkit-text-stroke（栅格化不同步会重影）
+     不用 0 0 Xpx currentColor 外发光（opacity 渐变时与文字本体不同步形成光晕重影） */
   text-shadow:
     -2px -2px 0 rgba(0, 0, 0, 0.95),
     2px -2px 0 rgba(0, 0, 0, 0.95),
     -2px 2px 0 rgba(0, 0, 0, 0.95),
     2px 2px 0 rgba(0, 0, 0, 0.95),
-    3px 3px 0 rgba(0, 0, 0, 0.7),
-    0 0 10px currentColor;
-  will-change: transform;
+    3px 3px 0 rgba(0, 0, 0, 0.7);
+  /* 不用 will-change，避免强制创建合成层导致栅格化残影 */
 }
 @keyframes combo-char-in {
   0% {
     opacity: 0;
-    /* 从上方 40px 砸下，初始放大 1.5 倍（克制，避免大字残影），轻微左倾
-       不用 blur，避免模糊残影叠在最终位置上形成"重影"感 */
-    transform: translateY(-40px) scale(1.5) rotate(-5deg);
+    /* 从上方 32px 砸下，无 scale/rotate/blur，避免大字缩放残影 */
+    transform: translateY(-32px);
   }
-  55% {
-    /* 砸到位置：过冲到 0.9（轻微收缩），轻微右倾，模拟落地顿挫 */
+  60% {
+    /* 轻微过冲：向下多走 4px 模拟落地顿挫 */
     opacity: 1;
-    transform: translateY(0) scale(0.9) rotate(3deg);
+    transform: translateY(4px);
   }
   100% {
-    /* 定格：回到正常大小，稳稳定住，不再多次反弹避免拖影 */
+    /* 定格：回到原位 */
     opacity: 1;
-    transform: translateY(0) scale(1) rotate(0deg);
+    transform: translateY(0);
   }
 }
 
@@ -577,8 +577,8 @@ const onPetAnimEnd = () => {
    注意：不再有 combo-char-out，由外层 .kill-combo 统一淡出 */
 .combo-legendary { color: #FFD600; }
 .combo-legendary .combo-char {
-  animation: combo-char-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
-             legendary-glow 0.7s ease-in-out infinite alternate 0.6s;
+  animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
+             legendary-glow 0.8s ease-in-out infinite alternate 0.6s;
 }
 @keyframes legendary-glow {
   0% {
@@ -586,24 +586,21 @@ const onPetAnimEnd = () => {
     text-shadow:
       -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
       -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
-      3px 3px 0 rgba(0,0,0,0.7),
-      0 0 12px #FFD600, 0 0 20px #FF6E40;
+      3px 3px 0 rgba(0,0,0,0.7);
   }
   50% {
     color: #FF1744;
     text-shadow:
       -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
       -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
-      3px 3px 0 rgba(0,0,0,0.7),
-      0 0 14px #FF1744, 0 0 24px #D500F9;
+      3px 3px 0 rgba(0,0,0,0.7);
   }
   100% {
     color: #FFD600;
     text-shadow:
       -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
       -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
-      3px 3px 0 rgba(0,0,0,0.7),
-      0 0 16px #FFD600, 0 0 28px #FF1744;
+      3px 3px 0 rgba(0,0,0,0.7);
   }
 }
 
