@@ -35,17 +35,21 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：双杀 / 三杀 等 -->
+      <!-- 连击特效：四字成语 / 诗句，逐字显示，强度随连杀数递增 -->
       <div v-if="comboLabel" :key="`combo-${animKey}`" class="kill-combo" :class="comboClass">
-        <span class="combo-text">{{ comboLabel }}</span>
-        <span v-if="comboCount > 1" class="combo-count">×{{ comboCount }}</span>
+        <span
+          v-for="(ch, i) in comboLabelChars"
+          :key="i"
+          class="combo-char"
+          :style="{ animationDelay: (i * 0.08) + 's' }"
+        >{{ ch }}</span>
       </div>
     </div>
   </teleport>
 </template>
 
 <script setup>
-import { ref, watch, onUnmounted } from 'vue'
+import { ref, watch, computed, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
@@ -70,28 +74,48 @@ let petDelayTimer = null
 
 const comboLabel = ref('')
 const comboClass = ref('')
-const comboCount = ref(0)
+// 逐字显示：将文案拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
+const comboLabelChars = computed(() => Array.from(comboLabel.value || ''))
 
-// ===== 连击系统 =====
-// 连击窗口：每次击杀BOSS后 12 秒内再次击杀则连击+1，超时重置
-const COMBO_WINDOW_MS = 12000
+// ===== 连击系统：中文斩杀文案库 =====
+// 按连杀次数分 10 个层级，强度递增（四字成语 → 五字 → 七字诗句 → 十字传奇）
+// 文案来源：李白《侠客行》、贯休《献钱尚父》、古龙武侠、修仙小说常用意象
+// 每层多条文案轮换，避免重复单调
+const COMBO_TIERS = [
+  // 第 1 杀：初斩·四字（凌厉但不夸张）
+  { class: 'combo-1', lines: ['一击必杀', '势如破竹', '雷厉风行', '剑出如虹', '快如闪电', '锋芒毕露'] },
+  // 第 2 杀：连斩·四字（杀气渐起）
+  { class: 'combo-2', lines: ['连斩双煞', '双剑合璧', '左右开弓', '势不可挡', '杀气腾腾', '所向披靡'] },
+  // 第 3 杀：凌厉·五字（如入无人境）
+  { class: 'combo-3', lines: ['剑气纵横起', '杀气盈原野', '所向皆披靡', '一剑斩乾坤', '凌厉无匹敌', '剑落惊风雨'] },
+  // 第 4 杀：霸道·六字（横扫千军）
+  { class: 'combo-4', lines: ['横扫千军如卷', '一夫当关莫开', '万军之中取首', '剑气荡平八荒', '杀伐果断无情', '势若雷霆万钧'] },
+  // 第 5 杀：王者·七字（大杀四方）
+  { class: 'combo-5', lines: ['大杀四方震八荒', '剑锋所指皆披靡', '气吞山河万里红', '杀尽奸邪不留行', '一剑光寒动九州', '血染黄沙战未休'] },
+  // 第 6 杀：诗·七字（李白侠客行意象）
+  { class: 'combo-6', lines: ['十步杀一人千里', '事了拂衣深藏名', '飒沓如流星杀尽', '纵死侠骨犹留香', '吴钩霜雪斩群魔', '三杯吐诺重五岳'] },
+  // 第 7 杀：狂·七字（贯休献钱尚父）
+  { class: 'combo-7', lines: ['一剑霜寒十四州', '满堂花醉三千客', '冲天香阵透长安', '剑气冲霄贯斗牛', '杀气三声动天地', '狂歌痛饮斩天骄'] },
+  // 第 8 杀：超凡·八字（踏碎凌霄）
+  { class: 'combo-8', lines: ['踏碎凌霄放肆桀骜', '气吞万里猛如虎', '一身转战三千里', '一剑曾当百万师', '剑破苍穹碎虚空', '杀伐决断震九霄'] },
+  // 第 9 杀：神威·九字（一剑光寒）
+  { class: 'combo-9', lines: ['剑气纵横三万里', '一剑光寒十九州', '十步杀尽千人挡', '千里不留行无踪', '杀尽苍生不见血', '剑出星辰皆黯淡'] },
+  // 第 10+ 杀：传奇·十字（诗剑双绝）
+  { class: 'combo-legendary', lines: ['剑气纵横三万里，一剑光寒十九州', '十步杀一人，千里不留行', '事了拂衣去，深藏身与名', '一身转战三千里，一剑曾当百万师', '满堂花醉三千客，一剑霜寒十四州'] }
+]
+
+// 连击窗口：每次击杀BOSS后 15 秒内再次击杀则连击+1，超时重置
+const COMBO_WINDOW_MS = 15000
 let comboTimerId = null
 let currentCombo = 0
 
-// 连击等级表：根据连续击杀数返回中文标签与样式类
-// 与本修仙游戏风格一致，避免使用 Double Kill、Triple Kill 等英文
+// 根据连杀数取对应层级文案（随机选一条，避免重复）
 function getComboTier(count) {
-  if (count < 2) return { label: '', class: '' }
-  if (count === 2) return { label: '双杀', class: 'combo-double' }
-  if (count === 3) return { label: '三杀', class: 'combo-triple' }
-  if (count === 4) return { label: '四杀', class: 'combo-quadra' }
-  if (count === 5) return { label: '五杀', class: 'combo-penta' }
-  if (count === 6) return { label: '暴走', class: 'combo-spree' }
-  if (count === 7) return { label: '狂暴', class: 'combo-rampage' }
-  if (count === 8) return { label: '不可阻挡', class: 'combo-unstoppable' }
-  if (count === 9) return { label: '主宰比赛', class: 'combo-dominating' }
-  if (count === 10) return { label: '超神', class: 'combo-godlike' }
-  return { label: '传奇', class: 'combo-legendary' }
+  if (count < 1) return { label: '', class: '' }
+  const tierIdx = Math.min(count, COMBO_TIERS.length) - 1
+  const tier = COMBO_TIERS[tierIdx]
+  const label = tier.lines[Math.floor(Math.random() * tier.lines.length)]
+  return { label, class: tier.class }
 }
 
 function bumpCombo() {
@@ -99,14 +123,12 @@ function bumpCombo() {
   const tier = getComboTier(currentCombo)
   comboLabel.value = tier.label
   comboClass.value = tier.class
-  comboCount.value = currentCombo
   // 重置连击窗口计时器
   if (comboTimerId) clearTimeout(comboTimerId)
   comboTimerId = setTimeout(() => {
     currentCombo = 0
     comboLabel.value = ''
     comboClass.value = ''
-    comboCount.value = 0
     comboTimerId = null
   }, COMBO_WINDOW_MS)
 }
@@ -436,67 +458,86 @@ const onPetAnimEnd = () => {
   100% { opacity: 0; transform: translateY(-10px); }
 }
 
-/* ===== 连击特效 ===== */
-/* 位置：屏幕右上角，从右侧滑入后弹跳停留，再淡出消失 */
+/* ===== 连击特效：逐字显示，一字一字弹出 ===== */
+/* 位置：屏幕右上角。每个字独立动画，配合 animation-delay 实现逐字出现 */
 .kill-combo {
   position: absolute;
-  top: 18%;
-  right: 8%;
+  top: 16%;
+  right: 6%;
   display: flex;
-  align-items: baseline;
-  gap: 8px;
-  opacity: 0;
-  animation: combo-in 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
-  text-shadow: 0 0 16px currentColor, 0 0 32px currentColor, 0 2px 6px rgba(0, 0, 0, 0.9);
-  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+  flex-wrap: wrap;
+  justify-content: flex-end;
+  max-width: 60vw;
+  /* 标点符号（逗号等）也占位但不单独成行 */
+  gap: 2px;
 }
-.combo-text {
-  font-size: 42px;
+.combo-char {
+  display: inline-block;
+  font-size: clamp(28px, 5vw, 48px);
   font-weight: 900;
-  letter-spacing: 4px;
-  /* 中文斩杀特效不使用斜体（中文字符斜体显示效果差） */
+  letter-spacing: 2px;
+  opacity: 0;
+  /* 逐字弹出：从右侧 60px 飞入 + 0→1.3→1 缩放 + 旋转，配合 delay 形成一字一字效果
+     每字 0.4s 完成，留 0.08s 给下一个字（有力量感但不拖沓）
+     全部字弹出后整体停留 1s 再淡出 */
+  animation: combo-char-in 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards,
+             combo-char-out 0.5s ease-in 2s forwards;
+  text-shadow: 0 0 12px currentColor, 0 0 24px currentColor, 0 2px 6px rgba(0, 0, 0, 0.9);
+  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+  will-change: transform, opacity;
 }
-.combo-count {
-  font-size: 28px;
-  font-weight: 700;
-  opacity: 0.9;
+@keyframes combo-char-in {
+  0% {
+    opacity: 0;
+    transform: translateX(60px) scale(0.2) rotate(-15deg);
+    filter: blur(4px);
+  }
+  60% {
+    opacity: 1;
+    transform: translateX(0) scale(1.3) rotate(2deg);
+    filter: blur(0);
+  }
+  100% {
+    opacity: 1;
+    transform: translateX(0) scale(1) rotate(0deg);
+    filter: blur(0);
+  }
 }
-@keyframes combo-in {
-  0% { opacity: 0; transform: translateX(80px) scale(0.3) rotate(-10deg); }
-  25% { opacity: 1; transform: translateX(0) scale(1.3) rotate(3deg); }
-  40% { transform: translateX(0) scale(1) rotate(-2deg); }
-  55% { transform: translateX(0) scale(1.1) rotate(1deg); }
-  70% { transform: translateX(0) scale(1) rotate(0deg); }
-  85% { opacity: 1; }
-  100% { opacity: 0; transform: translateX(40px) scale(0.8) rotate(5deg); }
+@keyframes combo-char-out {
+  0% { opacity: 1; transform: translateX(0) scale(1); }
+  100% { opacity: 0; transform: translateX(20px) scale(0.85); filter: blur(2px); }
 }
 
-/* 连击等级配色：从蓝→紫→金→红，强度递增 */
-.combo-double { color: #4FC3F7; }        /* 浅蓝 */
-.combo-triple { color: #BA68C8; }         /* 紫 */
-.combo-quadra { color: #FFB300; }         /* 金橙 */
-.combo-penta { color: #FF6E40; }          /* 橙红 */
-.combo-spree { color: #FF5252; }          /* 红 */
-.combo-rampage { color: #FF1744; }        /* 深红 */
-.combo-unstoppable { color: #D500F9; }    /* 品红 */
-.combo-dominating { color: #00E5FF; }     /* 青蓝 */
-.combo-godlike { color: #FFD600; }        /* 金黄 */
-.combo-legendary {
-  color: #FFD600;
-  animation: combo-in-legendary 1.8s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards, legendary-glow 0.8s ease-in-out infinite alternate 1.8s;
+/* 连击等级配色：从白蓝→青→金→橙→红→紫→品红→深红→金红→传奇彩，强度递增 */
+.combo-1 { color: #B3E5FC; }        /* 浅白蓝：初斩，凌厉但克制 */
+.combo-2 { color: #4FC3F7; }        /* 亮蓝：连斩，杀气渐起 */
+.combo-3 { color: #26C6DA; }        /* 青：凌厉，剑气纵横 */
+.combo-4 { color: #FFB300; }        /* 金橙：霸道，横扫千军 */
+.combo-5 { color: #FF6E40; }        /* 橙红：王者，大杀四方 */
+.combo-6 { color: #FF5252; }        /* 红：诗·李白，杀气浓烈 */
+.combo-7 { color: #FF1744; }        /* 深红：狂·贯休，杀伐果断 */
+.combo-8 { color: #D500F9; }        /* 品红：超凡，踏碎凌霄 */
+.combo-9 { color: #FFD600; }        /* 金黄：神威，一剑光寒 */
+/* 传奇层级：金红交替发光，配合 rainbow-glow 持续脉冲 */
+.combo-legendary { color: #FFD600; }
+.combo-legendary .combo-char {
+  animation: combo-char-in 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards,
+             combo-char-out 0.5s ease-in 2.5s forwards,
+             legendary-glow 0.6s ease-in-out infinite alternate 2.5s;
 }
 @keyframes legendary-glow {
-  0% { text-shadow: 0 0 16px #FFD600, 0 0 32px #FF6E40, 0 2px 6px rgba(0,0,0,0.9); }
-  100% { text-shadow: 0 0 28px #FFD600, 0 0 56px #FF1744, 0 0 84px #D500F9, 0 2px 6px rgba(0,0,0,0.9); }
-}
-@keyframes combo-in-legendary {
-  0% { opacity: 0; transform: translateX(80px) scale(0.3) rotate(-10deg); }
-  25% { opacity: 1; transform: translateX(0) scale(1.4) rotate(3deg); }
-  40% { transform: translateX(0) scale(1) rotate(-2deg); }
-  55% { transform: translateX(0) scale(1.15) rotate(1deg); }
-  70% { transform: translateX(0) scale(1) rotate(0deg); }
-  85% { opacity: 1; }
-  100% { opacity: 0; transform: translateX(40px) scale(0.8) rotate(5deg); }
+  0% {
+    color: #FFD600;
+    text-shadow: 0 0 12px #FFD600, 0 0 24px #FF6E40, 0 2px 6px rgba(0,0,0,0.9);
+  }
+  50% {
+    color: #FF1744;
+    text-shadow: 0 0 16px #FF1744, 0 0 32px #D500F9, 0 2px 6px rgba(0,0,0,0.9);
+  }
+  100% {
+    color: #FFD600;
+    text-shadow: 0 0 20px #FFD600, 0 0 40px #FF1744, 0 0 60px #D500F9, 0 2px 6px rgba(0,0,0,0.9);
+  }
 }
 
 /* 尊重无障碍：减弱动画偏好下不播放演出 */
