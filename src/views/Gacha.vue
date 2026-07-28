@@ -105,6 +105,9 @@
               <div v-if="result.category === 'character' && getCharacterAvatar(result.item)" class="result-avatar" :class="result.item.star >= 5 ? 'star-5-glow' : (result.item.star >= 4 ? 'star-4-glow' : '')">
                 <img :src="getCharacterThumbnail(result.item)" :alt="result.item.name" loading="lazy" decoding="async" />
               </div>
+              <div v-else-if="result.category === 'pet' && getPetThumbnail(result.item)" class="result-avatar" :class="(result.item.rarity === 'divine' || result.item.rarity === 'celestial') ? 'star-5-glow' : ''">
+                <img :src="getPetThumbnail(result.item)" :alt="result.item.name" loading="lazy" decoding="async" @error="$event.target.style.display='none'" />
+              </div>
               <div class="result-type" :style="{ color: getResultColor(result) }">
                 {{ getResultTypeName(result) }}
               </div>
@@ -156,6 +159,7 @@
     </div>
 
     <CharacterPortraitModal v-if="showCharModal" :character="selectedCharacter" @close="closeCharModal" />
+    <PetPortraitModal v-if="showPetModal" :pet="selectedPet" @close="closePetModal" @update-skin="onPetSkinChange" />
 
     <!-- 祈福物品详情弹窗（装备/法宝/灵宠） -->
     <div v-if="showGachaItemDetail" class="simple-modal" @click.self="closeGachaItemDetail">
@@ -254,7 +258,9 @@
   import { setBonuses, calculateEquipmentScore, rarityConfig } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
   import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
+  import PetPortraitModal from '../components/PetPortraitModal.vue'
   import { characterSchools, characterTalents, characterRoles, getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
+  import { getPetThumbnail } from '../plugins/pets'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -266,6 +272,19 @@
   const selectedCharacter = ref(null)
   const selectedGachaItem = ref(null)
   const showGachaItemDetail = ref(false)
+  // 灵宠立绘弹窗：抽到 celestial/divine 灵宠时自动弹出，或点击灵宠结果卡片触发
+  const showPetModal = ref(false)
+  const selectedPet = ref(null)
+  const openPetModal = (pet) => {
+    if (!pet) return
+    selectedPet.value = pet
+    showPetModal.value = true
+  }
+  const closePetModal = () => { showPetModal.value = false }
+  const onPetSkinChange = ({ pet, skin }) => {
+    if (!pet) return
+    playerStore.setPetCurrentSkin(pet.id, skin)
+  }
 
   const poolList = computed(() => [
     { key: 'all', name: '综合池', cost: gachaPools.all.cost, desc: '人物/武器/法宝/灵宠/资源' },
@@ -371,6 +390,10 @@
       selectedCharacter.value = result.item
       showCharModal.value = true
     }
+    // 抽到 celestial/divine 灵宠自动弹出立绘
+    if (result.category === 'pet' && (result.item.rarity === 'celestial' || result.item.rarity === 'divine')) {
+      openPetModal(result.item)
+    }
     playerStore.queueSave()
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
@@ -428,6 +451,14 @@
       selectedCharacter.value = bestChar.item
       showCharModal.value = true
     }
+    // 十连中抽到 celestial/divine 灵宠自动弹出立绘（取最高品质）
+    const rarityOrder = { divine: 5, celestial: 4, mystic: 3, spiritual: 2, mortal: 1 }
+    const bestPet = results
+      .filter(r => r.category === 'pet' && (r.item.rarity === 'celestial' || r.item.rarity === 'divine'))
+      .sort((a, b) => (rarityOrder[b.item.rarity] || 0) - (rarityOrder[a.item.rarity] || 0))[0]
+    if (bestPet) {
+      openPetModal(bestPet.item)
+    }
     playerStore.queueSave()
     playerStore.saveToCurrentSlot().catch(err => console.error('抽奖后自动存档失败:', err))
   }
@@ -437,7 +468,10 @@
     if (result.category === 'character') {
       selectedCharacter.value = result.item
       showCharModal.value = true
-    } else if (result.category === 'equipment' || result.category === 'artifact' || result.category === 'pet') {
+    } else if (result.category === 'pet') {
+      // 灵宠结果卡片点击 → 直接弹立绘（对称于人物卡片点击 → 立绘）
+      openPetModal(result.item)
+    } else if (result.category === 'equipment' || result.category === 'artifact') {
       selectedGachaItem.value = result.item
       showGachaItemDetail.value = true
     }

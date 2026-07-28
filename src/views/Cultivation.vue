@@ -187,9 +187,18 @@
     <!-- 5. 灵宠区域 -->
     <div v-if="selectedMember" class="pet-card glass-card">
       <h3 class="section-title">灵宠</h3>
-      <div v-if="selectedMember.equippedPet" class="pet-equipped" @click="unequipPet">
-        <span class="pet-name" :style="{ color: getPetColor(selectedMember.equippedPet) }">{{ selectedMember.equippedPet.name }}</span>
-        <span class="pet-meta">Lv.{{ selectedMember.equippedPet.level }} {{ selectedMember.equippedPet.rarity || '' }}</span>
+      <div v-if="selectedMember.equippedPet" class="pet-equipped">
+        <img
+          v-if="getPetThumbnail(selectedMember.equippedPet)"
+          :src="getPetThumbnail(selectedMember.equippedPet)"
+          class="pet-thumb"
+          :alt="selectedMember.equippedPet.name"
+          decoding="async"
+          @click.stop="openPetPortrait(selectedMember.equippedPet)"
+          @error="$event.target.style.display='none'"
+        />
+        <span class="pet-name" :style="{ color: getPetColor(selectedMember.equippedPet) }" @click="unequipPet">{{ selectedMember.equippedPet.name }}</span>
+        <span class="pet-meta" @click="unequipPet">Lv.{{ selectedMember.equippedPet.level }} {{ selectedMember.equippedPet.rarity || '' }} · 点击卸下</span>
       </div>
       <div v-else class="pet-empty" @click="showPetSelect = true">
         <span class="pet-empty-icon">🐾</span>
@@ -371,6 +380,7 @@
 
     <!-- 立绘查看器：复用抽卡时的角色立绘大图弹窗效果 -->
     <CharacterPortraitModal v-if="showPortrait" :character="portraitCharacter" @close="closePortrait" />
+    <PetPortraitModal v-if="showPetPortrait" :pet="portraitPet" @close="closePetPortrait" @update-skin="onPetSkinChange" />
 
     <!-- 装备选择弹窗 -->
     <div v-if="showEquipSelect" class="equip-select-modal" @click.self="closeEquipSelect">
@@ -438,8 +448,10 @@ import { calculateLevelExp } from '../plugins/cultivationSystem'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
+import PetPortraitModal from '../components/PetPortraitModal.vue'
 import { formatNumber } from '../utils/formatNumber.js'
 import { getIconUrl } from '../plugins/icons'
+import { getPetThumbnail } from '../plugins/pets'
 
 const playerStore = usePlayerStore()
 const message = useMessage()
@@ -846,6 +858,20 @@ const openMemberPortrait = (member) => {
 
 const closePortrait = () => {
   showPortrait.value = false
+}
+
+// 灵宠立绘弹窗（对称于人物立绘弹窗）：点击灵宠头像/缩略图触发
+const showPetPortrait = ref(false)
+const portraitPet = ref(null)
+const openPetPortrait = (pet) => {
+  if (!pet) return
+  portraitPet.value = pet
+  showPetPortrait.value = true
+}
+const closePetPortrait = () => { showPetPortrait.value = false }
+const onPetSkinChange = ({ pet, skin }) => {
+  if (!pet) return
+  playerStore.setPetCurrentSkin(pet.id, skin)
 }
 
 // 详情弹窗中的属性统计
@@ -1768,6 +1794,20 @@ watch([allMembers, teamMembers], () => {
 }
 .pet-equipped:hover {
   border-color: rgba(140, 120, 255, 0.5);
+}
+.pet-thumb {
+  width: 36px;
+  height: 36px;
+  object-fit: cover;
+  border-radius: 6px;
+  border: 1px solid rgba(140, 120, 255, 0.5);
+  cursor: pointer;
+  flex-shrink: 0;
+  transition: transform 0.15s ease, border-color 0.15s ease;
+}
+.pet-thumb:hover {
+  transform: scale(1.12);
+  border-color: rgba(140, 120, 255, 1);
 }
 .pet-meta {
   font-size: 12px;

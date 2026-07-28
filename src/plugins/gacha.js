@@ -236,9 +236,14 @@ export const generateEquipment = (playerLevel = 1, specificType = null) => {
 // 生成随机灵宠
 export const generatePet = (playerLevel = 1) => {
   const rarityInfo = pickByWeight(petRarities)
-  const nameBase = petNameParts[Math.floor(Math.random() * petNameParts.length)]
+  const nameBaseIdx = Math.floor(Math.random() * petNameParts.length)
+  const nameBase = petNameParts[nameBaseIdx]
   const name = `${nameBase}·${rarityInfo.name}`
   const description = petDescriptions[Math.floor(Math.random() * petDescriptions.length)]
+
+  // 立绘 templateId：按 nameBase 在 petNameParts 中的索引分配
+  // 形如 'pet_kind_01'..'pet_kind_18'，对应 public/pets/ 下的立绘资源
+  const templateId = `pet_kind_${String(nameBaseIdx + 1).padStart(2, '0')}`
 
   // 品质倍率
   const rarityMultiplier = { mortal: 1, spiritual: 1.5, mystic: 2, celestial: 3, divine: 5 }
@@ -280,6 +285,8 @@ export const generatePet = (playerLevel = 1) => {
     rarity: rarityInfo.key,
     level: 1,
     star: 0,
+    templateId,
+    currentSkin: 0,
     combatAttributes
   }
 }

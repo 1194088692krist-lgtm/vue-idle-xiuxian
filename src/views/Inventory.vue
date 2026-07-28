@@ -185,9 +185,8 @@
                 <div class="material-meta">
                   <span class="material-kind">
                     {{ getMaterialKindName(mat.kind) }}
-                    <span v-if="mat.virtual" class="material-virtual-tag">只读</span>
                   </span>
-                  <span class="material-price" v-if="!mat.virtual">
+                  <span class="material-price" v-if="!mat.virtual || mat.sellable">
                     单价 {{ getMaterialUnitPrice(mat) }} 灵石
                     <span class="material-total">总价 {{ getMaterialTotalPrice(mat) }} 灵石</span>
                   </span>
@@ -257,9 +256,20 @@
             <button class="btn-small" :disabled="currentPage * pageSize >= filteredPets.length" @click="currentPage++">下一页</button>
           </div>
           <div v-if="displayPets.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="pet in displayPets" :key="pet.id" class="simple-card" @click="showPetDetails(pet)">
+            <div v-for="pet in displayPets" :key="pet.id" class="simple-card pet-card" @click="showPetDetails(pet)">
               <div class="card-header">
-                <span>{{ pet.name }}</span>
+                <span class="pet-card-title">
+                  <img
+                    v-if="getPetThumbnail(pet)"
+                    :src="getPetThumbnail(pet)"
+                    class="pet-thumb"
+                    :alt="pet.name"
+                    decoding="async"
+                    @error="$event.target.style.display='none'"
+                    @click.stop="openPetPortrait(pet)"
+                  />
+                  {{ pet.name }}
+                </span>
               </div>
               <div class="card-body">
                 <p>{{ pet.description }}</p>
@@ -319,6 +329,13 @@
         </div>
         <div class="modal-actions">
           <button
+            class="btn-small"
+            @click="openPetPortrait(selectedPet)"
+            title="查看灵宠立绘（可在立绘中切换皮肤）"
+          >
+            🖼️ 立绘
+          </button>
+          <button
             class="btn-small btn-primary"
             @click="upgradePet(selectedPet)"
             :disabled="!canUpgrade(selectedPet)"
@@ -345,6 +362,14 @@
       </div>
     </div>
   </div>
+
+  <!-- 灵宠立绘弹窗 -->
+  <PetPortraitModal
+    v-if="showPetPortrait"
+    :pet="portraitPet"
+    @close="showPetPortrait = false"
+    @update-skin="onPetSkinChange"
+  />
 
   <!-- 批量放生确认弹窗 -->
   <div v-if="showBatchReleaseConfirm" class="simple-modal" @click.self="showBatchReleaseConfirm = false">
@@ -783,6 +808,8 @@
   import { qualityTierLabel, qualityTierClass, bestAffixTier, bestAffixTierTag } from '../utils/affixQuality'
   import { craftCurrencies } from '../plugins/craftCurrency'
   import { getRuneSynergy, RUNE_ELEMENTS, getRuneStats } from '../plugins/runes'
+  import { getPetThumbnail } from '../plugins/pets'
+  import PetPortraitModal from '../components/PetPortraitModal.vue'
 
   // 移动端适配
   const isMobile = ref(window.innerWidth <= 768)
@@ -842,6 +869,7 @@
     { key: 'special', label: '奇遇' },
     { key: 'boss_material', label: 'BOSS素材' },
     { key: 'boss_ticket', label: '挑战券' },
+    { key: 'pet', label: '灵宠素材' },
     { key: 'other', label: '其他资源' }
   ]
   const selectedMaterialCategory = ref('all')
@@ -870,7 +898,7 @@
       list.push({
         id: 'virt_reforge_stone', name: '高级洗炼石', kind: 'refinement',
         quality: 'legendary', description: '八卦炉大洗练消耗（可改变词条种类并冲击高数值）；获得难度介于高级强化石与至尊强化石之间',
-        count: ps.refinementStones, virtual: true, usage: '八卦炉 → 大洗练'
+        count: ps.refinementStones, virtual: true, sellable: true, usage: '八卦炉 → 大洗练'
       })
     }
     if (ps.craftCurrencies) {
@@ -880,20 +908,27 @@
           list.push({
             id: 'virt_' + cid, name: def?.name || cid, kind: 'craft_currency',
             quality: 'rare', description: def?.desc || '工艺货币，用于装备打造/点化',
-            count: n, virtual: true, usage: '炼器 → 点化/打造'
+            count: n, virtual: true, sellable: true, usage: '炼器 → 点化/打造'
           })
         }
       }
     }
+    // 灵纹按 r.id 聚合堆叠，避免出现「焚天纹」「焚天纹（rune）」「焚天纹（rune）（1）」等多个同名条目
+    const runeAggMap = {}
     for (const r of (ps.runes || [])) {
-      const el = RUNE_ELEMENTS[r.element]
-      list.push({
-        id: 'virt_' + (r.id || r.name), name: r.name || r.id, kind: 'rune',
-        quality: r.rarity || 'rare',
-        description: `五行·${el?.name || '?'}　灵纹，用于装备镶嵌`,
-        count: 1, virtual: true, usage: '炼器 → 镶嵌'
-      })
+      const rid = r.id || r.name
+      if (!runeAggMap[rid]) {
+        const el = RUNE_ELEMENTS[r.element]
+        runeAggMap[rid] = {
+          id: 'virt_' + rid, name: r.name || r.id, kind: 'rune',
+          quality: r.rarity || 'rare',
+          description: `五行·${el?.name || '?'}　灵纹，用于装备镶嵌`,
+          count: 0, virtual: true, sellable: true, usage: '炼器 → 镶嵌'
+        }
+      }
+      runeAggMap[rid].count++
     }
+    Object.values(runeAggMap).forEach(r => list.push(r))
     if (ps.phantomCrystals > 0) {
       list.push({
         id: 'virt_phantom_crystal', name: '幻灵结晶', kind: 'phantom',
@@ -908,31 +943,34 @@
         count: ps.petFragments, virtual: true, usage: '灵宠 → 升星'
       })
     }
-    // 同名去重：若多个虚拟条目显示名相同（如“洗练石”同时存在于工艺洗练石与同名工艺货币两处），
-    // 对后者追加区分后缀，避免背包出现看似重复、且难以辨认的条目。
-    const seenNames = {}
-    for (const e of list) {
-      if (seenNames[e.name]) {
-        const qual = e.kind === 'craft_currency' ? '（工艺）' : `（${e.kind}）`
-        e.name = e.name + qual
-      } else {
-        seenNames[e.name] = true
-      }
+    if (ps.petEssence > 0) {
+      list.push({
+        id: 'virt_pet_essence', name: '灵宠精华', kind: 'pet_essence',
+        quality: 'rare', description: '用于灵宠升级',
+        count: ps.petEssence, virtual: true, usage: '灵宠 → 升级'
+      })
     }
+    // 同名去重逻辑已删除：灵纹改为按 id 聚合 count，不再产生重名虚拟条目；
+    // 工艺货币的 cid 各不相同、虚拟条目 id 唯一，也不存在重名问题。
     return list
   })
 
   const allMaterialEntries = computed(() => [...groupedMaterials.value, ...virtualResources.value])
 
+  // 「灵宠素材」分类：灵宠精华（升级）+ 灵宠碎片（升星）
+  const PET_MATERIAL_KINDS = ['pet_essence', 'pet_fragment']
+  const isPetMaterial = (m) => PET_MATERIAL_KINDS.includes(m.kind)
+
   const filteredMaterials = computed(() => {
     const cat = selectedMaterialCategory.value
     if (cat === 'all') return allMaterialEntries.value
-    if (cat === 'other') return virtualResources.value
+    if (cat === 'other') return virtualResources.value.filter(m => !isPetMaterial(m))
+    if (cat === 'pet') return virtualResources.value.filter(m => isPetMaterial(m))
     return allMaterialEntries.value.filter(m => m.kind === cat)
   })
 
-  // 可出售（真实素材）数量：虚拟条目不可出售，多选卖出按钮据此禁用
-  const sellableMaterialsCount = computed(() => filteredMaterials.value.filter(m => !m.virtual).length)
+  // 可出售数量：真实素材 + 标记为 sellable 的虚拟条目（洗炼石/工艺货币/灵纹）
+  const sellableMaterialsCount = computed(() => filteredMaterials.value.filter(m => m.sellable || !m.virtual).length)
 
   const currentMaterialPage = ref(1)
   const materialPageSize = ref(12)
@@ -976,7 +1014,8 @@
     craft_currency: '工艺货币',
     rune: '灵纹',
     phantom: '幻灵结晶',
-    pet_fragment: '灵宠碎片'
+    pet_fragment: '灵宠碎片',
+    pet_essence: '灵宠精华'
   }
 
   const MATERIAL_PRICE_MAP = {
@@ -1011,9 +1050,12 @@
 
   const confirmQuickSell = () => {
     if (!quickSellMaterial.value) return
-    const result = playerStore.sellMaterial(quickSellMaterial.value.kind, quickSellMaterial.value.id, quickSellCount.value)
+    const mat = quickSellMaterial.value
+    const result = mat.virtual
+      ? playerStore.sellVirtualMaterial(mat.kind, mat.id, quickSellCount.value)
+      : playerStore.sellMaterial(mat.kind, mat.id, quickSellCount.value)
     if (result.success) {
-      message.success(`卖出 ${quickSellCount.value} 个${quickSellMaterial.value.name}，获得 ${result.totalPrice} 灵石`)
+      message.success(`卖出 ${result.sellCount} 个${mat.name}，获得 ${result.totalPrice} 灵石`)
       showQuickSellModal.value = false
     } else {
       message.error(result.message || '卖出失败')
@@ -1029,7 +1071,7 @@
   const isMaterialSelected = (mat) => selectedMaterialIds.value.includes(mat.id)
 
   const toggleMaterialSelect = (mat) => {
-    if (mat.virtual) return
+    if (mat.virtual && !mat.sellable) return
     const idx = selectedMaterialIds.value.indexOf(mat.id)
     if (idx >= 0) {
       selectedMaterialIds.value.splice(idx, 1)
@@ -1041,7 +1083,7 @@
   }
 
   const handleMaterialClick = (mat) => {
-    if (mat.virtual) {
+    if (mat.virtual && !mat.sellable) {
       message.info(`${mat.name}：${mat.usage || '该资源不可在背包出售'}`)
       return
     }
@@ -1084,7 +1126,9 @@
     let totalGot = 0
     selectedMaterials.value.forEach(mat => {
       const cnt = materialSellCounts.value[mat.id] || 1
-      const result = playerStore.sellMaterial(mat.kind, mat.id, cnt)
+      const result = mat.virtual
+        ? playerStore.sellVirtualMaterial(mat.kind, mat.id, cnt)
+        : playerStore.sellMaterial(mat.kind, mat.id, cnt)
       if (result.success) totalGot += result.totalPrice
     })
     message.success(`卖出完成，共获得 ${totalGot} 灵石`)
@@ -1349,6 +1393,20 @@
   const showPetDetails = pet => {
     selectedPet.value = pet
     showPetModal.value = true
+  }
+
+  // 灵宠立绘弹窗：点击灵宠卡片右上角「🖼️」或详情弹窗「查看立绘」按钮触发
+  const showPetPortrait = ref(false)
+  const portraitPet = ref(null)
+  const openPetPortrait = (pet) => {
+    if (!pet) return
+    portraitPet.value = pet
+    showPetPortrait.value = true
+  }
+  // 立绘切换皮肤 → 持久化到灵宠 item
+  const onPetSkinChange = ({ pet, skin }) => {
+    if (!pet) return
+    playerStore.setPetCurrentSkin(pet.id, skin)
   }
 
   // 计算灵宠属性加成
@@ -2298,6 +2356,26 @@
     gap: 8px;
     flex-wrap: wrap;
     margin-top: 6px;
+  }
+
+  .pet-card-title {
+    display: flex;
+    align-items: center;
+    gap: 6px;
+  }
+  .pet-thumb {
+    width: 22px;
+    height: 22px;
+    object-fit: cover;
+    border-radius: 4px;
+    border: 1px solid rgba(218, 165, 32, 0.4);
+    cursor: pointer;
+    flex-shrink: 0;
+    transition: transform 0.15s ease;
+  }
+  .pet-thumb:hover {
+    transform: scale(1.1);
+    border-color: rgba(218, 165, 32, 0.8);
   }
 
   .pet-score {

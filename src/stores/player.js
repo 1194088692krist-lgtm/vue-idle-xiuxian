@@ -7,6 +7,7 @@ import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
+import { petNameParts } from '../plugins/gacha'
 import { getSkillsForBreakthrough } from '../plugins/skills'
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
@@ -622,6 +623,34 @@ export const usePlayerStore = defineStore('player', {
             if (!this.craftCurrencies || typeof this.craftCurrencies !== 'object') this.craftCurrencies = {}
             // M1 迁移：旧档补灵纹库存
             if (!Array.isArray(this.runes)) this.runes = []
+            // M2 迁移：旧档灵宠补 templateId 和 currentSkin 字段（立绘系统启用）
+            // 旧档灵宠没有 templateId，按 name 反查 petNameParts 推断；currentSkin 默认 0（原立绘）
+            if (Array.isArray(this.items)) {
+              this.items.forEach(it => {
+                if (it && it.type === 'pet') {
+                  if (!it.templateId && it.name) {
+                    const nameBase = String(it.name).split('·')[0]
+                    const idx = petNameParts.indexOf(nameBase)
+                    if (idx >= 0) it.templateId = `pet_kind_${String(idx + 1).padStart(2, '0')}`
+                  }
+                  if (typeof it.currentSkin !== 'number') it.currentSkin = 0
+                }
+              })
+            }
+            // 出战灵宠 / 宗门成员装备灵宠同样需要补齐
+            const fixPetFields = (p) => {
+              if (!p || p.type !== 'pet') return
+              if (!p.templateId && p.name) {
+                const nameBase = String(p.name).split('·')[0]
+                const idx = petNameParts.indexOf(nameBase)
+                if (idx >= 0) p.templateId = `pet_kind_${String(idx + 1).padStart(2, '0')}`
+              }
+              if (typeof p.currentSkin !== 'number') p.currentSkin = 0
+            }
+            if (this.activePet) fixPetFields(this.activePet)
+            if (Array.isArray(this.sectMembers)) {
+              this.sectMembers.forEach(m => { if (m && m.equippedPet) fixPetFields(m.equippedPet) })
+            }
           } else {
             console.error('存档数据验证失败，使用初始数据')
           }
@@ -1349,6 +1378,53 @@ export const usePlayerStore = defineStore('player', {
           removed++
         }
       }
+      const totalPrice = sellCount * pricePerUnit
+      this.spiritStones += totalPrice
+      this.queueSave()
+      return { success: true, message: `出售 ${sellCount} 个，获得 ${totalPrice} 灵石`, sellCount, totalPrice }
+    },
+    // 出售虚拟资源（高级洗炼石 / 工艺货币 / 灵纹）。
+    // 这些资源在 player store 中以独立计数器存储（refinementStones / craftCurrencies / runes），
+    // 不在 materials 数组中，故不能复用 sellMaterial。
+    // materialId 形如 'virt_reforge_stone' / 'virt_<cid>' / 'virt_<runeId>'，去掉 'virt_' 前缀即为资源 key。
+    sellVirtualMaterial(kind, materialId, count) {
+      const priceMap = { common: 5, uncommon: 10, rare: 25, epic: 60, legendary: 150, mythic: 400 }
+      let sellCount = 0
+      let pricePerUnit = 0
+      if (kind === 'refinement') {
+        const have = this.refinementStones || 0
+        sellCount = Math.min(count, have)
+        pricePerUnit = priceMap.legendary // 高级洗炼石=legendary
+        if (sellCount > 0) this.refinementStones = have - sellCount
+      } else if (kind === 'craft_currency') {
+        const cid = String(materialId).replace(/^virt_/, '')
+        const have = this.craftCurrencies?.[cid] || 0
+        sellCount = Math.min(count, have)
+        pricePerUnit = priceMap.rare // 工艺货币=rare
+        if (sellCount > 0) {
+          const next = have - sellCount
+          if (next > 0) this.craftCurrencies[cid] = next
+          else delete this.craftCurrencies[cid]
+        }
+      } else if (kind === 'rune') {
+        const rid = String(materialId).replace(/^virt_/, '')
+        const matches = (this.runes || []).filter(r => (r.id || r.name) === rid)
+        sellCount = Math.min(count, matches.length)
+        const q = matches[0]?.rarity || 'rare'
+        pricePerUnit = priceMap[q] || priceMap.rare
+        // 按 id 删除 sellCount 个实例（删除最早的）
+        let removed = 0
+        for (let i = 0; i < (this.runes || []).length && removed < sellCount; i++) {
+          if ((this.runes[i].id || this.runes[i].name) === rid) {
+            this.runes.splice(i, 1)
+            i--
+            removed++
+          }
+        }
+      } else {
+        return { success: false, message: '该资源不可出售' }
+      }
+      if (sellCount <= 0) return { success: false, message: '数量不足' }
       const totalPrice = sellCount * pricePerUnit
       this.spiritStones += totalPrice
       this.queueSave()
@@ -2951,6 +3027,19 @@ export const usePlayerStore = defineStore('player', {
       this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
       this.queueSave()
       return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
+    },
+    // 设置灵宠当前展示的皮肤（立绘切换持久化）。
+    // skin: 0=原立绘, 1=skin1, 2=skin2 ...
+    // 同步更新 items 数组、activePet、宗门成员装备灵宠中的同 id 引用，保证 UI 一致。
+    setPetCurrentSkin(petId, skin) {
+      if (!petId || typeof skin !== 'number' || skin < 0) return
+      const apply = (p) => { if (p && p.id === petId) p.currentSkin = skin }
+      if (Array.isArray(this.items)) this.items.forEach(apply)
+      if (this.activePet) apply(this.activePet)
+      if (Array.isArray(this.sectMembers)) {
+        this.sectMembers.forEach(m => { if (m && m.equippedPet) apply(m.equippedPet) })
+      }
+      this.queueSave()
     },
     getEvolveCost(pet) {
       const baseCost = { divine: 50, celestial: 30, mystic: 15, spiritual: 8, mortal: 3 }

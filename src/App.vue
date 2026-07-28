@@ -165,6 +165,7 @@
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
 import { initCharacterDefs } from './plugins/characters'
+import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
 
   // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）
@@ -265,6 +266,9 @@ import SaveButton from './components/SaveButton.vue'
     // 立绘资源已改为完全后台加载（loadSharedPortraits 内部 fetch 不阻塞）
     updateLoading('正在加载立绘资源...', 60)
     await nextTick()
+    // 灵宠立绘与皮肤清单后台异步加载（不阻塞游戏启动；图片资源未到位时静默降级）
+    try { loadSharedPetPortraits() } catch (e) { /* 静默降级 */ }
+    try { loadPetSkinsManifest() } catch (e) { /* 静默降级 */ }
 
     updateLoading('正在初始化挂机系统...', 80)
     await nextTick()
