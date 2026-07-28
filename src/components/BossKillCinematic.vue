@@ -340,7 +340,7 @@ const onPetAnimEnd = () => {
 .kill-portrait {
   position: relative;
   width: min(70vw, 520px);
-  max-height: 80vh;
+  max-height: 68vh; /* 从 80vh 减小：留出顶部空间给连击文字，避免立绘与文字重叠 */
   object-fit: contain;
   border-radius: 12px;
   filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.7));
@@ -466,7 +466,9 @@ const onPetAnimEnd = () => {
 /* 击杀文案 */
 .kill-text {
   position: absolute;
-  bottom: 12%;
+  /* 立绘 max-height 68vh，底部约在 84vh
+     斩杀文案 bottom:6% = 94vh，文字顶部约 88vh > 84vh，不与立绘重叠 */
+  bottom: 6%;
   left: 50%;
   transform: translateX(-50%);
   text-align: center;
@@ -497,9 +499,9 @@ const onPetAnimEnd = () => {
    内层 .combo-char：仅负责逐字砸入出现（纯 translateY+opacity，无 scale/blur 避免残影） */
 .kill-combo {
   position: absolute;
-  /* 屏幕上方居中：宽度自适应内容，整体水平居中
-     用 left:50% + translateX(-50%) 而非 left:0;right:0，避免容器撑满 100vw 导致字间距松散 */
-  top: 14%;
+  /* 屏幕顶部居中：立绘 max-height 68vh，顶部约在 16vh
+     连击文字 top:4%，文字高度约 6vh，底部约 10vh < 16vh，不与立绘重叠 */
+  top: 4%;
   left: 50%;
   transform: translateX(-50%);
   display: flex;
