@@ -35,7 +35,7 @@
             <button v-if="canSwitch" class="skin-arrow skin-arrow-left" @click.stop="prevSkin" aria-label="上一个皮肤">‹</button>
             <button v-if="canSwitch" class="skin-arrow skin-arrow-right" @click.stop="nextSkin" aria-label="下一个皮肤">›</button>
             <div v-if="canSwitch" class="skin-indicator">{{ skinLabel }}</div>
-            <div v-else-if="unlockedCount < skinCount" class="skin-lock-hint">🔒 升至 {{ nextUnlockStar }} 星解锁皮肤</div>
+            <div v-else-if="unlockedCount < skinCount && nextUnlockStar" class="skin-lock-hint">🔒 升至 {{ nextUnlockStar }} 星解锁皮肤</div>
           </div>
           <div class="pet-modal-footer">
             <h2 class="pet-name-large">{{ pet.name }}</h2>
@@ -50,12 +50,14 @@
 <script setup>
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
 import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount } from '../plugins/pets'
+import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
   pet: { type: Object, default: null }
 })
 const emit = defineEmits(['close', 'update-skin'])
 
+const playerStore = usePlayerStore()
 const imgEl = ref(null)
 const avatarLoaded = ref(false)
 const avatarError = ref(false)
@@ -64,8 +66,10 @@ const imgRetryCount = ref(0)
 
 const avatar = computed(() => (props.pet ? getPetAvatar(props.pet) : null))
 
-// 已解锁皮肤数（按升星逐级解锁，min(unlocked, available)）
-const unlockedCount = computed(() => getUnlockedSkinCount(props.pet))
+// 已解锁皮肤数：
+// 5 星解锁 skin1，之后每星 +1，满星全解锁；
+// 同名灵宠（同 templateId）已解锁过的进度通过 petSkinUnlockRecord 共享，无需再次解锁
+const unlockedCount = computed(() => getUnlockedSkinCount(props.pet, playerStore.petSkinUnlockRecord))
 // 该灵宠实际拥有的皮肤总数（manifest 中声明）
 const skinCount = computed(() => getPetSkinCount(props.pet))
 // 是否可切换：已解锁至少 1 个皮肤，且实际拥有至少 1 个皮肤
@@ -74,8 +78,12 @@ const canSwitch = computed(() => unlockedCount.value >= 1 && skinCount.value >= 
 // currentSkin: 0 = 原立绘；1 = skin1；2 = skin2 ...
 // 优先用灵宠持久化的 currentSkin，否则默认 0
 const currentSkin = ref(0)
-// 下一个解锁星级（用于锁定提示文案）
-const nextUnlockStar = computed(() => (unlockedCount.value + 1) * 5)
+// 下一个解锁星级（用于锁定提示文案）：5 星解锁第 1 个，之后每星 +1
+const nextUnlockStar = computed(() => {
+  const unlocked = unlockedCount.value
+  if (unlocked >= skinCount.value) return null // 已全解锁
+  return 5 + unlocked
+})
 
 // 当前展示的立绘 URL：选中皮肤（且该皮肤已解锁）则取皮肤图，否则回退原立绘
 const displaySrc = computed(() => {

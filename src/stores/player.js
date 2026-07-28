@@ -13,6 +13,7 @@ import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, ge
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
+import { getPetSkinCount, getPetTemplateId, PET_MAX_STAR } from '../plugins/pets'
 import {
   BLACK_MARKET_CONFIG,
   PHASE_PRICE_MULT,
@@ -198,6 +199,9 @@ export const usePlayerStore = defineStore('player', {
     refinementStones: 0, // 高级洗炼石数量（八卦炉大洗练消耗；难度介于高级强化石与至尊强化石之间）
     petEssence: 0, // 灵宠精华
     petFragments: 0, // 灵宠升星碎片
+    // 灵宠皮肤解锁记录：{ [templateId]: 已解锁皮肤数 }
+    // 用于「同名灵宠已解锁过的无需再次解锁」共享进度。升星解锁新皮肤时更新此记录。
+    petSkinUnlockRecord: {},
     // 通胀治理：装备出售月度累计计数器
     // 当月累计出售装备达到一定量后，折价率阶梯下降，斩断"装备→灵石"无限变现乘数
     // { monthKey: 'YYYY-MM', soldCount: N, lastResetTs: timestamp }
@@ -576,6 +580,27 @@ export const usePlayerStore = defineStore('player', {
             if (this.activePet) fixPetFields(this.activePet)
             if (Array.isArray(this.sectMembers)) {
               this.sectMembers.forEach(m => { if (m && m.equippedPet) fixPetFields(m.equippedPet) })
+            }
+            // M3 迁移：初始化灵宠皮肤解锁记录
+            // 旧档没有 petSkinUnlockRecord，按现有灵宠星级回填：
+            // 5 星解锁 skin1，之后每星 +1，满星全解锁；取同种类最大解锁进度
+            if (!this.petSkinUnlockRecord || typeof this.petSkinUnlockRecord !== 'object') {
+              this.petSkinUnlockRecord = {}
+            }
+            if (Array.isArray(this.items)) {
+              this.items.forEach(p => {
+                if (!p || p.type !== 'pet' || !p.templateId) return
+                const star = p.star || 0
+                let unlocked = 0
+                if (star >= PET_MAX_STAR) {
+                  unlocked = getPetSkinCount(p)
+                } else if (star >= 5) {
+                  unlocked = Math.min(1 + (star - 5), getPetSkinCount(p))
+                }
+                const tid = p.templateId
+                const prev = this.petSkinUnlockRecord[tid] || 0
+                if (unlocked > prev) this.petSkinUnlockRecord[tid] = unlocked
+              })
             }
           } else {
             console.error('存档数据验证失败，使用初始数据')
@@ -3033,8 +3058,29 @@ export const usePlayerStore = defineStore('player', {
         this.resetPetBonuses()
         this.applyPetBonuses()
       }
+      // 更新同名灵宠皮肤解锁记录：
+      // 5 星解锁 skin1，之后每星 +1，满星全解锁；同名灵宠（同 templateId）已解锁过的进度共享
+      this._updatePetSkinUnlockRecord(currentPet)
       this.queueSave()
       return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
+    },
+    // 内部：更新灵宠皮肤解锁记录（按 templateId 共享进度，同名灵宠无需再次解锁）
+    _updatePetSkinUnlockRecord(pet) {
+      if (!pet) return
+      const tid = getPetTemplateId(pet)
+      if (!tid) return
+      const star = pet.star || 0
+      const available = getPetSkinCount(pet)
+      if (available === 0) return
+      let unlocked = 0
+      if (star >= PET_MAX_STAR) {
+        unlocked = available
+      } else if (star >= 5) {
+        unlocked = Math.min(1 + (star - 5), available)
+      }
+      if (!this.petSkinUnlockRecord) this.petSkinUnlockRecord = {}
+      const prev = this.petSkinUnlockRecord[tid] || 0
+      if (unlocked > prev) this.petSkinUnlockRecord[tid] = unlocked
     },
     // 灵石兑换升星碎片（1000灵石 = 1碎片，比幻灵结晶 200:1 更贵，保持稀缺）
     exchangePetFragments(amount) {

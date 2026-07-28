@@ -63,7 +63,8 @@
             <button v-if="canSwitch" class="skin-arrow skin-arrow-left" @click.stop="prevSkin" aria-label="上一个皮肤">‹</button>
             <button v-if="canSwitch" class="skin-arrow skin-arrow-right" @click.stop="nextSkin" aria-label="下一个皮肤">›</button>
             <div v-if="canSwitch" class="skin-indicator">{{ skinLabel }}</div>
-            <div v-else-if="skinCount >= 2" class="skin-lock-hint">🔒 突破 1 次解锁皮肤切换</div>
+            <div v-else-if="skinCount >= 2 && breakThrough < 1" class="skin-lock-hint">🔒 突破 1 次解锁皮肤切换</div>
+            <div v-if="canSwitch && maxSkinIndex < skinCount" class="skin-lock-hint">🔒 突破 {{ maxSkinIndex }} 次解锁更多皮肤</div>
           </div>
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
@@ -107,7 +108,8 @@ const effectiveVideoSrc = computed(() =>
 const shouldShowVideo = computed(() => !!playerStore.dynamicPortrait && !!effectiveVideoSrc.value)
 
 // ===== 皮肤切换 =====
-// 突破 >=1 次且角色拥有 >=2 张皮肤时，允许在 skin1 / skin2 之间左右切换
+// 突破 >=1 次且角色拥有 >=2 张皮肤时，允许切换皮肤
+// skin1/skin2：突破 >=1 次解锁；skin3：突破 >=2 次解锁
 const breakThrough = computed(() => (props.character && props.character.breakThrough) || 0)
 const skinCount = computed(() => getSkinCount(props.character))
 const canSwitch = computed(() => breakThrough.value >= 1 && skinCount.value >= 2)
@@ -117,7 +119,8 @@ const currentSkin = ref(0)
 // 含图片重试缓存破坏参数：imgRetryCount > 0 时追加 ?r=N
 const displaySrc = computed(() => {
   let url
-  if (currentSkin.value >= 1) {
+  // 仅可切换到已解锁的皮肤（受 maxSkinIndex 限制）
+  if (currentSkin.value >= 1 && currentSkin.value <= maxSkinIndex.value) {
     const u = getCharacterSkinUrl(props.character, currentSkin.value)
     if (u) url = u
   }
@@ -235,8 +238,14 @@ watch(
   { immediate: true }
 )
 
-// 最大索引 = skinCount（0 原立绘 + skin1..skinN）
-const maxSkinIndex = computed(() => skinCount.value)
+// 最大可切换索引 = 按突破次数限制（0 原立绘不在计数内）
+// skin1/skin2：突破 >=1 次解锁；skin3：突破 >=2 次解锁；skinN(>=3)：突破 >= N-1 次
+const maxSkinIndex = computed(() => {
+  if (!canSwitch.value) return 0
+  // 突破 1 次：解锁前 2 个皮肤；突破 2 次起：每多 1 次突破再解锁 1 个
+  const byBreak = breakThrough.value >= 2 ? Math.min(skinCount.value, 1 + breakThrough.value) : Math.min(skinCount.value, 2)
+  return Math.min(byBreak, skinCount.value)
+})
 const skinLabel = computed(() => {
   if (currentSkin.value === 0) return '原立绘'
   return `皮肤 ${currentSkin.value}/${skinCount.value}`

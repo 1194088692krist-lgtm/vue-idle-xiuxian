@@ -171,13 +171,32 @@ export function getPetSkinUrl(pet, skin) {
 }
 
 /**
- * 计算灵宠当前已解锁的皮肤数（按升星逐级解锁：每 5 星解锁 1 个皮肤）。
+ * 灵宠升星满星上限（达到此星级解锁全部皮肤，无论还剩多少未解锁）
+ */
+export const PET_MAX_STAR = 10
+
+/**
+ * 计算灵宠当前已解锁的皮肤数。
+ * 解锁规则：
+ *  - 5 星解锁 skin1，之后每升 1 星解锁 1 个（6 星 skin2，7 星 skin3 ...）
+ *  - 达到 PET_MAX_STAR（满星）直接解锁全部，无论还剩多少
+ *  - 同名灵宠（同 templateId）已解锁过的进度可共享：unlockedRecord 形如 { pet_kind_01: 2 }
+ *    新获得的同名灵宠无需再次升星解锁；调用方传 null/空对象 则只按自身星级计算
  * 实际可切换的最大皮肤索引 = min(已解锁数, 该种类实际拥有的皮肤数)
  */
-export function getUnlockedSkinCount(pet) {
+export function getUnlockedSkinCount(pet, unlockedRecord = null) {
   if (!pet) return 0
   const star = pet.star || 0
-  const unlocked = Math.floor(star / 5)
   const available = getPetSkinCount(pet)
+  if (available === 0) return 0
+  // 满星直接全解锁
+  if (star >= PET_MAX_STAR) return available
+  // 5 星解锁 skin1，之后每星 +1
+  let unlocked = star >= 5 ? 1 + (star - 5) : 0
+  // 同名灵宠已解锁过的进度共享
+  const id = getPetTemplateId(pet)
+  if (unlockedRecord && unlockedRecord[id] !== undefined) {
+    unlocked = Math.max(unlocked, unlockedRecord[id] || 0)
+  }
   return Math.min(unlocked, available)
 }
