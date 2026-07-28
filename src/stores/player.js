@@ -127,10 +127,12 @@ export const usePlayerStore = defineStore('player', {
     disablePullToRefresh: localStorage.getItem('disablePullToRefresh') !== 'false',
     // 击杀BOSS立绘突入动画开关，默认开启
     bossKillAnimation: localStorage.getItem('bossKillAnimation') !== 'false',
-    // 击杀动画立绘来源角色ID：null=跟随斩杀者（动态），指定ID=固定用该角色立绘
-    bossKillCharacterId: localStorage.getItem('bossKillCharacterId') || null,
-    // 击杀动画使用的立绘索引：0=原立绘 1=skin1 2=skin2 3=skin3
-    bossKillSkinIndex: Number(localStorage.getItem('bossKillSkinIndex')) || 0,
+    // 每个角色的击杀立绘设置：{ [memberId]: skinIndex }
+    // skinIndex: 0=原立绘 1=skin1 2=skin2 3=skin3 ...
+    // 击杀BOSS时按实际斩杀者(memberId)取其对应立绘索引；该角色未设置则用原立绘(0)；
+    // 斩杀者无法确定时从存活队伍成员中随机选一个，并使用其设置。
+    // 三人出战时每个角色都可独立设置自己的击杀立绘，避免全局只设一个的 bug。
+    characterKillSkins: JSON.parse(localStorage.getItem('characterKillSkins') || '{}'),
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
@@ -680,12 +682,22 @@ export const usePlayerStore = defineStore('player', {
       // 初始化移动端下拉刷新设置：默认锁定（true），用户主动关闭才为 false
       const ptrSaved = localStorage.getItem('disablePullToRefresh')
       this.disablePullToRefresh = ptrSaved === null ? true : ptrSaved === 'true'
-      // 初始化击杀动画设置：默认开启，立绘索引用原立绘(0)，角色ID默认跟随斩杀者
+      // 初始化击杀动画设置：默认开启
       const bkaSaved = localStorage.getItem('bossKillAnimation')
       this.bossKillAnimation = bkaSaved === null ? true : bkaSaved === 'true'
-      const bksiSaved = localStorage.getItem('bossKillSkinIndex')
-      this.bossKillSkinIndex = bksiSaved === null ? 0 : (Number(bksiSaved) || 0)
-      this.bossKillCharacterId = localStorage.getItem('bossKillCharacterId') || null
+      // 加载每个角色的击杀立绘设置（per-character）
+      const cksSaved = localStorage.getItem('characterKillSkins')
+      this.characterKillSkins = cksSaved ? JSON.parse(cksSaved) : {}
+      // 一次性迁移：旧版本全局 bossKillCharacterId/bossKillSkinIndex → 新版 per-character
+      const oldCharId = localStorage.getItem('bossKillCharacterId')
+      const oldSkinIdx = localStorage.getItem('bossKillSkinIndex')
+      if (oldCharId && !(oldCharId in this.characterKillSkins)) {
+        this.characterKillSkins[oldCharId] = oldSkinIdx === null ? 0 : (Number(oldSkinIdx) || 0)
+        localStorage.setItem('characterKillSkins', JSON.stringify(this.characterKillSkins))
+      }
+      // 清理旧版全局字段，避免遗留状态干扰 per-character 逻辑
+      localStorage.removeItem('bossKillCharacterId')
+      localStorage.removeItem('bossKillSkinIndex')
       // 初始化GM模式设置
       const gmMode = localStorage.getItem('isGMMode')
       if (gmMode !== null) {

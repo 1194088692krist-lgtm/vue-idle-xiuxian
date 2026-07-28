@@ -23,7 +23,7 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：Double Kill / Triple Kill 等 -->
+      <!-- 连击特效：双杀 / 三杀 等 -->
       <div v-if="comboLabel" class="kill-combo" :class="comboClass">
         <span class="combo-text">{{ comboLabel }}</span>
         <span v-if="comboCount > 1" class="combo-count">×{{ comboCount }}</span>
@@ -55,19 +55,20 @@ const COMBO_WINDOW_MS = 12000
 let comboTimerId = null
 let currentCombo = 0
 
-// 连击等级表：根据连续击杀数返回标签与样式类
+// 连击等级表：根据连续击杀数返回中文标签与样式类
+// 与本修仙游戏风格一致，避免使用 Double Kill、Triple Kill 等英文
 function getComboTier(count) {
   if (count < 2) return { label: '', class: '' }
-  if (count === 2) return { label: 'DOUBLE KILL', class: 'combo-double' }
-  if (count === 3) return { label: 'TRIPLE KILL', class: 'combo-triple' }
-  if (count === 4) return { label: 'QUADRA KILL', class: 'combo-quadra' }
-  if (count === 5) return { label: 'PENTA KILL', class: 'combo-penta' }
-  if (count === 6) return { label: 'KILLING SPREE', class: 'combo-spree' }
-  if (count === 7) return { label: 'RAMPAGE', class: 'combo-rampage' }
-  if (count === 8) return { label: 'UNSTOPPABLE', class: 'combo-unstoppable' }
-  if (count === 9) return { label: 'DOMINATING', class: 'combo-dominating' }
-  if (count === 10) return { label: 'GODLIKE', class: 'combo-godlike' }
-  return { label: 'LEGENDARY', class: 'combo-legendary' }
+  if (count === 2) return { label: '双杀', class: 'combo-double' }
+  if (count === 3) return { label: '三杀', class: 'combo-triple' }
+  if (count === 4) return { label: '四杀', class: 'combo-quadra' }
+  if (count === 5) return { label: '五杀', class: 'combo-penta' }
+  if (count === 6) return { label: '暴走', class: 'combo-spree' }
+  if (count === 7) return { label: '狂暴', class: 'combo-rampage' }
+  if (count === 8) return { label: '不可阻挡', class: 'combo-unstoppable' }
+  if (count === 9) return { label: '主宰比赛', class: 'combo-dominating' }
+  if (count === 10) return { label: '超神', class: 'combo-godlike' }
+  return { label: '传奇', class: 'combo-legendary' }
 }
 
 function bumpCombo() {
@@ -97,15 +98,17 @@ watch(bossKillEvent, (evt) => {
   // 设置开关关闭则不触发
   if (!playerStore.bossKillAnimation) return
 
-  // 立绘来源：随机播放三人中的一个（用户可为每个角色指定立绘）
-  // 优先使用 bossKillCharacterId 固定角色；否则从队伍存活成员中随机选
+  // 立绘来源：优先使用事件中的 killerMemberId（实际斩杀者）
+  // 斩杀者无法确定时，从存活队伍成员中随机选一个（兜底）
   let member = null
-  const fixedCharId = playerStore.bossKillCharacterId
-  if (fixedCharId) {
-    member = playerStore.sectMembers.find(m => (m.templateId || m.id) === fixedCharId)
+  const killerId = evt.killerMemberId
+  if (killerId) {
+    // killerId 与 sectMembers.id 对齐（useIdleSystem 中 entity.memberId = member.id）
+    member = playerStore.sectMembers.find(m => m.id === killerId)
+      || playerStore.sectMembers.find(m => (m.templateId || m.id) === killerId)
   }
   if (!member) {
-    // 从队伍存活成员中随机选一个
+    // 兜底：从队伍存活成员中随机选一个
     if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
       const aliveMembers = playerStore.teamMembers
         .map(id => playerStore.sectMembers.find(m => m.id === id))
@@ -117,8 +120,10 @@ watch(bossKillEvent, (evt) => {
   }
   if (!member) return
 
-  // 按设置选择立绘索引：0=原立绘 1-3=skin
-  const skinIdx = playerStore.bossKillSkinIndex || 0
+  // 立绘索引：使用该角色自己的击杀立绘设置（characterKillSkins[memberId]）
+  // 未设置则默认 0（原立绘）
+  const memberId = member.id || member.templateId
+  const skinIdx = Number(playerStore.characterKillSkins?.[memberId]) || 0
   let url = null
   if (skinIdx > 0) {
     const skinCount = getSkinCount(member)
@@ -305,8 +310,8 @@ const onAnimationEnd = () => {
 .combo-text {
   font-size: 42px;
   font-weight: 900;
-  letter-spacing: 2px;
-  font-style: italic;
+  letter-spacing: 4px;
+  /* 中文斩杀特效不使用斜体（中文字符斜体显示效果差） */
 }
 .combo-count {
   font-size: 28px;

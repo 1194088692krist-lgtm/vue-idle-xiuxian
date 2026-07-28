@@ -69,20 +69,13 @@
           <div class="char-modal-footer">
             <h2 class="char-name-large">{{ character.name }}</h2>
             <div class="char-stars-large">{{ '⭐'.repeat(character.star || 1) }}</div>
-            <!-- 设为击杀动画立绘：固定用此角色当前选中皮肤作为击杀BOSS演出立绘 -->
+            <!-- 设为击杀立绘：为本角色单独指定击杀BOSS时弹出的立绘（每个角色独立设置） -->
             <button
               class="set-kill-portrait-btn"
               :class="{ active: isCurrentKillPortrait }"
               @click.stop="setAsKillPortrait"
             >
-              {{ isCurrentKillPortrait ? '✓ 已设为击杀动画立绘' : '设为击杀动画立绘' }}
-            </button>
-            <button
-              v-if="playerStore.bossKillCharacterId"
-              class="set-kill-portrait-btn reset"
-              @click.stop="resetKillPortrait"
-            >
-              恢复跟随斩杀者
+              {{ isCurrentKillPortrait ? '✓ 已设为本角色击杀立绘' : '设为本角色击杀立绘' }}
             </button>
           </div>
         </div>
@@ -277,27 +270,23 @@ const nextSkin = () => {
   avatarLoaded.value = false
 }
 
-// ===== 设为击杀动画立绘 =====
-// 角色ID：templateId 优先，回退 id
+// ===== 设为本角色击杀立绘 =====
+// 角色ID：templateId 优先，回退 id（与 useIdleSystem 的 memberId 一致）
 const characterId = computed(() => (props.character && (props.character.templateId || props.character.id)) || null)
-// 当前角色+当前皮肤是否已被设为击杀动画立绘
+// 当前角色+当前皮肤是否已被设为本角色的击杀立绘
 const isCurrentKillPortrait = computed(() => {
   if (!characterId.value) return false
-  return playerStore.bossKillCharacterId === characterId.value && playerStore.bossKillSkinIndex === currentSkin.value
+  const saved = playerStore.characterKillSkins?.[characterId.value]
+  // 未设置（undefined）默认等价于 0（原立绘）
+  return (saved === undefined ? 0 : saved) === currentSkin.value
 })
-// 设为击杀动画立绘：固定用此角色当前选中皮肤
+// 设为本角色击杀立绘：把当前选中皮肤保存为该角色的击杀立绘索引
+// 三个出战角色可分别设置自己的击杀立绘，击杀BOSS时按实际斩杀者取用
 const setAsKillPortrait = () => {
   if (!characterId.value) return
-  playerStore.bossKillCharacterId = characterId.value
-  playerStore.bossKillSkinIndex = currentSkin.value
-  localStorage.setItem('bossKillCharacterId', characterId.value)
-  localStorage.setItem('bossKillSkinIndex', currentSkin.value)
-  playerStore.saveData()
-}
-// 恢复跟随斩杀者：清空固定角色，动画用实际最后一击者的立绘
-const resetKillPortrait = () => {
-  playerStore.bossKillCharacterId = null
-  localStorage.removeItem('bossKillCharacterId')
+  if (!playerStore.characterKillSkins) playerStore.characterKillSkins = {}
+  playerStore.characterKillSkins[characterId.value] = currentSkin.value
+  localStorage.setItem('characterKillSkins', JSON.stringify(playerStore.characterKillSkins))
   playerStore.saveData()
 }
 
