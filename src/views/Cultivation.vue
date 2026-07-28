@@ -325,21 +325,17 @@
         <div class="attr-block" v-if="detailMember && detailMember.skills && detailMember.skills.length">
           <h4 class="sub-title">技能 <span v-if="detailMember.skillSchoolName">{{ detailMember.skillSchoolIcon }} {{ detailMember.skillSchoolName }}</span></h4>
 
-          <!-- 技能装备槽（3 槽位，玩家选择装备的主动技能） -->
+          <!-- 技能装备槽（3 槽位，垂直排列避免溢出） -->
           <div class="skill-equip-section" v-if="getActiveSkillsForEquip(detailMember).length > 0">
-            <h5 class="equip-sub-title">技能装备 <span class="equip-hint">（点击槽位选中，再点击下方技能装备到该槽）</span></h5>
+            <h5 class="equip-sub-title">技能装备槽</h5>
             <div class="skill-equip-slots">
               <div
                 v-for="slotIdx in 3"
                 :key="'slot-' + slotIdx"
                 class="skill-equip-slot"
-                :class="{
-                  selected: selectedSlotIndex === slotIdx - 1,
-                  filled: !!getEquippedSkillAtSlot(detailMember, slotIdx - 1)
-                }"
-                @click="onSlotClick(slotIdx - 1)"
+                :class="{ filled: !!getEquippedSkillAtSlot(detailMember, slotIdx - 1) }"
               >
-                <span class="slot-label">槽位 {{ slotIdx }}</span>
+                <span class="slot-label">槽{{ slotIdx }}</span>
                 <template v-if="getEquippedSkillAtSlot(detailMember, slotIdx - 1)">
                   <span class="slot-skill-name">
                     {{ getSkillCategoryIcon(getEquippedSkillAtSlot(detailMember, slotIdx - 1).category) }}
@@ -347,31 +343,12 @@
                   </span>
                   <button class="btn-unequip" @click.stop="onUnequipSkill(detailMember, slotIdx - 1)" title="卸下">✕</button>
                 </template>
-                <span v-else class="slot-empty-text">＋ 空</span>
-              </div>
-            </div>
-
-            <!-- 已学主动技能列表：点击装备到当前选中槽位 -->
-            <div class="equip-skill-list">
-              <div
-                v-for="skill in getActiveSkillsForEquip(detailMember)"
-                :key="'equip-' + skill.id"
-                class="equip-skill-item"
-                :class="{ equipped: isSkillEquipped(detailMember, skill.id) }"
-                @click="onEquipSkill(detailMember, skill)"
-              >
-                <span class="skill-icon">{{ getSkillCategoryIcon(skill.category) }}</span>
-                <div class="skill-info">
-                  <div class="skill-name">{{ skill.name }}</div>
-                  <div class="skill-type">{{ getSkillTypeName(skill.type) }}</div>
-                </div>
-                <div class="skill-desc">{{ skill.description }}</div>
-                <span class="equip-status" v-if="isSkillEquipped(detailMember, skill.id)">已装备</span>
-                <span class="equip-status equip-btn" v-else>装备</span>
+                <span v-else class="slot-empty-text">空</span>
               </div>
             </div>
           </div>
 
+          <!-- 技能列表（含装备按钮，不再重复显示） -->
           <div class="skill-list">
             <div v-for="skill in detailMember.skills" :key="skill.id" class="skill-item" :class="skill.type">
               <div class="skill-icon">{{ getSkillCategoryIcon(skill.category) }}</div>
@@ -380,6 +357,14 @@
                 <div class="skill-type">{{ getSkillTypeName(skill.type) }}</div>
               </div>
               <div class="skill-desc">{{ skill.description }}</div>
+              <button
+                v-if="skill.type === 'active'"
+                class="btn-equip-toggle"
+                :class="{ equipped: isSkillEquipped(detailMember, skill.id) }"
+                @click="onEquipBtnClick(detailMember, skill)"
+              >
+                {{ isSkillEquipped(detailMember, skill.id) ? '已装' : '装备' }}
+              </button>
             </div>
           </div>
           <div class="breakthrough-section">
@@ -396,6 +381,33 @@
             </button>
             <div v-if="(detailMember.breakThrough || 0) >= 5" class="breakthrough-max">
               ★ 已突破至最高境界 ★
+            </div>
+          </div>
+        </div>
+
+        <!-- 技能槽位选择弹窗：点击"装备"按钮后弹出，选择要装备到哪个槽位 -->
+        <div v-if="skillSlotPicker.show" class="skill-slot-picker-overlay" @click.self="closeSkillSlotPicker">
+          <div class="skill-slot-picker">
+            <div class="picker-header">
+              <span>选择装备槽位</span>
+              <button class="picker-close" @click="closeSkillSlotPicker">✕</button>
+            </div>
+            <div class="picker-skill-name">
+              {{ getSkillCategoryIcon(skillSlotPicker.skill?.category) }} {{ skillSlotPicker.skill?.name }}
+            </div>
+            <div class="picker-slots">
+              <button
+                v-for="slotIdx in 3"
+                :key="'pick-' + slotIdx"
+                class="picker-slot-btn"
+                @click="confirmEquipToSlot(slotIdx - 1)"
+              >
+                <span class="picker-slot-label">槽位 {{ slotIdx }}</span>
+                <span class="picker-slot-current" v-if="getEquippedSkillAtSlot(detailMember, slotIdx - 1)">
+                  {{ getEquippedSkillAtSlot(detailMember, slotIdx - 1).name }}
+                </span>
+                <span class="picker-slot-current empty" v-else>（空）</span>
+              </button>
             </div>
           </div>
         </div>
@@ -486,7 +498,7 @@
 
 <script setup>
 import { usePlayerStore, computePetMultiplier } from '../stores/player'
-import { ref, computed, watch } from 'vue'
+import { ref, computed, watch, reactive } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats, getEffortCap } from '../plugins/characters'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
@@ -1116,9 +1128,13 @@ const tryManualBreakthrough = () => {
   else message.error(r.message)
 }
 
-// ============ 技能装备系统（3 槽位） ============
-// 当前选中的槽位索引（0/1/2），点击未装备技能时装备到此槽
-const selectedSlotIndex = ref(0)
+// ============ 技能装备系统（3 槽位 + 弹窗选择） ============
+// 槽位选择弹窗状态
+const skillSlotPicker = reactive({
+  show: false,
+  member: null,
+  skill: null
+})
 
 // 取该角色所有已学主动技能（被动技能不可装备）
 const getActiveSkillsForEquip = (member) => {
@@ -1140,21 +1156,39 @@ const isSkillEquipped = (member, skillId) => {
   return member.equippedSkills.includes(skillId)
 }
 
-// 点击槽位：选中该槽位
-const onSlotClick = (slotIdx) => {
-  selectedSlotIndex.value = slotIdx
-}
-
-// 点击技能：装备到当前选中槽位（若已在其他槽位则自动迁移）
-const onEquipSkill = (member, skill) => {
+// 点击技能后的"装备"按钮：打开槽位选择弹窗
+const onEquipBtnClick = (member, skill) => {
   if (!member || !skill) return
+  // 若已装备，点击则卸下
   if (isSkillEquipped(member, skill.id)) {
-    message.info(`${skill.name} 已装备`)
+    const slotIdx = member.equippedSkills.indexOf(skill.id)
+    if (slotIdx >= 0) {
+      const r = playerStore.unequipSkill(member.id, slotIdx)
+      if (r.success) message.success(r.message)
+      else message.error(r.message)
+    }
     return
   }
-  const r = playerStore.equipSkill(member.id, selectedSlotIndex.value, skill.id)
+  // 未装备：弹出槽位选择弹窗
+  skillSlotPicker.member = member
+  skillSlotPicker.skill = skill
+  skillSlotPicker.show = true
+}
+
+// 确认装备到指定槽位
+const confirmEquipToSlot = (slotIdx) => {
+  if (!skillSlotPicker.member || !skillSlotPicker.skill) return
+  const r = playerStore.equipSkill(skillSlotPicker.member.id, slotIdx, skillSlotPicker.skill.id)
   if (r.success) message.success(r.message)
   else message.error(r.message)
+  closeSkillSlotPicker()
+}
+
+// 关闭弹窗
+const closeSkillSlotPicker = () => {
+  skillSlotPicker.show = false
+  skillSlotPicker.member = null
+  skillSlotPicker.skill = null
 }
 
 // 卸下指定槽位的技能
@@ -2357,42 +2391,21 @@ watch([allMembers, teamMembers], () => {
   font-weight: bold;
 }
 
-.equip-hint {
-  font-size: 11px;
-  color: #8b7fa8;
-  font-weight: normal;
-}
-
 .skill-equip-slots {
-  display: grid;
-  grid-template-columns: repeat(3, 1fr);
-  gap: 6px;
-  margin-bottom: 10px;
+  display: flex;
+  flex-direction: column;
+  gap: 5px;
 }
 
 .skill-equip-slot {
   display: flex;
   align-items: center;
-  justify-content: space-between;
-  gap: 4px;
-  padding: 8px 10px;
+  gap: 6px;
+  padding: 7px 10px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
-  cursor: pointer;
-  transition: all 0.2s ease;
-  min-height: 38px;
-}
-
-.skill-equip-slot:hover {
-  background: rgba(255, 255, 255, 0.08);
-  border-color: rgba(255, 255, 255, 0.2);
-}
-
-.skill-equip-slot.selected {
-  background: rgba(142, 68, 255, 0.18);
-  border-color: rgba(142, 68, 255, 0.6);
-  box-shadow: 0 0 8px rgba(142, 68, 255, 0.3);
+  min-height: 34px;
 }
 
 .skill-equip-slot.filled {
@@ -2400,15 +2413,11 @@ watch([allMembers, teamMembers], () => {
   border-color: rgba(76, 175, 80, 0.4);
 }
 
-.skill-equip-slot.filled.selected {
-  background: rgba(142, 68, 255, 0.22);
-  border-color: rgba(142, 68, 255, 0.7);
-}
-
 .slot-label {
   font-size: 10px;
   color: #8b7fa8;
   flex-shrink: 0;
+  width: 28px;
 }
 
 .slot-skill-name {
@@ -2424,7 +2433,6 @@ watch([allMembers, teamMembers], () => {
   font-size: 11px;
   color: #6b6280;
   flex: 1;
-  text-align: right;
 }
 
 .btn-unequip {
@@ -2436,7 +2444,6 @@ watch([allMembers, teamMembers], () => {
   font-size: 11px;
   cursor: pointer;
   line-height: 1;
-  transition: all 0.2s ease;
   flex-shrink: 0;
 }
 
@@ -2444,71 +2451,117 @@ watch([allMembers, teamMembers], () => {
   background: rgba(244, 67, 54, 0.3);
 }
 
-.equip-skill-list {
-  display: flex;
-  flex-direction: column;
-  gap: 6px;
-}
-
-.equip-skill-item {
-  display: flex;
-  align-items: center;
-  gap: 10px;
-  padding: 8px 10px;
-  background: rgba(255, 255, 255, 0.04);
-  border-radius: 6px;
-  border-left: 2px solid rgba(255, 255, 255, 0.15);
+/* 技能列表项的装备按钮 */
+.btn-equip-toggle {
+  background: rgba(142, 68, 255, 0.2);
+  color: #d4c5f9;
+  border: 1px solid rgba(142, 68, 255, 0.4);
+  border-radius: 4px;
+  padding: 4px 10px;
+  font-size: 11px;
   cursor: pointer;
+  flex-shrink: 0;
   transition: all 0.2s ease;
 }
 
-.equip-skill-item:hover {
-  background: rgba(142, 68, 255, 0.12);
-  border-left-color: rgba(142, 68, 255, 0.6);
+.btn-equip-toggle:hover {
+  background: rgba(142, 68, 255, 0.35);
 }
 
-.equip-skill-item.equipped {
-  opacity: 0.55;
-  background: rgba(76, 175, 80, 0.06);
-  border-left-color: rgba(76, 175, 80, 0.5);
-  cursor: default;
+.btn-equip-toggle.equipped {
+  background: rgba(76, 175, 80, 0.15);
+  color: #66bb6a;
+  border-color: rgba(76, 175, 80, 0.4);
 }
 
-.equip-skill-item .skill-icon {
-  font-size: 18px;
+/* 槽位选择弹窗 */
+.skill-slot-picker-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.6);
+  z-index: 10000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 20px;
 }
 
-.equip-skill-item .skill-info {
-  flex-shrink: 0;
+.skill-slot-picker {
+  background: #1e1b2e;
+  border: 1px solid rgba(142, 68, 255, 0.5);
+  border-radius: 12px;
+  padding: 16px;
+  width: 100%;
+  max-width: 320px;
+  box-shadow: 0 8px 32px rgba(0, 0, 0, 0.5);
 }
 
-.equip-skill-item .skill-name {
-  font-size: 13px;
-}
-
-.equip-skill-item .skill-desc {
-  font-size: 11px;
-  color: #aaa;
-}
-
-.equip-status {
-  font-size: 11px;
-  color: #8b7fa8;
-  padding: 2px 8px;
-  border-radius: 4px;
-  background: rgba(255, 255, 255, 0.06);
-  flex-shrink: 0;
-}
-
-.equip-status.equip-btn {
+.picker-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 10px;
+  font-size: 14px;
+  font-weight: bold;
   color: #d4c5f9;
-  background: rgba(142, 68, 255, 0.2);
-  border: 1px solid rgba(142, 68, 255, 0.4);
+}
+
+.picker-close {
+  background: none;
+  border: none;
+  color: #8b7fa8;
+  font-size: 16px;
+  cursor: pointer;
+  padding: 2px 6px;
+}
+
+.picker-skill-name {
+  font-size: 13px;
+  color: #fff;
+  padding: 8px 10px;
+  background: rgba(142, 68, 255, 0.1);
+  border-radius: 6px;
+  margin-bottom: 10px;
+}
+
+.picker-slots {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.picker-slot-btn {
+  display: flex;
+  flex-direction: column;
+  align-items: flex-start;
+  gap: 4px;
+  padding: 10px 12px;
+  background: rgba(255, 255, 255, 0.05);
+  border: 1px solid rgba(255, 255, 255, 0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  text-align: left;
+  transition: all 0.2s ease;
+}
+
+.picker-slot-btn:hover {
+  background: rgba(142, 68, 255, 0.15);
+  border-color: rgba(142, 68, 255, 0.5);
+}
+
+.picker-slot-label {
+  font-size: 12px;
+  color: #d4c5f9;
   font-weight: bold;
 }
 
-.equip-skill-item:not(.equipped):hover .equip-status.equip-btn {
-  background: rgba(142, 68, 255, 0.35);
+.picker-slot-current {
+  font-size: 11px;
+  color: #ccc;
+}
+
+.picker-slot-current.empty {
+  color: #6b6280;
 }
 
 .breakthrough-section {

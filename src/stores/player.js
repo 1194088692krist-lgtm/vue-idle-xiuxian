@@ -1,7 +1,7 @@
 import { defineStore } from 'pinia'
 import { GameDB } from './db'
 import { useAuthStore } from './auth'
-import { pillRecipes, tryCreatePill, calculatePillEffect } from '../plugins/pills'
+import { pillRecipes, tryCreatePill, calculatePillEffect, pillGrades } from '../plugins/pills'
 import { encryptData, decryptData, validateData } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
@@ -2762,67 +2762,87 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: '炼制数量至少为1' }
       }
       const fragments = this.pillFragments[recipeId] || 0
+
+      // 性能优化：预先构建材料索引 Map（key: kind|id → 数量）
+      // 避免循环内反复 filter/splice 导致 O(n²) 卡顿
+      const matIndex = new Map() // key → [count, indices...]
+      for (let i = 0; i < this.materials.length; i++) {
+        const m = this.materials[i]
+        const key = `${m.kind || 'herb'}|${m.id || m.herb}`
+        if (!matIndex.has(key)) matIndex.set(key, [])
+        matIndex.get(key).push(i)
+      }
+
       // 检查材料是否足够 N 倍
       for (const material of recipe.materials) {
-        const kind = material.kind || 'herb'
-        const mid = material.id || material.herb
-        const have = this.materials.filter(m => m.kind === kind && m.id === mid).length
+        const key = `${material.kind || 'herb'}|${material.id || material.herb}`
+        const have = (matIndex.get(key) || []).length
         if (have < material.count * count) {
           return { success: false, message: '材料不足' }
         }
       }
+
+      // 预计算批量结果：先模拟全部 N 次成功率判定，不在此循环内操作响应式数组
+      const grade = pillGrades[recipe.grade]
+      const luckFactor = this.luck * this.alchemyRate
       let successCount = 0
       let failCount = 0
-      // P1-B：失败损失 50% 材料（向上取整），让"成功率"重新成为真实的代价杠杆
-      // （原实现失败不扣料，等于免费重试，让品阶难度形同虚设）
       const FAILURE_LOSS_RATIO = 0.5
+
+      // 累计每种材料需要扣除的总数（成功+失败损耗）
+      const matConsume = new Map() // key → totalNeeded
+      for (const material of recipe.materials) {
+        const key = `${material.kind || 'herb'}|${material.id || material.herb}`
+        matConsume.set(key, 0)
+      }
+
+      // 模拟 N 次炼制，累计消耗（不触碰响应式数组）
       for (let n = 0; n < count; n++) {
-        const result = tryCreatePill(recipe, this.materials, this, fragments, this.luck * this.alchemyRate)
-        if (result.success) {
-          // 消耗材料（按 kind+id 精确扣减）
-          recipe.materials.forEach(material => {
-            const kind = material.kind || 'herb'
-            const mid = material.id || material.herb
-            let remaining = material.count
-            for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
-              if (this.materials[i].kind === kind && this.materials[i].id === mid) {
-                this.materials.splice(i, 1)
-                remaining--
-              }
-            }
-          })
-          // 创建丹药并加入持有
-          if (!this.ownedPills[recipeId]) {
-            this.ownedPills[recipeId] = { count: 0, craftedAt: Date.now() }
-          }
-          this.ownedPills[recipeId].count++
-          this.ownedPills[recipeId].craftedAt = Date.now()
-          this.pillsCrafted++
+        if (Math.random() <= grade.successRate * luckFactor) {
+          // 成功：消耗 1 份材料
           successCount++
-        } else if (result.message === '炼制失败') {
-          // 仅"炼制失败"才扣料（"材料不足"不扣——根本没材料可扣）
-          failCount++
-          recipe.materials.forEach(material => {
-            const kind = material.kind || 'herb'
-            const mid = material.id || material.herb
-            const loss = Math.ceil(material.count * FAILURE_LOSS_RATIO)
-            let remaining = loss
-            for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
-              if (this.materials[i].kind === kind && this.materials[i].id === mid) {
-                this.materials.splice(i, 1)
-                remaining--
-              }
-            }
-          })
+          for (const material of recipe.materials) {
+            const key = `${material.kind || 'herb'}|${material.id || material.herb}`
+            matConsume.set(key, matConsume.get(key) + material.count)
+          }
         } else {
-          // 材料不足等其它原因：直接中止后续批量
+          // 失败：消耗 50% 材料（向上取整）
           failCount++
-          break
+          for (const material of recipe.materials) {
+            const key = `${material.kind || 'herb'}|${material.id || material.herb}`
+            const loss = Math.ceil(material.count * FAILURE_LOSS_RATIO)
+            matConsume.set(key, matConsume.get(key) + loss)
+          }
         }
       }
+
+      // 一次性扣减材料：按索引从大到小删除，避免索引错位（单次 splice 批量）
+      const indicesToRemove = new Set()
+      for (const [key, totalNeeded] of matConsume) {
+        const indices = matIndex.get(key) || []
+        let needed = totalNeeded
+        for (let i = indices.length - 1; i >= 0 && needed > 0; i--) {
+          indicesToRemove.add(indices[i])
+          needed--
+        }
+      }
+      // 按索引降序删除，一次清理
+      const sortedIndices = Array.from(indicesToRemove).sort((a, b) => b - a)
+      for (const idx of sortedIndices) {
+        this.materials.splice(idx, 1)
+      }
+
+      // 一次性增加丹药
       if (successCount > 0) {
+        if (!this.ownedPills[recipeId]) {
+          this.ownedPills[recipeId] = { count: 0, craftedAt: Date.now() }
+        }
+        this.ownedPills[recipeId].count += successCount
+        this.ownedPills[recipeId].craftedAt = Date.now()
+        this.pillsCrafted += successCount
         this.queueSave()
       }
+
       if (count === 1) {
         return successCount > 0
           ? { success: true, message: '炼制成功' }
