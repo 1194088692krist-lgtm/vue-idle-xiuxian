@@ -43,7 +43,7 @@
         :key="`combo-${animKey}`"
         class="kill-combo"
         :class="comboClass"
-        :style="{ animationDelay: comboFadeDelay + 's' }"
+        :style="{ animationDelay: comboFadeDelay + 's', '--combo-font-size': comboFontSize }"
       >
         <span
           v-for="(ch, i) in comboLabelChars"
@@ -90,6 +90,15 @@ const comboFadeDelay = computed(() => {
   const n = comboLabelChars.value.length
   if (n === 0) return 0
   return (n - 1) * 0.18 + 0.55 + 1.2
+})
+// 字号自适应：字数越多字号越小，保证单排显示不超出屏幕
+// 4字 → 60px，5-7字 → 48px，8-10字 → 36px，10+字 → 28px
+const comboFontSize = computed(() => {
+  const n = comboLabelChars.value.length
+  if (n <= 4) return 'clamp(40px, 7vw, 60px)'
+  if (n <= 7) return 'clamp(32px, 5.5vw, 48px)'
+  if (n <= 10) return 'clamp(24px, 4vw, 36px)'
+  return 'clamp(18px, 3vw, 28px)'
 })
 
 // ===== 连击系统：中文斩杀文案库 =====
@@ -489,42 +498,46 @@ const onPetAnimEnd = () => {
   top: 10%;
   right: 6%;
   display: flex;
-  flex-wrap: wrap;
+  flex-wrap: nowrap;     /* 单排显示，避免 5/7 字换行不美观 */
   justify-content: flex-end;
-  max-width: 42vw;  /* 限制宽度避免两排过宽与底部 kill-text 重合 */
   gap: 2px;
-  /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算 */
+  /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
+     注意：外层只控制 opacity，不用 transform，避免与内层 .combo-char 的 transform 叠加造成重影 */
   opacity: 1;
   animation: combo-fade-out 0.5s ease-in forwards;
 }
 @keyframes combo-fade-out {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(2px); }
+  /* 前段保持 opacity:1 不动，到延迟时间才开始淡出
+     避免"字还没逐个砸入，整体就开始变透明"导致的重影 */
+  0%, 99% { opacity: 1; }
+  100% { opacity: 0; }
 }
 .combo-char {
   display: inline-block;
   /* 坚实有力字体：Ma Shan Zheng 毛笔楷书（项目已加载），回退到系统楷体/黑体 */
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
-  font-size: clamp(36px, 6.5vw, 60px);
+  /* 字号由 --combo-font-size CSS 变量控制（JS 根据字数动态计算）
+     字数越多字号越小，保证单排显示不超出屏幕 */
+  font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
   letter-spacing: 4px;
   opacity: 0;
-  /* 逐字砸入：从上方砸下 + 缩放过冲(2.5→0.85→1.12→1) + 顿挫，配合 delay 形成三国杀式"一字一字打进去"效果
+  /* 逐字砸入：从上方砸下 + 缩放过冲 + 顿挫，配合 delay 形成三国杀式"一字一字打进去"效果
      每字 0.55s 完成，间隔 0.18s 让用户看清每个字
      注意：不再有 out 动画，由外层 .kill-combo 统一淡出 */
   animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  /* 坚实有力：粗描边 + 立体阴影 + 金属质感高光
-     -webkit-text-stroke 加粗黑描边让字"刻"在屏幕上
-     多层 text-shadow 实现立体投影 + 外发光 + 暗色描边 */
-  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
-  paint-order: stroke fill; /* 描边在填充下方，保证字心清晰 */
-  /* 顺序：立体投影(右下黑) → 外发光(本色) → 暗描边 */
+  /* 坚实有力：全部用 text-shadow 模拟描边+立体投影+外发光
+     不用 -webkit-text-stroke（动画时与 text-shadow 栅格化不同步会重影）
+     顺序：四方向黑色描边(模拟粗描边) → 立体投影(右下) → 外发光(本色) */
   text-shadow:
+    -2px -2px 0 rgba(0, 0, 0, 0.9),
+    2px -2px 0 rgba(0, 0, 0, 0.9),
+    -2px 2px 0 rgba(0, 0, 0, 0.9),
     2px 2px 0 rgba(0, 0, 0, 0.9),
     4px 4px 0 rgba(0, 0, 0, 0.7),
     0 0 16px currentColor,
     0 0 28px currentColor;
-  will-change: transform, opacity;
+  will-change: transform;
 }
 @keyframes combo-char-in {
   0% {
@@ -577,26 +590,26 @@ const onPetAnimEnd = () => {
   0% {
     color: #FFD600;
     text-shadow:
-      2px 2px 0 rgba(0, 0, 0, 0.9),
-      4px 4px 0 rgba(0, 0, 0, 0.7),
-      0 0 18px #FFD600,
-      0 0 32px #FF6E40;
+      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
+      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
+      4px 4px 0 rgba(0,0,0,0.7),
+      0 0 18px #FFD600, 0 0 32px #FF6E40;
   }
   50% {
     color: #FF1744;
     text-shadow:
-      2px 2px 0 rgba(0, 0, 0, 0.9),
-      4px 4px 0 rgba(0, 0, 0, 0.7),
-      0 0 22px #FF1744,
-      0 0 40px #D500F9;
+      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
+      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
+      4px 4px 0 rgba(0,0,0,0.7),
+      0 0 22px #FF1744, 0 0 40px #D500F9;
   }
   100% {
     color: #FFD600;
     text-shadow:
-      2px 2px 0 rgba(0, 0, 0, 0.9),
-      4px 4px 0 rgba(0, 0, 0, 0.7),
-      0 0 26px #FFD600,
-      0 0 48px #FF1744;
+      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
+      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
+      4px 4px 0 rgba(0,0,0,0.7),
+      0 0 26px #FFD600, 0 0 48px #FF1744;
   }
 }
 
