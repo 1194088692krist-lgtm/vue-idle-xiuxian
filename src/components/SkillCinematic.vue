@@ -1,5 +1,5 @@
 <template>
-  <!-- 技能释放全屏特写演出：仅 BOSS 战时触发，技能名四字大字 + 属性色光闪 + 聚气波纹 -->
+  <!-- 技能释放全屏特写演出：仅 BOSS 战时触发，技能名四字大字 + 属性色光闪 + 专属图形特效 -->
   <teleport to="body">
     <div v-if="show" class="skill-cinematic" aria-hidden="true">
       <!-- 全屏属性色光闪 -->
@@ -7,10 +7,10 @@
       <!-- 中心光晕 -->
       <div :key="`glow-${animKey}`" class="skill-glow" :style="{ background: glowBg }"></div>
 
-      <!-- 专属图形特效：按技能属性系渲染不同图形 -->
+      <!-- 专属图形特效：按技能属性系渲染不同图形，纯 transform/opacity 走 GPU 合成层 -->
       <!-- 暗系：旋转黑洞漩涡 -->
-      <div v-if="skillFx === 'vortex'" :key="`fx-${animKey}`" class="fx-vortex" :style="{ borderColor: skillColor }">
-        <div class="vortex-ring r1" :style="{ borderColor: skillColor }"></div>
+      <div v-if="skillFx === 'vortex'" :key="`fx-${animKey}`" class="fx-vortex">
+        <div class="vortex-ring r1" :style="{ borderColor: skillColor, '--c': skillColor }"></div>
         <div class="vortex-ring r2" :style="{ borderColor: skillColor }"></div>
         <div class="vortex-ring r3" :style="{ borderColor: skillColor }"></div>
         <div class="vortex-core" :style="{ background: glowBg }"></div>
@@ -255,6 +255,8 @@ onUnmounted(() => {
   padding-bottom: 22vh;
   pointer-events: none;
   overflow: hidden;
+  /* 性能优化：强制创建合成层，整层 GPU 加速 */
+  transform: translateZ(0);
 }
 
 /* 全屏属性色光闪：0.4s 闪一下 */
@@ -263,6 +265,7 @@ onUnmounted(() => {
   inset: 0;
   opacity: 0;
   animation: skill-flash-anim 0.5s ease-out forwards;
+  will-change: opacity;
 }
 @keyframes skill-flash-anim {
   0% { opacity: 0; }
@@ -278,6 +281,7 @@ onUnmounted(() => {
   border-radius: 50%;
   opacity: 0;
   animation: skill-glow-anim 1.8s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes skill-glow-anim {
   0% { opacity: 0; transform: scale(0.5); }
@@ -306,6 +310,7 @@ onUnmounted(() => {
   border: 3px dashed;
   opacity: 0;
   animation: vortex-spin 1.6s ease-out forwards;
+  will-change: opacity, transform;
 }
 .vortex-ring.r1 { animation-delay: 0s; }
 .vortex-ring.r2 { inset: 12%; animation-delay: 0.15s; }
@@ -316,6 +321,7 @@ onUnmounted(() => {
   border-radius: 50%;
   opacity: 0;
   animation: vortex-core-in 1s ease-in 0.4s forwards;
+  will-change: opacity, transform;
 }
 @keyframes vortex-spin {
   0% { opacity: 0; transform: rotate(0) scale(0.3); }
@@ -338,8 +344,8 @@ onUnmounted(() => {
   background: var(--c);
   border-radius: 50% 50% 20% 20% / 80% 80% 20% 20%;
   opacity: 0;
-  filter: blur(2px);
   animation: flame-rise 1.4s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes flame-rise {
   0% { opacity: 0; transform: translateY(40px) scale(0.3); }
@@ -357,11 +363,11 @@ onUnmounted(() => {
   height: 100%;
   opacity: 0;
   animation: lightning-flash 1s ease-out forwards;
+  will-change: opacity;
 }
 .lightning-svg polyline {
   fill: none;
   stroke-width: 3;
-  filter: drop-shadow(0 0 8px currentColor);
 }
 .lightning-svg .bolt2 { animation: bolt-flicker 0.8s ease-out 0.15s forwards; opacity: 0; }
 .lightning-svg .bolt3 { animation: bolt-flicker 0.8s ease-out 0.3s forwards; opacity: 0; }
@@ -386,6 +392,7 @@ onUnmounted(() => {
   transform: rotate(45deg);
   opacity: 0;
   animation: crystal-in 1.6s ease-out forwards;
+  will-change: opacity, transform;
 }
 .crystal-shape.small {
   inset: 25%;
@@ -419,8 +426,8 @@ onUnmounted(() => {
   background: var(--c);
   border-radius: 50% 40% 55% 45%;
   opacity: 0;
-  filter: blur(4px);
   animation: cloud-bubble 1.8s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes cloud-bubble {
   0% { opacity: 0; transform: translateY(20px) scale(0.2); }
@@ -440,6 +447,7 @@ onUnmounted(() => {
   opacity: 0;
   transform-origin: bottom;
   animation: vine-grow 1.6s ease-out forwards;
+  will-change: opacity, transform;
 }
 .vine-leaf {
   position: absolute;
@@ -473,11 +481,10 @@ onUnmounted(() => {
   background: linear-gradient(to right, transparent, var(--c), transparent);
   opacity: 0;
   transform-origin: center;
-  filter: blur(0.5px);
 }
-.slash-line.s1 { animation: slash-anim 0.8s ease-out forwards; }
-.slash-line.s2 { animation: slash-anim 0.8s ease-out 0.2s forwards; }
-.slash-line.s3 { animation: slash-anim 0.8s ease-out 0.4s forwards; }
+.slash-line.s1 { animation: slash-anim 0.8s ease-out forwards; will-change: opacity, transform; }
+.slash-line.s2 { animation: slash-anim 0.8s ease-out 0.2s forwards; will-change: opacity, transform; }
+.slash-line.s3 { animation: slash-anim 0.8s ease-out 0.4s forwards; will-change: opacity, transform; }
 @keyframes slash-anim {
   0% { opacity: 0; transform: translate(-50%, -50%) rotate(-45deg) scaleX(0); }
   30% { opacity: 1; transform: translate(-50%, -50%) rotate(-45deg) scaleX(1); }
@@ -509,6 +516,7 @@ onUnmounted(() => {
   border-bottom: 0 solid var(--c);
   opacity: 0;
   animation: spike-rise 1.2s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes spike-rise {
   0% { opacity: 0; border-bottom-width: 0; transform: translateY(20px); }
@@ -527,6 +535,7 @@ onUnmounted(() => {
   opacity: 0;
   transform: translateX(-50%) rotate(0deg);
   animation: tornado-spin 1.8s ease-out forwards;
+  will-change: opacity, transform;
 }
 .tornado-ring.r1 { top: 60%; width: 30vmin; height: 8vmin; animation-delay: 0s; }
 .tornado-ring.r2 { top: 45%; width: 22vmin; height: 6vmin; animation-delay: 0.15s; }
@@ -552,6 +561,7 @@ onUnmounted(() => {
   opacity: 0;
   transform: translate(-50%, -50%) scaleX(0);
   animation: wave-spread 1.6s ease-out forwards;
+  will-change: opacity, transform;
 }
 .wave-line.w1 { animation-delay: 0s; }
 .wave-line.w2 { animation-delay: 0.25s; height: 35vmin; }
@@ -579,6 +589,7 @@ onUnmounted(() => {
   transform-origin: bottom center;
   opacity: 0;
   animation: star-ray-anim 0.8s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes star-ray-anim {
   0% { opacity: 0; height: 0; }
@@ -594,6 +605,7 @@ onUnmounted(() => {
   border-radius: 50%;
   opacity: 0;
   animation: star-core-pulse 1.2s ease-out forwards;
+  will-change: opacity, transform;
 }
 @keyframes star-core-pulse {
   0% { opacity: 0; transform: scale(0); }
@@ -611,6 +623,7 @@ onUnmounted(() => {
   opacity: 0;
   transform: rotate(45deg) scale(0);
   animation: impact-punch 1.2s ease-out forwards;
+  will-change: opacity, transform;
 }
 .impact-diamond.d1 { animation-delay: 0s; }
 .impact-diamond.d2 { inset: 15%; animation-delay: 0.15s; }
@@ -621,6 +634,7 @@ onUnmounted(() => {
   border-radius: 50%;
   opacity: 0;
   animation: impact-core-flash 0.6s ease-out 0.4s forwards;
+  will-change: opacity, transform;
 }
 @keyframes impact-punch {
   0% { opacity: 0; transform: rotate(45deg) scale(0); }
@@ -643,6 +657,7 @@ onUnmounted(() => {
   border-radius: 50%;
   opacity: 0;
   animation: hexagram-circle-in 1.8s ease-out forwards;
+  will-change: opacity, transform;
 }
 .hexagram-triangle {
   position: absolute;
@@ -707,7 +722,7 @@ onUnmounted(() => {
 }
 @keyframes skill-text-fade-out {
   0% { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(2px); }
+  100% { opacity: 0; transform: translateY(20px) scale(0.92); }
 }
 .skill-caster {
   font-size: clamp(14px, 2.5vw, 20px);
@@ -735,46 +750,38 @@ onUnmounted(() => {
   font-weight: 900;
   letter-spacing: 4px;
   opacity: 0;
-  /* 逐字砸入：从上方砸下 + 缩放过冲 + 顿挫，与 BossKillCinematic 风格统一
+  /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免重绘卡顿
      每字 0.55s 完成，间隔 0.15s（技能名通常 2-4 字，节奏比斩杀文案稍快）
      注意：不再有 out 动画，由外层 .skill-text 统一淡出 */
   animation: skill-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
-  /* 坚实有力：粗描边 + 立体阴影 + 外发光 */
-  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
-  paint-order: stroke fill;
+  /* 坚实有力：四方向粗黑描边 + 立体阴影，避免 -webkit-text-stroke 引起栅格化不同步 */
   text-shadow:
+    -2px -2px 0 rgba(0, 0, 0, 0.9),
+    2px -2px 0 rgba(0, 0, 0, 0.9),
+    -2px 2px 0 rgba(0, 0, 0, 0.9),
     2px 2px 0 rgba(0, 0, 0, 0.9),
-    4px 4px 0 rgba(0, 0, 0, 0.7),
-    0 0 18px currentColor,
-    0 0 32px currentColor;
+    4px 4px 0 rgba(0, 0, 0, 0.7);
   will-change: transform, opacity;
 }
 @keyframes skill-char-in {
   0% {
     opacity: 0;
-    /* 从上方 60px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
-    transform: translateY(-60px) scale(2.5) rotate(-8deg);
-    filter: blur(3px);
-  }
-  40% {
-    /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
-    opacity: 1;
-    transform: translateY(0) scale(0.85) rotate(4deg);
-    filter: blur(0);
+    /* 纯位移砸入：从上方 60px 砸下，无 scale/blur 避免重绘 */
+    transform: translateY(-60px);
   }
   60% {
-    /* 反弹一下：放大到 1.12（皮球落地反弹感） */
-    transform: translateY(0) scale(1.12) rotate(-2deg);
+    /* 砸到位置后小回弹 */
+    opacity: 1;
+    transform: translateY(8px);
   }
   80% {
-    /* 再次小顿挫：0.97，模拟重物落地的二次震动 */
-    transform: translateY(0) scale(0.97) rotate(1deg);
+    /* 二次小顿挫 */
+    transform: translateY(-2px);
   }
   100% {
-    /* 定格：回到正常大小，稳稳定住 */
+    /* 定格 */
     opacity: 1;
-    transform: translateY(0) scale(1) rotate(0deg);
-    filter: blur(0);
+    transform: translateY(0);
   }
 }
 
