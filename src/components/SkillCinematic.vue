@@ -2,16 +2,99 @@
   <!-- 技能释放全屏特写演出：仅 BOSS 战时触发，技能名四字大字 + 属性色光闪 + 聚气波纹 -->
   <teleport to="body">
     <div v-if="show" class="skill-cinematic" aria-hidden="true">
-      <!-- 全屏属性色光闪：按技能关键词匹配属性色 -->
+      <!-- 全屏属性色光闪 -->
       <div :key="`flash-${animKey}`" class="skill-flash" :style="{ background: flashBg }"></div>
-      <!-- 中心聚气波纹：3 圈扩散 -->
-      <div :key="`wave1-${animKey}`" class="skill-wave wave-1" :style="{ borderColor: skillColor }"></div>
-      <div :key="`wave2-${animKey}`" class="skill-wave wave-2" :style="{ borderColor: skillColor }"></div>
-      <div :key="`wave3-${animKey}`" class="skill-wave wave-3" :style="{ borderColor: skillColor }"></div>
       <!-- 中心光晕 -->
       <div :key="`glow-${animKey}`" class="skill-glow" :style="{ background: glowBg }"></div>
+
+      <!-- 专属图形特效：按技能属性系渲染不同图形 -->
+      <!-- 暗系：旋转黑洞漩涡 -->
+      <div v-if="skillFx === 'vortex'" :key="`fx-${animKey}`" class="fx-vortex" :style="{ borderColor: skillColor }">
+        <div class="vortex-ring r1" :style="{ borderColor: skillColor }"></div>
+        <div class="vortex-ring r2" :style="{ borderColor: skillColor }"></div>
+        <div class="vortex-ring r3" :style="{ borderColor: skillColor }"></div>
+        <div class="vortex-core" :style="{ background: glowBg }"></div>
+      </div>
+      <!-- 火系：腾起火焰粒子 -->
+      <div v-else-if="skillFx === 'flames'" :key="`fx-${animKey}`" class="fx-flames">
+        <div v-for="i in 7" :key="i" class="flame-particle"
+          :style="{ '--c': skillColor, left: `${15 + i * 10}%`, animationDelay: `${i * 0.08}s` }"></div>
+      </div>
+      <!-- 雷系：Z字闪电链 -->
+      <div v-else-if="skillFx === 'lightning'" :key="`fx-${animKey}`" class="fx-lightning">
+        <svg class="lightning-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
+          <polyline :stroke="skillColor" points="50,0 40,30 60,35 45,65 55,70 50,100" />
+          <polyline class="bolt2" :stroke="skillColor" points="30,5 20,35 40,40 25,70 35,75 30,100" />
+          <polyline class="bolt3" :stroke="skillColor" points="70,5 60,35 80,40 65,70 75,75 70,100" />
+        </svg>
+      </div>
+      <!-- 冰系：六角冰晶 -->
+      <div v-else-if="skillFx === 'crystal'" :key="`fx-${animKey}`" class="fx-crystal">
+        <div class="crystal-shape" :style="{ borderColor: skillColor }">
+          <div class="crystal-arm a1" :style="{ background: skillColor }"></div>
+          <div class="crystal-arm a2" :style="{ background: skillColor }"></div>
+          <div class="crystal-arm a3" :style="{ background: skillColor }"></div>
+        </div>
+        <div class="crystal-shape small" :style="{ borderColor: skillColor }"></div>
+      </div>
+      <!-- 毒系：冒泡毒气云 -->
+      <div v-else-if="skillFx === 'cloud'" :key="`fx-${animKey}`" class="fx-cloud">
+        <div v-for="i in 6" :key="i" class="cloud-bubble"
+          :style="{ '--c': skillColor, left: `${10 + i * 14}%`, animationDelay: `${i * 0.12}s` }"></div>
+      </div>
+      <!-- 木系：向上生长的藤蔓 -->
+      <div v-else-if="skillFx === 'vines'" :key="`fx-${animKey}`" class="fx-vines">
+        <div v-for="i in 5" :key="i" class="vine" :style="{ '--c': skillColor, left: `${15 + i * 16}%`, animationDelay: `${i * 0.1}s` }">
+          <div class="vine-leaf" :style="{ background: skillColor }"></div>
+        </div>
+      </div>
+      <!-- 剑系：交叉剑光斜劈 -->
+      <div v-else-if="skillFx === 'slash'" :key="`fx-${animKey}`" class="fx-slash">
+        <div class="slash-line s1" :style="`--c:${skillColor}`"></div>
+        <div class="slash-line s2" :style="`--c:${skillColor}`"></div>
+        <div class="slash-line s3" :style="`--c:${skillColor}`"></div>
+      </div>
+      <!-- 土系：升起岩石尖刺 -->
+      <div v-else-if="skillFx === 'spikes'" :key="`fx-${animKey}`" class="fx-spikes">
+        <div v-for="i in 7" :key="i" class="spike"
+          :style="{ '--c': skillColor, left: `${8 + i * 12}%`, animationDelay: `${i * 0.07}s` }"></div>
+      </div>
+      <!-- 风系：旋转龙卷风圈 -->
+      <div v-else-if="skillFx === 'tornado'" :key="`fx-${animKey}`" class="fx-tornado">
+        <div class="tornado-ring r1" :style="{ borderColor: skillColor }"></div>
+        <div class="tornado-ring r2" :style="{ borderColor: skillColor }"></div>
+        <div class="tornado-ring r3" :style="{ borderColor: skillColor }"></div>
+        <div class="tornado-ring r4" :style="{ borderColor: skillColor }"></div>
+      </div>
+      <!-- 水系：横向波纹 -->
+      <div v-else-if="skillFx === 'waves'" :key="`fx-${animKey}`" class="fx-waves">
+        <div class="wave-line w1" :style="{ borderColor: skillColor }"></div>
+        <div class="wave-line w2" :style="{ borderColor: skillColor }"></div>
+        <div class="wave-line w3" :style="{ borderColor: skillColor }"></div>
+      </div>
+      <!-- 光系：八芒星放射 -->
+      <div v-else-if="skillFx === 'star'" :key="`fx-${animKey}`" class="fx-star" :style="{ '--c': skillColor }">
+        <div class="star-rays">
+          <div v-for="i in 8" :key="i" class="star-ray"
+            :style="{ transform: `translate(-50%, -100%) rotate(${(i - 1) * 45}deg)`, background: `linear-gradient(to top, transparent, ${skillColor})`, animationDelay: `${(i - 1) * 0.05}s` }"></div>
+        </div>
+        <div class="star-core" :style="{ background: glowBg }"></div>
+      </div>
+      <!-- 战系：向下冲击拳印 -->
+      <div v-else-if="skillFx === 'impact'" :key="`fx-${animKey}`" class="fx-impact">
+        <div class="impact-diamond d1" :style="{ borderColor: skillColor }"></div>
+        <div class="impact-diamond d2" :style="{ borderColor: skillColor }"></div>
+        <div class="impact-diamond d3" :style="{ borderColor: skillColor }"></div>
+        <div class="impact-core" :style="{ background: skillColor }"></div>
+      </div>
+      <!-- 阵法系：旋转六芒星阵 -->
+      <div v-else-if="skillFx === 'hexagram'" :key="`fx-${animKey}`" class="fx-hexagram">
+        <div class="hexagram-circle" :style="{ borderColor: skillColor }"></div>
+        <div class="hexagram-triangle up" :style="{ borderColor: skillColor }"></div>
+        <div class="hexagram-triangle down" :style="{ borderColor: skillColor }"></div>
+      </div>
+
       <!-- 技能名四字特写：逐字砸入出现，全部到齐后整体一起消失 -->
-      <!-- 外层 .skill-text 负责整体淡出（统一延迟），内层 .skill-name-char 仅负责逐字砸入出现 -->
       <div
         :key="`text-${animKey}`"
         class="skill-text"
@@ -27,19 +110,6 @@
             :style="{ animationDelay: (0.15 + i * 0.15) + 's' }"
           >{{ ch }}</span>
         </div>
-      </div>
-      <!-- 放射光线：8 道从中心射出 -->
-      <div :key="`rays-${animKey}`" class="skill-rays">
-        <div
-          v-for="i in 8"
-          :key="i"
-          class="skill-ray"
-          :style="{
-            transform: `translate(-50%, -100%) rotate(${(i - 1) * 45}deg)`,
-            background: `linear-gradient(to top, transparent, ${skillColor})`,
-            animationDelay: ((i - 1) * 0.05) + 's'
-          }"
-        ></div>
       </div>
     </div>
   </teleport>
@@ -58,6 +128,7 @@ const skillName = ref('')
 const casterName = ref('')
 const animKey = ref(0)
 const skillColor = ref('#DAA520')
+const skillFx = ref('star')
 const flashBg = ref('rgba(255, 215, 0, 0.4)')
 const glowBg = ref('radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, transparent 70%)')
 
@@ -73,38 +144,38 @@ const skillFadeDelay = computed(() => {
 // 整体淡出 class：在 skillCastEvent watch 内通过 nextTick 触发，避免初始化误触发
 const skillFadeClass = ref('')
 
-// ===== 技能属性色映射：按技能名关键词推断属性色 =====
-// 修仙主题属性配色，覆盖 11 大属性系，确保每个技能都有契合的视觉效果
+// ===== 技能属性色映射：按技能名关键词推断属性色 + 专属图形特效 =====
+// 修仙主题属性配色，覆盖 13 大属性系，每个系有专属图形特效（fx）
 // 排序即优先级：多属性关键词技能按靠前的系匹配（如"光暗交织"归暗系）
 const SKILL_COLOR_MAP = [
-  // 暗系（最高优先级，避免"光暗交织"误归光系）：暗紫/黑紫，阴冷深邃
-  { keys: ['暗', '影', '夜', '幽', '冥', '煞', '魔', '鬼', '魂', '噬', '阴'], color: '#7E1FA2', flash: 'rgba(126, 31, 162, 0.4)', glow: 'radial-gradient(circle, rgba(126, 31, 162, 0.5) 0%, rgba(48, 12, 64, 0.3) 40%, transparent 70%)' },
-  // 火系：烈焰红橙
-  { keys: ['火', '焰', '焚', '炽', '炎', '烛', '爆'], color: '#FF5252', flash: 'rgba(255, 82, 82, 0.4)', glow: 'radial-gradient(circle, rgba(255, 82, 82, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
-  // 雷系：明黄电光
-  { keys: ['雷', '电', '霆', '霹雳', '震'], color: '#FFEB3B', flash: 'rgba(255, 235, 59, 0.4)', glow: 'radial-gradient(circle, rgba(255, 235, 59, 0.5) 0%, rgba(255, 193, 7, 0.2) 40%, transparent 70%)' },
-  // 冰系：寒冰青蓝（排在剑系前，"寒霜剑意"归冰）
-  { keys: ['冰', '雪', '霜', '寒', '凛'], color: '#4FC3F7', flash: 'rgba(79, 195, 247, 0.4)', glow: 'radial-gradient(circle, rgba(79, 195, 247, 0.5) 0%, rgba(38, 198, 218, 0.2) 40%, transparent 70%)' },
-  // 毒系：幽毒紫绿
-  { keys: ['毒', '蛊', '腐', '蚀'], color: '#AB47BC', flash: 'rgba(171, 71, 188, 0.4)', glow: 'radial-gradient(circle, rgba(171, 71, 188, 0.5) 0%, rgba(74, 20, 140, 0.2) 40%, transparent 70%)' },
-  // 木系（治疗/自然/生命）：青翠绿（与风系区分用更深青绿）
-  { keys: ['木', '藤', '根', '愈', '养', '治', '疗', '复', '生', '命', '自然'], color: '#26A69A', flash: 'rgba(38, 166, 154, 0.4)', glow: 'radial-gradient(circle, rgba(38, 166, 154, 0.5) 0%, rgba(0, 105, 92, 0.2) 40%, transparent 70%)' },
-  // 剑系：锋金灿金
-  { keys: ['剑', '刀', '锋', '斩', '劈', '刃', '刺', '舞'], color: '#FFD700', flash: 'rgba(255, 215, 0, 0.4)', glow: 'radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)' },
-  // 土系：厚土褐黄
-  { keys: ['土', '山', '岳', '岩', '石', '泰坦', '铁壁', '盾', '护', '防', '守', '不破', '磐石'], color: '#8D6E63', flash: 'rgba(141, 110, 99, 0.4)', glow: 'radial-gradient(circle, rgba(141, 110, 99, 0.5) 0%, rgba(78, 52, 46, 0.2) 40%, transparent 70%)' },
-  // 风系：疾风翠绿
-  { keys: ['风', '云', '气', '御', '疾', '动', '灵'], color: '#66BB6A', flash: 'rgba(102, 187, 106, 0.4)', glow: 'radial-gradient(circle, rgba(102, 187, 106, 0.5) 0%, rgba(46, 125, 50, 0.2) 40%, transparent 70%)' },
-  // 水/波系：流水青
-  { keys: ['水', '波', '潮', '涌', '渊', '海'], color: '#29B6F6', flash: 'rgba(41, 182, 246, 0.4)', glow: 'radial-gradient(circle, rgba(41, 182, 246, 0.5) 0%, rgba(13, 71, 161, 0.2) 40%, transparent 70%)' },
-  // 光/佛/圣系：圣金光
-  { keys: ['佛', '禅', '金光', '圣', '光', '阳', '神'], color: '#FFE082', flash: 'rgba(255, 224, 130, 0.4)', glow: 'radial-gradient(circle, rgba(255, 224, 130, 0.6) 0%, rgba(255, 152, 0, 0.2) 40%, transparent 70%)' },
-  // 战/力/狂系：战神赤红（战士类技能专属）
-  { keys: ['战', '狂', '暴', '重击', '处决', '天罚', '主宰', '威慑', '吼'], color: '#E53935', flash: 'rgba(229, 57, 53, 0.4)', glow: 'radial-gradient(circle, rgba(229, 57, 53, 0.5) 0%, rgba(127, 0, 0, 0.2) 40%, transparent 70%)' },
-  // 阵法系：玄机青灰（阵法类技能专属）
-  { keys: ['阵', '迷', '迟', '陷阱', '静止', '幸运', '增幅'], color: '#78909C', flash: 'rgba(120, 144, 156, 0.4)', glow: 'radial-gradient(circle, rgba(120, 144, 156, 0.5) 0%, rgba(38, 50, 56, 0.2) 40%, transparent 70%)' }
+  // 暗系：暗紫/黑紫，阴冷深邃；fx=vortex 黑洞漩涡
+  { keys: ['暗', '影', '夜', '幽', '冥', '煞', '魔', '鬼', '魂', '噬', '阴'], color: '#7E1FA2', flash: 'rgba(126, 31, 162, 0.4)', glow: 'radial-gradient(circle, rgba(126, 31, 162, 0.5) 0%, rgba(48, 12, 64, 0.3) 40%, transparent 70%)', fx: 'vortex' },
+  // 火系：烈焰红橙；fx=flames 腾起火焰
+  { keys: ['火', '焰', '焚', '炽', '炎', '烛', '爆'], color: '#FF5252', flash: 'rgba(255, 82, 82, 0.4)', glow: 'radial-gradient(circle, rgba(255, 82, 82, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)', fx: 'flames' },
+  // 雷系：明黄电光；fx=lightning Z字闪电链
+  { keys: ['雷', '电', '霆', '霹雳', '震'], color: '#FFEB3B', flash: 'rgba(255, 235, 59, 0.4)', glow: 'radial-gradient(circle, rgba(255, 235, 59, 0.5) 0%, rgba(255, 193, 7, 0.2) 40%, transparent 70%)', fx: 'lightning' },
+  // 冰系：寒冰青蓝；fx=crystal 六角冰晶
+  { keys: ['冰', '雪', '霜', '寒', '凛'], color: '#4FC3F7', flash: 'rgba(79, 195, 247, 0.4)', glow: 'radial-gradient(circle, rgba(79, 195, 247, 0.5) 0%, rgba(38, 198, 218, 0.2) 40%, transparent 70%)', fx: 'crystal' },
+  // 毒系：幽毒紫绿；fx=cloud 冒泡毒气云
+  { keys: ['毒', '蛊', '腐', '蚀'], color: '#AB47BC', flash: 'rgba(171, 71, 188, 0.4)', glow: 'radial-gradient(circle, rgba(171, 71, 188, 0.5) 0%, rgba(74, 20, 140, 0.2) 40%, transparent 70%)', fx: 'cloud' },
+  // 木系（治疗/自然/生命）：青翠绿；fx=vines 向上生长的藤蔓
+  { keys: ['木', '藤', '根', '愈', '养', '治', '疗', '复', '生', '命', '自然'], color: '#26A69A', flash: 'rgba(38, 166, 154, 0.4)', glow: 'radial-gradient(circle, rgba(38, 166, 154, 0.5) 0%, rgba(0, 105, 92, 0.2) 40%, transparent 70%)', fx: 'vines' },
+  // 剑系：锋金灿金；fx=slash 交叉剑光斜劈
+  { keys: ['剑', '刀', '锋', '斩', '劈', '刃', '刺', '舞'], color: '#FFD700', flash: 'rgba(255, 215, 0, 0.4)', glow: 'radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, rgba(255, 140, 0, 0.2) 40%, transparent 70%)', fx: 'slash' },
+  // 土系：厚土褐黄；fx=spikes 升起的岩石尖刺
+  { keys: ['土', '山', '岳', '岩', '石', '泰坦', '铁壁', '盾', '护', '防', '守', '不破', '磐石'], color: '#8D6E63', flash: 'rgba(141, 110, 99, 0.4)', glow: 'radial-gradient(circle, rgba(141, 110, 99, 0.5) 0%, rgba(78, 52, 46, 0.2) 40%, transparent 70%)', fx: 'spikes' },
+  // 风系：疾风翠绿；fx=tornado 旋转龙卷风圈
+  { keys: ['风', '云', '气', '御', '疾', '动', '灵'], color: '#66BB6A', flash: 'rgba(102, 187, 106, 0.4)', glow: 'radial-gradient(circle, rgba(102, 187, 106, 0.5) 0%, rgba(46, 125, 50, 0.2) 40%, transparent 70%)', fx: 'tornado' },
+  // 水/波系：流水青；fx=waves 横向波纹
+  { keys: ['水', '波', '潮', '涌', '渊', '海'], color: '#29B6F6', flash: 'rgba(41, 182, 246, 0.4)', glow: 'radial-gradient(circle, rgba(41, 182, 246, 0.5) 0%, rgba(13, 71, 161, 0.2) 40%, transparent 70%)', fx: 'waves' },
+  // 光/佛/圣系：圣金光；fx=star 八芒星放射
+  { keys: ['佛', '禅', '金光', '圣', '光', '阳', '神'], color: '#FFE082', flash: 'rgba(255, 224, 130, 0.4)', glow: 'radial-gradient(circle, rgba(255, 224, 130, 0.6) 0%, rgba(255, 152, 0, 0.2) 40%, transparent 70%)', fx: 'star' },
+  // 战/力/狂系：战神赤红；fx=impact 向下冲击拳印
+  { keys: ['战', '狂', '暴', '重击', '处决', '天罚', '主宰', '威慑', '吼'], color: '#E53935', flash: 'rgba(229, 57, 53, 0.4)', glow: 'radial-gradient(circle, rgba(229, 57, 53, 0.5) 0%, rgba(127, 0, 0, 0.2) 40%, transparent 70%)', fx: 'impact' },
+  // 阵法系：玄机青灰；fx=hexagram 旋转六芒星阵
+  { keys: ['阵', '迷', '迟', '陷阱', '静止', '幸运', '增幅'], color: '#78909C', flash: 'rgba(120, 144, 156, 0.4)', glow: 'radial-gradient(circle, rgba(120, 144, 156, 0.5) 0%, rgba(38, 50, 56, 0.2) 40%, transparent 70%)', fx: 'hexagram' }
 ]
-const DEFAULT_COLOR = { color: '#DAA520', flash: 'rgba(218, 165, 32, 0.4)', glow: 'radial-gradient(circle, rgba(218, 165, 32, 0.5) 0%, transparent 70%)' }
+const DEFAULT_COLOR = { color: '#DAA520', flash: 'rgba(218, 165, 32, 0.4)', glow: 'radial-gradient(circle, rgba(218, 165, 32, 0.5) 0%, transparent 70%)', fx: 'star' }
 
 function resolveSkillColor(name) {
   if (!name) return DEFAULT_COLOR
@@ -146,6 +217,7 @@ watch(skillCastEvent, (evt) => {
   casterName.value = evt.casterName || ''
   const c = resolveSkillColor(evt.skillName)
   skillColor.value = c.color
+  skillFx.value = c.fx || 'star'
   flashBg.value = c.flash
   glowBg.value = c.glow
   // 重置淡出 class：先移除再在下一次 tick 加回，确保 animation-delay 重新计算
@@ -198,26 +270,6 @@ onUnmounted(() => {
   100% { opacity: 0; }
 }
 
-/* 中心聚气波纹：3 圈向外扩散，错峰 0.15s */
-.skill-wave {
-  position: absolute;
-  width: 20vmin;
-  height: 20vmin;
-  border-radius: 50%;
-  border: 3px solid;
-  opacity: 0;
-  transform: scale(0.3);
-  animation: skill-wave-anim 1s ease-out forwards;
-}
-.wave-1 { animation-delay: 0s; }
-.wave-2 { animation-delay: 0.15s; }
-.wave-3 { animation-delay: 0.3s; }
-@keyframes skill-wave-anim {
-  0% { opacity: 0; transform: scale(0.3); border-width: 6px; }
-  30% { opacity: 1; }
-  100% { opacity: 0; transform: scale(4); border-width: 1px; }
-}
-
 /* 中心光晕：聚气时的辐射光 */
 .skill-glow {
   position: absolute;
@@ -234,28 +286,412 @@ onUnmounted(() => {
   100% { opacity: 0; transform: scale(1.3); }
 }
 
-/* 放射光线：8 道从中心射出 */
-.skill-rays {
+/* ============ 13 种属性系专属图形特效 ============ */
+/* 所有 fx 容器统一居中绝对定位 */
+[class^="fx-"] {
   position: absolute;
+  left: 50%;
+  top: 50%;
+  transform: translate(-50%, -50%);
   width: 0;
   height: 0;
-  top: 50%;
-  left: 50%;
 }
-.skill-ray {
+
+/* 暗系：旋转黑洞漩涡（3 圈反向旋转 + 中心暗核） */
+.fx-vortex { width: 60vmin; height: 60vmin; }
+.vortex-ring {
+  position: absolute;
+  inset: 0;
+  border-radius: 50%;
+  border: 3px dashed;
+  opacity: 0;
+  animation: vortex-spin 1.6s ease-out forwards;
+}
+.vortex-ring.r1 { animation-delay: 0s; }
+.vortex-ring.r2 { inset: 12%; animation-delay: 0.15s; }
+.vortex-ring.r3 { inset: 24%; animation-delay: 0.3s; }
+.vortex-core {
+  position: absolute;
+  inset: 38%;
+  border-radius: 50%;
+  opacity: 0;
+  animation: vortex-core-in 1s ease-in 0.4s forwards;
+}
+@keyframes vortex-spin {
+  0% { opacity: 0; transform: rotate(0) scale(0.3); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: rotate(540deg) scale(1.2); }
+}
+@keyframes vortex-core-in {
+  0% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1.3); }
+  100% { opacity: 0; transform: scale(0.8); }
+}
+
+/* 火系：腾起火焰粒子（向上抖动 + 缩小消散） */
+.fx-flames { width: 80vw; height: 60vh; }
+.flame-particle {
+  position: absolute;
+  bottom: 0;
+  width: 18px;
+  height: 60px;
+  background: var(--c);
+  border-radius: 50% 50% 20% 20% / 80% 80% 20% 20%;
+  opacity: 0;
+  filter: blur(2px);
+  animation: flame-rise 1.4s ease-out forwards;
+}
+@keyframes flame-rise {
+  0% { opacity: 0; transform: translateY(40px) scale(0.3); }
+  20% { opacity: 1; transform: translateY(0) scale(1); }
+  60% { opacity: 0.8; transform: translateY(-40vh) scale(0.8); }
+  100% { opacity: 0; transform: translateY(-70vh) scale(0.2); }
+}
+
+/* 雷系：Z 字闪电链（3 道折线闪现） */
+.fx-lightning { width: 80vw; height: 80vh; }
+.lightning-svg {
+  position: absolute;
+  inset: 0;
+  width: 100%;
+  height: 100%;
+  opacity: 0;
+  animation: lightning-flash 1s ease-out forwards;
+}
+.lightning-svg polyline {
+  fill: none;
+  stroke-width: 3;
+  filter: drop-shadow(0 0 8px currentColor);
+}
+.lightning-svg .bolt2 { animation: bolt-flicker 0.8s ease-out 0.15s forwards; opacity: 0; }
+.lightning-svg .bolt3 { animation: bolt-flicker 0.8s ease-out 0.3s forwards; opacity: 0; }
+@keyframes lightning-flash {
+  0%, 100% { opacity: 0; }
+  10%, 25%, 45% { opacity: 1; }
+  18%, 35%, 55% { opacity: 0.3; }
+  70% { opacity: 0.6; }
+}
+@keyframes bolt-flicker {
+  0%, 100% { opacity: 0; }
+  10%, 30% { opacity: 1; }
+  20% { opacity: 0.4; }
+}
+
+/* 冰系：六角冰晶（中心大晶体 + 小晶体，缓慢旋转） */
+.fx-crystal { width: 40vmin; height: 40vmin; }
+.crystal-shape {
+  position: absolute;
+  inset: 0;
+  border: 3px solid;
+  transform: rotate(45deg);
+  opacity: 0;
+  animation: crystal-in 1.6s ease-out forwards;
+}
+.crystal-shape.small {
+  inset: 25%;
+  animation-delay: 0.3s;
+}
+.crystal-arm {
+  position: absolute;
+  width: 4px;
+  height: 140%;
+  top: -20%;
+  left: 50%;
+  margin-left: -2px;
+}
+.crystal-arm.a1 { transform: rotate(0deg); }
+.crystal-arm.a2 { transform: rotate(60deg); }
+.crystal-arm.a3 { transform: rotate(-60deg); }
+@keyframes crystal-in {
+  0% { opacity: 0; transform: rotate(45deg) scale(0); }
+  30% { opacity: 1; }
+  70% { opacity: 0.9; transform: rotate(225deg) scale(1.1); }
+  100% { opacity: 0; transform: rotate(405deg) scale(0.8); }
+}
+
+/* 毒系：冒泡毒气云（6 个不规则扩散圆） */
+.fx-cloud { width: 80vw; height: 50vh; }
+.cloud-bubble {
+  position: absolute;
+  bottom: 0;
+  width: 60px;
+  height: 60px;
+  background: var(--c);
+  border-radius: 50% 40% 55% 45%;
+  opacity: 0;
+  filter: blur(4px);
+  animation: cloud-bubble 1.8s ease-out forwards;
+}
+@keyframes cloud-bubble {
+  0% { opacity: 0; transform: translateY(20px) scale(0.2); }
+  25% { opacity: 0.9; transform: translateY(0) scale(1); }
+  60% { opacity: 0.7; transform: translateY(-30vh) scale(1.4); }
+  100% { opacity: 0; transform: translateY(-50vh) scale(1.8); }
+}
+
+/* 木系：向上生长的藤蔓（垂直延伸 + 末端叶子绽放） */
+.fx-vines { width: 80vw; height: 70vh; }
+.vine {
+  position: absolute;
+  bottom: 0;
+  width: 3px;
+  height: 0;
+  background: var(--c);
+  opacity: 0;
+  transform-origin: bottom;
+  animation: vine-grow 1.6s ease-out forwards;
+}
+.vine-leaf {
+  position: absolute;
+  top: -8px;
+  left: -8px;
+  width: 18px;
+  height: 18px;
+  border-radius: 50% 0;
+  opacity: 0;
+  animation: leaf-bloom 0.5s ease-out 1s forwards;
+}
+@keyframes vine-grow {
+  0% { opacity: 0; height: 0; }
+  20% { opacity: 1; }
+  70% { opacity: 1; height: 55vh; }
+  100% { opacity: 0; height: 55vh; }
+}
+@keyframes leaf-bloom {
+  0% { opacity: 0; transform: scale(0) rotate(0); }
+  100% { opacity: 0.9; transform: scale(1) rotate(45deg); }
+}
+
+/* 剑系：交叉剑光斜劈（3 道对角剑气） */
+.fx-slash { width: 100vw; height: 100vh; }
+.slash-line {
   position: absolute;
   top: 50%;
   left: 50%;
+  width: 80vmin;
+  height: 4px;
+  background: linear-gradient(to right, transparent, var(--c), transparent);
+  opacity: 0;
+  transform-origin: center;
+  filter: blur(0.5px);
+}
+.slash-line.s1 { animation: slash-anim 0.8s ease-out forwards; }
+.slash-line.s2 { animation: slash-anim 0.8s ease-out 0.2s forwards; }
+.slash-line.s3 { animation: slash-anim 0.8s ease-out 0.4s forwards; }
+@keyframes slash-anim {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(-45deg) scaleX(0); }
+  30% { opacity: 1; transform: translate(-50%, -50%) rotate(-45deg) scaleX(1); }
+  60% { opacity: 0.8; transform: translate(-50%, -50%) rotate(-45deg) scaleX(1.2); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(-45deg) scaleX(1.5); }
+}
+.slash-line.s2 { animation-name: slash-anim-2; }
+.slash-line.s3 { animation-name: slash-anim-3; }
+@keyframes slash-anim-2 {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scaleX(0); }
+  30% { opacity: 1; transform: translate(-50%, -50%) rotate(45deg) scaleX(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(45deg) scaleX(1.5); }
+}
+@keyframes slash-anim-3 {
+  0% { opacity: 0; transform: translate(-50%, -50%) rotate(90deg) scaleX(0); }
+  30% { opacity: 1; transform: translate(-50%, -50%) rotate(90deg) scaleX(1); }
+  100% { opacity: 0; transform: translate(-50%, -50%) rotate(90deg) scaleX(1.5); }
+}
+
+/* 土系：升起岩石尖刺（7 个向上突起的三角） */
+.fx-spikes { width: 80vw; height: 50vh; }
+.spike {
+  position: absolute;
+  bottom: 0;
+  width: 0;
+  height: 0;
+  border-left: 18px solid transparent;
+  border-right: 18px solid transparent;
+  border-bottom: 0 solid var(--c);
+  opacity: 0;
+  animation: spike-rise 1.2s ease-out forwards;
+}
+@keyframes spike-rise {
+  0% { opacity: 0; border-bottom-width: 0; transform: translateY(20px); }
+  30% { opacity: 1; }
+  60% { opacity: 1; border-bottom-width: 35vh; transform: translateY(0); }
+  100% { opacity: 0; border-bottom-width: 35vh; transform: translateY(-10px); }
+}
+
+/* 风系：旋转龙卷风圈（4 层椭圆环旋转） */
+.fx-tornado { width: 40vmin; height: 60vh; }
+.tornado-ring {
+  position: absolute;
+  left: 50%;
+  border: 3px solid;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translateX(-50%) rotate(0deg);
+  animation: tornado-spin 1.8s ease-out forwards;
+}
+.tornado-ring.r1 { top: 60%; width: 30vmin; height: 8vmin; animation-delay: 0s; }
+.tornado-ring.r2 { top: 45%; width: 22vmin; height: 6vmin; animation-delay: 0.15s; }
+.tornado-ring.r3 { top: 30%; width: 14vmin; height: 4vmin; animation-delay: 0.3s; }
+.tornado-ring.r4 { top: 15%; width: 6vmin; height: 2vmin; animation-delay: 0.45s; }
+@keyframes tornado-spin {
+  0% { opacity: 0; transform: translateX(-50%) rotate(0deg) scaleY(0.3); }
+  30% { opacity: 1; }
+  70% { opacity: 0.9; transform: translateX(-50%) rotate(720deg) scaleY(1); }
+  100% { opacity: 0; transform: translateX(-50%) rotate(1080deg) scaleY(1.2); }
+}
+
+/* 水系：横向波纹（3 条水平扩散的弧线） */
+.fx-waves { width: 100vw; height: 40vh; }
+.wave-line {
+  position: absolute;
+  left: 50%;
+  top: 50%;
+  width: 0;
+  height: 20vmin;
+  border: 3px solid;
+  border-radius: 50%;
+  opacity: 0;
+  transform: translate(-50%, -50%) scaleX(0);
+  animation: wave-spread 1.6s ease-out forwards;
+}
+.wave-line.w1 { animation-delay: 0s; }
+.wave-line.w2 { animation-delay: 0.25s; height: 35vmin; }
+.wave-line.w3 { animation-delay: 0.5s; height: 50vmin; }
+@keyframes wave-spread {
+  0% { opacity: 0; transform: translate(-50%, -50%) scaleX(0); }
+  30% { opacity: 1; transform: translate(-50%, -50%) scaleX(1); }
+  70% { opacity: 0.6; transform: translate(-50%, -50%) scaleX(1.5); }
+  100% { opacity: 0; transform: translate(-50%, -50%) scaleX(2); }
+}
+
+/* 光系：八芒星放射（8 道光线 + 中心光球） */
+.fx-star { width: 0; height: 0; }
+.star-rays {
+  position: absolute;
+  left: 0;
+  top: 0;
+}
+.star-ray {
+  position: absolute;
+  top: 0;
+  left: 0;
   width: 3px;
-  height: 30vmin;
+  height: 0;
   transform-origin: bottom center;
   opacity: 0;
-  animation: skill-ray-anim 0.6s ease-out forwards;
+  animation: star-ray-anim 0.8s ease-out forwards;
 }
-@keyframes skill-ray-anim {
-  0% { opacity: 0; height: 5vmin; }
+@keyframes star-ray-anim {
+  0% { opacity: 0; height: 0; }
   40% { opacity: 1; height: 35vmin; }
   100% { opacity: 0; height: 50vmin; }
+}
+.star-core {
+  position: absolute;
+  left: -10vmin;
+  top: -10vmin;
+  width: 20vmin;
+  height: 20vmin;
+  border-radius: 50%;
+  opacity: 0;
+  animation: star-core-pulse 1.2s ease-out forwards;
+}
+@keyframes star-core-pulse {
+  0% { opacity: 0; transform: scale(0); }
+  30% { opacity: 1; transform: scale(1.2); }
+  60% { opacity: 0.8; transform: scale(1); }
+  100% { opacity: 0; transform: scale(0.7); }
+}
+
+/* 战系：向下冲击拳印（3 圈菱形冲击波 + 中心爆点） */
+.fx-impact { width: 50vmin; height: 50vmin; }
+.impact-diamond {
+  position: absolute;
+  inset: 0;
+  border: 3px solid;
+  opacity: 0;
+  transform: rotate(45deg) scale(0);
+  animation: impact-punch 1.2s ease-out forwards;
+}
+.impact-diamond.d1 { animation-delay: 0s; }
+.impact-diamond.d2 { inset: 15%; animation-delay: 0.15s; }
+.impact-diamond.d3 { inset: 30%; animation-delay: 0.3s; }
+.impact-core {
+  position: absolute;
+  inset: 40%;
+  border-radius: 50%;
+  opacity: 0;
+  animation: impact-core-flash 0.6s ease-out 0.4s forwards;
+}
+@keyframes impact-punch {
+  0% { opacity: 0; transform: rotate(45deg) scale(0); }
+  30% { opacity: 1; transform: rotate(45deg) scale(1); }
+  60% { opacity: 0.7; transform: rotate(45deg) scale(1.3); }
+  100% { opacity: 0; transform: rotate(45deg) scale(1.6); }
+}
+@keyframes impact-core-flash {
+  0% { opacity: 0; transform: scale(0); }
+  50% { opacity: 1; transform: scale(1.5); }
+  100% { opacity: 0; transform: scale(0.5); }
+}
+
+/* 阵法系：旋转六芒星阵（外圆 + 上下三角） */
+.fx-hexagram { width: 50vmin; height: 50vmin; }
+.hexagram-circle {
+  position: absolute;
+  inset: 0;
+  border: 3px solid;
+  border-radius: 50%;
+  opacity: 0;
+  animation: hexagram-circle-in 1.8s ease-out forwards;
+}
+.hexagram-triangle {
+  position: absolute;
+  inset: 10%;
+  border: 3px solid;
+  opacity: 0;
+}
+.hexagram-triangle.up {
+  border-bottom: 0;
+  border-left: 0;
+  border-right: 0;
+  border-top: 3px solid;
+  /* 等边三角向上 */
+  width: 0;
+  height: 0;
+  border-left: 20vmin solid transparent;
+  border-right: 20vmin solid transparent;
+  border-top: 0;
+  border-bottom: 35vmin solid;
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: hexagram-tri-in 1.6s ease-out 0.3s forwards;
+}
+.hexagram-triangle.down {
+  width: 0;
+  height: 0;
+  border-left: 20vmin solid transparent;
+  border-right: 20vmin solid transparent;
+  border-top: 35vmin solid;
+  border-bottom: 0;
+  inset: auto;
+  top: 50%;
+  left: 50%;
+  transform: translate(-50%, -50%);
+  animation: hexagram-tri-in 1.6s ease-out 0.5s forwards;
+}
+@keyframes hexagram-circle-in {
+  0% { opacity: 0; transform: rotate(0) scale(0.3); }
+  30% { opacity: 1; }
+  70% { opacity: 0.8; transform: rotate(180deg) scale(1); }
+  100% { opacity: 0; transform: rotate(360deg) scale(1.2); }
+}
+@keyframes hexagram-tri-in {
+  0% { opacity: 0; }
+  30% { opacity: 1; }
+  70% { opacity: 0.8; }
+  100% { opacity: 0; }
 }
 
 /* 技能名文字层：负责整体淡出（animation-delay 由 JS 动态计算） */
