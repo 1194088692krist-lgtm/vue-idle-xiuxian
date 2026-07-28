@@ -133,6 +133,9 @@
               </div>
             </nav>
             </div>
+
+            <!-- 击杀BOSS立绘演出：全局挂载，任意页面挂机/挑战击杀BOSS都能弹出 -->
+            <BossKillCinematic />
           </div>
       </n-dialog-provider>
     </n-message-provider>
