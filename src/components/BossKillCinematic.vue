@@ -35,8 +35,16 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：四字成语 / 诗句，逐字砸入显示，强度随连杀数递增 -->
-      <div v-if="comboLabel" :key="`combo-${animKey}`" class="kill-combo" :class="comboClass">
+      <!-- 连击特效：四字成语 / 诗句，逐字砸入出现，全部到齐后整体一起消失 -->
+      <!-- 外层 .kill-combo 负责整体淡出（统一延迟，所有字一起消失） -->
+      <!-- 内层 .combo-char 仅负责逐字砸入出现（按 delay），不再独立 out -->
+      <div
+        v-if="comboLabel"
+        :key="`combo-${animKey}`"
+        class="kill-combo"
+        :class="comboClass"
+        :style="{ animationDelay: comboFadeDelay + 's' }"
+      >
         <span
           v-for="(ch, i) in comboLabelChars"
           :key="i"
@@ -76,6 +84,13 @@ const comboLabel = ref('')
 const comboClass = ref('')
 // 逐字显示：将文案拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
 const comboLabelChars = computed(() => Array.from(comboLabel.value || ''))
+// 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
+// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.55 + 停留 1.2
+const comboFadeDelay = computed(() => {
+  const n = comboLabelChars.value.length
+  if (n === 0) return 0
+  return (n - 1) * 0.18 + 0.55 + 1.2
+})
 
 // ===== 连击系统：中文斩杀文案库 =====
 // 按连杀次数分 10 个层级，强度递增（四字成语 → 五字 → 七字诗句 → 十字传奇）
@@ -464,8 +479,9 @@ const onPetAnimEnd = () => {
   100% { opacity: 0; transform: translateY(-10px); }
 }
 
-/* ===== 连击特效：逐字显示，一字一字弹出 ===== */
-/* 位置：屏幕右上角。每个字独立动画，配合 animation-delay 实现逐字出现 */
+/* ===== 连击特效：逐字砸入出现，全部到齐后整体一起消失 ===== */
+/* 外层 .kill-combo：负责整体淡出（animation-delay 由 JS 按"最后一字入场完成+停留"计算）
+   内层 .combo-char：仅负责逐字砸入出现，不独立 out（避免边出现边消失） */
 .kill-combo {
   position: absolute;
   top: 16%;
@@ -474,40 +490,60 @@ const onPetAnimEnd = () => {
   flex-wrap: wrap;
   justify-content: flex-end;
   max-width: 60vw;
-  /* 标点符号（逗号等）也占位但不单独成行 */
   gap: 2px;
+  /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算 */
+  opacity: 1;
+  animation: combo-fade-out 0.5s ease-in forwards;
+}
+@keyframes combo-fade-out {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(2px); }
 }
 .combo-char {
   display: inline-block;
-  font-size: clamp(32px, 6vw, 56px);
+  /* 坚实有力字体：Ma Shan Zheng 毛笔楷书（项目已加载），回退到系统楷体/黑体 */
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
+  font-size: clamp(36px, 6.5vw, 60px);
   font-weight: 900;
-  letter-spacing: 2px;
+  letter-spacing: 4px;
   opacity: 0;
-  /* 逐字砸入：从上方大字砸下 + 缩放过冲(2.5→0.85→1.1→1) + 轻微抖动，配合 delay 形成三国杀式"一字一字打进去"效果
-     每字 0.55s 完成（含砸下+反弹+定格），间隔 0.18s 让用户看清每个字
-     全部字砸完后停留 3s 再淡出，给足震撼时间 */
-  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
-             combo-char-out 0.5s ease-in 3.5s forwards;
-  text-shadow: 0 0 12px currentColor, 0 0 24px currentColor, 0 2px 6px rgba(0, 0, 0, 0.9);
-  -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
+  /* 逐字砸入：从上方砸下 + 缩放过冲(2.5→0.85→1.12→1) + 顿挫，配合 delay 形成三国杀式"一字一字打进去"效果
+     每字 0.55s 完成，间隔 0.18s 让用户看清每个字
+     注意：不再有 out 动画，由外层 .kill-combo 统一淡出 */
+  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  /* 坚实有力：粗描边 + 立体阴影 + 金属质感高光
+     -webkit-text-stroke 加粗黑描边让字"刻"在屏幕上
+     多层 text-shadow 实现立体投影 + 外发光 + 暗色描边 */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
+  paint-order: stroke fill; /* 描边在填充下方，保证字心清晰 */
+  /* 顺序：立体投影(右下黑) → 外发光(本色) → 暗描边 */
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.9),
+    4px 4px 0 rgba(0, 0, 0, 0.7),
+    0 0 16px currentColor,
+    0 0 28px currentColor;
   will-change: transform, opacity;
 }
 @keyframes combo-char-in {
   0% {
     opacity: 0;
-    /* 从上方 50px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
-    transform: translateY(-50px) scale(2.5) rotate(-6deg);
-    filter: blur(4px);
+    /* 从上方 60px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
+    transform: translateY(-60px) scale(2.5) rotate(-8deg);
+    filter: blur(3px);
   }
-  45% {
+  40% {
     /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
     opacity: 1;
-    transform: translateY(0) scale(0.85) rotate(3deg);
+    transform: translateY(0) scale(0.85) rotate(4deg);
     filter: blur(0);
   }
-  65% {
-    /* 反弹一下：放大到 1.15（皮球落地反弹感） */
-    transform: translateY(0) scale(1.15) rotate(-1deg);
+  60% {
+    /* 反弹一下：放大到 1.12（皮球落地反弹感） */
+    transform: translateY(0) scale(1.12) rotate(-2deg);
+  }
+  80% {
+    /* 再次小顿挫：0.97，模拟重物落地的二次震动 */
+    transform: translateY(0) scale(0.97) rotate(1deg);
   }
   100% {
     /* 定格：回到正常大小，稳稳定住 */
@@ -516,13 +552,10 @@ const onPetAnimEnd = () => {
     filter: blur(0);
   }
 }
-@keyframes combo-char-out {
-  0% { opacity: 1; transform: translateY(0) scale(1); }
-  100% { opacity: 0; transform: translateY(15px) scale(0.9); filter: blur(2px); }
-}
 
-/* 连击等级配色：从白蓝→青→金→橙→红→紫→品红→深红→金红→传奇彩，强度递增 */
-.combo-1 { color: #B3E5FC; }        /* 浅白蓝：初斩，凌厉但克制 */
+/* 连击等级配色：从白蓝→青→金→橙→红→紫→品红→深红→金红→传奇彩，强度递增
+   颜色饱和度提高，配合粗描边让字更坚实 */
+.combo-1 { color: #E1F5FE; }        /* 浅白蓝：初斩，凌厉但克制 */
 .combo-2 { color: #4FC3F7; }        /* 亮蓝：连斩，杀气渐起 */
 .combo-3 { color: #26C6DA; }        /* 青：凌厉，剑气纵横 */
 .combo-4 { color: #FFB300; }        /* 金橙：霸道，横扫千军 */
@@ -531,25 +564,37 @@ const onPetAnimEnd = () => {
 .combo-7 { color: #FF1744; }        /* 深红：狂·贯休，杀伐果断 */
 .combo-8 { color: #D500F9; }        /* 品红：超凡，踏碎凌霄 */
 .combo-9 { color: #FFD600; }        /* 金黄：神威，一剑光寒 */
-/* 传奇层级：金红交替发光，配合 legendary-glow 持续脉冲 */
+/* 传奇层级：金红交替发光，配合 legendary-glow 持续脉冲（在淡出前持续发光）
+   注意：不再有 combo-char-out，由外层 .kill-combo 统一淡出 */
 .combo-legendary { color: #FFD600; }
 .combo-legendary .combo-char {
   animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
-             combo-char-out 0.5s ease-in 3.5s forwards,
-             legendary-glow 0.6s ease-in-out infinite alternate 3.5s;
+             legendary-glow 0.7s ease-in-out infinite alternate 0.6s;
 }
 @keyframes legendary-glow {
   0% {
     color: #FFD600;
-    text-shadow: 0 0 12px #FFD600, 0 0 24px #FF6E40, 0 2px 6px rgba(0,0,0,0.9);
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.9),
+      4px 4px 0 rgba(0, 0, 0, 0.7),
+      0 0 18px #FFD600,
+      0 0 32px #FF6E40;
   }
   50% {
     color: #FF1744;
-    text-shadow: 0 0 16px #FF1744, 0 0 32px #D500F9, 0 2px 6px rgba(0,0,0,0.9);
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.9),
+      4px 4px 0 rgba(0, 0, 0, 0.7),
+      0 0 22px #FF1744,
+      0 0 40px #D500F9;
   }
   100% {
     color: #FFD600;
-    text-shadow: 0 0 20px #FFD600, 0 0 40px #FF1744, 0 0 60px #D500F9, 0 2px 6px rgba(0,0,0,0.9);
+    text-shadow:
+      2px 2px 0 rgba(0, 0, 0, 0.9),
+      4px 4px 0 rgba(0, 0, 0, 0.7),
+      0 0 26px #FFD600,
+      0 0 48px #FF1744;
   }
 }
 

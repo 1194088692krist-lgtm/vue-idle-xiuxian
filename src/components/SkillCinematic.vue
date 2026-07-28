@@ -10,19 +10,21 @@
       <div :key="`wave3-${animKey}`" class="skill-wave wave-3" :style="{ borderColor: skillColor }"></div>
       <!-- 中心光晕 -->
       <div :key="`glow-${animKey}`" class="skill-glow" :style="{ background: glowBg }"></div>
-      <!-- 技能名四字特写：从中心缩放弹出，配合字一字一字出现 -->
-      <div :key="`text-${animKey}`" class="skill-text" :style="{ color: skillColor }">
+      <!-- 技能名四字特写：逐字砸入出现，全部到齐后整体一起消失 -->
+      <!-- 外层 .skill-text 负责整体淡出（统一延迟），内层 .skill-name-char 仅负责逐字砸入出现 -->
+      <div
+        :key="`text-${animKey}`"
+        class="skill-text"
+        :class="skillFadeClass"
+        :style="{ color: skillColor, animationDelay: skillFadeDelay + 's' }"
+      >
         <div class="skill-caster">{{ casterName }}</div>
         <div class="skill-name">
           <span
             v-for="(ch, i) in skillNameChars"
             :key="i"
             class="skill-name-char"
-            :style="{
-              animationDelay: (0.15 + i * 0.15) + 's',
-              color: skillColor,
-              textShadow: `0 0 20px ${skillColor}, 0 0 40px ${skillColor}`
-            }"
+            :style="{ animationDelay: (0.15 + i * 0.15) + 's' }"
           >{{ ch }}</span>
         </div>
       </div>
@@ -44,7 +46,7 @@
 </template>
 
 <script setup>
-import { ref, computed, watch, onUnmounted } from 'vue'
+import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 
 const { skillCastEvent } = useIdleSystem()
@@ -59,6 +61,15 @@ const glowBg = ref('radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, transpare
 
 // 技能名拆字：实现一字一字弹出效果（与 BossKillCinematic 一致，节奏更紧凑）
 const skillNameChars = computed(() => Array.from(skillName.value || ''))
+// 整体淡出延迟：等所有字逐字砸入完成 + 停留 1s 后，整体一起消失
+// 计算 = 第一字基础 delay 0.15 + 最后一字 (n-1)*0.15 + 入场 0.55 + 停留 1.0
+const skillFadeDelay = computed(() => {
+  const n = skillNameChars.value.length
+  if (n === 0) return 0
+  return 0.15 + (n - 1) * 0.15 + 0.55 + 1.0
+})
+// 整体淡出 class：在 skillCastEvent watch 内通过 nextTick 触发，避免初始化误触发
+const skillFadeClass = ref('')
 
 // ===== 技能属性色映射：按技能名关键词推断属性，未匹配时用金色（中性） =====
 // 修仙主题属性：火→红、雷→黄、冰→青、剑气→金、毒→紫、土→褐、风→绿
@@ -116,8 +127,12 @@ watch(skillCastEvent, (evt) => {
   skillColor.value = c.color
   flashBg.value = c.flash
   glowBg.value = c.glow
+  // 重置淡出 class：先移除再在下一次 tick 加回，确保 animation-delay 重新计算
+  skillFadeClass.value = ''
   animKey.value++
   show.value = true
+  // 下一帧再加 fade-out class，让 Vue 先渲染新字再触发淡出动画
+  nextTick(() => { skillFadeClass.value = 'skill-fade-out' })
   scheduleAutoHide()
 }, { deep: true })
 
@@ -211,12 +226,20 @@ onUnmounted(() => {
   100% { opacity: 0; height: 50vmin; }
 }
 
-/* 技能名文字层 */
+/* 技能名文字层：负责整体淡出（animation-delay 由 JS 动态计算） */
 .skill-text {
   position: relative;
   z-index: 10;
   text-align: center;
   pointer-events: none;
+}
+/* 整体淡出：所有字一起消失 */
+.skill-text.skill-fade-out {
+  animation: skill-text-fade-out 0.5s ease-in forwards;
+}
+@keyframes skill-text-fade-out {
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(20px) scale(0.92); filter: blur(2px); }
 }
 .skill-caster {
   font-size: clamp(14px, 2.5vw, 20px);
@@ -238,33 +261,46 @@ onUnmounted(() => {
 }
 .skill-name-char {
   display: inline-block;
-  font-size: clamp(40px, 8vw, 80px);
+  /* 坚实有力字体：Ma Shan Zheng 毛笔楷书，回退系统楷体/黑体 */
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
+  font-size: clamp(44px, 9vw, 88px);
   font-weight: 900;
   letter-spacing: 4px;
   opacity: 0;
-  /* 逐字砸入：从上方大字砸下 + 缩放过冲(2.5→0.85→1.15→1) + 轻微抖动，与 BossKillCinematic 风格统一
+  /* 逐字砸入：从上方砸下 + 缩放过冲 + 顿挫，与 BossKillCinematic 风格统一
      每字 0.55s 完成，间隔 0.15s（技能名通常 2-4 字，节奏比斩杀文案稍快）
-     全部字砸完后停留 2s 再淡出 */
-  animation: skill-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
-             skill-char-out 0.4s ease-in 2.8s forwards;
+     注意：不再有 out 动画，由外层 .skill-text 统一淡出 */
+  animation: skill-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  /* 坚实有力：粗描边 + 立体阴影 + 外发光 */
+  -webkit-text-stroke: 2px rgba(0, 0, 0, 0.85);
+  paint-order: stroke fill;
+  text-shadow:
+    2px 2px 0 rgba(0, 0, 0, 0.9),
+    4px 4px 0 rgba(0, 0, 0, 0.7),
+    0 0 18px currentColor,
+    0 0 32px currentColor;
   will-change: transform, opacity;
 }
 @keyframes skill-char-in {
   0% {
     opacity: 0;
-    /* 从上方 50px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
-    transform: translateY(-50px) scale(2.5) rotate(-6deg);
-    filter: blur(4px);
+    /* 从上方 60px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
+    transform: translateY(-60px) scale(2.5) rotate(-8deg);
+    filter: blur(3px);
   }
-  45% {
+  40% {
     /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
     opacity: 1;
-    transform: translateY(0) scale(0.85) rotate(3deg);
+    transform: translateY(0) scale(0.85) rotate(4deg);
     filter: blur(0);
   }
-  65% {
-    /* 反弹一下：放大到 1.15（皮球落地反弹感） */
-    transform: translateY(0) scale(1.15) rotate(-1deg);
+  60% {
+    /* 反弹一下：放大到 1.12（皮球落地反弹感） */
+    transform: translateY(0) scale(1.12) rotate(-2deg);
+  }
+  80% {
+    /* 再次小顿挫：0.97，模拟重物落地的二次震动 */
+    transform: translateY(0) scale(0.97) rotate(1deg);
   }
   100% {
     /* 定格：回到正常大小，稳稳定住 */
@@ -272,10 +308,6 @@ onUnmounted(() => {
     transform: translateY(0) scale(1) rotate(0deg);
     filter: blur(0);
   }
-}
-@keyframes skill-char-out {
-  0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: translateY(15px) scale(0.9); filter: blur(2px); }
 }
 
 /* 尊重无障碍：减弱动画偏好下不播放演出 */
