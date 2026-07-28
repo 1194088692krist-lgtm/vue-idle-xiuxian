@@ -1591,16 +1591,22 @@ async function runBossChallenge(zoneId, bossId, count) {
     if (victory) {
       result.victories++
       // 发出击杀事件：触发立绘突入动画（手动 BOSS 挑战路径）
+      // 修复：原用 typeof players !== 'undefined' 检查，但 players 在本作用域未定义，
+      // 永远走 null 分支。改为直接读 currentEncounter.value.players（与挂机路径一致）
       const killer = roundResult.lastPlayerAttacker
-        || (typeof players !== 'undefined' && players.find(p => p.currentHealth > 0))
+        || currentEncounter.value.players.find(p => p.currentHealth > 0)
+        || currentEncounter.value.players[0]
         || null
-      bossKillEvent.value = {
+      const killEvt = {
         killerMemberId: killer?.memberId || null,
         killerName: killer?.name || '',
         bossName: boss?.name || '',
         zoneId: zoneId || '',
         ts: Date.now()
       }
+      bossKillEvent.value = killEvt
+      // 诊断日志：确认手动挑战击杀事件已发出
+      console.log('[useIdleSystem] 手动BOSS挑战击杀事件已发出', killEvt)
       // 发放 BOSS 标准奖励（10x 数量型奖励，参考挂机 BOSS）
       rewards = grantReward(effectiveZone, false, true)
       // BOSS 挑战专属掉落（boss 素材 + 返还挑战券）
@@ -3023,13 +3029,16 @@ async function runIdleEncounter() {
         const killer = roundResult.lastPlayerAttacker
           || encounter.players.find(p => p.currentHealth > 0)
           || encounter.players[0]
-        bossKillEvent.value = {
+        const killEvt = {
           killerMemberId: killer?.memberId || null,
           killerName: killer?.name || '',
           bossName: enemy?.name || '',
           zoneId: effectiveZone?.id || '',
           ts: Date.now()
         }
+        bossKillEvent.value = killEvt
+        // 诊断日志：确认击杀事件已发出（排查挂机立绘不弹出的关键证据）
+        console.log('[useIdleSystem] BOSS击杀事件已发出', killEvt)
       }
 
       if (victory) {

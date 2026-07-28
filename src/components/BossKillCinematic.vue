@@ -115,17 +115,43 @@ function bumpCombo() {
 function clearPendingTimers() {
   if (comboTimerId) { clearTimeout(comboTimerId); comboTimerId = null }
   if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
+  if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
 }
 
 onUnmounted(() => {
   clearPendingTimers()
 })
 
+// ===== 兜底隐藏：动画结束后或超时后强制隐藏，防止 animationend 未触发导致 show 卡死 =====
+// CSS 动画总时长约 1.8s，留 2.5s 兜底；多次击杀时重新计时
+let hideTimerId = null
+function scheduleAutoHide() {
+  if (hideTimerId) clearTimeout(hideTimerId)
+  // 人物立绘 2.5s + 灵宠 1s 延迟 + 1.8s ≈ 5.3s，给 6s 兜底
+  hideTimerId = setTimeout(() => {
+    if (show.value) {
+      show.value = false
+      portraitUrl.value = null
+      petShow.value = false
+      petPortraitUrl.value = null
+    }
+    hideTimerId = null
+  }, 6000)
+}
+
 // 监听击杀事件，触发立绘突入动画
 watch(bossKillEvent, (evt) => {
-  if (!evt || !evt.ts) return
+  // 诊断日志：确认 watch 是否被触发（排查挂机立绘不弹出的关键证据）
+  console.log('[BossKillCinematic] watch 触发', evt)
+  if (!evt || !evt.ts) {
+    console.warn('[BossKillCinematic] 事件无效，跳过', evt)
+    return
+  }
   // 设置开关关闭则不触发
-  if (!playerStore.bossKillAnimation) return
+  if (!playerStore.bossKillAnimation) {
+    console.log('[BossKillCinematic] bossKillAnimation 设置已关闭，跳过')
+    return
+  }
 
   // ===== 人物立绘来源 =====
   // 从存活队伍成员中随机选一个，确保平均分布（每人 ~33%）
@@ -185,7 +211,9 @@ watch(bossKillEvent, (evt) => {
   bossName.value = evt.bossName || ''
   animKey.value++
   show.value = true
+  scheduleAutoHide()
   schedulePetPortrait()
+  console.log('[BossKillCinematic] 立绘已设置，show=true', { url: url.slice(0, 50), killerName: killerName.value, bossName: bossName.value })
 }, { deep: true })
 
 // ===== 灵宠立绘：人物立绘弹出 1s 后从另一侧弹出 =====
@@ -219,20 +247,26 @@ function schedulePetPortrait() {
 }
 
 const onPortraitAnimEnd = () => {
+  // 诊断日志：确认人物立绘动画结束事件触发
+  console.log('[BossKillCinematic] 人物立绘 animationend')
   // 人物立绘动画播完：移除外层节点
   // 若灵宠立绘仍在播放则保留外层（petShow 仍 true）
   if (!petShow.value) {
     show.value = false
     portraitUrl.value = null
+    if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
   }
 }
 
 const onPetAnimEnd = () => {
+  // 诊断日志：确认灵宠立绘动画结束事件触发
+  console.log('[BossKillCinematic] 灵宠立绘 animationend')
   // 灵宠立绘动画播完：清除灵宠状态，并连同外层一起隐藏
   petShow.value = false
   petPortraitUrl.value = null
   show.value = false
   portraitUrl.value = null
+  if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
 }
 </script>
 
