@@ -3388,8 +3388,10 @@ export const usePlayerStore = defineStore('player', {
         this.items.push(member.equippedPet)
       }
       // 从背包移除该灵宠（按 uid/id 精确匹配，清除历史上可能重复的同 id 条目）
+      // 修复：原 p.uid === pet.uid 在灵宠无 uid 字段时 undefined===undefined 恒为 true，
+      // 导致 while 循环清空整个背包灵宠。改用 petKey 比较（uid 缺失时回退 id）
       let petIndex
-      while ((petIndex = this.items.findIndex(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')) !== -1) {
+      while ((petIndex = this.items.findIndex(p => p.type === 'pet' && petKey(p) === targetKey)) !== -1) {
         this.items.splice(petIndex, 1)
       }
       member.equippedPet = pet
@@ -3403,7 +3405,10 @@ export const usePlayerStore = defineStore('player', {
       if (!member.equippedPet) return { success: false, message: '该角色没有装备灵宠' }
       const pet = member.equippedPet
       // 防御：若背包中已存在同一灵宠（理论不应发生），避免重复持有
-      const alreadyInBag = this.items.some(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')
+      // 修复：原 p.uid===pet.uid 在无 uid 时恒为 true，导致已存在其他灵宠时误判已存在而漏 push
+      const pKey = (p) => p && (p.uid || p.id)
+      const targetKey = pKey(pet)
+      const alreadyInBag = this.items.some(p => p.type === 'pet' && pKey(p) === targetKey)
       if (!alreadyInBag) this.items.push(pet)
       member.equippedPet = null
       this.queueSave()
@@ -3469,7 +3474,10 @@ export const usePlayerStore = defineStore('player', {
       // 一并卸下灵宠并归还背包，避免“一键卸下”后灵宠仍被占用而看似丢失
       if (member.equippedPet) {
         const pet = member.equippedPet
-        const alreadyInBag = this.items.some(p => (p.uid === pet.uid || p.id === pet.id) && p.type === 'pet')
+        // 修复：同 unequipCharacterPet，用 petKey 比较避免 undefined===undefined
+        const pKey = (p) => p && (p.uid || p.id)
+        const targetKey = pKey(pet)
+        const alreadyInBag = this.items.some(p => p.type === 'pet' && pKey(p) === targetKey)
         if (!alreadyInBag) this.items.push(pet)
         member.equippedPet = null
         unequippedCount++
@@ -3479,16 +3487,18 @@ export const usePlayerStore = defineStore('player', {
     },
     // 灵兽放生（报恩返还培养素养 + 素材 + 升星碎片）
     releasePet(petUid) {
-      const petIndex = this.items.findIndex(i => (i.uid === petUid || i.id === petUid) && i.type === 'pet')
+      const pKey = (p) => p && (p.uid || p.id)
+      const petIndex = this.items.findIndex(i => i.type === 'pet' && pKey(i) === petUid)
       if (petIndex === -1) return { success: false, message: '灵宠不存在' }
       const pet = this.items[petIndex]
+      const targetKey = pKey(pet)
       // 检查是否为出战灵宠
-      if (this.activePet && (this.activePet.uid === pet.uid || this.activePet.id === pet.id)) {
+      if (this.activePet && pKey(this.activePet) === targetKey) {
         return { success: false, message: '出战中的灵宠无法放生，请先收回' }
       }
       // 检查是否被宗门成员装备
       for (const m of this.sectMembers) {
-        if (m.equippedPet && (m.equippedPet.uid === pet.uid || m.equippedPet.id === pet.id)) {
+        if (m.equippedPet && pKey(m.equippedPet) === targetKey) {
           return { success: false, message: `${m.name}正在装备该灵宠，无法放生` }
         }
       }
