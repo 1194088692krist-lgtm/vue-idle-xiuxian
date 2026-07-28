@@ -1038,35 +1038,40 @@ function createPlayerEntity() {
   // 战斗单位直接采用「最终属性」（自然属性 + 已装备 + 套装 + 出战灵宠），
   // 与人物属性对照面板、Build 计算口径完全一致，确保装备/灵宠真实作用于战斗。
   const eff = s.getEffectiveStats
+  // 灵宠战斗率/抗性/特殊属性加成：recomputeAttributes 只对四维做 petMult 放大，
+  // 灵宠的 critRate/comboRate 等战斗率需在此处补上（与队伍成员 buildMemberCombatStats 口径一致）
+  const pet = s.activePet
+  const pca = pet?.combatAttributes || {}
   const baseStats = {
     health: eff.health || 0,
     damage: eff.attack || 0,
     defense: eff.defense || 0,
     speed: eff.speed || 0,
-    critRate: eff.critRate || 0,
-    comboRate: eff.comboRate || 0,
-    counterRate: eff.counterRate || 0,
-    stunRate: eff.stunRate || 0,
-    dodgeRate: eff.dodgeRate || 0,
-    vampireRate: eff.vampireRate || 0,
-    critResist: eff.critResist || 0,
-    comboResist: eff.comboResist || 0,
-    counterResist: eff.counterResist || 0,
-    stunResist: eff.stunResist || 0,
-    dodgeResist: eff.dodgeResist || 0,
-    vampireResist: eff.vampireResist || 0,
-    healBoost: eff.healBoost || 0,
-    critDamageBoost: eff.critDamageBoost || 0,
-    critDamageReduce: eff.critDamageReduce || 0,
-    finalDamageBoost: eff.finalDamageBoost || 0,
-    finalDamageReduce: eff.finalDamageReduce || 0,
-    combatBoost: eff.combatBoost || 0,
-    resistanceBoost: eff.resistanceBoost || 0,
+    // 灵宠战斗率/抗性独立叠加（移出 1.0 cap，可突破上限对抗敌方抗性）
+    critRate: (eff.critRate || 0) + (pca.critRate || 0),
+    comboRate: (eff.comboRate || 0) + (pca.comboRate || 0),
+    counterRate: (eff.counterRate || 0) + (pca.counterRate || 0),
+    stunRate: (eff.stunRate || 0) + (pca.stunRate || 0),
+    dodgeRate: (eff.dodgeRate || 0) + (pca.dodgeRate || 0),
+    vampireRate: (eff.vampireRate || 0) + (pca.vampireRate || 0),
+    critResist: (eff.critResist || 0) + (pca.critResist || 0),
+    comboResist: (eff.comboResist || 0) + (pca.comboResist || 0),
+    counterResist: (eff.counterResist || 0) + (pca.counterResist || 0),
+    stunResist: (eff.stunResist || 0) + (pca.stunResist || 0),
+    dodgeResist: (eff.dodgeResist || 0) + (pca.dodgeResist || 0),
+    vampireResist: (eff.vampireResist || 0) + (pca.vampireResist || 0),
+    healBoost: (eff.healBoost || 0) + (pca.healBoost || 0),
+    critDamageBoost: (eff.critDamageBoost || 0) + (pca.critDamageBoost || 0),
+    critDamageReduce: (eff.critDamageReduce || 0) + (pca.critDamageReduce || 0),
+    finalDamageBoost: (eff.finalDamageBoost || 0) + (pca.finalDamageBoost || 0),
+    finalDamageReduce: (eff.finalDamageReduce || 0) + (pca.finalDamageReduce || 0),
+    combatBoost: (eff.combatBoost || 0) + (pca.combatBoost || 0),
+    resistanceBoost: (eff.resistanceBoost || 0) + (pca.resistanceBoost || 0),
     spiritDamage: s.spirit * 0.1,
     maxHealth: s.baseAttributes.health
   }
-  // 注意：s.baseAttributes 已由 store.recomputeAttributes 统一烘焙「装备 + 套装 + 出战灵宠」的全部加成，
-  // 此处直接读取即可，切勿再叠加 getPetBonus / artifactBonuses，否则会造成双重计算、属性翻倍。
+  // 注意：s.baseAttributes 已由 store.recomputeAttributes 统一烘焙「装备 + 套装 + 出战灵宠(四维)」的全部加成，
+  // 四维切勿再叠加；灵宠的战斗率/抗性/特殊属性 recomputeAttributes 未烘焙，故在此补充。
   return new CombatEntity(s.name, s.level, baseStats, s.realm)
 }
 
@@ -2336,18 +2341,20 @@ function buildMemberCombatStats(member) {
     damage: finalDamage,
     defense: finalDefense,
     speed: finalSpeed,
-    critRate: Math.min(1, calcFinalStat('critRate', combatAttrs.critRate || 0) + (equipBonus.critRate || 0) + (pet?.combatAttributes?.critRate || 0)),
-    comboRate: Math.min(1, calcFinalStat('comboRate', combatAttrs.comboRate || 0) + (equipBonus.comboRate || 0) + (pet?.combatAttributes?.comboRate || 0)),
-    counterRate: Math.min(1, calcFinalStat('counterRate', combatAttrs.counterRate || 0) + (equipBonus.counterRate || 0) + (pet?.combatAttributes?.counterRate || 0)),
-    stunRate: Math.min(1, calcFinalStat('stunRate', combatAttrs.stunRate || 0) + (equipBonus.stunRate || 0) + (pet?.combatAttributes?.stunRate || 0)),
-    dodgeRate: Math.min(1, calcFinalStat('dodgeRate', combatAttrs.dodgeRate || 0) + (equipBonus.dodgeRate || 0) + (pet?.combatAttributes?.dodgeRate || 0)),
-    vampireRate: Math.min(1, calcFinalStat('vampireRate', combatAttrs.vampireRate || 0) + (equipBonus.vampireRate || 0) + (pet?.combatAttributes?.vampireRate || 0)),
-    critResist: Math.min(1, calcFinalStat('critResist', combatResist.critResist || 0) + (equipBonus.critResist || 0) + (pet?.combatAttributes?.critResist || 0)),
-    comboResist: Math.min(1, calcFinalStat('comboResist', combatResist.comboResist || 0) + (equipBonus.comboResist || 0) + (pet?.combatAttributes?.comboResist || 0)),
-    counterResist: Math.min(1, calcFinalStat('counterResist', combatResist.counterResist || 0) + (equipBonus.counterResist || 0) + (pet?.combatAttributes?.counterResist || 0)),
-    stunResist: Math.min(1, calcFinalStat('stunResist', combatResist.stunResist || 0) + (equipBonus.stunResist || 0) + (pet?.combatAttributes?.stunResist || 0)),
-    dodgeResist: Math.min(1, calcFinalStat('dodgeResist', combatResist.dodgeResist || 0) + (equipBonus.dodgeResist || 0) + (pet?.combatAttributes?.dodgeResist || 0)),
-    vampireResist: Math.min(1, calcFinalStat('vampireResist', combatResist.vampireResist || 0) + (equipBonus.vampireResist || 0) + (pet?.combatAttributes?.vampireResist || 0)),
+    // 战斗率/抗性：角色自身+装备部分受 1.0 上限约束，灵宠加成独立叠加（可突破上限用于对抗敌方抗性）
+    // 修复：原 Math.min(1, base+equip+pet) 在后期角色自身暴击/连击率已满时，灵宠加成被完全截断 → 零效果
+    critRate: Math.min(1, calcFinalStat('critRate', combatAttrs.critRate || 0) + (equipBonus.critRate || 0)) + (pet?.combatAttributes?.critRate || 0),
+    comboRate: Math.min(1, calcFinalStat('comboRate', combatAttrs.comboRate || 0) + (equipBonus.comboRate || 0)) + (pet?.combatAttributes?.comboRate || 0),
+    counterRate: Math.min(1, calcFinalStat('counterRate', combatAttrs.counterRate || 0) + (equipBonus.counterRate || 0)) + (pet?.combatAttributes?.counterRate || 0),
+    stunRate: Math.min(1, calcFinalStat('stunRate', combatAttrs.stunRate || 0) + (equipBonus.stunRate || 0)) + (pet?.combatAttributes?.stunRate || 0),
+    dodgeRate: Math.min(1, calcFinalStat('dodgeRate', combatAttrs.dodgeRate || 0) + (equipBonus.dodgeRate || 0)) + (pet?.combatAttributes?.dodgeRate || 0),
+    vampireRate: Math.min(1, calcFinalStat('vampireRate', combatAttrs.vampireRate || 0) + (equipBonus.vampireRate || 0)) + (pet?.combatAttributes?.vampireRate || 0),
+    critResist: Math.min(1, calcFinalStat('critResist', combatResist.critResist || 0) + (equipBonus.critResist || 0)) + (pet?.combatAttributes?.critResist || 0),
+    comboResist: Math.min(1, calcFinalStat('comboResist', combatResist.comboResist || 0) + (equipBonus.comboResist || 0)) + (pet?.combatAttributes?.comboResist || 0),
+    counterResist: Math.min(1, calcFinalStat('counterResist', combatResist.counterResist || 0) + (equipBonus.counterResist || 0)) + (pet?.combatAttributes?.counterResist || 0),
+    stunResist: Math.min(1, calcFinalStat('stunResist', combatResist.stunResist || 0) + (equipBonus.stunResist || 0)) + (pet?.combatAttributes?.stunResist || 0),
+    dodgeResist: Math.min(1, calcFinalStat('dodgeResist', combatResist.dodgeResist || 0) + (equipBonus.dodgeResist || 0)) + (pet?.combatAttributes?.dodgeResist || 0),
+    vampireResist: Math.min(1, calcFinalStat('vampireResist', combatResist.vampireResist || 0) + (equipBonus.vampireResist || 0)) + (pet?.combatAttributes?.vampireResist || 0),
     healBoost: calcFinalStat('healBoost', specialAttrs.healBoost || 0) + (equipBonus.healBoost || 0) + (pet?.combatAttributes?.healBoost || 0),
     critDamageBoost: calcFinalStat('critDamageBoost', specialAttrs.critDamageBoost || 0) + (equipBonus.critDamageBoost || 0) + (pet?.combatAttributes?.critDamageBoost || 0),
     critDamageReduce: calcFinalStat('critDamageReduce', specialAttrs.critDamageReduce || 0) + (equipBonus.critDamageReduce || 0) + (pet?.combatAttributes?.critDamageReduce || 0),

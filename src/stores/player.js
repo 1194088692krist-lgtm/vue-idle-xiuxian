@@ -3316,9 +3316,10 @@ export const usePlayerStore = defineStore('player', {
         const ca = character.equippedPet.combatAttributes || {}
         // 扁平属性贡献
         petScore = (ca.attack || 0) * 8 + (ca.health || 0) * 0.8 + (ca.defense || 0) * 5 + (ca.speed || 0) * 12
-        // 百分比倍率贡献：灵宠 petMult 放大了角色基础属性，贡献 = charBaseScore × (petMult - 1)
+        // 百分比倍率贡献：实战中 petMult 乘在 (基础+装备+灵宠扁平) 之上，故 Build 也应乘 (charBaseScore + equipScore)
+        // 修复：原仅乘 charBaseScore（裸属性），后期装备分远大于裸属性，灵宠对 Build 拉动被严重低估
         const petMult = computePetMultiplier(character.equippedPet)
-        petScore += charBaseScore * (petMult - 1)
+        petScore += (charBaseScore + equipScore) * (petMult - 1)
       }
       let setScore = 0
       const activeSets = getActiveSetBonuses(artifacts)
