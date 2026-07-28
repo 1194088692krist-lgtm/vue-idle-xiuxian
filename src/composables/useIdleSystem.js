@@ -28,6 +28,9 @@ const formatBuffPercent = (value) => {
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
 const selectedDifficultyKey = ref('xiongxian')
+// 击杀BOSS事件总线：击杀时写入 { killerMemberId, killerName, bossName, zoneId, ts }
+// BattleStage/挂机界面 watch 此 ref 触发立绘突入动画
+const bossKillEvent = ref(null)
 const isIdling = ref(false)
 const logs = ref([])                 // 挂机日志（仅内存，不写入存档）
 // 日志自增 id：用于 v-for 稳定 key，避免 slice 截断后 index key 错位导致 DOM 全量 patch 跳动
@@ -1587,6 +1590,17 @@ async function runBossChallenge(zoneId, bossId, count) {
 
     if (victory) {
       result.victories++
+      // 发出击杀事件：触发立绘突入动画（手动 BOSS 挑战路径）
+      const killer = roundResult.lastPlayerAttacker
+        || (typeof players !== 'undefined' && players.find(p => p.currentHealth > 0))
+        || null
+      bossKillEvent.value = {
+        killerMemberId: killer?.memberId || null,
+        killerName: killer?.name || '',
+        bossName: boss?.name || '',
+        zoneId: zoneId || '',
+        ts: Date.now()
+      }
       // 发放 BOSS 标准奖励（10x 数量型奖励，参考挂机 BOSS）
       rewards = grantReward(effectiveZone, false, true)
       // BOSS 挑战专属掉落（boss 素材 + 返还挑战券）
@@ -2605,11 +2619,16 @@ async function executeRound(effectiveZone) {
   const turnResult = encounter.manager.executeTurn(attackingPlayers, enemy)
 
   // 收集 executeTurn 结果到 combatStats 和 roundLog
+  let lastPlayerAttacker = null  // 追踪最后一击的玩家攻击者（用于击杀BOSS立绘突入）
   if (turnResult && turnResult.results) {
     for (const r of turnResult.results) {
       const attackerPlayer = players.find(pl => pl.name === r.attacker)
       const defenderPlayer = players.find(pl => pl.name === r.defender)
       const isPlayerAttacker = !!attackerPlayer
+      // 记录最后一次造成伤害的玩家攻击者（敌人未死前）
+      if (isPlayerAttacker && attackerPlayer && !r.isDodged && enemy.currentHealth > 0) {
+        lastPlayerAttacker = attackerPlayer
+      }
 
       // 更新 combatStats
       if (isPlayerAttacker && attackerPlayer) {
@@ -2719,7 +2738,7 @@ async function executeRound(effectiveZone) {
         cs.enemyFinalHP = Math.round(enemy.currentHealth)
       }
     }
-    return { finished: true, victory: battleStatus.victory }
+    return { finished: true, victory: battleStatus.victory, lastPlayerAttacker }
   }
 
   return { finished: false }
@@ -2977,7 +2996,18 @@ async function runIdleEncounter() {
       let loss = 0
       let roleEffects = []
       // BOSS 被击杀：标记通过核心挑战（用于结算「最后 1/5 能否击杀 BOSS」）
-      if (bossSpawned.value && victory) bossDefeated.value = true
+      if (bossSpawned.value && victory) {
+        bossDefeated.value = true
+        // 发出击杀事件：触发立绘突入动画（由 BattleStage/挂机界面 watch bossKillEvent）
+        const killer = lastPlayerAttacker || players.find(p => p.currentHealth > 0) || players[0]
+        bossKillEvent.value = {
+          killerMemberId: killer?.memberId || null,
+          killerName: killer?.name || '',
+          bossName: enemy?.name || '',
+          zoneId: effectiveZone?.id || '',
+          ts: Date.now()
+        }
+      }
 
       if (victory) {
         rewards = grantReward(effectiveZone, true, isBossEncounter)
@@ -3752,6 +3782,7 @@ export function useIdleSystem() {
     idleCombatLog,
     bossSpawned,
     bossDefeated,
+    bossKillEvent,
     bossSpawnRound,
     bossTimeRemaining,
     bossRoundsCleared,

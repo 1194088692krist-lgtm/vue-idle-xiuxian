@@ -96,6 +96,36 @@
           </p>
         </div>
 
+        <!-- 击杀BOSS立绘突入动画 -->
+        <div class="setting-row">
+          <label class="setting-label">击杀BOSS动画</label>
+          <div class="setting-input-group">
+            <button
+              class="btn"
+              :class="playerStore.bossKillAnimation ? 'btn-success' : 'btn-outline'"
+              @click="toggleBossKillAnimation"
+            >
+              {{ playerStore.bossKillAnimation ? '已开启（击杀BOSS时立绘突入演出）' : '已关闭' }}
+            </button>
+          </div>
+          <p class="setting-hint">
+            击杀BOSS时，最后一击者的立绘从左下突入、中心旋转、右上消失，纯CSS动画对挂机性能无负担。
+          </p>
+          <div v-if="playerStore.bossKillAnimation" class="setting-input-group" style="margin-top: 8px;">
+            <label class="setting-label" style="margin: 0; font-size: 13px;">动画立绘：</label>
+            <button
+              v-for="i in 4"
+              :key="i"
+              class="btn btn-small"
+              :class="playerStore.bossKillSkinIndex === (i - 1) ? 'btn-primary' : 'btn-outline'"
+              @click="setBossKillSkinIndex(i - 1)"
+              style="margin-left: 4px;"
+            >
+              {{ ['原立绘', '皮肤1', '皮肤2', '皮肤3'][i - 1] }}
+            </button>
+          </div>
+        </div>
+
         <!-- 危险操作 -->
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
@@ -759,6 +789,19 @@
     playerStore.disablePullToRefresh = !playerStore.disablePullToRefresh
     localStorage.setItem('disablePullToRefresh', playerStore.disablePullToRefresh)
     playerStore.updateHtmlPullToRefresh(playerStore.disablePullToRefresh)
+    playerStore.saveData()
+  }
+
+  // 击杀BOSS动画开关
+  const toggleBossKillAnimation = () => {
+    playerStore.bossKillAnimation = !playerStore.bossKillAnimation
+    localStorage.setItem('bossKillAnimation', playerStore.bossKillAnimation)
+    playerStore.saveData()
+  }
+  // 选择击杀动画使用的立绘索引（0=原立绘 1-3=皮肤1-3）
+  const setBossKillSkinIndex = (idx) => {
+    playerStore.bossKillSkinIndex = idx
+    localStorage.setItem('bossKillSkinIndex', idx)
     playerStore.saveData()
   }
 

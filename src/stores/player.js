@@ -125,6 +125,10 @@ export const usePlayerStore = defineStore('player', {
     // 移动端下拉刷新开关：默认锁定（true=禁用下拉刷新，避免误触刷新页面丢存档）
     // 用户可在设置中关闭以恢复原生下拉刷新行为
     disablePullToRefresh: localStorage.getItem('disablePullToRefresh') !== 'false',
+    // 击杀BOSS立绘突入动画开关，默认开启
+    bossKillAnimation: localStorage.getItem('bossKillAnimation') !== 'false',
+    // 击杀动画使用的立绘索引：0=原立绘 1=skin1 2=skin2 3=skin3（固定不随角色切换）
+    bossKillSkinIndex: Number(localStorage.getItem('bossKillSkinIndex')) || 0,
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
@@ -674,6 +678,11 @@ export const usePlayerStore = defineStore('player', {
       // 初始化移动端下拉刷新设置：默认锁定（true），用户主动关闭才为 false
       const ptrSaved = localStorage.getItem('disablePullToRefresh')
       this.disablePullToRefresh = ptrSaved === null ? true : ptrSaved === 'true'
+      // 初始化击杀动画设置：默认开启，立绘索引用原立绘(0)
+      const bkaSaved = localStorage.getItem('bossKillAnimation')
+      this.bossKillAnimation = bkaSaved === null ? true : bkaSaved === 'true'
+      const bksiSaved = localStorage.getItem('bossKillSkinIndex')
+      this.bossKillSkinIndex = bksiSaved === null ? 0 : (Number(bksiSaved) || 0)
       // 初始化GM模式设置
       const gmMode = localStorage.getItem('isGMMode')
       if (gmMode !== null) {

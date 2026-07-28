@@ -199,6 +199,8 @@
         </div>
       </div>
     </teleport>
+    <!-- 击杀BOSS立绘突入演出（watch bossKillEvent 触发） -->
+    <BossKillCinematic />
   </div>
 </template>
 
@@ -206,6 +208,7 @@
 import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem.js'
 import { getMonsterAvatarSync, monsterManifestVersion } from '../plugins/monsters'
+import BossKillCinematic from './BossKillCinematic.vue'
 
 const props = defineProps({
   encounter: { type: Object, default: null }
