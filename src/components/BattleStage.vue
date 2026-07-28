@@ -258,6 +258,10 @@ const playerStore = usePlayerStore()
 // 灵宠助战标识：当前出战队伍有灵宠时，给所有队员头像旁加灵光环绕
 // 灵宠非独立队员（属性合并到角色），通过此视觉装饰让玩家感知灵宠助战
 const hasPetAssist = computed(() => !!playerStore.activePet)
+// BOSS 战判断：仅 BOSS 战触发重特效（胜负演出/暴击刀光/高伤冲击）
+// 小怪战保持朴素，避免过分占用系统资源导致卡顿或设备过热
+// 判定依据：enemy.tier === 'boss'（手动 BOSS 挑战 / 挂机 BOSS 出现都会标记 tier='boss'）
+const isBossFight = computed(() => props.encounter?.enemy?.tier === 'boss')
 
 // 完整战斗日志累积源：挂机时跨所有遭遇，从挂机开始累积到当前（非当前回合）
 // 现已切换回旧版「实时战斗日志」系统（logs/displayLogs），保留时间戳与彩色分类
@@ -527,17 +531,21 @@ function showEvent(e) {
     effectBadge.value = { text: '暴击！', cls: 'badge-crit' }
     screenShake.value = 'shake-strong'
     setTimeout(() => { if (screenShake.value === 'shake-strong') screenShake.value = '' }, 500)
-    // 暴击刀光：全屏白色斜劈 + 局部白闪，强化暴击冲击力
-    // 通过 :key 递增强制重建 DOM，让 CSS 动画每次暴击都从 0% 重新播放
-    critSlash.value = { show: true, key: Date.now() }
-    if (critSlashTimer) clearTimeout(critSlashTimer)
-    // 刀光动画 0.3s 后清除
-    critSlashTimer = setTimeout(() => { critSlash.value.show = false; critSlashTimer = null }, 350)
-    // 高伤冲击（伤害≥目标最大HP 30%）：舞台短暂放大+亮度提升，模拟慢镜头冲击感
-    if (ratio >= 0.3) {
-      impactPunch.value = true
-      if (impactPunchTimer) clearTimeout(impactPunchTimer)
-      impactPunchTimer = setTimeout(() => { impactPunch.value = false; impactPunchTimer = null }, 200)
+    // 暴击刀光 + 高伤冲击：仅 BOSS 战触发，小怪战保持朴素（仅 badge + 屏震）
+    // 避免小怪战频繁触发全屏特效占用资源导致卡顿或设备过热
+    if (isBossFight.value) {
+      // 暴击刀光：全屏白色斜劈 + 局部白闪，强化暴击冲击力
+      // 通过 :key 递增强制重建 DOM，让 CSS 动画每次暴击都从 0% 重新播放
+      critSlash.value = { show: true, key: Date.now() }
+      if (critSlashTimer) clearTimeout(critSlashTimer)
+      // 刀光动画 0.3s 后清除
+      critSlashTimer = setTimeout(() => { critSlash.value.show = false; critSlashTimer = null }, 350)
+      // 高伤冲击（伤害≥目标最大HP 30%）：舞台短暂放大+亮度提升，模拟慢镜头冲击感
+      if (ratio >= 0.3) {
+        impactPunch.value = true
+        if (impactPunchTimer) clearTimeout(impactPunchTimer)
+        impactPunchTimer = setTimeout(() => { impactPunch.value = false; impactPunchTimer = null }, 200)
+      }
     }
   }
   if (e.isCombo) effectBadge.value = effectBadge.value || { text: '连击！', cls: 'badge-combo' }
@@ -601,9 +609,15 @@ watch(() => props.encounter, (nc) => {
 }, { immediate: true })
 
 // 监听 inProgress 变化：true → false 时触发胜负全屏演出
+// 仅 BOSS 战触发：小怪战保持朴素（顶部 result-badge 小文字标签即可），避免频繁演出占用资源
 // lastInProgress 防御 inProgress 在同一 tick 内多次切换导致重复触发
 watch(() => props.encounter?.inProgress, (now) => {
   if (lastInProgress && now === false && props.encounter) {
+    // 非BOSS战不触发全屏演出，仅保留顶部小文字标签（result-badge）
+    if (!isBossFight.value) {
+      lastInProgress = !!now
+      return
+    }
     const isVictory = (props.encounter.enemy?.currentHealth ?? 0) <= 0
     resultCinematic.value = {
       show: true,

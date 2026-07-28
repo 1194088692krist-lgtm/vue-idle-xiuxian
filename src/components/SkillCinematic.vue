@@ -19,7 +19,7 @@
             :key="i"
             class="skill-name-char"
             :style="{
-              animationDelay: (0.15 + i * 0.06) + 's',
+              animationDelay: (0.15 + i * 0.15) + 's',
               color: skillColor,
               textShadow: `0 0 20px ${skillColor}, 0 0 40px ${skillColor}`
             }"
@@ -92,11 +92,11 @@ let hideTimerId = null
 
 function scheduleAutoHide() {
   if (hideTimerId) clearTimeout(hideTimerId)
-  // 演出总时长约 1.8s（含聚气 0.15s + 字一字一字 + 1s 停留），留 2.2s 兜底
+  // 逐字砸入后停留 2.8s 才淡出：4 字技能名最后一字 delay ≈ 0.15+3*0.15+0.55+2.8+0.4 ≈ 4.35s，给 4.6s 兜底
   hideTimerId = setTimeout(() => {
     show.value = false
     hideTimerId = null
-  }, 2200)
+  }, 4600)
 }
 
 watch(skillCastEvent, (evt) => {
@@ -242,24 +242,32 @@ onUnmounted(() => {
   font-weight: 900;
   letter-spacing: 4px;
   opacity: 0;
-  /* 一字一字弹出：从下方飞入 + 0→1.4→1 缩放 + 模糊→清晰，配合 delay 形成"一字一字"效果
-     每字 0.45s 完成，间隔 0.06s，紧凑而有力量感 */
-  animation: skill-char-in 0.45s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards,
-             skill-char-out 0.4s ease-in 1.4s forwards;
+  /* 逐字砸入：从上方大字砸下 + 缩放过冲(2.5→0.85→1.15→1) + 轻微抖动，与 BossKillCinematic 风格统一
+     每字 0.55s 完成，间隔 0.15s（技能名通常 2-4 字，节奏比斩杀文案稍快）
+     全部字砸完后停留 2s 再淡出 */
+  animation: skill-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+             skill-char-out 0.4s ease-in 2.8s forwards;
   will-change: transform, opacity;
 }
 @keyframes skill-char-in {
   0% {
     opacity: 0;
-    transform: translateY(40px) scale(0.2) rotate(-10deg);
-    filter: blur(6px);
+    /* 从上方 50px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
+    transform: translateY(-50px) scale(2.5) rotate(-6deg);
+    filter: blur(4px);
   }
-  60% {
+  45% {
+    /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
     opacity: 1;
-    transform: translateY(0) scale(1.4) rotate(3deg);
+    transform: translateY(0) scale(0.85) rotate(3deg);
     filter: blur(0);
   }
+  65% {
+    /* 反弹一下：放大到 1.15（皮球落地反弹感） */
+    transform: translateY(0) scale(1.15) rotate(-1deg);
+  }
   100% {
+    /* 定格：回到正常大小，稳稳定住 */
     opacity: 1;
     transform: translateY(0) scale(1) rotate(0deg);
     filter: blur(0);
@@ -267,7 +275,7 @@ onUnmounted(() => {
 }
 @keyframes skill-char-out {
   0% { opacity: 1; transform: translateY(0) scale(1); filter: blur(0); }
-  100% { opacity: 0; transform: translateY(-20px) scale(0.85); filter: blur(3px); }
+  100% { opacity: 0; transform: translateY(15px) scale(0.9); filter: blur(2px); }
 }
 
 /* 尊重无障碍：减弱动画偏好下不播放演出 */

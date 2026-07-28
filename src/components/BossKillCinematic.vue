@@ -35,13 +35,13 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：四字成语 / 诗句，逐字显示，强度随连杀数递增 -->
+      <!-- 连击特效：四字成语 / 诗句，逐字砸入显示，强度随连杀数递增 -->
       <div v-if="comboLabel" :key="`combo-${animKey}`" class="kill-combo" :class="comboClass">
         <span
           v-for="(ch, i) in comboLabelChars"
           :key="i"
           class="combo-char"
-          :style="{ animationDelay: (i * 0.08) + 's' }"
+          :style="{ animationDelay: (i * 0.18) + 's' }"
         >{{ ch }}</span>
       </div>
     </div>
@@ -145,11 +145,12 @@ onUnmounted(() => {
 })
 
 // ===== 兜底隐藏：动画结束后或超时后强制隐藏，防止 animationend 未触发导致 show 卡死 =====
-// CSS 动画总时长约 1.8s，留 2.5s 兜底；多次击杀时重新计时
+// 斩杀文案逐字砸入后停留 3.5s 才淡出，整体时延长，需更长兜底；多次击杀时重新计时
 let hideTimerId = null
 function scheduleAutoHide() {
   if (hideTimerId) clearTimeout(hideTimerId)
-  // 人物立绘 2.5s + 灵宠 1s 延迟 + 1.8s ≈ 5.3s，给 6s 兜底
+  // 人物立绘 1.8s + 灵宠 1s 延迟 + 1.8s ≈ 4.6s，但斩杀文案最后一字砸入后停留 3.5s + 0.5s 淡出
+  // 10 字诗句最后一字 delay ≈ 9*0.18 + 0.55 + 3.5 + 0.5 ≈ 6.2s，给 8s 兜底
   hideTimerId = setTimeout(() => {
     if (show.value) {
       show.value = false
@@ -158,7 +159,7 @@ function scheduleAutoHide() {
       petPortraitUrl.value = null
     }
     hideTimerId = null
-  }, 6000)
+  }, 8000)
 }
 
 // 监听击杀事件，触发立绘突入动画
@@ -478,15 +479,15 @@ const onPetAnimEnd = () => {
 }
 .combo-char {
   display: inline-block;
-  font-size: clamp(28px, 5vw, 48px);
+  font-size: clamp(32px, 6vw, 56px);
   font-weight: 900;
   letter-spacing: 2px;
   opacity: 0;
-  /* 逐字弹出：从右侧 60px 飞入 + 0→1.3→1 缩放 + 旋转，配合 delay 形成一字一字效果
-     每字 0.4s 完成，留 0.08s 给下一个字（有力量感但不拖沓）
-     全部字弹出后整体停留 1s 再淡出 */
-  animation: combo-char-in 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards,
-             combo-char-out 0.5s ease-in 2s forwards;
+  /* 逐字砸入：从上方大字砸下 + 缩放过冲(2.5→0.85→1.1→1) + 轻微抖动，配合 delay 形成三国杀式"一字一字打进去"效果
+     每字 0.55s 完成（含砸下+反弹+定格），间隔 0.18s 让用户看清每个字
+     全部字砸完后停留 3s 再淡出，给足震撼时间 */
+  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+             combo-char-out 0.5s ease-in 3.5s forwards;
   text-shadow: 0 0 12px currentColor, 0 0 24px currentColor, 0 2px 6px rgba(0, 0, 0, 0.9);
   -webkit-text-stroke: 1px rgba(0, 0, 0, 0.4);
   will-change: transform, opacity;
@@ -494,23 +495,30 @@ const onPetAnimEnd = () => {
 @keyframes combo-char-in {
   0% {
     opacity: 0;
-    transform: translateX(60px) scale(0.2) rotate(-15deg);
+    /* 从上方 50px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
+    transform: translateY(-50px) scale(2.5) rotate(-6deg);
     filter: blur(4px);
   }
-  60% {
+  45% {
+    /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
     opacity: 1;
-    transform: translateX(0) scale(1.3) rotate(2deg);
+    transform: translateY(0) scale(0.85) rotate(3deg);
     filter: blur(0);
   }
+  65% {
+    /* 反弹一下：放大到 1.15（皮球落地反弹感） */
+    transform: translateY(0) scale(1.15) rotate(-1deg);
+  }
   100% {
+    /* 定格：回到正常大小，稳稳定住 */
     opacity: 1;
-    transform: translateX(0) scale(1) rotate(0deg);
+    transform: translateY(0) scale(1) rotate(0deg);
     filter: blur(0);
   }
 }
 @keyframes combo-char-out {
-  0% { opacity: 1; transform: translateX(0) scale(1); }
-  100% { opacity: 0; transform: translateX(20px) scale(0.85); filter: blur(2px); }
+  0% { opacity: 1; transform: translateY(0) scale(1); }
+  100% { opacity: 0; transform: translateY(15px) scale(0.9); filter: blur(2px); }
 }
 
 /* 连击等级配色：从白蓝→青→金→橙→红→紫→品红→深红→金红→传奇彩，强度递增 */
@@ -523,12 +531,12 @@ const onPetAnimEnd = () => {
 .combo-7 { color: #FF1744; }        /* 深红：狂·贯休，杀伐果断 */
 .combo-8 { color: #D500F9; }        /* 品红：超凡，踏碎凌霄 */
 .combo-9 { color: #FFD600; }        /* 金黄：神威，一剑光寒 */
-/* 传奇层级：金红交替发光，配合 rainbow-glow 持续脉冲 */
+/* 传奇层级：金红交替发光，配合 legendary-glow 持续脉冲 */
 .combo-legendary { color: #FFD600; }
 .combo-legendary .combo-char {
-  animation: combo-char-in 0.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards,
-             combo-char-out 0.5s ease-in 2.5s forwards,
-             legendary-glow 0.6s ease-in-out infinite alternate 2.5s;
+  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+             combo-char-out 0.5s ease-in 3.5s forwards,
+             legendary-glow 0.6s ease-in-out infinite alternate 3.5s;
 }
 @keyframes legendary-glow {
   0% {
