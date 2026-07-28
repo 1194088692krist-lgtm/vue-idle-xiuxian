@@ -2957,6 +2957,10 @@ export const usePlayerStore = defineStore('player', {
         }
         // 如果是当前出战的灵宠，先还原再按新星级/等级重新应用加成（避免重复叠加）
         if (this.activePet && this.activePet.id === pet.id) {
+          // 关键：同步 activePet 引用到 items 中的最新对象
+          // 存档加载后 activePet 与 items[petIndex] 可能是不同对象引用（JSON 反序列化），
+          // 若不同步，recomputeAttributes 仍会读取 activePet 上的旧 level，导致战力不变化
+          this.activePet = currentPet
           this.resetPetBonuses()
           this.applyPetBonuses()
         }
@@ -3022,6 +3026,10 @@ export const usePlayerStore = defineStore('player', {
       }
       // 升星后触发属性重算（修复：原版缺失此调用导致升星对实际属性 0 提升）
       if (this.activePet && this.activePet.id === pet.id) {
+        // 关键：同步 activePet 引用到 items 中的最新对象
+        // 存档加载后 activePet 与 items[petIndex] 可能是不同对象引用（JSON 反序列化），
+        // 若不同步，recomputeAttributes 仍会读取 activePet 上的旧 star，导致战力不变化
+        this.activePet = currentPet
         this.resetPetBonuses()
         this.applyPetBonuses()
       }
