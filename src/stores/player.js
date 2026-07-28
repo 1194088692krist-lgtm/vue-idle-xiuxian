@@ -2495,7 +2495,29 @@ export const usePlayerStore = defineStore('player', {
           }
         }
       })
-      // 5) 出战灵宠已并入裸身基线（步骤1），此处不再重复叠加，避免双重计算
+      // 5) 出战灵宠百分比加成：基于 star/level/rarity 计算倍率，乘到最终 baseAttributes 上
+      // 修复「灵宠扁平属性直接相加，后期玩家数值高后贡献微乎其微」的问题
+      // 灵宠扁平属性已在步骤1并入裸身基线（低等级时有效），此处额外按百分比放大玩家最终属性
+      if (this.activePet) {
+        const pet = this.activePet
+        const qualityBonusMap = {
+          divine: 0.15, celestial: 0.12, mystic: 0.09, spiritual: 0.06, mortal: 0.03
+        }
+        const starBonusPerQuality = {
+          divine: 0.02, celestial: 0.01, mystic: 0.01, spiritual: 0.01, mortal: 0.01
+        }
+        const baseBonus = qualityBonusMap[pet.rarity] || 0
+        const starBonus = (pet.star || 0) * (starBonusPerQuality[pet.rarity] || 0)
+        const levelBonus = ((pet.level || 1) - 1) * (baseBonus * 0.1)
+        const phase = Math.floor((pet.star || 0) / 5)
+        const phaseBonus = phase * (baseBonus * 0.5)
+        const petMult = 1 + baseBonus + starBonus + levelBonus + phaseBonus
+        // 扁平属性按倍率放大（attack/health/defense/speed）
+        this.baseAttributes.attack = Math.floor(this.baseAttributes.attack * petMult)
+        this.baseAttributes.health = Math.floor(this.baseAttributes.health * petMult)
+        this.baseAttributes.defense = Math.floor(this.baseAttributes.defense * petMult)
+        this.baseAttributes.speed = Math.floor(this.baseAttributes.speed * petMult)
+      }
     },
     // 兼容旧调用点：重算套装加成（现由 recomputeAttributes 统一处理）
     recalcSetBonuses() {
