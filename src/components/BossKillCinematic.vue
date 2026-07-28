@@ -85,18 +85,20 @@ const comboClass = ref('')
 // 逐字显示：将文案拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
 const comboLabelChars = computed(() => Array.from(comboLabel.value || ''))
 // 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
-// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.55 + 停留 1.2
+// 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.5 + 停留 1.2
 const comboFadeDelay = computed(() => {
   const n = comboLabelChars.value.length
   if (n === 0) return 0
-  return (n - 1) * 0.18 + 0.55 + 1.2
+  return (n - 1) * 0.18 + 0.5 + 1.2
 })
-// 字号自适应：字数越多字号越小，保证单排显示不超出屏幕
-// 4字 → 60px，5-7字 → 48px，8-10字 → 36px，10+字 → 28px
+// 字号自适应：字数越多字号越小，保证单排居中显示不超出屏幕
+// 细化梯度：5字单独一档（比6-7字更大），让五字诗句也突出美观
+// ≤4字 → 64px，5字 → 54px，6-7字 → 46px，8-10字 → 36px，10+字 → 28px
 const comboFontSize = computed(() => {
   const n = comboLabelChars.value.length
-  if (n <= 4) return 'clamp(40px, 7vw, 60px)'
-  if (n <= 7) return 'clamp(32px, 5.5vw, 48px)'
+  if (n <= 4) return 'clamp(44px, 7.5vw, 64px)'
+  if (n === 5) return 'clamp(38px, 6.5vw, 54px)'
+  if (n <= 7) return 'clamp(32px, 5.5vw, 46px)'
   if (n <= 10) return 'clamp(24px, 4vw, 36px)'
   return 'clamp(18px, 3vw, 28px)'
 })
@@ -495,11 +497,13 @@ const onPetAnimEnd = () => {
    内层 .combo-char：仅负责逐字砸入出现，不独立 out（避免边出现边消失） */
 .kill-combo {
   position: absolute;
-  top: 10%;
-  right: 6%;
+  /* 屏幕上方居中：独立于底部击杀文案与中心立绘，避免视觉重叠 */
+  top: 16%;
+  left: 0;
+  right: 0;
   display: flex;
   flex-wrap: nowrap;     /* 单排显示，避免 5/7 字换行不美观 */
-  justify-content: flex-end;
+  justify-content: center;
   gap: 2px;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
      注意：外层只控制 opacity，不用 transform，避免与内层 .combo-char 的 transform 叠加造成重影 */
@@ -522,49 +526,39 @@ const onPetAnimEnd = () => {
   font-weight: 900;
   letter-spacing: 4px;
   opacity: 0;
-  /* 逐字砸入：从上方砸下 + 缩放过冲 + 顿挫，配合 delay 形成三国杀式"一字一字打进去"效果
-     每字 0.55s 完成，间隔 0.18s 让用户看清每个字
+  /* 逐字砸入：干脆的一次过冲，避免多次 scale 波动产生残影
+     每字 0.5s 完成，间隔 0.18s 让用户看清每个字
      注意：不再有 out 动画，由外层 .kill-combo 统一淡出 */
-  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards;
+  animation: combo-char-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
   /* 坚实有力：全部用 text-shadow 模拟描边+立体投影+外发光
      不用 -webkit-text-stroke（动画时与 text-shadow 栅格化不同步会重影）
-     顺序：四方向黑色描边(模拟粗描边) → 立体投影(右下) → 外发光(本色) */
+     顺序：四方向黑色描边(模拟粗描边) → 立体投影(右下) → 外发光(本色)
+     发光范围收窄，避免动画时大范围光晕残影 */
   text-shadow:
-    -2px -2px 0 rgba(0, 0, 0, 0.9),
-    2px -2px 0 rgba(0, 0, 0, 0.9),
-    -2px 2px 0 rgba(0, 0, 0, 0.9),
-    2px 2px 0 rgba(0, 0, 0, 0.9),
-    4px 4px 0 rgba(0, 0, 0, 0.7),
-    0 0 16px currentColor,
-    0 0 28px currentColor;
+    -2px -2px 0 rgba(0, 0, 0, 0.95),
+    2px -2px 0 rgba(0, 0, 0, 0.95),
+    -2px 2px 0 rgba(0, 0, 0, 0.95),
+    2px 2px 0 rgba(0, 0, 0, 0.95),
+    3px 3px 0 rgba(0, 0, 0, 0.7),
+    0 0 10px currentColor;
   will-change: transform;
 }
 @keyframes combo-char-in {
   0% {
     opacity: 0;
-    /* 从上方 60px 砸下，初始放大 2.5 倍（大字砸小），轻微左倾 */
-    transform: translateY(-60px) scale(2.5) rotate(-8deg);
-    filter: blur(3px);
+    /* 从上方 40px 砸下，初始放大 1.5 倍（克制，避免大字残影），轻微左倾
+       不用 blur，避免模糊残影叠在最终位置上形成"重影"感 */
+    transform: translateY(-40px) scale(1.5) rotate(-5deg);
   }
-  40% {
-    /* 砸到位置：缩小到 0.85（过冲），轻微右倾，模拟落地顿挫 */
+  55% {
+    /* 砸到位置：过冲到 0.9（轻微收缩），轻微右倾，模拟落地顿挫 */
     opacity: 1;
-    transform: translateY(0) scale(0.85) rotate(4deg);
-    filter: blur(0);
-  }
-  60% {
-    /* 反弹一下：放大到 1.12（皮球落地反弹感） */
-    transform: translateY(0) scale(1.12) rotate(-2deg);
-  }
-  80% {
-    /* 再次小顿挫：0.97，模拟重物落地的二次震动 */
-    transform: translateY(0) scale(0.97) rotate(1deg);
+    transform: translateY(0) scale(0.9) rotate(3deg);
   }
   100% {
-    /* 定格：回到正常大小，稳稳定住 */
+    /* 定格：回到正常大小，稳稳定住，不再多次反弹避免拖影 */
     opacity: 1;
     transform: translateY(0) scale(1) rotate(0deg);
-    filter: blur(0);
   }
 }
 
@@ -583,33 +577,33 @@ const onPetAnimEnd = () => {
    注意：不再有 combo-char-out，由外层 .kill-combo 统一淡出 */
 .combo-legendary { color: #FFD600; }
 .combo-legendary .combo-char {
-  animation: combo-char-in 0.55s cubic-bezier(0.25, 0.46, 0.45, 0.94) forwards,
+  animation: combo-char-in 0.5s cubic-bezier(0.2, 0.8, 0.3, 1) forwards,
              legendary-glow 0.7s ease-in-out infinite alternate 0.6s;
 }
 @keyframes legendary-glow {
   0% {
     color: #FFD600;
     text-shadow:
-      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
-      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
-      4px 4px 0 rgba(0,0,0,0.7),
-      0 0 18px #FFD600, 0 0 32px #FF6E40;
+      -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
+      -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
+      3px 3px 0 rgba(0,0,0,0.7),
+      0 0 12px #FFD600, 0 0 20px #FF6E40;
   }
   50% {
     color: #FF1744;
     text-shadow:
-      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
-      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
-      4px 4px 0 rgba(0,0,0,0.7),
-      0 0 22px #FF1744, 0 0 40px #D500F9;
+      -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
+      -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
+      3px 3px 0 rgba(0,0,0,0.7),
+      0 0 14px #FF1744, 0 0 24px #D500F9;
   }
   100% {
     color: #FFD600;
     text-shadow:
-      -2px -2px 0 rgba(0,0,0,0.9), 2px -2px 0 rgba(0,0,0,0.9),
-      -2px 2px 0 rgba(0,0,0,0.9), 2px 2px 0 rgba(0,0,0,0.9),
-      4px 4px 0 rgba(0,0,0,0.7),
-      0 0 26px #FFD600, 0 0 48px #FF1744;
+      -2px -2px 0 rgba(0,0,0,0.95), 2px -2px 0 rgba(0,0,0,0.95),
+      -2px 2px 0 rgba(0,0,0,0.95), 2px 2px 0 rgba(0,0,0,0.95),
+      3px 3px 0 rgba(0,0,0,0.7),
+      0 0 16px #FFD600, 0 0 28px #FF1744;
   }
 }
 
