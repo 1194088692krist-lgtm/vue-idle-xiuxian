@@ -1409,33 +1409,30 @@
     playerStore.setPetCurrentSkin(pet.id, skin)
   }
 
-  // 计算灵宠属性加成
+  // 计算灵宠属性加成（与 store upgradePet/evolvePet 实际生效的系数一致）
+  // 升级每级加成 = 0.02 * qualityMultiplier（神品 +4%/级）
+  // 升星每星加成 = 0.01 * qualityMultiplier（神品 +2%/星，= 升级的一半）
   const getPetBonus = pet => {
     if (!pet) return { attack: 0, defense: 0, health: 0 }
-    const qualityBonusMap = {
-      divine: 0.5,
-      celestial: 0.3,
-      mystic: 0.2,
-      spiritual: 0.1,
-      mortal: 0.05
-    }
-    const starBonusPerQuality = {
-      divine: 0.1,
-      celestial: 0.08,
-      mystic: 0.06,
-      spiritual: 0.04,
-      mortal: 0.02
-    }
-    const baseBonus = qualityBonusMap[pet.rarity] || 0.05
-    const starBonus = (pet.star || 0) * (starBonusPerQuality[pet.rarity] || 0.02)
-    const totalBonus = baseBonus + starBonus
-    const phase = Math.floor((pet.star || 0) / 5)
-    const phaseBonus = phase * (baseBonus * 0.5)
-    const finalBonus = totalBonus + phaseBonus
+    // 品质倍率（与 store upgradePet/evolvePet 一致）
+    const qualityMultiplier =
+      {
+        divine: 2.0,
+        celestial: 1.8,
+        mystic: 1.6,
+        spiritual: 1.4,
+        mortal: 1.2
+      }[pet.rarity] || 1.2
+    const starGrowth = 0.01 * qualityMultiplier // 每星成长率
+    const levelGrowth = 0.02 * qualityMultiplier // 每级成长率（= 2 × 升星）
+    // 累计成长比例（复利）：(1+starGrowth)^star * (1+levelGrowth)^(level-1) - 1
+    const starMult = Math.pow(1 + starGrowth, pet.star || 0)
+    const levelMult = Math.pow(1 + levelGrowth, Math.max(0, (pet.level || 1) - 1))
+    const totalGrowth = starMult * levelMult - 1
     return {
-      attack: finalBonus,
-      defense: finalBonus,
-      health: finalBonus
+      attack: totalGrowth,
+      defense: totalGrowth,
+      health: totalGrowth
     }
   }
 

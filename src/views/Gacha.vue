@@ -92,6 +92,18 @@
           </div>
         </div>
 
+        <div class="crystal-exchange pet-fragment-exchange">
+          <div class="exchange-info">
+            <span class="label">灵石 → 升星碎片</span>
+            <span class="rate">200 灵石 = 1 升星碎片（持有 {{ playerStore.petFragments }} 个）</span>
+          </div>
+          <div class="exchange-actions">
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 2000" @click="exchangePetFragments(10)">兑换10</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 10000" @click="exchangePetFragments(50)">兑换50</button>
+            <button class="btn btn-info" :disabled="playerStore.spiritStones < 20000" @click="exchangePetFragments(100)">兑换100</button>
+          </div>
+        </div>
+
         <div v-if="gachaResults.length > 0" class="gacha-results">
           <h3 class="section-title">祈福结果</h3>
           <div class="results-grid">
@@ -535,6 +547,13 @@
   // 妖兽核 → 幻灵结晶（1 = 5）
   const exchangeBeastCore = (amount) => {
     const result = playerStore.exchangeBeastCoreForCrystals(amount)
+    if (result.success) showMessage('success', result.message)
+    else showMessage('error', result.message)
+  }
+
+  // 灵石 → 升星碎片（200 = 1）
+  const exchangePetFragments = (amount) => {
+    const result = playerStore.exchangePetFragments(amount)
     if (result.success) showMessage('success', result.message)
     else showMessage('error', result.message)
   }

@@ -353,80 +353,6 @@ export const usePlayerStore = defineStore('player', {
   getters: {
     // 待领取礼包数量（驱动顶部铃铛红点）
     giftCount: s => (s.gifts || []).length,
-    // 获取灵宠的属性加成
-    getPetBonus() {
-      if (!this.activePet)
-        return {
-          attack: 0,
-          defense: 0,
-          health: 0,
-          critRate: 0,
-          comboRate: 0,
-          counterRate: 0,
-          stunRate: 0,
-          dodgeRate: 0,
-          vampireRate: 0,
-          critResist: 0,
-          comboResist: 0,
-          counterResist: 0,
-          stunResist: 0,
-          dodgeResist: 0,
-          vampireResist: 0,
-          healBoost: 0,
-          critDamageBoost: 0,
-          critDamageReduce: 0,
-          finalDamageBoost: 0,
-          finalDamageReduce: 0,
-          combatBoost: 0,
-          resistanceBoost: 0
-        }
-      const qualityBonusMap = {
-        divine: 0.15, // 神品基础加成15%
-        celestial: 0.12, // 仙品基础加成12%
-        mystic: 0.09, // 玄品基础加成9%
-        spiritual: 0.06, // 灵品基础加成6%
-        mortal: 0.03 // 凡品基础加成3%
-      }
-      const starBonusPerQuality = {
-        divine: 0.02, // 神品每星+2%
-        celestial: 0.01, // 仙品每星+1%
-        mystic: 0.01, // 玄品每星+1%
-        spiritual: 0.01, // 灵品每星+1%
-        mortal: 0.01 // 凡品每星+1%
-      }
-      const baseBonus = qualityBonusMap[this.activePet.rarity] || 0
-      const starBonus = (this.activePet.star || 0) * (starBonusPerQuality[this.activePet.rarity] || 0)
-      const levelBonus = ((this.activePet.level || 1) - 1) * (baseBonus * 0.1)
-      const totalBonus = baseBonus + starBonus + levelBonus
-      const phase = Math.floor((this.activePet.star || 0) / 5)
-      const phaseBonus = phase * (baseBonus * 0.5)
-      const finalBonus = totalBonus + phaseBonus
-      const combatBonus = finalBonus * 0.5
-      return {
-        attack: finalBonus,
-        defense: finalBonus,
-        health: finalBonus,
-        critRate: combatBonus,
-        comboRate: combatBonus,
-        counterRate: combatBonus,
-        stunRate: combatBonus,
-        dodgeRate: combatBonus,
-        vampireRate: combatBonus,
-        critResist: combatBonus,
-        comboResist: combatBonus,
-        counterResist: combatBonus,
-        stunResist: combatBonus,
-        dodgeResist: combatBonus,
-        vampireResist: combatBonus,
-        healBoost: combatBonus,
-        critDamageBoost: combatBonus,
-        critDamageReduce: combatBonus,
-        finalDamageBoost: combatBonus,
-        finalDamageReduce: combatBonus,
-        combatBoost: combatBonus,
-        resistanceBoost: combatBonus
-      }
-    },
     buildStrength() {
       // 综合 Build：装备分 + 角色裸战力（含出战灵宠），并按修炼层级成长
       return calculateTotalBuild(this)
@@ -2955,7 +2881,7 @@ export const usePlayerStore = defineStore('player', {
       this.items.push(equipment)
       this.queueSave()
     },
-    // 升级灵宠
+    // 升级灵宠（主要增强途径：每级加成 = 升星每星加成的 2 倍）
     upgradePet(pet, essenceCount) {
       if (this.petEssence < essenceCount) {
         return { success: false, message: '灵宠精华不足' }
@@ -2966,7 +2892,8 @@ export const usePlayerStore = defineStore('player', {
       if (petIndex > -1) {
         const currentPet = this.items[petIndex]
         currentPet.level = (currentPet.level || 1) + 1
-        // 根据品质和等级提升战斗属性
+        // 品质倍率：升级系数 = 0.02 * qualityMultiplier（是升星 0.01 的 2 倍）
+        // 神品每级 +4%，仙品 +3.6%，玄品 +3.2%，灵品 +2.8%，凡品 +2.4%
         const qualityMultiplier =
           {
             divine: 2.0,
@@ -2975,34 +2902,36 @@ export const usePlayerStore = defineStore('player', {
             spiritual: 1.4,
             mortal: 1.2
           }[currentPet.rarity] || 1.2
-        // 更新战斗属性
+        const growthRate = 0.02 * qualityMultiplier // 升级成长率（= 2 × 升星成长率）
+        const ca = currentPet.combatAttributes
+        // 更新战斗属性：扁平属性按百分比成长，Rate/Resist/Boost 按固定值累加并钳制上限 1.0
         currentPet.combatAttributes = {
-          attack: Math.floor(currentPet.combatAttributes.attack * (1 + 0.01 * qualityMultiplier)),
-          health: Math.floor(currentPet.combatAttributes.health * (1 + 0.01 * qualityMultiplier)),
-          defense: Math.floor(currentPet.combatAttributes.defense * (1 + 0.01 * qualityMultiplier)),
-          speed: Math.floor(currentPet.combatAttributes.speed * (1 + 0.01 * qualityMultiplier)),
+          attack: Math.floor(ca.attack * (1 + growthRate)),
+          health: Math.floor(ca.health * (1 + growthRate)),
+          defense: Math.floor(ca.defense * (1 + growthRate)),
+          speed: Math.floor(ca.speed * (1 + growthRate)),
 
-          critRate: currentPet.combatAttributes.critRate + 0.01 * qualityMultiplier,
-          comboRate: currentPet.combatAttributes.comboRate + 0.01 * qualityMultiplier,
-          counterRate: currentPet.combatAttributes.counterRate + 0.01 * qualityMultiplier,
-          stunRate: currentPet.combatAttributes.stunRate + 0.01 * qualityMultiplier,
-          dodgeRate: currentPet.combatAttributes.dodgeRate + 0.01 * qualityMultiplier,
-          vampireRate: currentPet.combatAttributes.vampireRate + 0.01 * qualityMultiplier,
+          critRate: Math.min(1, ca.critRate + growthRate),
+          comboRate: Math.min(1, ca.comboRate + growthRate),
+          counterRate: Math.min(1, ca.counterRate + growthRate),
+          stunRate: Math.min(1, ca.stunRate + growthRate),
+          dodgeRate: Math.min(1, ca.dodgeRate + growthRate),
+          vampireRate: Math.min(1, ca.vampireRate + growthRate),
 
-          critResist: currentPet.combatAttributes.critResist + 0.01 * qualityMultiplier, // 抗暴击
-          comboResist: currentPet.combatAttributes.comboResist + 0.01 * qualityMultiplier, // 抗连击
-          counterResist: currentPet.combatAttributes.counterResist + 0.01 * qualityMultiplier, // 抗反击
-          stunResist: currentPet.combatAttributes.stunResist + 0.01 * qualityMultiplier, // 抗眩晕
-          dodgeResist: currentPet.combatAttributes.dodgeResist + 0.01 * qualityMultiplier, // 抗闪避
-          vampireResist: currentPet.combatAttributes.vampireResist + 0.01 * qualityMultiplier, // 抗吸血
+          critResist: Math.min(1, ca.critResist + growthRate),
+          comboResist: Math.min(1, ca.comboResist + growthRate),
+          counterResist: Math.min(1, ca.counterResist + growthRate),
+          stunResist: Math.min(1, ca.stunResist + growthRate),
+          dodgeResist: Math.min(1, ca.dodgeResist + growthRate),
+          vampireResist: Math.min(1, ca.vampireResist + growthRate),
 
-          healBoost: currentPet.combatAttributes.healBoost + 0.01 * qualityMultiplier,
-          critDamageBoost: currentPet.combatAttributes.critDamageBoost + 0.01 * qualityMultiplier,
-          critDamageReduce: currentPet.combatAttributes.critDamageReduce + 0.01 * qualityMultiplier,
-          finalDamageBoost: currentPet.combatAttributes.finalDamageBoost + 0.01 * qualityMultiplier,
-          finalDamageReduce: currentPet.combatAttributes.finalDamageReduce + 0.01 * qualityMultiplier,
-          combatBoost: currentPet.combatAttributes.combatBoost + 0.01 * qualityMultiplier,
-          resistanceBoost: currentPet.combatAttributes.resistanceBoost + 0.01 * qualityMultiplier
+          healBoost: ca.healBoost + growthRate,
+          critDamageBoost: ca.critDamageBoost + growthRate,
+          critDamageReduce: ca.critDamageReduce + growthRate,
+          finalDamageBoost: ca.finalDamageBoost + growthRate,
+          finalDamageReduce: ca.finalDamageReduce + growthRate,
+          combatBoost: ca.combatBoost + growthRate,
+          resistanceBoost: ca.resistanceBoost + growthRate
         }
         // 如果是当前出战的灵宠，先还原再按新星级/等级重新应用加成（避免重复叠加）
         if (this.activePet && this.activePet.id === pet.id) {
@@ -3013,7 +2942,7 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: '升级成功' }
     },
-    // 升星灵宠
+    // 升星灵宠（次要增强途径：每星加成 = 升级每级加成的一半；升星后属性真实生效）
     evolvePet(pet) {
       const petIndex = this.items.findIndex(item => item.id === pet.id)
       if (petIndex === -1) {
@@ -3025,8 +2954,68 @@ export const usePlayerStore = defineStore('player', {
       }
       this.petFragments -= cost
       this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
+      // 升星后真实提升 combatAttributes（修复：原版只改 star 字段不触发属性变化）
+      // 系数 = 0.01 * qualityMultiplier（升级 0.02 的一半）
+      // 神品每星 +2%，10 星累计 ≈ +22%（远低于原 UI 显示的"10星翻10倍"）
+      const currentPet = this.items[petIndex]
+      const qualityMultiplier =
+        {
+          divine: 2.0,
+          celestial: 1.8,
+          mystic: 1.6,
+          spiritual: 1.4,
+          mortal: 1.2
+        }[currentPet.rarity] || 1.2
+      const growthRate = 0.01 * qualityMultiplier // 升星成长率（= 升级的一半）
+      const ca = currentPet.combatAttributes
+      if (ca) {
+        currentPet.combatAttributes = {
+          attack: Math.floor(ca.attack * (1 + growthRate)),
+          health: Math.floor(ca.health * (1 + growthRate)),
+          defense: Math.floor(ca.defense * (1 + growthRate)),
+          speed: Math.floor(ca.speed * (1 + growthRate)),
+
+          critRate: Math.min(1, ca.critRate + growthRate),
+          comboRate: Math.min(1, ca.comboRate + growthRate),
+          counterRate: Math.min(1, ca.counterRate + growthRate),
+          stunRate: Math.min(1, ca.stunRate + growthRate),
+          dodgeRate: Math.min(1, ca.dodgeRate + growthRate),
+          vampireRate: Math.min(1, ca.vampireRate + growthRate),
+
+          critResist: Math.min(1, ca.critResist + growthRate),
+          comboResist: Math.min(1, ca.comboResist + growthRate),
+          counterResist: Math.min(1, ca.counterResist + growthRate),
+          stunResist: Math.min(1, ca.stunResist + growthRate),
+          dodgeResist: Math.min(1, ca.dodgeResist + growthRate),
+          vampireResist: Math.min(1, ca.vampireResist + growthRate),
+
+          healBoost: ca.healBoost + growthRate,
+          critDamageBoost: ca.critDamageBoost + growthRate,
+          critDamageReduce: ca.critDamageReduce + growthRate,
+          finalDamageBoost: ca.finalDamageBoost + growthRate,
+          finalDamageReduce: ca.finalDamageReduce + growthRate,
+          combatBoost: ca.combatBoost + growthRate,
+          resistanceBoost: ca.resistanceBoost + growthRate
+        }
+      }
+      // 升星后触发属性重算（修复：原版缺失此调用导致升星对实际属性 0 提升）
+      if (this.activePet && this.activePet.id === pet.id) {
+        this.resetPetBonuses()
+        this.applyPetBonuses()
+      }
       this.queueSave()
       return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
+    },
+    // 灵石兑换升星碎片（200灵石 = 1碎片，比幻灵结晶 50:1 更贵，保持稀缺）
+    exchangePetFragments(amount) {
+      const cost = amount * 200
+      if (this.spiritStones < cost) {
+        return { success: false, message: `灵石不足，需要 ${cost} 灵石` }
+      }
+      this.spiritStones -= cost
+      this.petFragments += amount
+      this.queueSave()
+      return { success: true, message: `成功兑换 ${amount} 升星碎片` }
     },
     // 设置灵宠当前展示的皮肤（立绘切换持久化）。
     // skin: 0=原立绘, 1=skin1, 2=skin2 ...
