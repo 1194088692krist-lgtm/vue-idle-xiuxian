@@ -95,17 +95,17 @@ function resolveSkillColor(name) {
   return DEFAULT_COLOR
 }
 
-// ===== 全局冷却：避免短时间内多个技能连发触发演出，影响战斗节奏 =====
-// 6 秒内同一技能名不重复触发；3 秒内不同技能也不触发（让上一个演出完整播完）
-const CAST_COOLDOWN_MS = 3000
-const SAME_SKILL_COOLDOWN_MS = 6000
+// ===== 同名去重：避免同一角色同名技能连续重复触发 =====
+// 全局冷却已由 useIdleSystem 侧控制（每个技能事件间隔 1.8s 逐个触发）
+// 此处只做同名去重，不再做全局冷却，让所有角色的技能都能显示
+const SAME_SKILL_COOLDOWN_MS = 5000
 let lastCastTs = 0
 let lastSkillKey = ''
 let hideTimerId = null
 
 function scheduleAutoHide() {
   if (hideTimerId) clearTimeout(hideTimerId)
-  // 逐字砸入后停留 2.8s 才淡出：4 字技能名最后一字 delay ≈ 0.15+3*0.15+0.55+2.8+0.4 ≈ 4.35s，给 4.6s 兜底
+  // 兜底隐藏：4 字技能名演出约 4.35s，给 4.6s
   hideTimerId = setTimeout(() => {
     show.value = false
     hideTimerId = null
@@ -116,9 +116,7 @@ watch(skillCastEvent, (evt) => {
   if (!evt || !evt.ts || !evt.isBoss) return
   // 仅在探索挂机页显示技能演出：切到背包/炼丹等其他页面时不弹特效
   if (route.path !== '/exploration') return
-  // 全局冷却：3 秒内不重复触发（不同技能也不打断上一个演出）
-  if (evt.ts - lastCastTs < CAST_COOLDOWN_MS) return
-  // 同技能冷却：6 秒内同名不重复（避免每回合都弹同一个技能）
+  // 同技能冷却：5 秒内同名同角色不重复（避免每回合都弹同一个技能）
   const skillKey = `${evt.casterName}-${evt.skillName}`
   if (skillKey === lastSkillKey && evt.ts - lastCastTs < SAME_SKILL_COOLDOWN_MS) return
 
@@ -160,8 +158,10 @@ onUnmounted(() => {
   inset: 0;
   z-index: 9998; /* 略低于 BossKillCinematic(9999)，避免击杀演出被技能演出遮挡 */
   display: flex;
-  align-items: center;
+  /* 偏下方显示：不遮挡顶部回合信息/HP条等，但也别太靠下 */
+  align-items: flex-end;
   justify-content: center;
+  padding-bottom: 22vh;
   pointer-events: none;
   overflow: hidden;
 }

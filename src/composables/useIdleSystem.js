@@ -2579,6 +2579,9 @@ async function executeRound(effectiveZone) {
   // 2. 玩家行动：每个存活角色按职业AI选择行为
   const attackingPlayers = []
   const s = store()
+  // 本回合收集的技能释放事件：循环内同步赋值会被 Vue watch batching 合并只触发一次
+  // 改为收集到数组，循环结束后逐个延时触发，让每个角色的技能演出都能显示
+  const roundSkillEvents = []
   for (const p of players) {
     if (p.currentHealth <= 0) continue
     const memberState = teamMemberStates.value.find(ms => ms.memberId === p.memberId)
@@ -2595,17 +2598,15 @@ async function executeRound(effectiveZone) {
       p.stats.damage = Math.floor(p.stats.damage * damagePercent)
       p._skillName = action.skillName
       attackingPlayers.push(p)
-      // 发出技能释放事件：触发 SkillCinematic 全屏特写演出
-      // 仅 BOSS 战触发（手动 BOSS 挑战 / 挂机 BOSS 出现），避免普通战斗频繁打断节奏
-      // 每个技能每场战斗只触发一次（同名同 caster 去重，由组件侧做冷却避免重复弹出）
+      // 收集技能释放事件（循环结束后统一延时触发）
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
-        skillCastEvent.value = {
+        roundSkillEvents.push({
           skillName: action.skillName,
           casterName: p.name,
           isBoss: true,
           ts: Date.now()
-        }
+        })
       }
     } else if (action.type === 'heal') {
       if (action.isTeam) {
@@ -2624,15 +2625,38 @@ async function executeRound(effectiveZone) {
         if (cs) cs.playerHeal += healed
         roundLog.push(`💚 ${p.name}施展${action.skillName || '治疗'}，为${targetEntity.name}恢复${Math.floor(healed)}点气血`)
       }
+      // 治疗/增益/防御类技能也收集事件，让所有角色的技能都能显示特写
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
     } else if (action.type === 'buff') {
       const targetEntity = players.find(pl => pl.name === action.target?.name) || p
       targetEntity.addBuff({ type: action.buffType, value: action.value, duration: action.duration, source: p.name })
       roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，${targetEntity.name}获得${action.buffType}（持续${action.duration}回合）`)
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
     } else if (action.type === 'defend') {
       const targetEntity = players.find(pl => pl.name === action.target?.name) || p
       targetEntity.addBuff({ type: 'defense_up', value: action.value, duration: action.duration, source: p.name })
       roundLog.push(`🛡️ ${p.name}施展${action.skillName || '防御'}，为${targetEntity.name}展开防御姿态，防御提升`)
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+      }
     }
+  }
+
+  // 本回合技能事件逐个延时触发：避免 Vue watch batching 把同 tick 多次赋值合并成一次
+  // 每个事件间隔 1.8s（约一个技能演出时长），让所有角色的技能都能完整显示
+  if (roundSkillEvents.length > 0) {
+    roundSkillEvents.forEach((evt, idx) => {
+      setTimeout(() => {
+        skillCastEvent.value = { ...evt, ts: Date.now() }
+      }, idx * 1800)
+    })
   }
 
   // 3. 怪物行动 + 玩家攻击：executeTurn 按速度排序处理所有攻击者
