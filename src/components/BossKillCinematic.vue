@@ -35,22 +35,25 @@
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
-      <!-- 连击特效：四字成语 / 诗句，逐字砸入出现，全部到齐后整体一起消失 -->
+      <!-- 连击特效：第一行"X杀"小字标签 + 第二行成语/诗句逐字砸入 -->
       <!-- 外层 .kill-combo 负责整体淡出（统一延迟，所有字一起消失） -->
-      <!-- 内层 .combo-char 仅负责逐字砸入出现（按 delay），不再独立 out -->
+      <!-- count 行整体淡入，text 行逐字砸入出现 -->
       <div
-        v-if="comboLabel"
+        v-if="comboText"
         :key="`combo-${animKey}`"
         class="kill-combo"
         :class="comboClass"
         :style="{ animationDelay: comboFadeDelay + 's', '--combo-font-size': comboFontSize }"
       >
-        <span
-          v-for="(ch, i) in comboLabelChars"
-          :key="i"
-          class="combo-char"
-          :style="{ animationDelay: (i * 0.18) + 's' }"
-        >{{ ch }}</span>
+        <div class="combo-count">{{ comboCount }}</div>
+        <div class="combo-text">
+          <span
+            v-for="(ch, i) in comboTextChars"
+            :key="i"
+            class="combo-char"
+            :style="{ animationDelay: (i * 0.18) + 's' }"
+          >{{ ch }}</span>
+        </div>
       </div>
     </div>
   </teleport>
@@ -82,22 +85,26 @@ const petName = ref('')
 const petAnimKey = ref(0)
 let petDelayTimer = null
 
-const comboLabel = ref('')
+// 连击文案：count（如"一杀"）与 text（如"势如破竹"）分两行显示
+// 分离后 text 行字数固定为四字/五字/七字等，字号自适应只针对 text 行
+// count 行小字固定字号，不再参与自适应，避免与 text 行相互挤压
+const comboCount = ref('')
+const comboText = ref('')
 const comboClass = ref('')
-// 逐字显示：将文案拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
-const comboLabelChars = computed(() => Array.from(comboLabel.value || ''))
+// 逐字显示：将 text 拆成单字数组，配合 CSS animation-delay 实现一字一字弹出
+// count 行不逐字（小字标签，整体淡入即可）
+const comboTextChars = computed(() => Array.from(comboText.value || ''))
 // 整体淡出延迟：等所有字逐字砸入完成 + 停留 1.2s 后，整体一起消失
 // 计算 = 最后一字的入场 delay (n-1)*0.18 + 入场时长 0.45 + 停留 1.2
 const comboFadeDelay = computed(() => {
-  const n = comboLabelChars.value.length
+  const n = comboTextChars.value.length
   if (n === 0) return 0
   return (n - 1) * 0.18 + 0.45 + 1.2
 })
-// 字号自适应：字数越多字号越小，保证单排居中显示不超出屏幕
-// 细化梯度：5字单独一档（比6-7字更大），让五字诗句也突出美观
+// 字号自适应：仅针对 text 行，字数越多字号越小
 // ≤4字 → 64px，5字 → 54px，6-7字 → 46px，8-10字 → 36px，10+字 → 28px
 const comboFontSize = computed(() => {
-  const n = comboLabelChars.value.length
+  const n = comboTextChars.value.length
   if (n <= 4) return 'clamp(44px, 7.5vw, 64px)'
   if (n === 5) return 'clamp(38px, 6.5vw, 54px)'
   if (n <= 7) return 'clamp(32px, 5.5vw, 46px)'
@@ -109,27 +116,98 @@ const comboFontSize = computed(() => {
 // 按连杀次数分 10 个层级，强度递增（四字成语 → 五字 → 七字诗句 → 十字传奇）
 // 文案来源：李白《侠客行》、贯休《献钱尚父》、古龙武侠、修仙小说常用意象
 // 每层多条文案轮换，避免重复单调
+// 每条文案格式：{ count: 'X杀', text: '成语/诗句' }
+// 显示时 count 与 text 分两行，避免长文案单行撑爆屏幕，也更有层次感
 const COMBO_TIERS = [
   // 第 1 杀：初斩·四字（凌厉但不夸张）
-  { class: 'combo-1', lines: ['一击必杀', '势如破竹', '雷厉风行', '剑出如虹', '快如闪电', '锋芒毕露'] },
+  { class: 'combo-1', lines: [
+    { count: '一杀', text: '势如破竹' },
+    { count: '一杀', text: '一击必杀' },
+    { count: '一杀', text: '雷厉风行' },
+    { count: '一杀', text: '剑出如虹' },
+    { count: '一杀', text: '快如闪电' },
+    { count: '一杀', text: '锋芒毕露' }
+  ] },
   // 第 2 杀：连斩·四字（杀气渐起）
-  { class: 'combo-2', lines: ['连斩双煞', '双剑合璧', '左右开弓', '势不可挡', '杀气腾腾', '所向披靡'] },
+  { class: 'combo-2', lines: [
+    { count: '二杀', text: '势不可挡' },
+    { count: '二杀', text: '所向披靡' },
+    { count: '二杀', text: '杀气腾腾' },
+    { count: '二杀', text: '连斩双煞' },
+    { count: '二杀', text: '双剑合璧' },
+    { count: '二杀', text: '左右开弓' }
+  ] },
   // 第 3 杀：凌厉·五字（如入无人境）
-  { class: 'combo-3', lines: ['剑气纵横起', '杀气盈原野', '所向皆披靡', '一剑斩乾坤', '凌厉无匹敌', '剑落惊风雨'] },
+  { class: 'combo-3', lines: [
+    { count: '三杀', text: '剑气纵横起' },
+    { count: '三杀', text: '杀气盈原野' },
+    { count: '三杀', text: '所向皆披靡' },
+    { count: '三杀', text: '一剑斩乾坤' },
+    { count: '三杀', text: '凌厉无匹敌' },
+    { count: '三杀', text: '剑落惊风雨' }
+  ] },
   // 第 4 杀：霸道·六字（横扫千军）
-  { class: 'combo-4', lines: ['横扫千军如卷', '一夫当关莫开', '万军之中取首', '剑气荡平八荒', '杀伐果断无情', '势若雷霆万钧'] },
+  { class: 'combo-4', lines: [
+    { count: '四杀', text: '横扫千军如卷' },
+    { count: '四杀', text: '一夫当关莫开' },
+    { count: '四杀', text: '万军之中取首' },
+    { count: '四杀', text: '剑气荡平八荒' },
+    { count: '四杀', text: '杀伐果断无情' },
+    { count: '四杀', text: '势若雷霆万钧' }
+  ] },
   // 第 5 杀：王者·七字（大杀四方）
-  { class: 'combo-5', lines: ['大杀四方震八荒', '剑锋所指皆披靡', '气吞山河万里红', '杀尽奸邪不留行', '一剑光寒动九州', '血染黄沙战未休'] },
+  { class: 'combo-5', lines: [
+    { count: '五杀', text: '大杀四方震八荒' },
+    { count: '五杀', text: '剑锋所指皆披靡' },
+    { count: '五杀', text: '气吞山河万里红' },
+    { count: '五杀', text: '杀尽奸邪不留行' },
+    { count: '五杀', text: '一剑光寒动九州' },
+    { count: '五杀', text: '血染黄沙战未休' }
+  ] },
   // 第 6 杀：诗·七字（李白侠客行意象）
-  { class: 'combo-6', lines: ['十步杀一人千里', '事了拂衣深藏名', '飒沓如流星杀尽', '纵死侠骨犹留香', '吴钩霜雪斩群魔', '三杯吐诺重五岳'] },
+  { class: 'combo-6', lines: [
+    { count: '六杀', text: '十步杀一人千里' },
+    { count: '六杀', text: '事了拂衣深藏名' },
+    { count: '六杀', text: '飒沓如流星杀尽' },
+    { count: '六杀', text: '纵死侠骨犹留香' },
+    { count: '六杀', text: '吴钩霜雪斩群魔' },
+    { count: '六杀', text: '三杯吐诺重五岳' }
+  ] },
   // 第 7 杀：狂·七字（贯休献钱尚父）
-  { class: 'combo-7', lines: ['一剑霜寒十四州', '满堂花醉三千客', '冲天香阵透长安', '剑气冲霄贯斗牛', '杀气三声动天地', '狂歌痛饮斩天骄'] },
+  { class: 'combo-7', lines: [
+    { count: '七杀', text: '一剑霜寒十四州' },
+    { count: '七杀', text: '满堂花醉三千客' },
+    { count: '七杀', text: '冲天香阵透长安' },
+    { count: '七杀', text: '剑气冲霄贯斗牛' },
+    { count: '七杀', text: '杀气三声动天地' },
+    { count: '七杀', text: '狂歌痛饮斩天骄' }
+  ] },
   // 第 8 杀：超凡·八字（踏碎凌霄）
-  { class: 'combo-8', lines: ['踏碎凌霄放肆桀骜', '气吞万里猛如虎', '一身转战三千里', '一剑曾当百万师', '剑破苍穹碎虚空', '杀伐决断震九霄'] },
+  { class: 'combo-8', lines: [
+    { count: '八杀', text: '踏碎凌霄放肆桀骜' },
+    { count: '八杀', text: '气吞万里猛如虎' },
+    { count: '八杀', text: '一身转战三千里' },
+    { count: '八杀', text: '一剑曾当百万师' },
+    { count: '八杀', text: '剑破苍穹碎虚空' },
+    { count: '八杀', text: '杀伐决断震九霄' }
+  ] },
   // 第 9 杀：神威·九字（一剑光寒）
-  { class: 'combo-9', lines: ['剑气纵横三万里', '一剑光寒十九州', '十步杀尽千人挡', '千里不留行无踪', '杀尽苍生不见血', '剑出星辰皆黯淡'] },
+  { class: 'combo-9', lines: [
+    { count: '九杀', text: '剑气纵横三万里' },
+    { count: '九杀', text: '一剑光寒十九州' },
+    { count: '九杀', text: '十步杀尽千人挡' },
+    { count: '九杀', text: '千里不留行无踪' },
+    { count: '九杀', text: '杀尽苍生不见血' },
+    { count: '九杀', text: '剑出星辰皆黯淡' }
+  ] },
   // 第 10+ 杀：传奇·十字（诗剑双绝）
-  { class: 'combo-legendary', lines: ['剑气纵横三万里，一剑光寒十九州', '十步杀一人，千里不留行', '事了拂衣去，深藏身与名', '一身转战三千里，一剑曾当百万师', '满堂花醉三千客，一剑霜寒十四州'] }
+  { class: 'combo-legendary', lines: [
+    { count: '十杀', text: '剑气纵横三万里，一剑光寒十九州' },
+    { count: '十杀', text: '十步杀一人，千里不留行' },
+    { count: '十杀', text: '事了拂衣去，深藏身与名' },
+    { count: '十杀', text: '一身转战三千里，一剑曾当百万师' },
+    { count: '十杀', text: '满堂花醉三千客，一剑霜寒十四州' }
+  ] }
 ]
 
 // 连击窗口：每次击杀BOSS后 15 秒内再次击杀则连击+1，超时重置
@@ -138,31 +216,53 @@ let comboTimerId = null
 let currentCombo = 0
 
 // 根据连杀数取对应层级文案（随机选一条，避免重复）
+// 返回 { count: 'X杀', text: '成语/诗句', class: 'combo-N' }
 function getComboTier(count) {
-  if (count < 1) return { label: '', class: '' }
+  if (count < 1) return { count: '', text: '', class: '' }
   const tierIdx = Math.min(count, COMBO_TIERS.length) - 1
   const tier = COMBO_TIERS[tierIdx]
-  const label = tier.lines[Math.floor(Math.random() * tier.lines.length)]
-  return { label, class: tier.class }
+  const line = tier.lines[Math.floor(Math.random() * tier.lines.length)]
+  return { count: line.count, text: line.text, class: tier.class }
 }
 
+// 连击锁：防止两次击杀事件几乎同时到达时，bumpCombo 交错执行导致两组文字共存
+// 场景：挂机一轮战斗可能连斩多只 BOSS，事件密集触发，nextTick 异步设置 comboLabel
+// 时第二次 bumpCombo 已把 comboLabel 清空，造成状态错乱
+let comboBumping = false
 function bumpCombo() {
+  if (comboBumping) {
+    // 上一次还没渲染完，直接累加计数但不重复触发渲染
+    currentCombo++
+    if (comboTimerId) clearTimeout(comboTimerId)
+    comboTimerId = setTimeout(() => {
+      currentCombo = 0
+      comboCount.value = ''
+      comboText.value = ''
+      comboClass.value = ''
+      comboTimerId = null
+    }, COMBO_WINDOW_MS)
+    return
+  }
+  comboBumping = true
   currentCombo++
   const tier = getComboTier(currentCombo)
-  // 关键：先清空 comboLabel，让旧 .kill-combo 节点（v-if=false）立即卸载
+  // 关键：先清空，让旧 .kill-combo 节点（v-if=false）立即卸载
   // 避免旧节点响应式更新为新文案字符后，与新节点短暂共存导致"两组不同文字同时显示"
-  // 然后 nextTick 设置新值，此时旧节点已从 DOM 移除，新节点才创建
-  comboLabel.value = ''
+  comboCount.value = ''
+  comboText.value = ''
   comboClass.value = ''
   nextTick(() => {
-    comboLabel.value = tier.label
+    comboCount.value = tier.count
+    comboText.value = tier.text
     comboClass.value = tier.class
+    comboBumping = false
   })
   // 重置连击窗口计时器
   if (comboTimerId) clearTimeout(comboTimerId)
   comboTimerId = setTimeout(() => {
     currentCombo = 0
-    comboLabel.value = ''
+    comboCount.value = ''
+    comboText.value = ''
     comboClass.value = ''
     comboTimerId = null
   }, COMBO_WINDOW_MS)
@@ -188,7 +288,8 @@ watch(() => route.path, (newPath) => {
     petShow.value = false
     petPortraitUrl.value = null
     // 连击状态也一并清空
-    comboLabel.value = ''
+    comboCount.value = ''
+    comboText.value = ''
     comboClass.value = ''
     if (comboTimerId) { clearTimeout(comboTimerId); comboTimerId = null }
     if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
@@ -530,61 +631,77 @@ const onPetAnimEnd = () => {
   100% { opacity: 0; transform: translate(-50%, -10px); }
 }
 
-/* ===== 连击特效：逐字砸入出现，全部到齐后整体一起消失 ===== */
-/* 外层 .kill-combo：负责整体淡出 + 居中定位
-   内层 .combo-char：仅负责逐字砸入出现（纯 translateY+opacity，无 scale/blur 避免残影） */
+/* ===== 连击特效：第一行"X杀"小字 + 第二行成语/诗句逐字砸入 ===== */
+/* 外层 .kill-combo：负责整体淡出 + 居中定位，纵向排列 count 与 text 两行 */
 .kill-combo {
   position: absolute;
-  /* 中间偏下显示：用户要求此位置，立绘贴顶后下方空间充足
-     top:58% = 58vh，文字高度约 8vh，底部约 66vh，立绘底部约 56vh，留有空隙不重叠
-     且此处不遮挡立绘主体，玩家也看得清 */
-  top: 58%;
+  /* 中间偏下显示：立绘贴顶后下方空间充足，不遮挡立绘主体也看得清 */
+  top: 56%;
   left: 50%;
   transform: translateX(-50%);
+  /* 纵向排列：count 在上，text 在下 */
   display: flex;
-  flex-wrap: nowrap;
-  justify-content: center;
-  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒，gap 太小相邻字笔画会侵入重叠
-     60px 字号下 18px gap 约留出 1/3 字宽的安全间距 */
-  gap: 18px;
-  white-space: nowrap;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
   /* 整体淡出：所有字一起消失。延迟时间由 comboFadeDelay computed 动态计算
-     注意：外层 transform 是静态值（translateX(-50%)），不在动画中改变，不会与内层叠加
+     外层 transform 是静态值（translateX(-50%)），不在动画中改变，不会与内层叠加
      combo-fade-out 只控制 opacity，不触碰 transform，避免覆盖居中定位 */
   opacity: 1;
   animation: combo-fade-out 0.5s ease-in forwards;
 }
 @keyframes combo-fade-out {
-  /* 前段保持 opacity:1 不动，到延迟时间才开始淡出 */
   0%, 99% { opacity: 1; }
   100% { opacity: 0; }
 }
+/* count 行：小字标签，整体淡入（不逐字） */
+.combo-count {
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
+  font-size: clamp(20px, 3.5vw, 30px);
+  font-weight: 700;
+  letter-spacing: 8px;
+  line-height: 1;
+  opacity: 0;
+  animation: combo-count-in 0.4s ease-out forwards;
+  text-shadow:
+    -1px -1px 0 rgba(0, 0, 0, 0.9),
+    1px -1px 0 rgba(0, 0, 0, 0.9),
+    -1px 1px 0 rgba(0, 0, 0, 0.9),
+    1px 1px 0 rgba(0, 0, 0, 0.9);
+}
+@keyframes combo-count-in {
+  0% { opacity: 0; transform: translateY(-8px); }
+  100% { opacity: 0.9; transform: translateY(0); }
+}
+/* text 行：横向排列单字容器 */
+.combo-text {
+  display: flex;
+  flex-wrap: nowrap;
+  justify-content: center;
+  /* 字间距加大：Ma Shan Zheng 毛笔字字形会溢出字号盒，gap 太小相邻字笔画会侵入重叠 */
+  gap: 18px;
+  white-space: nowrap;
+}
 .combo-char {
   display: inline-block;
-  /* 坚实有力字体：Ma Shan Zheng 毛笔楷书，回退到系统楷体/黑体 */
   font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
-  /* 字号由 --combo-font-size CSS 变量控制（JS 根据字数动态计算） */
   font-size: var(--combo-font-size, clamp(36px, 6.5vw, 60px));
   font-weight: 900;
   letter-spacing: 0;
-  /* line-height 必须 >1：Ma Shan Zheng 毛笔字字形上下溢出字号盒
-     line-height:1 会让上下笔画侵入相邻行/字区域，造成视觉重叠
-     1.4 给字形留足安全空间 */
+  /* line-height >1：避免毛笔字字形上下溢出侵入相邻区域 */
   line-height: 1.4;
   opacity: 0;
-  /* 逐字砸入：纯 translateY + opacity，绝对不产生 scale/blur 残影
-     每字 0.45s 完成，间隔 0.18s */
+  /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影 */
   animation: combo-char-in 0.45s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
-  /* 坚实有力：四方向黑色粗描边 + 右下立体投影
+  /* 四方向黑色粗描边 + 右下立体投影
      不用 -webkit-text-stroke（栅格化不同步会重影）
-     不用 0 0 Xpx currentColor 外发光（opacity 渐变时与文字本体不同步形成光晕重影） */
+     不用外发光（opacity 渐变时与文字本体不同步形成光晕重影） */
   text-shadow:
     -2px -2px 0 rgba(0, 0, 0, 0.95),
     2px -2px 0 rgba(0, 0, 0, 0.95),
     -2px 2px 0 rgba(0, 0, 0, 0.95),
     2px 2px 0 rgba(0, 0, 0, 0.95),
     3px 3px 0 rgba(0, 0, 0, 0.7);
-  /* 不用 will-change，避免强制创建合成层导致栅格化残影 */
 }
 @keyframes combo-char-in {
   0% {
