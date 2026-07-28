@@ -40,6 +40,14 @@
           <div class="pet-modal-footer">
             <h2 class="pet-name-large">{{ pet.name }}</h2>
             <div class="pet-stars-large">{{ '⭐'.repeat((pet.star || 0) + 1) }}</div>
+            <!-- 设为本灵宠击杀立绘：击杀BOSS时若此灵宠出战，1s 后从另一侧弹出该立绘 -->
+            <button
+              class="set-kill-portrait-btn"
+              :class="{ active: isCurrentKillPortrait }"
+              @click.stop="setAsKillPortrait"
+            >
+              {{ isCurrentKillPortrait ? '✓ 已设为本灵宠击杀立绘' : '设为本灵宠击杀立绘' }}
+            </button>
           </div>
         </div>
       </div>
@@ -49,7 +57,7 @@
 
 <script setup>
 import { computed, ref, watch, onMounted, nextTick } from 'vue'
-import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount } from '../plugins/pets'
+import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, getPetTemplateId } from '../plugins/pets'
 import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
@@ -154,6 +162,25 @@ const nextSkin = () => {
 // 通知父组件持久化灵宠的 currentSkin（父组件调 store action 写入）
 const persistSkin = () => {
   emit('update-skin', { pet: props.pet, skin: currentSkin.value })
+}
+
+// ===== 设为本灵宠击杀立绘 =====
+// 与角色击杀立绘对称：每个灵宠可单独指定击杀BOSS时弹出的立绘皮肤
+// 击杀BOSS演出时若玩家有出战灵宠(activePet)，人物立绘弹出 1s 后从另一侧弹出此立绘
+// 键使用 getPetTemplateId(pet)（与 BossKillCinematic 中的查找口径一致）
+const petKey = computed(() => getPetTemplateId(props.pet))
+const isCurrentKillPortrait = computed(() => {
+  if (!props.pet) return false
+  const saved = playerStore.petKillSkins?.[petKey.value]
+  // 未设置（undefined）默认等价于 0（原立绘）
+  return (saved === undefined ? 0 : saved) === currentSkin.value
+})
+const setAsKillPortrait = () => {
+  if (!props.pet) return
+  if (!playerStore.petKillSkins) playerStore.petKillSkins = {}
+  playerStore.petKillSkins[petKey.value] = currentSkin.value
+  localStorage.setItem('petKillSkins', JSON.stringify(playerStore.petKillSkins))
+  playerStore.saveData()
 }
 
 onMounted(() => {
@@ -325,6 +352,27 @@ onMounted(() => {
 .pet-stars-large {
   font-size: 22px;
   letter-spacing: 4px;
+}
+.set-kill-portrait-btn {
+  margin-top: 12px;
+  padding: 8px 20px;
+  font-size: 14px;
+  color: #fff;
+  background: rgba(120, 220, 100, 0.15);
+  border: 1px solid rgba(120, 220, 100, 0.5);
+  border-radius: 6px;
+  cursor: pointer;
+  transition: all 0.2s;
+}
+.set-kill-portrait-btn:hover {
+  background: rgba(120, 220, 100, 0.3);
+  border-color: #80E060;
+}
+.set-kill-portrait-btn.active {
+  background: rgba(120, 220, 100, 0.35);
+  border-color: #80E060;
+  color: #80E060;
+  font-weight: bold;
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }

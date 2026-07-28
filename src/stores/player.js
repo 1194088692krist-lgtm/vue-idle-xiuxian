@@ -133,6 +133,10 @@ export const usePlayerStore = defineStore('player', {
     // 斩杀者无法确定时从存活队伍成员中随机选一个，并使用其设置。
     // 三人出战时每个角色都可独立设置自己的击杀立绘，避免全局只设一个的 bug。
     characterKillSkins: JSON.parse(localStorage.getItem('characterKillSkins') || '{}'),
+    // 每个灵宠的击杀立绘设置：{ [petTemplateId]: skinIndex }
+    // 击杀BOSS时若玩家有出战灵宠(activePet)，1s 后从另一侧弹出该灵宠立绘
+    // 灵宠未设置则用原立绘(0)；键使用 pet.templateId（与 getPetTemplateId 一致）
+    petKillSkins: JSON.parse(localStorage.getItem('petKillSkins') || '{}'),
     // 灵宠系统
     activePet: null, // 当前出战的灵宠
     _petNaturalSnapshot: null, // 出战灵宠前的自然属性快照（用于精确还原，避免重复叠加）
@@ -688,6 +692,9 @@ export const usePlayerStore = defineStore('player', {
       // 加载每个角色的击杀立绘设置（per-character）
       const cksSaved = localStorage.getItem('characterKillSkins')
       this.characterKillSkins = cksSaved ? JSON.parse(cksSaved) : {}
+      // 加载每个灵宠的击杀立绘设置（per-pet）
+      const pksSaved = localStorage.getItem('petKillSkins')
+      this.petKillSkins = pksSaved ? JSON.parse(pksSaved) : {}
       // 一次性迁移：旧版本全局 bossKillCharacterId/bossKillSkinIndex → 新版 per-character
       const oldCharId = localStorage.getItem('bossKillCharacterId')
       const oldSkinIdx = localStorage.getItem('bossKillSkinIndex')

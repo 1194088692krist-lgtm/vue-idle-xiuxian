@@ -3,28 +3,40 @@
   <teleport to="body">
     <div v-if="show" class="boss-kill-cinematic" aria-hidden="true">
       <!-- 全屏一闪：斩杀冲击白光 -->
-      <div class="kill-flash"></div>
+      <div :key="`flash-${animKey}`" class="kill-flash"></div>
       <!-- 中心顿帧光晕 -->
-      <div class="kill-glow"></div>
-      <!-- 击杀者立绘：左下突入→中心旋转→右上消失 -->
+      <div :key="`glow-${animKey}`" class="kill-glow"></div>
+      <!-- 击杀者立绘：左下突入→中心旋转→右上消失，纯 transform+opacity 走 GPU 合成层 -->
+      <!-- :key=animKey 强制每次击杀都重建 <img>，确保 CSS 动画可靠重启
+           （旧实现复用同一 <img> 仅换 src 时 CSS 动画不会重启，导致挂机连斩第二只起立绘不再弹出） -->
       <img
         v-if="portraitUrl"
+        :key="`portrait-${animKey}`"
         :src="portraitUrl"
         class="kill-portrait"
         :alt="killerName"
-        @animationend="onAnimationEnd"
+        @animationend="onPortraitAnimEnd"
+      />
+      <!-- 灵宠立绘：人物立绘弹出 1s 后从另一侧（右下→中心→左上）弹出，与人物相差约 1s -->
+      <img
+        v-if="petPortraitUrl && petShow"
+        :key="`pet-${petAnimKey}`"
+        :src="petPortraitUrl"
+        class="kill-pet-portrait"
+        :alt="petName"
+        @animationend="onPetAnimEnd"
       />
       <!-- 几片飘动粒子（灵光） -->
-      <div class="kill-particle p1"></div>
-      <div class="kill-particle p2"></div>
-      <div class="kill-particle p3"></div>
+      <div :key="`p1-${animKey}`" class="kill-particle p1"></div>
+      <div :key="`p2-${animKey}`" class="kill-particle p2"></div>
+      <div :key="`p3-${animKey}`" class="kill-particle p3"></div>
       <!-- 击杀文案 -->
-      <div class="kill-text">
+      <div :key="`text-${animKey}`" class="kill-text">
         <div class="kill-subtitle">斩杀</div>
         <div class="kill-bossname">{{ bossName }}</div>
       </div>
       <!-- 连击特效：双杀 / 三杀 等 -->
-      <div v-if="comboLabel" class="kill-combo" :class="comboClass">
+      <div v-if="comboLabel" :key="`combo-${animKey}`" class="kill-combo" :class="comboClass">
         <span class="combo-text">{{ comboLabel }}</span>
         <span v-if="comboCount > 1" class="combo-count">×{{ comboCount }}</span>
       </div>
@@ -33,10 +45,11 @@
 </template>
 
 <script setup>
-import { ref, watch, nextTick, onUnmounted } from 'vue'
+import { ref, watch, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
+import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, getPetTemplateId } from '../plugins/pets'
 
 const { bossKillEvent } = useIdleSystem()
 const playerStore = usePlayerStore()
@@ -45,6 +58,16 @@ const show = ref(false)
 const portraitUrl = ref(null)
 const killerName = ref('')
 const bossName = ref('')
+// 每次击杀递增的动画 key，强制 <img> 重建以重启 CSS 动画
+const animKey = ref(0)
+
+// 灵宠立绘状态：人物立绘弹出 1s 后再弹出，与人物相差约 1s
+const petShow = ref(false)
+const petPortraitUrl = ref(null)
+const petName = ref('')
+const petAnimKey = ref(0)
+let petDelayTimer = null
+
 const comboLabel = ref('')
 const comboClass = ref('')
 const comboCount = ref(0)
@@ -88,8 +111,14 @@ function bumpCombo() {
   }, COMBO_WINDOW_MS)
 }
 
+// 清理所有挂起的延时任务，防止组件卸载后仍 setState
+function clearPendingTimers() {
+  if (comboTimerId) { clearTimeout(comboTimerId); comboTimerId = null }
+  if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
+}
+
 onUnmounted(() => {
-  if (comboTimerId) clearTimeout(comboTimerId)
+  clearPendingTimers()
 })
 
 // 监听击杀事件，触发立绘突入动画
@@ -98,12 +127,13 @@ watch(bossKillEvent, (evt) => {
   // 设置开关关闭则不触发
   if (!playerStore.bossKillAnimation) return
 
-  // 立绘来源：优先使用事件中的 killerMemberId（实际斩杀者）
+  // ===== 人物立绘来源 =====
+  // 优先使用事件中的 killerMemberId（实际斩杀者）
   // 斩杀者无法确定时，从存活队伍成员中随机选一个（兜底）
   let member = null
   const killerId = evt.killerMemberId
   if (killerId) {
-    // killerId 与 sectMembers.id 对齐（useIdleSystem 中 entity.memberId = member.id）
+    // killerId 在 useIdleSystem 中等于 member.id（entity.memberId = member.id）
     member = playerStore.sectMembers.find(m => m.id === killerId)
       || playerStore.sectMembers.find(m => (m.templateId || m.id) === killerId)
   }
@@ -121,9 +151,12 @@ watch(bossKillEvent, (evt) => {
   if (!member) return
 
   // 立绘索引：使用该角色自己的击杀立绘设置（characterKillSkins[memberId]）
-  // 未设置则默认 0（原立绘）
-  const memberId = member.id || member.templateId
-  const skinIdx = Number(playerStore.characterKillSkins?.[memberId]) || 0
+  // 关键修复：键必须与 CharacterPortraitModal 保存时一致，即 templateId 优先（与
+  // getCharacterAvatar / getCharacterSkinUrl 内部 id 取值口径一致）
+  // 旧实现用 member.id || member.templateId，与保存时的 templateId || id 不匹配，
+  // 导致查找结果恒为 undefined，立绘永远回退到原皮肤（用户反馈的 bug）
+  const characterKey = member.templateId || member.id
+  const skinIdx = Number(playerStore.characterKillSkins?.[characterKey]) || 0
   let url = null
   if (skinIdx > 0) {
     const skinCount = getSkinCount(member)
@@ -137,26 +170,69 @@ watch(bossKillEvent, (evt) => {
   // 触发连击计数
   bumpCombo()
 
-  // 多场连打时（手动BOSS挑战count>1），上一次动画可能还在播放
-  // 先重置 show 让 <img> 卸载，nextTick 后再设 true 重新触发 CSS animation
-  if (show.value) {
-    show.value = false
-    nextTick(() => {
-      portraitUrl.value = url
-      killerName.value = evt.killerName || member.name || ''
-      bossName.value = evt.bossName || ''
-      show.value = true
-    })
-  } else {
-    portraitUrl.value = url
-    killerName.value = evt.killerName || member.name || ''
-    bossName.value = evt.bossName || ''
-    show.value = true
-  }
+  // ===== 重启动画的可靠方案：递增 animKey 让 Vue 销毁旧 <img> 并创建新 <img> =====
+  // 旧实现靠 show=false → nextTick → show=true 切换，nextTick 在 Vue 内部可能与
+  // 同 tick 的其他状态变更合并，导致 <img> 未真正卸载，CSS 动画无法重启，
+  // 表现为「挂机连斩第二只起立绘不再弹出」。
+  // 新方案：所有子元素（img/光晕/粒子/连击/文案）都通过 :key="...-${animKey}" 绑定，
+  // 每次 animKey++ 让 Vue 创建全新 DOM 节点，浏览器从 0% 重新开始 CSS 动画，
+  // 旧节点被卸载后其动画自然停止（不会触发错误的 animationend 干扰新动画）。
+  // 先清理上一次的灵宠延时（防止上一个宠物立绘抢点）
+  if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
+  petShow.value = false
+  petPortraitUrl.value = null
+
+  portraitUrl.value = url
+  killerName.value = evt.killerName || member.name || ''
+  bossName.value = evt.bossName || ''
+  animKey.value++
+  show.value = true
+  schedulePetPortrait()
 }, { deep: true })
 
-const onAnimationEnd = () => {
-  // 动画播完移除节点，内存零残留
+// ===== 灵宠立绘：人物立绘弹出 1s 后从另一侧弹出 =====
+function schedulePetPortrait() {
+  const pet = playerStore.activePet
+  if (!pet) return
+  // 灵宠立绘 URL（按灵宠自己的击杀立绘设置取皮肤，未设默认原立绘）
+  const petKey = getPetTemplateId(pet)
+  const petSkinIdx = Number(playerStore.petKillSkins?.[petKey]) || 0
+  let petUrl = null
+  if (petSkinIdx > 0) {
+    const petSkinCount = getPetSkinCount(pet)
+    const unlocked = getUnlockedSkinCount(pet, playerStore.petSkinUnlockRecord)
+    // 仅当该皮肤已解锁且确实存在时才使用
+    if (petSkinIdx <= petSkinCount && petSkinIdx <= unlocked) {
+      petUrl = getPetSkinUrl(pet, petSkinIdx)
+    }
+  }
+  if (!petUrl) petUrl = getPetAvatar(pet, 'full')
+  if (!petUrl) return
+
+  // 1s 延迟：人物立绘先弹出，1s 后灵宠从另一侧弹出
+  // 两者出现/消失相差约 1s，避免动画过于拖沓
+  petDelayTimer = setTimeout(() => {
+    petPortraitUrl.value = petUrl
+    petName.value = pet.name || ''
+    petAnimKey.value++
+    petShow.value = true
+    petDelayTimer = null
+  }, 1000)
+}
+
+const onPortraitAnimEnd = () => {
+  // 人物立绘动画播完：移除外层节点
+  // 若灵宠立绘仍在播放则保留外层（petShow 仍 true）
+  if (!petShow.value) {
+    show.value = false
+    portraitUrl.value = null
+  }
+}
+
+const onPetAnimEnd = () => {
+  // 灵宠立绘动画播完：清除灵宠状态，并连同外层一起隐藏
+  petShow.value = false
+  petPortraitUrl.value = null
   show.value = false
   portraitUrl.value = null
 }
@@ -174,7 +250,7 @@ const onAnimationEnd = () => {
   overflow: hidden;
 }
 
-/* 立绘主体：左下突入→中心旋转顿帧→右上消失，纯 transform+opacity 走 GPU 合成层 */
+/* 人物立绘主体：左下突入→中心旋转顿帧→右上消失，纯 transform+opacity 走 GPU 合成层 */
 .kill-portrait {
   position: relative;
   width: min(70vw, 520px);
@@ -201,6 +277,41 @@ const onAnimationEnd = () => {
   }
   100% {
     transform: translate(60vw, -60vh) rotate(200deg) scale(0.6);
+    opacity: 0;
+  }
+}
+
+/* 灵宠立绘：右下突入→中心顿帧→左上消失，与人物立绘轨迹镜像对称
+   - 与人物立绘相差约 1s 出现（由 JS setTimeout(1000) 控制）
+   - 动画时长同为 1.8s，确保整体节奏紧凑不拖沓 */
+.kill-pet-portrait {
+  position: absolute;
+  width: min(50vw, 360px);
+  max-height: 60vh;
+  object-fit: contain;
+  border-radius: 12px;
+  filter: drop-shadow(0 0 20px rgba(120, 220, 100, 0.7));
+  animation: pet-slash 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
+  will-change: transform, opacity;
+  /* 偏右下角定位，避免与人物立绘在中心位置完全重叠 */
+  right: 8%;
+  bottom: 18%;
+}
+@keyframes pet-slash {
+  0% {
+    transform: translate(60vw, 60vh) rotate(200deg) scale(0.5);
+    opacity: 0;
+  }
+  35% {
+    transform: translate(0, 0) rotate(0deg) scale(1.1);
+    opacity: 1;
+  }
+  55% {
+    transform: translate(0, 0) rotate(-8deg) scale(1.1);
+    opacity: 1; /* 中心顿帧 */
+  }
+  100% {
+    transform: translate(-60vw, -60vh) rotate(-200deg) scale(0.5);
     opacity: 0;
   }
 }
