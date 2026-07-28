@@ -339,9 +339,13 @@ const onPetAnimEnd = () => {
 /* 人物立绘主体：左下突入→中心旋转顿帧→右上消失，纯 transform+opacity 走 GPU 合成层 */
 .kill-portrait {
   position: relative;
-  width: min(70vw, 520px);
-  max-height: 68vh; /* 从 80vh 减小：留出顶部空间给连击文字，避免立绘与文字重叠 */
+  width: min(64vw, 460px);
+  max-height: 52vh; /* 减小高度，给中间偏下的连击文字让出空间 */
   object-fit: contain;
+  /* 立绘贴顶显示，避免与中间偏下的连击文字重叠
+     父容器是 align-items:center，align-self 覆盖为 flex-start 让立绘在顶部 */
+  align-self: flex-start;
+  margin-top: 4vh;
   border-radius: 12px;
   filter: drop-shadow(0 0 24px rgba(255, 215, 0, 0.7));
   animation: boss-slash 1.8s cubic-bezier(0.2, 0.7, 0.2, 1) forwards;
