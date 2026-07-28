@@ -855,8 +855,10 @@
         authBusy.value = true
         try {
           await playerStore.syncToCloud()
+          // syncToCloud 失败时会 throw 带原因的 Error，此处只有真正成功才显示成功
           message.success('已上传到云端')
         } catch (e) {
+          // 显示真实失败原因（鉴权过期/体积超限/网络超时/服务端错误等）
           message.error('上传失败：' + (e.message || e))
         } finally {
           authBusy.value = false

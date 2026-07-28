@@ -847,26 +847,63 @@ export const usePlayerStore = defineStore('player', {
       }
       throw lastErr || new Error('拉取云端存档失败')
     },
-    // 上传单槽到云端；返回是否成功（调用方据此如实上报，避免假成功）
+    // 上传单槽到云端：抛出带原因的 Error（对齐 fetchCloudSaves 模式）+ 重试 + 超时 + 体积预检
+    // 修复：原实现吞掉所有错误返回 false，导致 syncToCloud 假成功、用户无法定位失败原因
     async pushSlotToCloud(slot, encryptedBlob, updatedAt) {
       const auth = useAuthStore()
-      if (!auth.isLoggedIn) return false
-      try {
-        const r = await fetch('/api/save', {
-          method: 'POST',
-          headers: { 'content-type': 'application/json', ...auth.authHeaders() },
-          body: JSON.stringify({ slot, data: encryptedBlob, updated_at: updatedAt })
-        })
-        if (!r.ok) {
-          const data = await r.json().catch(() => ({}))
-          console.warn('云同步上传失败', r.status, data.error || '')
-          return false
-        }
-        return true
-      } catch (e) {
-        console.warn('云同步上传失败', e)
-        return false
+      if (!auth.isLoggedIn) throw new Error('请先登录后再上传存档')
+      // 开发者模式仅用本地存档、无真实账号 token，不支持云同步（与 fetchCloudSaves 一致）
+      if (auth.devMode && !auth.token) throw new Error('开发者模式仅使用本地存档，不支持云同步')
+      // 前端主动检测 token 过期：避免发起到 401 的无谓往返，直接提示重新登录
+      if (auth.tokenExpired) throw new Error('登录凭证已过期，请重新登录后再上传')
+      if (typeof encryptedBlob !== 'string' || !encryptedBlob) {
+        throw new Error('存档数据为空，无法上传')
       }
+      // 体积预检：Cloudflare Pages Functions 默认 body 上限约 100MB，D1 单行建议不超 1MB
+      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，此处用 1.5MB 作为安全阈值
+      const SIZE_LIMIT = 1.5 * 1024 * 1024
+      const payloadSize = new Blob([encryptedBlob]).size
+      if (payloadSize > SIZE_LIMIT) {
+        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 1.5MB），请清理部分宗门成员或装备后重试`)
+      }
+      let lastErr = null
+      for (let attempt = 0; attempt < 2; attempt++) {
+        if (attempt > 0) await new Promise(r => setTimeout(r, 400))
+        const controller = new AbortController()
+        // 30s 超时：大存档在慢网络下不再无限挂起
+        const timeoutId = setTimeout(() => controller.abort(), 30000)
+        try {
+          const r = await fetch('/api/save', {
+            method: 'POST',
+            headers: { 'content-type': 'application/json', ...auth.authHeaders() },
+            body: JSON.stringify({ slot, data: encryptedBlob, updated_at: updatedAt }),
+            signal: controller.signal
+          })
+          clearTimeout(timeoutId)
+          let data = {}
+          try { data = await r.json() } catch { /* 响应体非 JSON（如网关错误页）*/ }
+          if (r.ok && data.ok) return true
+          const reason = data.error || ('HTTP ' + r.status)
+          // 4xx（含 401 鉴权失败、413 体积超限）不重试，直接抛出明确原因
+          if (r.status >= 400 && r.status < 500) {
+            if (r.status === 401) throw new Error('登录凭证已过期，请重新登录后再上传')
+            throw new Error(`上传存档失败：${reason}`)
+          }
+          // 5xx 等可重试错误：记录后进入下一次重试
+          lastErr = new Error(`上传存档失败：${reason}`)
+        } catch (e) {
+          clearTimeout(timeoutId)
+          // 已在上方明确抛出的 4xx 错误，原样向上抛
+          if (e && e.message && e.message.startsWith('上传存档失败')) throw e
+          if (e && e.message && e.message.startsWith('登录凭证已过期')) throw e
+          if (e && e.name === 'AbortError') {
+            lastErr = new Error('上传存档失败：请求超时（30s），请检查网络后重试')
+          } else {
+            lastErr = new Error('上传存档失败：网络请求异常（' + (e && e.message ? e.message : '无法连接服务器') + '）')
+          }
+        }
+      }
+      throw lastErr || new Error('上传存档失败')
     },
     // 从密文 blob 提取基础信息（用于分支③对比弹窗）
     _slotInfo(blob) {
@@ -913,15 +950,21 @@ export const usePlayerStore = defineStore('player', {
       if (cloudSyncTimer) return
       cloudSyncTimer = setTimeout(() => {
         cloudSyncTimer = null
-        this.syncToCloud()
+        // 自动后台同步：静默吞错（状态已写入 cloudSyncStatus，不弹窗打扰用户）
+        this.syncToCloud().catch(() => {})
       }, 3000)
     },
+    // 并发锁：防止手动上传与自动节流同步同时进行导致 last-write-wins 覆盖
     async syncToCloud() {
       const auth = useAuthStore()
       if (!auth.isLoggedIn) return
+      // 开发者模式仅用本地存档、无真实账号 token，不支持云同步（静默跳过，不报错）
+      if (auth.devMode && !auth.token) return
+      if (this._cloudSyncing) return  // 已有同步进行中，跳过本次
+      this._cloudSyncing = true
       this.cloudSyncStatus = '同步中…'
+      const failures = []
       try {
-        let okAll = true
         const blob = await GameDB.getData('playerData')
         // 关键：上传时间戳必须用存档自身的 _saveTime，而非 Date.now()。
         // 否则云端 updated_at 永远晚于本地 _saveTime（_scheduleCloudSync 有 3s 延迟），
@@ -929,19 +972,40 @@ export const usePlayerStore = defineStore('player', {
         // 反复覆盖本地较强档，表现为刷新后战斗力骤降。
         const mainDecoded = blob ? decryptData(blob) : null
         const mainTime = mainDecoded?._saveTime || Date.now()
-        if (blob) okAll = (await this.pushSlotToCloud(0, blob, mainTime)) && okAll
+        if (blob) {
+          try {
+            await this.pushSlotToCloud(0, blob, mainTime)
+          } catch (e) {
+            failures.push(`活动档：${e.message}`)
+          }
+        }
         const slot = this.currentSlot || this.autoSaveSlot
         if (slot) {
           const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
           const slotDecoded = slotBlob ? decryptData(slotBlob) : null
           const slotTime = slotDecoded?._saveTime || Date.now()
-          if (slotBlob) okAll = (await this.pushSlotToCloud(slot, slotBlob, slotTime)) && okAll
+          if (slotBlob) {
+            try {
+              await this.pushSlotToCloud(slot, slotBlob, slotTime)
+            } catch (e) {
+              failures.push(`槽位${slot}：${e.message}`)
+            }
+          }
         }
-        // 如实上报：任一槽位上传失败则标记为失败，不再假成功
-        this.cloudSyncStatus = okAll ? '已同步到云端' : '云同步失败'
+        if (failures.length) {
+          // 收集所有失败原因，如实上报并抛出（让 UI 显示真实原因，不再假成功）
+          this.cloudSyncStatus = '云同步失败：' + failures.join('；')
+          throw new Error(failures.join('；'))
+        }
+        this.cloudSyncStatus = '已同步到云端'
       } catch (e) {
-        this.cloudSyncStatus = '云同步失败'
-        console.warn(e)
+        // syncToCloud 内部 failures 抛出的错误已经带原因，这里 rethrow 给 UI
+        if (!this.cloudSyncStatus || !this.cloudSyncStatus.startsWith('云同步失败')) {
+          this.cloudSyncStatus = '云同步失败：' + (e.message || '未知错误')
+        }
+        throw e
+      } finally {
+        this._cloudSyncing = false
       }
     },
     // 迁移决策树（登录后调用）

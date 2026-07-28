@@ -16,7 +16,21 @@ export const useAuthStore = defineStore('auth', {
   getters: {
     // 开发者模式下视为已登录，路由守卫放行
     isLoggedIn: s => !!s.token || s.devMode,
-    isDev: s => s.devMode
+    isDev: s => s.devMode,
+    // token 是否已过期（前端解码 JWT payload.exp 判断，提前 60s 视为过期避免边界请求失败）
+    // 用于在发起云同步前主动提示用户重新登录，而非等到 401
+    tokenExpired: s => {
+      if (!s.token) return false  // 无 token 时不报过期（由 isLoggedIn 拦截）
+      try {
+        const parts = s.token.split('.')
+        if (parts.length !== 3) return true
+        const payload = JSON.parse(atob(parts[1].replace(/-/g, '+').replace(/_/g, '/')))
+        if (!payload.exp) return false
+        return payload.exp < Date.now() + 60000  // 提前 60s 判定过期
+      } catch {
+        return true  // token 格式异常视为过期
+      }
+    }
   },
   actions: {
     async login(username, password) {
