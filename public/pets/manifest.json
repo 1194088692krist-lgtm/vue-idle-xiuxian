@@ -1,1 +1,146 @@
-{}
+{
+  "pet_kind_01": {
+    "full": "pet_01_fire_spirit_portrait.jpg",
+    "thumbnail": "pet_01_fire_spirit_avatar.jpg",
+    "skins": [
+      "pet_01_fire_spirit_skin1.jpg",
+      "pet_01_fire_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_02": {
+    "full": "pet_02_water_spirit_portrait.jpg",
+    "thumbnail": "pet_02_water_spirit_avatar.jpg",
+    "skins": [
+      "pet_02_water_spirit_skin1.jpg",
+      "pet_02_water_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_03": {
+    "full": "pet_03_thunder_spirit_portrait.jpg",
+    "thumbnail": "pet_03_thunder_spirit_avatar.jpg",
+    "skins": [
+      "pet_03_thunder_spirit_skin1.jpg",
+      "pet_03_thunder_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_04": {
+    "full": "pet_04_wind_spirit_portrait.jpg",
+    "thumbnail": "pet_04_wind_spirit_avatar.jpg",
+    "skins": [
+      "pet_04_wind_spirit_skin1.jpg",
+      "pet_04_wind_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_05": {
+    "full": "pet_05_earth_spirit_portrait.jpg",
+    "thumbnail": "pet_05_earth_spirit_avatar.jpg",
+    "skins": [
+      "pet_05_earth_spirit_skin1.jpg",
+      "pet_05_earth_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_06": {
+    "full": "pet_06_ice_spirit_portrait.jpg",
+    "thumbnail": "pet_06_ice_spirit_avatar.jpg",
+    "skins": [
+      "pet_06_ice_spirit_skin1.jpg",
+      "pet_06_ice_spirit_skin2.jpg"
+    ]
+  },
+  "pet_kind_07": {
+    "full": "pet_07_dragon_cub_portrait.jpg",
+    "thumbnail": "pet_07_dragon_cub_avatar.jpg",
+    "skins": [
+      "pet_07_dragon_cub_skin1.jpg",
+      "pet_07_dragon_cub_skin2.jpg"
+    ]
+  },
+  "pet_kind_08": {
+    "full": "pet_08_phoenix_chick_portrait.jpg",
+    "thumbnail": "pet_08_phoenix_chick_avatar.jpg",
+    "skins": [
+      "pet_08_phoenix_chick_skin1.jpg",
+      "pet_08_phoenix_chick_skin2.jpg"
+    ]
+  },
+  "pet_kind_09": {
+    "full": "pet_09_qilin_portrait.jpg",
+    "thumbnail": "pet_09_qilin_avatar.jpg",
+    "skins": [
+      "pet_09_qilin_skin1.jpg",
+      "pet_09_qilin_skin2.jpg"
+    ]
+  },
+  "pet_kind_10": {
+    "full": "pet_10_black_tortoise_portrait.jpg",
+    "thumbnail": "pet_10_black_tortoise_avatar.jpg",
+    "skins": [
+      "pet_10_black_tortoise_skin1.jpg",
+      "pet_10_black_tortoise_skin2.jpg"
+    ]
+  },
+  "pet_kind_11": {
+    "full": "pet_11_white_tiger_portrait.jpg",
+    "thumbnail": "pet_11_white_tiger_avatar.jpg",
+    "skins": [
+      "pet_11_white_tiger_skin1.jpg",
+      "pet_11_white_tiger_skin2.jpg"
+    ]
+  },
+  "pet_kind_12": {
+    "full": "pet_12_vermillion_bird_portrait.jpg",
+    "thumbnail": "pet_12_vermillion_bird_avatar.jpg",
+    "skins": [
+      "pet_12_vermillion_bird_skin1.jpg",
+      "pet_12_vermillion_bird_skin2.jpg"
+    ]
+  },
+  "pet_kind_13": {
+    "full": "pet_13_spirit_fox_portrait.jpg",
+    "thumbnail": "pet_13_spirit_fox_avatar.jpg",
+    "skins": [
+      "pet_13_spirit_fox_skin1.jpg",
+      "pet_13_spirit_fox_skin2.jpg"
+    ]
+  },
+  "pet_kind_14": {
+    "full": "pet_14_immortal_crane_portrait.jpg",
+    "thumbnail": "pet_14_immortal_crane_avatar.jpg",
+    "skins": [
+      "pet_14_immortal_crane_skin1.jpg",
+      "pet_14_immortal_crane_skin2.jpg"
+    ]
+  },
+  "pet_kind_15": {
+    "full": "pet_15_spirit_monkey_portrait.jpg",
+    "thumbnail": "pet_15_spirit_monkey_avatar.jpg",
+    "skins": [
+      "pet_15_spirit_monkey_skin1.jpg",
+      "pet_15_spirit_monkey_skin2.jpg"
+    ]
+  },
+  "pet_kind_16": {
+    "full": "pet_16_heavenly_wolf_portrait.jpg",
+    "thumbnail": "pet_16_heavenly_wolf_avatar.jpg",
+    "skins": [
+      "pet_16_heavenly_wolf_skin1.jpg",
+      "pet_16_heavenly_wolf_skin2.jpg"
+    ]
+  },
+  "pet_kind_17": {
+    "full": "pet_17_dark_serpent_portrait.jpg",
+    "thumbnail": "pet_17_dark_serpent_avatar.jpg",
+    "skins": [
+      "pet_17_dark_serpent_skin1.jpg",
+      "pet_17_dark_serpent_skin2.jpg"
+    ]
+  },
+  "pet_kind_18": {
+    "full": "pet_18_spirit_turtle_portrait.jpg",
+    "thumbnail": "pet_18_spirit_turtle_avatar.jpg",
+    "skins": [
+      "pet_18_spirit_turtle_skin1.jpg",
+      "pet_18_spirit_turtle_skin2.jpg"
+    ]
+  }
+}

@@ -22,12 +22,15 @@ const errorMessage = ref('')
 const cachedFileCount = ref(0)
 const cachedBytes = ref(0) // 已缓存总字节
 const lastDownloadResult = ref(null) // 上次下载完成结果
+const estimatedTotalBytes = ref(0) // 预估总下载字节（所有资源大小之和，含已缓存和未缓存）
 
 // 计算属性
 const progress = computed(() => totalCount.value > 0 ? Math.round(doneCount.value / totalCount.value * 100) : 0)
 const downloadedMB = computed(() => (downloadedBytes.value / 1024 / 1024).toFixed(2))
 const speedKBps = computed(() => speed.value.toFixed(1))
 const cachedMB = computed(() => (cachedBytes.value / 1024 / 1024).toFixed(2))
+// 预估总下载量 MB（所有资源大小之和，与是否已下载无关）
+const estimatedTotalMB = computed(() => (estimatedTotalBytes.value / 1024 / 1024).toFixed(1))
 // 预计剩余时间（秒）
 const etaSec = computed(() => {
   if (speed.value <= 0 || doneCount.value >= totalCount.value) return 0
@@ -44,11 +47,17 @@ function urlFromPath(p) {
 }
 
 // 收集所有需要预下载的资源 URL
-// 包括：人物立绘（50×2）+ 皮肤立绘（100）、怪物立绘（28×2）、立绘清单 2 个、皮肤清单 1 个、背景图 1 个、立绘动态视频 1 个
+// 包括：人物立绘（50×2）+ 皮肤立绘（100）、怪物立绘（28×2）、灵宠立绘（18×4）、立绘清单、背景图、立绘动态视频 1 个
 async function collectResourceUrls() {
   const urls = []
-  // 1. 立绘清单
-  const manifestUrls = ['./portraits/manifest.json', './monsters/manifest.json', './portraits/skins.json']
+  // 1. 立绘清单（人物/怪物/灵宠 + 人物皮肤清单）
+  const manifestUrls = [
+    './portraits/manifest.json',
+    './monsters/manifest.json',
+    './portraits/skins.json',
+    './pets/manifest.json',
+    './pets/skins.json'
+  ]
   for (const m of manifestUrls) {
     urls.push(m)
   }
@@ -57,7 +66,7 @@ async function collectResourceUrls() {
   urls.push('./favicon.ico')
   // 3. 从立绘清单提取所有图片 URL
   try {
-    const [portraitsRes, monstersRes, skinsRes] = await Promise.all(
+    const [portraitsRes, monstersRes, skinsRes, petManifestRes, petSkinsRes] = await Promise.all(
       manifestUrls.map(u => fetch(urlFromPath(u)))
     )
     const portraitsData = await portraitsRes.json()
@@ -86,12 +95,59 @@ async function collectResourceUrls() {
         }
       }
     }
+    // 灵宠立绘：manifest.json 含 full/thumbnail/skins 数组
+    if (petManifestRes.ok) {
+      const petManifestData = await petManifestRes.json()
+      for (const petId in petManifestData) {
+        const entry = petManifestData[petId]
+        if (entry.full) urls.push('./pets/' + entry.full)
+        if (entry.thumbnail) urls.push('./pets/' + entry.thumbnail)
+        if (Array.isArray(entry.skins)) {
+          for (const skinFile of entry.skins) {
+            urls.push('./pets/' + skinFile)
+          }
+        }
+      }
+    }
   } catch (e) {
     console.warn('[useAssetManager] 立绘清单加载失败', e)
     // 仍然继续，至少缓存清单和背景图
   }
   // 去重
   return [...new Set(urls)]
+}
+
+// 预估总下载量：对所有资源 URL 并发 HEAD 请求获取 Content-Length 累加
+// 用于在"首次约下载 XX MB"提示中显示准确的预估数据（而非已下载量）
+// 采用并发 10 路 + 超时保护，避免阻塞 UI
+export async function estimateTotalSize() {
+  try {
+    const urls = await collectResourceUrls()
+    const concurrency = 10
+    let totalBytes = 0
+    let cursor = 0
+
+    async function worker() {
+      while (cursor < urls.length) {
+        const url = urls[cursor++]
+        try {
+          const fullUrl = urlFromPath(url)
+          // HEAD 请求获取 Content-Length（不下载 body）
+          const res = await fetch(fullUrl, { method: 'HEAD' })
+          const len = parseInt(res.headers.get('content-length') || '0', 10)
+          if (len > 0) totalBytes += len
+        } catch (e) {
+          // 忽略单个文件失败
+        }
+      }
+    }
+    await Promise.all(Array.from({ length: concurrency }, () => worker()))
+    estimatedTotalBytes.value = totalBytes
+    return totalBytes
+  } catch (e) {
+    console.warn('[useAssetManager] 预估总量失败', e)
+    return 0
+  }
 }
 
 // 并发下载单个资源到 Cache Storage
@@ -183,6 +239,8 @@ export async function downloadAllAssets() {
     let failedCount = 0
     let skippedCount = 0
     const totalSize = { bytes: 0 }
+    // 累计所有文件大小（含已缓存跳过的），用于更新预估总量
+    const allFilesSize = { bytes: 0 }
 
     async function worker() {
       while (cursor < urls.length) {
@@ -195,6 +253,8 @@ export async function downloadAllAssets() {
             downloadedBytes.value += result.size
             totalSize.bytes += result.size
           }
+          // 无论是否跳过，都累加到预估总量
+          if (result.size > 0) allFilesSize.bytes += result.size
         } catch (e) {
           failedCount++
           console.warn('[useAssetManager] 下载失败：', url, e.message)
@@ -203,6 +263,9 @@ export async function downloadAllAssets() {
       }
     }
     await Promise.all(Array.from({ length: concurrency }, () => worker()))
+
+    // 下载完成后用实际文件大小更新预估总量（比 HEAD 请求更准确）
+    if (allFilesSize.bytes > 0) estimatedTotalBytes.value = allFilesSize.bytes
 
     stopSpeedMonitor()
     lastDownloadResult.value = {
@@ -255,12 +318,13 @@ export async function refreshCacheStats() {
 // 代码文件 = JS/CSS/HTML/字体等，应保留
 function isAssetFile(url) {
   if (!url) return false
-  // 立绘清单 manifest.json（在 portraits/ 或 monsters/ 目录下）
-  if (/\/(portraits|monsters)\/manifest\.json(\?|$)/i.test(url)) return true
+  // 立绘清单 manifest.json（在 portraits/ 或 monsters/ 或 pets/ 目录下）
+  if (/\/(portraits|monsters|pets)\/manifest\.json(\?|$)/i.test(url)) return true
+  if (/\/(portraits|monsters|pets)\/skins\.json(\?|$)/i.test(url)) return true
   // 图片/视频扩展名
   if (/\.(jpg|jpeg|png|webp|gif|svg|ico|avif|mp4|webm)$/i.test(url)) return true
-  // 素材目录下的文件（保险起见，凡是路径含 /portraits/ /monsters/ /assets/bg/ /assets/icons/ /assets/zones/ 都算素材）
-  if (/\/(portraits|monsters|assets\/bg|assets\/icons|assets\/zones)\//i.test(url)) return true
+  // 素材目录下的文件（保险起见，凡是路径含 /portraits/ /monsters/ /pets/ /assets/bg/ /assets/icons/ /assets/zones/ 都算素材）
+  if (/\/(portraits|monsters|pets|assets\/bg|assets\/icons|assets\/zones)\//i.test(url)) return true
   return false
 }
 
@@ -318,15 +382,18 @@ export function useAssetManager() {
     cachedFileCount,
     cachedBytes,
     lastDownloadResult,
+    estimatedTotalBytes,
     // 计算属性
     progress,
     downloadedMB,
     speedKBps,
     cachedMB,
+    estimatedTotalMB,
     etaSec,
     // 方法
     downloadAllAssets,
     clearAllAssets,
-    refreshCacheStats
+    refreshCacheStats,
+    estimateTotalSize
   }
 }

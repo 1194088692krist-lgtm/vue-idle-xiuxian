@@ -365,7 +365,7 @@
             </button>
           </div>
           <p class="setting-hint">
-            首次约下载 {{ cachedMB || '~31' }} MB 资源，下载完成后除手动清理外永久生效，二次访问秒开。
+            首次约下载 {{ estimatedTotalMB || '~31' }} MB 资源，下载完成后除手动清理外永久生效，二次访问秒开。
           </p>
         </div>
 
@@ -446,7 +446,8 @@
     useAssetManager,
     downloadAllAssets,
     clearAllAssets,
-    refreshCacheStats
+    refreshCacheStats,
+    estimateTotalSize
   } from '../composables/useAssetManager'
 
   // 资源管理状态
@@ -462,6 +463,7 @@
     downloadedMB,
     speedKBps,
     cachedMB,
+    estimatedTotalMB,
     cachedFileCount,
     cachedBytes,
     etaSec,
@@ -913,8 +915,9 @@
     if (auth.isLoggedIn) loadGifts()
     document.addEventListener('fullscreenchange', handleFullscreenChange)
     isFullscreen.value = !!document.fullscreenElement
-    // 初始化：刷新本地资源缓存统计
+    // 初始化：刷新本地资源缓存统计 + 预估总下载量（用于"首次约下载 XX MB"提示）
     refreshCacheStats().catch(() => {})
+    estimateTotalSize().catch(() => {})
   })
 
   onUnmounted(() => {

@@ -1,28 +1,28 @@
 // 灵宠立绘资源管理（对称于 characters.js 的角色立绘系统）
 //
-// 灵宠立绘资源布局（与人物立绘同构）：
-//   public/pets/
-//   ├── pet_kind_01.jpg                  # 原立绘（每种灵宠一张）
-//   ├── pet_kind_01_skin1.jpg            # 皮肤 1
-//   ├── pet_kind_01_skin2.jpg            # 皮肤 2
-//   ├── thumbnails/
-//   │   └── pet_kind_01_thumb.webp       # 缩略图（列表场景用，体积更小）
-//   ├── manifest.json                    # 立绘清单（含 full/thumbnail）
-//   └── skins.json                       # 皮肤数量清单（不含原立绘）
+// 资源布局（public/pets/）：
+//   ├── pet_01_fire_spirit_portrait.jpg   # 原立绘
+//   ├── pet_01_fire_spirit_avatar.jpg     # 缩略图（列表场景用）
+//   ├── pet_01_fire_spirit_skin1.jpg      # 皮肤 1
+//   ├── pet_01_fire_spirit_skin2.jpg      # 皮肤 2
+//   ├── manifest.json                     # 立绘清单（含 full/thumbnail/skins）
+//   └── skins.json                         # 皮肤数量清单（不含原立绘）
 //
-// 灵宠种类（templateId）来源：generatePet 按 nameBase 在 petNameParts 中的索引分配
+// 灵宠种类（templateId）：generatePet 按 nameBase 在 petNameParts 中的索引分配
 // petNameParts 共 18 种（火灵/水灵/.../灵龟），templateId 形如 'pet_kind_01'..'pet_kind_18'
 //
 // 皮肤解锁规则：每升 5 星（即每进一阶）解锁 1 个皮肤
-//   star < 5      → 仅原立绘
+//   star < 5       → 仅原立绘
 //   5 <= star < 10 → 原立绘 + skin1
-//   10 <= star < 15 → 原立绘 + skin1 + skin2
-//   以此类推，最多受 skins.json 中该种类实际拥有的皮肤数限制
+//   10 <= star     → 原立绘 + skin1 + skin2（受 skins.json 实际拥有数限制）
 
 import { reactive } from 'vue'
 import { petNameParts } from './gacha'
 
-// 立绘清单：templateId -> { full, thumbnail }
+const base = import.meta.env.BASE_URL || './'
+
+// 立绘清单：templateId -> { full, thumbnail, skins: [] }
+// 存储完整 URL（含 base + pets/ 前缀）
 export const petPortraitMap = reactive({})
 
 // 皮肤清单：templateId -> 皮肤数量（不含原立绘）
@@ -56,7 +56,6 @@ export function getPetTemplateId(pet) {
 export async function loadPetSkinsManifest() {
   if (petSkinsLoaded) return
   petSkinsLoaded = true
-  const base = import.meta.env.BASE_URL || './'
   fetch(`${base}pets/skins.json`, { cache: 'force-cache' })
     .then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
@@ -71,23 +70,29 @@ export async function loadPetSkinsManifest() {
 }
 
 /**
- * 后台加载 pets/manifest.json，填充 petPortraitMap（含 full/thumbnail）。
- * 与角色立绘一致：先用静态回退立即填，再异步加载 manifest 补全。
+ * 后台加载 pets/manifest.json，填充 petPortraitMap（含 full/thumbnail/skins）。
+ * 与角色立绘一致：先用静态回退立即填，再异步加载 manifest 补全实际文件名。
+ * manifest.json 结构：
+ *   { "pet_kind_01": { "full": "pet_01_fire_spirit_portrait.jpg",
+ *                      "thumbnail": "pet_01_fire_spirit_avatar.jpg",
+ *                      "skins": ["pet_01_fire_spirit_skin1.jpg", "pet_01_fire_spirit_skin2.jpg"] } }
  */
 export async function loadSharedPetPortraits() {
   if (petPortraitsLoaded) return
-  const base = import.meta.env.BASE_URL || './'
-  // 按 petNameParts 预填静态回退，让立绘立即可见（图片尚未提供时会 404，但不会阻塞 UI）
+  petPortraitsLoaded = true
+
+  // 静态回退：用 templateId 命名规则预填，让立绘立即可见（manifest 加载完成前）
+  // manifest 加载后会用实际文件名覆盖
   petNameParts.forEach((_, idx) => {
     const id = `pet_kind_${String(idx + 1).padStart(2, '0')}`
     if (!petPortraitMap[id]) {
       petPortraitMap[id] = {
         full: `${base}pets/${id}.jpg`,
-        thumbnail: `${base}pets/thumbnails/${id}_thumb.webp`
+        thumbnail: `${base}pets/thumbnails/${id}_thumb.webp`,
+        skins: null
       }
     }
   })
-  petPortraitsLoaded = true
 
   fetch(`${base}pets/manifest.json`, { cache: 'force-cache' })
     .then(res => {
@@ -97,16 +102,16 @@ export async function loadSharedPetPortraits() {
     .then(manifest => {
       if (!manifest || typeof manifest !== 'object') return
       Object.entries(manifest).forEach(([id, data]) => {
-        if (typeof data === 'object' && data.full) {
-          petPortraitMap[id] = {
-            full: `${base}pets/${data.full}`,
-            thumbnail: data.thumbnail ? `${base}pets/${data.thumbnail}` : null
-          }
-        } else if (typeof data === 'string') {
-          petPortraitMap[id] = { full: `${base}pets/${data}`, thumbnail: null }
+        const entry = {
+          full: data.full ? `${base}pets/${data.full}` : `${base}pets/${id}.jpg`,
+          thumbnail: data.thumbnail ? `${base}pets/${data.thumbnail}` : null,
+          skins: Array.isArray(data.skins)
+            ? data.skins.map(s => `${base}pets/${s}`)
+            : null
         }
+        petPortraitMap[id] = entry
       })
-      console.log('[petPortraits] pets/manifest.json 后台加载完成，灵宠立绘资源已更新')
+      console.log('[petPortraits] pets/manifest.json 后台加载完成')
     })
     .catch(e => {
       console.warn('[petPortraits] 后台加载 pets/manifest.json 失败，使用静态回退:', e.message)
@@ -123,13 +128,10 @@ export function getPetAvatar(pet, size = 'full') {
   if (!id) return null
   const portrait = petPortraitMap[id]
   if (portrait) {
-    if (typeof portrait === 'object') {
-      return size === 'thumbnail' && portrait.thumbnail ? portrait.thumbnail : portrait.full
-    }
-    return portrait
+    if (size === 'thumbnail' && portrait.thumbnail) return portrait.thumbnail
+    if (portrait.full) return portrait.full
   }
   // 静态回退：petPortraitMap 尚未加载完成时，按命名规则构造默认 URL
-  const base = import.meta.env.BASE_URL || './'
   return size === 'thumbnail'
     ? `${base}pets/thumbnails/${id}_thumb.webp`
     : `${base}pets/${id}.jpg`
@@ -150,8 +152,8 @@ export function getPetSkinCount(pet) {
 
 /**
  * 获取指定皮肤（skin>=1）的立绘 URL。
+ * 从 manifest 的 skins 数组中读取实际文件名（支持 zip 原始命名如 pet_01_fire_spirit_skin1.jpg）。
  * skin 超过该灵宠拥有的皮肤数时返回 null（调用方回退原立绘）。
- * 返回形如 `${base}pets/pet_kind_XX_skinN.jpg`
  */
 export function getPetSkinUrl(pet, skin) {
   if (!pet || !skin || skin < 1) return null
@@ -159,7 +161,12 @@ export function getPetSkinUrl(pet, skin) {
   if (!id) return null
   const count = petSkinMap[id] || 0
   if (skin > count) return null
-  const base = import.meta.env.BASE_URL || './'
+  // 优先从 manifest 的 skins 数组读取实际文件名（完整 URL）
+  const portrait = petPortraitMap[id]
+  if (portrait && Array.isArray(portrait.skins) && portrait.skins[skin - 1]) {
+    return portrait.skins[skin - 1]
+  }
+  // 回退：按命名规则拼接
   return `${base}pets/${id}_skin${skin}.jpg`
 }
 
@@ -170,7 +177,7 @@ export function getPetSkinUrl(pet, skin) {
 export function getUnlockedSkinCount(pet) {
   if (!pet) return 0
   const star = pet.star || 0
-  const unlocked = Math.floor(star / 5) // 每 5 星解锁 1 个皮肤
+  const unlocked = Math.floor(star / 5)
   const available = getPetSkinCount(pet)
   return Math.min(unlocked, available)
 }
