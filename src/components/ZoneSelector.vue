@@ -177,7 +177,8 @@
         <div class="rewards-title">可能获得的报酬</div>
         <div class="rewards-list">
           <div v-for="rw in selectedZone.rewards" :key="rw.name" class="reward-row">
-            <img :src="getRewardIcon(rw)" class="reward-icon" :alt="getRewardTypeName(rw.type, rw.name)" />
+            <span v-if="isIconEmoji(getRewardIcon(rw))" class="reward-icon emoji">{{ getRewardIcon(rw) }}</span>
+            <img v-else :src="getRewardIcon(rw)" class="reward-icon" :alt="getRewardTypeName(rw.type, rw.name)" />
             <span class="reward-name">{{ getRewardTypeName(rw.type, rw.name) }}</span>
             <span class="reward-chance">{{ (rw.chance * 100).toFixed(0) }}%</span>
           </div>
@@ -1324,11 +1325,11 @@ const EQUIP_EMOJI_MAP = {
 }
 
 const REWARD_TYPE_ICON_MAP = {
-  spirit_stone: getIconUrl('reward_spirit_stone.png'),
+  spirit_stone: getIconUrl('reward_mat_core.png'),
   herb: getIconUrl('reward_mat_herb.png'),
   ore: getIconUrl('reward_mat_ore.png'),
   liquid: getIconUrl('reward_mat_liquid.png'),
-  fortune: getIconUrl('reward_mat_core.png'),
+  fortune: '❓',
   cultivation: getIconUrl('reward_cultivation.png'),
   equipment: getIconUrl('reward_eq_default.png'),
   pet: getIconUrl('reward_pet.png')
@@ -1366,6 +1367,12 @@ const getRewardIcon = (rw) => {
     return getEquipIcon(rw.slot)
   }
   return REWARD_TYPE_ICON_MAP[type] || getIconUrl('reward_eq_default.png')
+}
+
+// 判断报酬图标是否为 emoji（非 URL/data URI）
+const isIconEmoji = (icon) => {
+  if (!icon) return false
+  return !(icon.startsWith('data:') || icon.startsWith('http') || icon.startsWith('/') || icon.startsWith('.'))
 }
 
 const getZonePillNames = (zoneId) => {
@@ -1779,6 +1786,15 @@ onUnmounted(() => {
   height: 18px;
   object-fit: contain;
   flex-shrink: 0;
+}
+.reward-icon.emoji {
+  width: auto;
+  height: auto;
+  font-size: 16px;
+  line-height: 1;
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
 }
 .reward-name {
   flex: 1;
