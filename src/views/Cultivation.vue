@@ -756,7 +756,8 @@ const buildStatRows = (member, keys) => {
 
 const mainStats = computed(() => {
   if (!selectedMember.value) return []
-  return buildStatRows(selectedMember.value, ['attack','health','defense','speed','critRate','comboRate','dodgeRate'])
+  // 仅保留纯基础属性，战斗属性（critRate/comboRate/dodgeRate 等）统一在"战斗属性"分组展示，避免重复
+  return buildStatRows(selectedMember.value, ['attack','health','defense','speed'])
 })
 
 const combatStats = computed(() => {

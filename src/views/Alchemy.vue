@@ -57,10 +57,23 @@
           <template v-if="unlockedRecipes.length > 0">
             <div class="section">
               <h3 class="section-title">丹方选择</h3>
+              <div class="recipe-filter-bar">
+                <select v-model="recipeFilterGrade" class="recipe-filter-select">
+                  <option value="">全部品阶</option>
+                  <option v-for="g in recipeGradeOptions" :key="g.value" :value="g.value">{{ g.label }}</option>
+                </select>
+                <select v-model="recipeFilterType" class="recipe-filter-select">
+                  <option value="">全部类型</option>
+                  <option v-for="t in recipeTypeOptions" :key="t.value" :value="t.value">{{ t.label }}</option>
+                </select>
+                <button class="btn-small" :class="{ active: recipeOnlyCraftable }" @click="recipeOnlyCraftable = !recipeOnlyCraftable">
+                  {{ recipeOnlyCraftable ? '✓ 仅可炼制' : '仅可炼制' }}
+                </button>
+              </div>
               <div class="recipes-grid">
                 <div
                   class="recipe-card glass-card"
-                  v-for="recipe in unlockedRecipes"
+                  v-for="recipe in filteredRecipes"
                   :key="recipe.id"
                   :class="{ selected: selectedRecipe?.id === recipe.id }"
                   @click="selectRecipe(recipe)"
@@ -990,6 +1003,27 @@
     return pillRecipes.filter(recipe => playerStore.pillRecipes.includes(recipe.id))
   })
 
+  // 丹方筛选：品阶 / 类型 / 仅可炼制（材料齐全）
+  const recipeFilterGrade = ref('')
+  const recipeFilterType = ref('')
+  const recipeOnlyCraftable = ref(false)
+  const recipeGradeOptions = computed(() => {
+    const grades = new Set(unlockedRecipes.value.map(r => r.grade))
+    return [...grades].map(g => ({ value: g, label: pillGrades[g]?.name || g }))
+  })
+  const recipeTypeOptions = computed(() => {
+    const types = new Set(unlockedRecipes.value.map(r => r.type))
+    return [...types].map(t => ({ value: t, label: pillTypes[t]?.name || t }))
+  })
+  const filteredRecipes = computed(() => {
+    return unlockedRecipes.value.filter(recipe => {
+      if (recipeFilterGrade.value && recipe.grade !== recipeFilterGrade.value) return false
+      if (recipeFilterType.value && recipe.type !== recipeFilterType.value) return false
+      if (recipeOnlyCraftable.value && !checkMaterials(recipe, 1)) return false
+      return true
+    })
+  })
+
   const selectRecipe = recipe => {
     selectedRecipe.value = recipe
   }
@@ -1663,6 +1697,27 @@
     display: grid;
     grid-template-columns: 1fr;
     gap: 12px;
+  }
+
+  .recipe-filter-bar {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    align-items: center;
+    margin-bottom: 12px;
+  }
+  .recipe-filter-select {
+    padding: 5px 10px;
+    border-radius: 8px;
+    border: 1px solid rgba(218, 165, 32, 0.3);
+    background: rgba(20, 16, 38, 0.6);
+    color: #e8e0ff;
+    font-size: 13px;
+    cursor: pointer;
+    outline: none;
+  }
+  .recipe-filter-select:focus {
+    border-color: rgba(218, 165, 32, 0.6);
   }
 
   .recipe-card {

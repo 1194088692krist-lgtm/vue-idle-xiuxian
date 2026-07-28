@@ -510,6 +510,26 @@ export const usePlayerStore = defineStore('player', {
           const decryptedData = decryptData(savedData)
           if (decryptedData && validateData(decryptedData)) {
             Object.assign(this.$state, decryptedData)
+            // 迁移：清理历史脏数据——经验/修为必须为整数。
+            // 早期版本 cultivate() 中 gained = amount * bonus（悟道丹 expGain 加成是小数），
+            // 导致 cultivationPool 与 member.experience 累积成 14171.26400000113 之类的浮点数。
+            // 这里在加载时统一取整，修复已有玩家存档。
+            if (typeof this.cultivationPool === 'number' && !Number.isInteger(this.cultivationPool)) {
+              this.cultivationPool = Math.floor(this.cultivationPool)
+            }
+            if (typeof this.cultivation === 'number' && !Number.isInteger(this.cultivation)) {
+              this.cultivation = Math.floor(this.cultivation)
+            }
+            if (Array.isArray(this.sectMembers)) {
+              this.sectMembers.forEach(m => {
+                if (m && typeof m.experience === 'number' && !Number.isInteger(m.experience)) {
+                  m.experience = Math.floor(m.experience)
+                }
+                if (m && typeof m.maxExperience === 'number' && !Number.isInteger(m.maxExperience)) {
+                  m.maxExperience = Math.floor(m.maxExperience)
+                }
+              })
+            }
             // 迁移：旧版灵草库存并入统一素材库（kind='herb'），随后移除遗留 herbs 键
             if (Array.isArray(this.$state.herbs)) {
               if (!Array.isArray(this.materials)) this.materials = []
@@ -610,6 +630,11 @@ export const usePlayerStore = defineStore('player', {
         console.error('加载存档失败:', error)
       }
       // 重置非持久化的保存相关状态，避免加载旧计时器 ID 等无效值
+      // 必须先 clearTimeout，否则旧定时器仍会在几秒后触发 saveData()，把可能尚未加载完成
+      // 或被 migrate $reset 的默认空状态写回 IndexedDB，覆盖真实存档（丢档根因之一）。
+      if (this.saveTimer) {
+        clearTimeout(this.saveTimer)
+      }
       this.saveTimer = null
       this.pendingSave = false
       this.lastSaveTime = 0
@@ -862,11 +887,19 @@ export const usePlayerStore = defineStore('player', {
       try {
         let okAll = true
         const blob = await GameDB.getData('playerData')
-        if (blob) okAll = (await this.pushSlotToCloud(0, blob, Date.now())) && okAll
+        // 关键：上传时间戳必须用存档自身的 _saveTime，而非 Date.now()。
+        // 否则云端 updated_at 永远晚于本地 _saveTime（_scheduleCloudSync 有 3s 延迟），
+        // 下次 migrate 时 cloudTime >= localTime 恒成立，导致云端（可能是较早的弱档）
+        // 反复覆盖本地较强档，表现为刷新后战斗力骤降。
+        const mainDecoded = blob ? decryptData(blob) : null
+        const mainTime = mainDecoded?._saveTime || Date.now()
+        if (blob) okAll = (await this.pushSlotToCloud(0, blob, mainTime)) && okAll
         const slot = this.currentSlot || this.autoSaveSlot
         if (slot) {
           const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
-          if (slotBlob) okAll = (await this.pushSlotToCloud(slot, slotBlob, Date.now())) && okAll
+          const slotDecoded = slotBlob ? decryptData(slotBlob) : null
+          const slotTime = slotDecoded?._saveTime || Date.now()
+          if (slotBlob) okAll = (await this.pushSlotToCloud(slot, slotBlob, slotTime)) && okAll
         }
         // 如实上报：任一槽位上传失败则标记为失败，不再假成功
         this.cloudSyncStatus = okAll ? '已同步到云端' : '云同步失败'
@@ -914,6 +947,11 @@ export const usePlayerStore = defineStore('player', {
               localTime,
               cloudTime
             })
+          } else if (localTime === 0 && cloudTime > 0) {
+            // 本地有数据但无 _saveTime（旧版存档），无法判断新旧。
+            // 此时按"本地优先"处理：保留本地、上传到云端，避免云端覆盖本地较强档。
+            await this.pushSlotToCloud(slot, localBlob, Date.now())
+            console.warn(`[migrate] slot=${slot} 本地无 _saveTime，保留本地并上传云端`)
           } else if (cloudTime >= localTime) {
             // 兜底保护：若本地修为池显著大于云端（>1.5 倍），即便云端时间戳较新
             // 也保留本地较大值，避免因时间戳异常（如旧版未写 _saveTime）造成 cultivationPool 回滚损失
@@ -1121,9 +1159,12 @@ export const usePlayerStore = defineStore('player', {
         if (!decryptedData || !validateData(decryptedData)) {
           throw new Error('存档数据损坏或无效')
         }
-        // 删除非游戏数据（_saveTime / _teamPower 仅为存档列表摘要使用，运行时不需要）
-        delete decryptedData._saveTime
+        // 保留 _saveTime：若删除，写入主档后下次 migrate 会判本地 localTime=0，
+        // 而云端 updated_at 总是 > 0，导致云端（可能是读档前的弱档）覆盖刚加载的强档。
+        // _teamPower 仅用于存档列表摘要，运行时无意义，可删除。
         delete decryptedData._teamPower
+        // 若槽位存档缺 _saveTime（极旧版本），补一个当前时间，避免被云端覆盖
+        if (!decryptedData._saveTime) decryptedData._saveTime = Date.now()
         // 写入主存档
         const encryptedData = encryptData(decryptedData)
         await GameDB.setData('playerData', encryptedData)

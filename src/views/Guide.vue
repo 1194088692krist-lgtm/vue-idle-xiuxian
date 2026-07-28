@@ -26,6 +26,7 @@
 <script setup>
   import { ref, onMounted, nextTick, onBeforeUnmount } from 'vue'
   import { guideHtml } from '../plugins/guideContent'
+  import { GAME_VERSION, GAME_VERSION_NAME } from '../plugins/version'
 
   const bodyRef = ref(null)
   const toc = ref([])
@@ -41,6 +42,14 @@
       list.push({ id: h.id, text: h.textContent.trim(), level: Number(h.tagName[1]) })
     })
     toc.value = list
+    // 目录构建完成后再在大标题（h1）后追加版本号徽标，避免目录文本混入版本号
+    const h1 = el.querySelector('h1')
+    if (h1 && !h1.querySelector('.guide-version')) {
+      const badge = document.createElement('span')
+      badge.className = 'guide-version'
+      badge.textContent = `v${GAME_VERSION} · ${GAME_VERSION_NAME}`
+      h1.appendChild(badge)
+    }
   }
 
   function scrollTo(id) {
@@ -149,6 +158,19 @@
     color: #FFD700;
     text-shadow: 0 0 18px rgba(255, 215, 0, 0.35);
     border-bottom: 1px solid rgba(255, 215, 0, 0.25);
+  }
+  .guide-body :deep(.guide-version) {
+    display: block;
+    font-size: 13px;
+    font-weight: bold;
+    color: #FFD700;
+    letter-spacing: 1px;
+    margin-top: 6px;
+    padding: 3px 12px;
+    border-radius: 10px;
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.18), rgba(139, 69, 19, 0.12));
+    border: 1px solid rgba(218, 165, 32, 0.35);
+    text-shadow: 0 1px 2px rgba(0, 0, 0, 0.6);
   }
   .guide-body :deep(h2) {
     font-size: 20px;
