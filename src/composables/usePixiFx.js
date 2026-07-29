@@ -182,13 +182,57 @@ function centerSprite(sprite) {
 // 纹理缓存：同一 url 不重复加载
 const textureCache = new Map()
 
+/**
+ * 判断 URL 是否为 data URL（base64 内联资源）
+ */
+function isDataUrl(url) {
+  return typeof url === 'string' && url.startsWith('data:')
+}
+
+/**
+ * 在主线程用 HTMLImageElement + decode() 加载图片，解码完成后返回 Image 元素
+ * 仅用于 data URL：规避 PixiJS 8 Assets.load 对 dataURL 走 Worker 路径导致
+ * createImageBitmap(blob) 在部分环境下返回 width=0 / source.valid=false 的问题
+ * @param {string} dataUrl
+ * @returns {Promise<HTMLImageElement>}
+ */
+function loadImageElement(dataUrl) {
+  return new Promise((resolve, reject) => {
+    const img = new Image()
+    img.onload = () => resolve(img)
+    img.onerror = (e) => reject(new Error('Image load failed: ' + (e?.type || 'unknown')))
+    img.src = dataUrl
+  })
+}
+
+/**
+ * 加载单帧纹理
+ * - data URL：主线程 Image+decode → Texture.from(img)，绕过 PixiJS Worker 路径
+ *   （PixiJS 8 Assets.load 对 dataURL 走 WorkerManager.loadImageBitmap → fetch+createImageBitmap，
+ *    在部分浏览器/Worker 环境下 createImageBitmap 返回损坏 bitmap，source.valid=false）
+ * - 普通 URL：走 Assets.load 正常异步流程
+ * @param {string} url
+ * @returns {Promise<Texture>}
+ */
 async function loadTexture(url) {
   if (textureCache.has(url)) return textureCache.get(url)
-  // PixiJS 8：Texture.from(dataURL) 是同步的，但底层 source 尚未完成解码，
-  // 直接用于 new AnimatedSprite 会抛 "Cannot read properties of undefined (reading 'texture')"。
-  // 必须用 Assets.load() 走完整的异步加载流程，纹理 source 就绪后才返回。
-  const { Assets } = pixiModule
-  const tex = await Assets.load(url)
+
+  let tex
+  if (isDataUrl(url)) {
+    // dataURL 路径：主线程加载并解码，确保 ImageSource 资源就绪
+    const img = await loadImageElement(url)
+    // 进一步 await decode()，确保浏览器完成图像解码
+    if (typeof img.decode === 'function') {
+      try { await img.decode() } catch (_) { /* decode 失败也继续，onload 已保证加载完成 */ }
+    }
+    const { Texture } = pixiModule
+    tex = Texture.from(img)
+  } else {
+    // 普通 URL 路径：走 PixiJS 完整异步加载
+    const { Assets } = pixiModule
+    tex = await Assets.load(url)
+  }
+
   textureCache.set(url, tex)
   return tex
 }
@@ -216,10 +260,16 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false })
     const textures = await Promise.all(frames.map(loadTexture))
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
-    // 校验纹理有效性：PixiJS 8 下 source 未就绪时 frame/source 可能为空，
-    // 直接构造 AnimatedSprite 会抛 "Cannot read properties of undefined (reading 'texture')"
-    if (!textures.every(t => t && t.source && t.source.valid)) {
-      console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS')
+    // 校验纹理有效性：逐帧检查 source.valid，定位具体哪一帧出问题
+    // 失败原因常见：dataURL 经 PixiJS Worker 路径 createImageBitmap 损坏（已通过主线程加载规避）
+    const badIndices = []
+    textures.forEach((t, i) => {
+      if (!t || !t.source || !t.source.valid) badIndices.push(i)
+    })
+    if (badIndices.length > 0) {
+      console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS。失败帧索引:', badIndices,
+        '总数:', textures.length,
+        '首帧详情:', textures[0] ? { hasSource: !!textures[0].source, valid: textures[0].source?.valid, width: textures[0].source?.width } : 'null')
       return false
     }
 
