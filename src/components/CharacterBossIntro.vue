@@ -1,8 +1,15 @@
 <template>
   <!-- 人物 BOSS 入场演出：立绘从屏幕上方滑入、居中展示后从下方滑出 -->
   <teleport to="body">
-    <div v-if="intro.show" class="char-boss-intro-overlay" @click="dismiss">
+    <div v-if="intro.show" class="char-boss-intro-overlay" :class="{ 'theme-wraith': intro.theme === 'wraith' }" @click="dismiss">
       <div class="char-boss-intro-stage" :key="intro.characterId + '-' + intro.name">
+        <!-- 怨灵降临：深紫色特效大字，人物 BOSS 登场时降下 -->
+        <div v-if="intro.theme === 'wraith'" class="char-boss-intro-title">
+          <span class="title-char">怨</span>
+          <span class="title-char">灵</span>
+          <span class="title-char">降</span>
+          <span class="title-char">临</span>
+        </div>
         <div class="char-boss-intro-portrait-wrap">
           <img
             :src="intro.portrait"
@@ -178,6 +185,83 @@ watch(
   }
   .char-boss-intro-name {
     font-size: 22px;
+  }
+  .char-boss-intro-title {
+    font-size: 32px;
+  }
+}
+
+/* 怨灵降临主题：深紫色背景强化 */
+.char-boss-intro-overlay.theme-wraith {
+  background: radial-gradient(ellipse at center, rgba(40, 5, 60, 0.92) 0%, rgba(10, 0, 20, 0.97) 70%);
+}
+
+.char-boss-intro-portrait-wrap {
+  /* 怨灵主题：紫色发光边框 */
+}
+.theme-wraith .char-boss-intro-portrait-wrap {
+  box-shadow: 0 0 60px rgba(157, 78, 221, 0.6), 0 0 20px rgba(123, 44, 191, 0.5);
+  border-color: rgba(157, 78, 221, 0.7);
+}
+
+/* 怨灵降临：四个深紫色特效大字 */
+.char-boss-intro-title {
+  display: flex;
+  gap: 12px;
+  margin-bottom: 16px;
+  font-size: 42px;
+  font-weight: 800;
+  letter-spacing: 4px;
+  color: #9D4EDD;
+  text-shadow:
+    0 0 20px rgba(157, 78, 221, 0.9),
+    0 0 40px rgba(157, 78, 221, 0.6),
+    0 0 60px rgba(123, 44, 191, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.8);
+  animation: charBossTitleSlam 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+.char-boss-intro-title .title-char {
+  display: inline-block;
+  animation: charBossTitleGlow 1.6s ease-in-out 0.9s infinite alternate;
+}
+
+/* 大字砸入动画：从上方放大旋转砸入 */
+@keyframes charBossTitleSlam {
+  0% {
+    transform: translateY(-60vh) scale(2.5) rotate(-8deg);
+    opacity: 0;
+    filter: blur(8px);
+  }
+  60% {
+    transform: translateY(8px) scale(1.1) rotate(2deg);
+    opacity: 1;
+    filter: blur(0);
+  }
+  80% {
+    transform: translateY(-4px) scale(0.98) rotate(-1deg);
+  }
+  100% {
+    transform: translateY(0) scale(1) rotate(0);
+    opacity: 1;
+    filter: blur(0);
+  }
+}
+
+/* 大字呼吸发光：紫色光晕脉动 */
+@keyframes charBossTitleGlow {
+  0% {
+    text-shadow:
+      0 0 20px rgba(157, 78, 221, 0.9),
+      0 0 40px rgba(157, 78, 221, 0.6),
+      0 2px 4px rgba(0, 0, 0, 0.8);
+  }
+  100% {
+    text-shadow:
+      0 0 30px rgba(157, 78, 221, 1),
+      0 0 60px rgba(157, 78, 221, 0.8),
+      0 0 80px rgba(123, 44, 191, 0.5),
+      0 2px 4px rgba(0, 0, 0, 0.8);
   }
 }
 </style>

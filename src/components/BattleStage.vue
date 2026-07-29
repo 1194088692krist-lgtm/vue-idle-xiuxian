@@ -88,7 +88,7 @@
             <div class="hp-bar">
               <div class="hp-fill" :style="{ width: memberHpPct(m) + '%', background: hpBarColor(memberHpPct(m)) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(m.currentHealth) }}/{{ m.stats.maxHealth }}</div>
+            <div class="hp-text">{{ Math.round(displayMemberHp[m.memberId] !== undefined ? displayMemberHp[m.memberId] : m.currentHealth) }}/{{ displayMemberMaxHp[m.memberId] > 0 ? displayMemberMaxHp[m.memberId] : m.stats.maxHealth }}</div>
           </div>
         </div>
       </div>
@@ -135,7 +135,7 @@
             <div class="hp-bar">
               <div class="hp-fill enemy-hp" :style="{ width: enemyHpPct + '%', background: hpBarColor(enemyHpPct) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(encounter.enemy.currentHealth) }}/{{ encounter.enemy.stats.maxHealth || 0 }}</div>
+            <div class="hp-text">{{ Math.round(displayEnemyHp > 0 ? displayEnemyHp : encounter.enemy.currentHealth) }}/{{ displayEnemyMaxHp > 0 ? displayEnemyMaxHp : (encounter.enemy.stats.maxHealth || 0) }}</div>
           </div>
         </div>
       </div>
@@ -297,6 +297,14 @@ const comboShadowEnemy = ref(false)
 const vampireChain = reactive({ show: false })
 const dodgeGhost = reactive({ show: false, avatar: '', name: '', style: {} })
 
+// 正向展示血量：血条绑定这些显示血量，而非实体实时血量
+// 回合开始时设为实体当前血量（上回合结束值），showEvent 中按事件快照逐步推进
+// 这样血量会随攻击动画逐步扣除，而非一回合瞬间跳到终值
+const displayEnemyHp = ref(0)
+const displayEnemyMaxHp = ref(0)
+const displayMemberHp = reactive({})  // { memberId: hp }
+const displayMemberMaxHp = reactive({})  // { memberId: maxHp }
+
 // 掉落动画
 const dropOrb = reactive({ show: false, rarity: '', emoji: '' })
 
@@ -349,7 +357,10 @@ function isImageUrl(str) {
 const enemyHpPct = computed(() => {
   const e = props.encounter?.enemy
   if (!e || !e.stats) return 0
-  return Math.max(0, Math.min(100, (e.currentHealth / (e.stats.maxHealth || 1)) * 100))
+  // 正向展示：优先用 displayEnemyHp（随攻击动画逐步推进），首次或未初始化时回退实体血量
+  const hp = displayEnemyHp.value > 0 ? displayEnemyHp.value : e.currentHealth
+  const max = displayEnemyMaxHp.value > 0 ? displayEnemyMaxHp.value : (e.stats.maxHealth || 1)
+  return Math.max(0, Math.min(100, (hp / (max || 1)) * 100))
 })
 
 // 实时显示：最多3条，来自 encounter.combatLog 字符串数组
@@ -615,8 +626,26 @@ async function playLiveRound(roundNum) {
     }
     // 玩家先手、敌人后手，顺序更自然
     events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
+
+    // 正向展示：回合开始时，将显示血量初始化为实体当前血量（本回合起点 = 上回合结束值）
+    // 然后随事件播放逐步推进，实现"满血开始→逐步扣除"的视觉效果
+    const enemy = props.encounter?.enemy
+    if (enemy && enemy.stats) {
+      displayEnemyHp.value = enemy.currentHealth
+      displayEnemyMaxHp.value = enemy.stats.maxHealth || enemy.currentHealth
+    }
+    for (const p of (props.encounter?.players || [])) {
+      if (p && p.stats) {
+        displayMemberHp[p.memberId] = p.currentHealth
+        displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
+      }
+    }
+
     for (const e of events) {
       showEvent(e)
+      // 正向展示：每播放一个事件后，根据事件快照推进显示血量
+      // defenderHP/attackerHP 是事件发生后的血量快照，逐步推进实现血条渐变
+      advanceDisplayHp(e)
       await delay(ACTION_DELAY)
     }
   } finally {
@@ -624,10 +653,51 @@ async function playLiveRound(roundNum) {
   }
 }
 
+// 根据事件快照推进显示血量（正向展示核心）
+function advanceDisplayHp(e) {
+  if (!e) return
+  const enemyName = props.encounter?.enemy?.name
+  // 防守方是敌人 → 更新敌人显示血量
+  if (e.defender === enemyName && typeof e.defenderHP === 'number') {
+    displayEnemyHp.value = Math.max(0, e.defenderHP)
+  }
+  // 防守方是玩家 → 更新对应玩家显示血量
+  if (e.defender !== enemyName) {
+    const defMember = props.encounter?.players?.find(p => p.name === e.defender)
+    if (defMember && typeof e.defenderHP === 'number') {
+      displayMemberHp[defMember.memberId] = Math.max(0, e.defenderHP)
+    }
+  }
+  // 攻击方血量也可能变化（如吸血回血、反伤扣血）
+  if (e.attacker !== enemyName) {
+    const atkMember = props.encounter?.players?.find(p => p.name === e.attacker)
+    if (atkMember && typeof e.attackerHP === 'number') {
+      displayMemberHp[atkMember.memberId] = Math.max(0, e.attackerHP)
+    }
+  } else if (typeof e.attackerHP === 'number') {
+    // 攻击方是敌人（敌人吸血等）
+    displayEnemyHp.value = Math.max(0, e.attackerHP)
+  }
+}
+
 // 监听遭遇对象变化（新的一场战斗）：重置瞬态动画
 watch(() => props.encounter, (nc) => {
   clearTransient()
   roundWatched.value = nc ? (nc.round || 0) : 0
+  // 新战斗：重置显示血量为满血（第一回合播放前初始展示满血）
+  if (nc && nc.enemy && nc.enemy.stats) {
+    displayEnemyHp.value = nc.enemy.currentHealth
+    displayEnemyMaxHp.value = nc.enemy.stats.maxHealth || nc.enemy.currentHealth
+  } else {
+    displayEnemyHp.value = 0
+    displayEnemyMaxHp.value = 0
+  }
+  for (const p of (nc?.players || [])) {
+    if (p && p.stats) {
+      displayMemberHp[p.memberId] = p.currentHealth
+      displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
+    }
+  }
 }, { immediate: true })
 
 // 监听 inProgress 变化：true → false 时触发胜负全屏演出
@@ -687,7 +757,12 @@ function getEnemyClasses() {
 
 function memberHpPct(m) {
   if (!m || !m.stats) return 0
-  return Math.max(0, Math.min(100, (m.currentHealth / (m.stats.maxHealth || 1)) * 100))
+  // 正向展示：优先用 displayMemberHp（随攻击动画逐步推进），回退实体血量
+  const dispHp = displayMemberHp[m.memberId]
+  const dispMax = displayMemberMaxHp[m.memberId]
+  const hp = (dispHp !== undefined && dispHp !== null) ? dispHp : m.currentHealth
+  const max = dispMax > 0 ? dispMax : (m.stats.maxHealth || 1)
+  return Math.max(0, Math.min(100, (hp / (max || 1)) * 100))
 }
 
 function hpBarColor(pct) {

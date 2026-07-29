@@ -1263,28 +1263,32 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   const secretLv = effectiveZone.difficulty
   const scale = effectiveZone.enemyScale || 1
   const lateMult = getLateZoneMult(effectiveZone.id)
-  // 人物 BOSS 比普通 BOSS 难 50%（在 totalBossMult 基础上再 ×1.5）
+  // 人物 BOSS 全面强化：达到同地图难度下怪物 BOSS 全数值的 1.5 倍
+  // 怪物 BOSS 的总倍率链 = BOSS_POWER_MULTIPLIER(1.5) × lateMult × BOSS_STRENGTH_MULT(1.5)
+  // 人物 BOSS 在此基础上再 × CHARACTER_BOSS_DIFFICULTY_MULT(1.5)，即达到怪物BOSS的2.25倍
+  // 但用户反馈"显然没有达到1.5倍"，问题在于原实现为避免重复乘1.5而除掉了，且缺少 BOSS_STRENGTH_MULT
+  // 修正：直接用 怪物BOSS总倍率 × 1.5，确保数值真正达到1.5倍
   const CHARACTER_BOSS_DIFFICULTY_MULT = 1.5
-  const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult * CHARACTER_BOSS_DIFFICULTY_MULT
+  const BOSS_STRENGTH_MULT = 1.5  // 与 createBossEnemy 一致的二次强化
+  const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult * BOSS_STRENGTH_MULT * CHARACTER_BOSS_DIFFICULTY_MULT
 
   // 基础 HP：基于角色星级和地图推荐血量
-  // 3星角色 HP 较低、5星角色 HP 较高，让人物 BOSS 与星级匹配
   const starMult = _starCfg[character.star]?.multiplier || 1
   const recHealth = (effectiveZone.recommendedStats?.health || 8000) * scale
-  const baseCharHealth = Math.floor(recHealth * 1.5 * starMult)  // 比普通 BOSS HP 高 50%
-  const scaledHealth = Math.floor(baseCharHealth * totalBossMult / CHARACTER_BOSS_DIFFICULTY_MULT) // 避免重复乘 1.5
-  const scaledDefense = Math.floor((effectiveZone.recommendedStats?.defense || 100) * scale * lateMult * 1.2) // 人物 BOSS 防御略高
-  const scaledSpeed = Math.floor(((character.baseStats?.speed || 10) * 1.5 + 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
+  // 人物 BOSS HP = 推荐血量 × starMult × 总倍率（不再除掉1.5，确保真正达到1.5倍怪物BOSS）
+  const scaledHealth = Math.floor(recHealth * starMult * totalBossMult)
+  const scaledDefense = Math.floor((effectiveZone.recommendedStats?.defense || 100) * scale * lateMult * BOSS_STRENGTH_MULT * CHARACTER_BOSS_DIFFICULTY_MULT * 1.2)
+  const scaledSpeed = Math.floor(((character.baseStats?.speed || 10) * 1.5 + 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult) * CHARACTER_BOSS_DIFFICULTY_MULT)
 
-  // 攻击力：比普通 BOSS 高 50%（按 recHealth × 0.22 × 1.5）
+  // 攻击力：比普通 BOSS 高 50%
   const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
-  const bossAtkRatio = 0.22 * CHARACTER_BOSS_DIFFICULTY_MULT
+  const bossAtkRatio = 0.22 * CHARACTER_BOSS_DIFFICULTY_MULT * BOSS_STRENGTH_MULT
   const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
 
-  // 战斗属性：高难 BOSS 附加额外属性，比普通 BOSS 略强
-  const bossCombatBoost = Math.min(0.5, Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.1)
-  const bossFinalDamageBoost = Math.min(0.35, 0.05 + Math.max(0, (scale - 1) * 0.1) + (lateMult - 1) * 0.05)
-  const bossFinalDamageReduce = Math.min(0.5, Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.1)
+  // 战斗属性：全面强化，达到怪物BOSS的1.5倍
+  const bossCombatBoost = Math.min(0.6, (Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.1) * CHARACTER_BOSS_DIFFICULTY_MULT)
+  const bossFinalDamageBoost = Math.min(0.45, (0.05 + Math.max(0, (scale - 1) * 0.1) + (lateMult - 1) * 0.05) * CHARACTER_BOSS_DIFFICULTY_MULT)
+  const bossFinalDamageReduce = Math.min(0.6, (Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.1) * CHARACTER_BOSS_DIFFICULTY_MULT)
 
   const baseStats = {
     health: scaledHealth,
@@ -1292,20 +1296,20 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
     damage: scaledAttack,
     defense: scaledDefense,
     speed: scaledSpeed,
-    critRate: Math.min(0.4, 0.08 + secretLv * 0.025),
-    comboRate: Math.min(0.25, 0.03 + secretLv * 0.012),
-    counterRate: Math.min(0.25, 0.03 + secretLv * 0.012),
-    stunRate: Math.min(0.2, 0.03 + secretLv * 0.008),
-    dodgeRate: Math.min(0.25, 0.04 + secretLv * 0.018),
-    vampireRate: Math.min(0.2, 0.03 + secretLv * 0.008),
-    critResist: Math.min(0.3, 0.06 + secretLv * 0.025),
-    comboResist: Math.min(0.3, 0.06 + secretLv * 0.025),
-    counterResist: Math.min(0.3, 0.06 + secretLv * 0.025),
-    stunResist: Math.min(0.3, 0.06 + secretLv * 0.025),
-    dodgeResist: Math.min(0.3, 0.06 + secretLv * 0.025),
-    vampireResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    critRate: Math.min(0.5, 0.08 + secretLv * 0.025),
+    comboRate: Math.min(0.3, 0.03 + secretLv * 0.012),
+    counterRate: Math.min(0.3, 0.03 + secretLv * 0.012),
+    stunRate: Math.min(0.25, 0.03 + secretLv * 0.008),
+    dodgeRate: Math.min(0.3, 0.04 + secretLv * 0.018),
+    vampireRate: Math.min(0.25, 0.03 + secretLv * 0.008),
+    critResist: Math.min(0.4, 0.06 + secretLv * 0.025),
+    comboResist: Math.min(0.4, 0.06 + secretLv * 0.025),
+    counterResist: Math.min(0.4, 0.06 + secretLv * 0.025),
+    stunResist: Math.min(0.4, 0.06 + secretLv * 0.025),
+    dodgeResist: Math.min(0.4, 0.06 + secretLv * 0.025),
+    vampireResist: Math.min(0.4, 0.06 + secretLv * 0.025),
     healBoost: 0,
-    critDamageBoost: 0.6,
+    critDamageBoost: 0.8,
     critDamageReduce: 0,
     finalDamageBoost: bossFinalDamageBoost,
     finalDamageReduce: bossFinalDamageReduce,
@@ -1347,11 +1351,13 @@ function triggerCharacterBossIntro(enemy) {
     characterId: enemy.characterBossId,
     name: enemy.name,
     portrait,
-    star: enemy.characterBossStar || 0
+    star: enemy.characterBossStar || 0,
+    // 人物 BOSS 登场主题：怨灵降临（深紫色特效大字）
+    theme: 'wraith'
   }
   // 2.4s 后关闭（与 CSS 动画时长对齐：0.6s 入场 + 1.2s 停留 + 0.6s 离场）
   setTimeout(() => {
-    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0 }
+    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null }
   }, 2400)
 }
 
@@ -1650,9 +1656,9 @@ function grantCharacterBossDrops(enemy) {
     // drops 用独立 type，便于结算栏单独统计「人物内丹碎片」获得量
     drops.push({ ...pillItem, type: 'character_inner_pill', amount: pillCount })
   }
-  // 人物挑战券：30% 概率掉 1~2 张
+  // 人物挑战券：50% 概率掉 1~2 张（原30%过低导致玩家长期无法获得）
   const ticketDef = CHARACTER_BOSS_TICKETS[charId]
-  if (ticketDef && Math.random() < 0.30) {
+  if (ticketDef && Math.random() < 0.50) {
     const amount = Math.floor(Math.random() * 2) + 1 // 1~2 张
     const ticketItem = {
       id: ticketDef.id,

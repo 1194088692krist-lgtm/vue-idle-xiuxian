@@ -130,9 +130,10 @@ const currentSkin = ref(0)
 // 含图片重试缓存破坏参数：imgRetryCount > 0 时追加 ?r=N
 const displaySrc = computed(() => {
   let url
-  // 仅展示已解锁的皮肤：皮肤0(原立绘)恒可；skin1~breakThrough 由突破解锁；skin6/7 由商店购买
-  // 修复：原逻辑仅用 maxSkinIndex 连续上界判断，会暴露未购买的 skin4/5
-  if (currentSkin.value >= 1 && isSkinUnlocked(currentSkin.value)) {
+  // 商店预览态：initialSkin>=1 且当前展示的就是该初始皮肤时，绕过 isSkinUnlocked 检查
+  // 这就是要出售的商品，必须直接展示对应皮肤立绘（用户尚未购买，isSkinUnlocked 会返回 false）
+  const isShopPreview = Number(props.initialSkin) >= 1 && currentSkin.value === Number(props.initialSkin)
+  if (currentSkin.value >= 1 && (isShopPreview || isSkinUnlocked(currentSkin.value))) {
     const u = getCharacterSkinUrl(props.character, currentSkin.value)
     if (u) url = u
   }

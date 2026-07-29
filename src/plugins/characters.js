@@ -331,7 +331,11 @@ export function getCharacterSkinUrl(member, skin) {
   const id = member.templateId || member.id
   if (!id) return null
   const count = skinMap[id] || 0
-  if (skin > count) return null
+  // skins.json 异步加载，未加载完成时 count=0 会误判皮肤不存在
+  // 放宽校验：skin<=7（最大皮肤数）时即使 manifest 未加载也返回构造 URL
+  // 让浏览器去请求，文件不存在则由调用方的 onError 回退处理
+  if (count > 0 && skin > count) return null
+  if (count === 0 && skin > 7) return null
   const base = import.meta.env.BASE_URL || './'
   return `${base}portraits/${id}_skin${skin}.jpg`
 }
