@@ -184,8 +184,11 @@ const textureCache = new Map()
 
 async function loadTexture(url) {
   if (textureCache.has(url)) return textureCache.get(url)
-  const { Texture } = pixiModule
-  const tex = await Texture.from(url)
+  // PixiJS 8：Texture.from(dataURL) 是同步的，但底层 source 尚未完成解码，
+  // 直接用于 new AnimatedSprite 会抛 "Cannot read properties of undefined (reading 'texture')"。
+  // 必须用 Assets.load() 走完整的异步加载流程，纹理 source 就绪后才返回。
+  const { Assets } = pixiModule
+  const tex = await Assets.load(url)
   textureCache.set(url, tex)
   return tex
 }
@@ -213,6 +216,12 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false })
     const textures = await Promise.all(frames.map(loadTexture))
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
+    // 校验纹理有效性：PixiJS 8 下 source 未就绪时 frame/source 可能为空，
+    // 直接构造 AnimatedSprite 会抛 "Cannot read properties of undefined (reading 'texture')"
+    if (!textures.every(t => t && t.source && t.source.valid)) {
+      console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS')
+      return false
+    }
 
     const { AnimatedSprite } = pixiModule
     const sprite = new AnimatedSprite(textures)
