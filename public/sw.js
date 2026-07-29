@@ -131,9 +131,19 @@ async function cacheFirst(req, cacheName) {
 
 // Stale-While-Revalidate：缓存优先 + 后台刷新（JS/CSS/JSON）
 // 命中缓存→立即返回 + 后台异步更新；未命中→网络获取并写入缓存
+// 与 cacheFirst 一致：先遍历所有 cache 查找命中（兼容客户端预下载的 user-assets）
+// 这样用户预载到 user-assets 的 pixi-fx chunk 也能命中，首次技能演出 0 网络等待
 async function staleWhileRevalidate(req, cacheName) {
+  // 1. 遍历所有 cache 查找命中
+  const keys = await caches.keys()
+  let cached = null
+  for (const k of keys) {
+    const cache = await caches.open(k)
+    const hit = await cache.match(req)
+    if (hit) { cached = hit; break }
+  }
+  // 2. 后台刷新（命中或未命中都执行，保证下次拿到最新版本）
   const cache = await caches.open(cacheName)
-  const cached = await cache.match(req)
   const fetchPromise = fetch(req)
     .then(res => {
       if (res && res.ok && res.type === 'basic') {

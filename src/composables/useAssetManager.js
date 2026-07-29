@@ -108,6 +108,7 @@ function urlFromPath(p) {
 
 // 收集所有需要预下载的资源 URL
 // 包括：人物立绘（50×2）+ 皮肤立绘（100）、怪物立绘（28×2）、灵宠立绘（18×4）、立绘清单、背景图、立绘动态视频 1 个
+// 特效：PixiJS chunk（懒加载 chunk，预载后 SW cacheFirst 命中，首次火系演出零网络等待）
 async function collectResourceUrls() {
   const urls = []
   // 1. 立绘清单（人物/怪物/灵宠 + 人物皮肤清单）
@@ -124,10 +125,13 @@ async function collectResourceUrls() {
   // 2. 背景图 + favicon
   urls.push('./assets/bg/main_bg.png')
   urls.push('./favicon.ico')
+  // 2.1 特效清单（fx-manifest.json 由 vite 构建后生成，含 pixi-fx chunk URL）
+  //     清单本身也加入预载，下次读取零网络
+  urls.push('./fx-manifest.json')
   // 3. 从立绘清单提取所有图片 URL
   try {
-    const [portraitsRes, monstersRes, skinsRes, petManifestRes, petSkinsRes] = await Promise.all(
-      manifestUrls.map(u => fetch(urlFromPath(u)))
+    const [portraitsRes, monstersRes, skinsRes, petManifestRes, petSkinsRes, fxManifestRes] = await Promise.all(
+      manifestUrls.map(u => fetch(urlFromPath(u))).concat([fetch(urlFromPath('./fx-manifest.json'))])
     )
     const portraitsData = await portraitsRes.json()
     const monstersData = await monstersRes.json()
@@ -167,6 +171,14 @@ async function collectResourceUrls() {
             urls.push('./pets/' + skinFile)
           }
         }
+      }
+    }
+    // 特效 chunk：把 pixi-fx chunk URL 加入预载列表
+    // 用户预载后，触发 import('pixi.js') 时 SW SWR 命中本地 cache，0 网络延迟
+    if (fxManifestRes.ok) {
+      const fxManifest = await fxManifestRes.json()
+      if (fxManifest.pixiChunk) {
+        urls.push('./' + fxManifest.pixiChunk)
       }
     }
   } catch (e) {

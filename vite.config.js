@@ -98,6 +98,28 @@ export default defineConfig({
         const content = fs.readFileSync(swPath, 'utf8')
         fs.writeFileSync(swPath, content.replace(/__SW_VERSION__/g, version))
       }
+    },
+    // 特效 chunk 清单生成：扫描 docs/assets/js/pixi-fx-*.js，写入 docs/fx-manifest.json
+    // 供 useAssetManager 主动预载 PixiJS chunk（避免首次技能演出卡顿）
+    // 清单内含 _version 字段，与 skins.json 一致的版本号机制
+    {
+      name: 'fx-manifest-gen',
+      closeBundle: () => {
+        const __dirname = path.dirname(fileURLToPath(import.meta.url))
+        const jsDir = path.resolve(__dirname, 'docs/assets/js')
+        if (!fs.existsSync(jsDir)) return
+        const files = fs.readdirSync(jsDir)
+        const pixiChunk = files.find(f => /^pixi-fx-[a-zA-Z0-9_-]+\.js$/i.test(f))
+        if (!pixiChunk) return
+        const manifest = {
+          _version: `v${pkg.version}_${Date.now()}`,
+          pixiChunk: `assets/js/${pixiChunk}`
+        }
+        fs.writeFileSync(
+          path.resolve(__dirname, 'docs/fx-manifest.json'),
+          JSON.stringify(manifest, null, 2)
+        )
+      }
     }
   ],
   worker: {
