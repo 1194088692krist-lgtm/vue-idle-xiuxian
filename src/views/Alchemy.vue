@@ -998,12 +998,12 @@
                 :class="{ sold: item.sold }"
                 @click="!item.sold && previewSkin(item)"
               >
-                <div class="skin-card-portrait">
+                <div class="skin-card-portrait" @click.stop="openSkinCharPortrait(item)">
                   <img
                     v-if="getCharAvatar(item.characterId)"
                     :src="getCharAvatar(item.characterId)"
                     :alt="item.characterName"
-                    class="skin-avatar"
+                    class="skin-avatar clickable-portrait"
                     @error="$event.target.style.display='none'"
                   />
                   <div v-else class="skin-avatar-placeholder">{{ item.characterName?.slice(0, 1) || '?' }}</div>
@@ -1062,6 +1062,13 @@
               </div>
             </div>
           </div>
+
+          <!-- 角色立绘弹窗（点击商店角色头像触发，与人物立绘展示逻辑一致） -->
+          <CharacterPortraitModal
+            v-if="showSkinCharPortrait"
+            :character="skinCharPortrait"
+            @close="closeSkinCharPortrait"
+          />
         </template>
       </div>
     </div>
@@ -1091,7 +1098,8 @@
   import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
   import { BLACK_MARKET_CONFIG, getManualRefreshCost, SKIN_SHOP_CONFIG, getSkinShopRefreshCost } from '../plugins/shopConfig'
-  import { getCharacterAvatar, getCharacterSkinUrl } from '../plugins/characters'
+  import { getCharacterAvatar, getCharacterSkinUrl, characterDefMap } from '../plugins/characters'
+  import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
   import {
     EXCLUSIVE_EQUIP_CONFIG,
     EXCLUSIVE_EQUIP_SLOTS,
@@ -1294,6 +1302,23 @@
   }
   // 在 switchToShop 中并行预加载 characterList
   ;(async () => { await _ensureCharList() })()
+
+  // 立绘弹窗（与人物立绘展示逻辑一致）：点击商店角色头像打开 CharacterPortraitModal
+  const showSkinCharPortrait = ref(false)
+  const skinCharPortrait = ref(null)
+  function openSkinCharPortrait(item) {
+    if (!item || !item.characterId) return
+    // 用 characterDefMap 取角色定义，模态框内部依赖 templateId/name/star/breakThrough 等字段
+    const char = characterDefMap[item.characterId]
+    if (char) {
+      skinCharPortrait.value = char
+      showSkinCharPortrait.value = true
+    }
+  }
+  function closeSkinCharPortrait() {
+    showSkinCharPortrait.value = false
+    skinCharPortrait.value = null
+  }
 
   function runeStatLabel(item) {
     const map = { attack: '攻击%', health: '生命%', defense: '防御%', speed: '速度',
@@ -3558,11 +3583,19 @@
     overflow: hidden;
     background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
     margin-bottom: 6px;
+    cursor: pointer;
+    transition: transform 0.2s ease;
+  }
+  .skin-card-portrait:hover {
+    transform: scale(1.03);
   }
   .skin-avatar {
     width: 100%;
     height: 100%;
     object-fit: cover;
+  }
+  .skin-avatar.clickable-portrait {
+    cursor: pointer;
   }
   .skin-avatar-placeholder {
     width: 100%;

@@ -2614,7 +2614,11 @@ export const usePlayerStore = defineStore('player', {
           return { success: false, message: `灵石不足，刷新需要 ${cost} 灵石` }
         }
       }
-      const items = await rollSkinShopItems({ unlockedShopSkins: this.unlockedShopSkins || {} })
+      const items = await rollSkinShopItems({
+        unlockedShopSkins: this.unlockedShopSkins || {},
+        // 仅出售玩家已招募角色的皮肤，避免摆出未解锁角色
+        ownedCharacterIds: (this.sectMembers || []).map(m => m.templateId).filter(Boolean)
+      })
       this.skinShopState.items = items
       this.skinShopState.refreshedAt = now
       if (!autoRefresh) {

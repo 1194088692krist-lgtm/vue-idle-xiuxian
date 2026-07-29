@@ -874,8 +874,118 @@
                 <span class="boss-challenge-tip">挑战需消耗对应 BOSS 专属挑战券（挂机该秘境击杀 BOSS 时 ~30% 概率掉落 1~2 张）</span>
               </div>
 
-            <!-- BOSS 选择网格（按秘境分组） -->
-            <div v-if="!selectedBossTarget" class="boss-groups">
+              <!-- 切换：怪物 BOSS / 人物 BOSS -->
+              <div class="boss-challenge-mode-tabs">
+                <button
+                  class="boss-mode-tab"
+                  :class="{ active: bossChallengeMode === 'monster' }"
+                  @click="bossChallengeMode = 'monster'"
+                >怪物 BOSS</button>
+                <button
+                  class="boss-mode-tab"
+                  :class="{ active: bossChallengeMode === 'character' }"
+                  @click="bossChallengeMode = 'character'"
+                >人物 BOSS</button>
+              </div>
+
+              <!-- 人物 BOSS 挑战面板 -->
+              <div v-if="bossChallengeMode === 'character'">
+                <div class="boss-challenge-tip" style="margin-bottom: 8px; color: #C9C4BA;">
+                  人物 BOSS 挑战券来源：挂机击杀"人物形态 BOSS"时 30% 概率掉落 1~2 张。挑战胜利掉落对应角色内丹碎片（用于专属装备打造）+ 10% 概率返还挑战券。
+                </div>
+                <!-- 人物 BOSS 选择网格（按星级分组） -->
+                <div v-if="!selectedCharBossTarget" class="boss-groups">
+                  <div v-for="group in characterBossGroups" :key="group.star" class="boss-group">
+                    <div class="boss-group-title">
+                      <span class="boss-group-name">{{ group.star }} 星角色</span>
+                      <span class="boss-group-badge" :style="{ backgroundColor: starColor(group.star) }">{{ group.star }}★</span>
+                    </div>
+                    <div class="boss-cards-row">
+                      <div
+                        v-for="cb in group.characters"
+                        :key="cb.characterId"
+                        class="boss-target-card character-boss-card"
+                        :class="{ disabled: cb.ticketCount <= 0 }"
+                        @click="cb.ticketCount > 0 ? selectCharBossTarget(cb) : null"
+                      >
+                        <img
+                          v-if="cb.avatar"
+                          :src="cb.avatar"
+                          class="character-boss-avatar"
+                          :alt="cb.name"
+                          loading="lazy"
+                          decoding="async"
+                        />
+                        <div class="boss-target-name">{{ cb.name }}</div>
+                        <div class="boss-target-ticket" :class="{ none: cb.ticketCount <= 0 }">
+                          🎟️ ×{{ cb.ticketCount }}
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </div>
+                <!-- 人物 BOSS 挑战确认面板 -->
+                <div v-else class="boss-challenge-confirm">
+                  <button class="btn-back" @click="selectedCharBossTarget = null">← 返回选择</button>
+                  <div class="boss-confirm-info">
+                    <div class="boss-confirm-name">
+                      {{ selectedCharBossTarget.name }}
+                      <span class="boss-confirm-zone">（人物形态 BOSS）</span>
+                    </div>
+                    <div class="boss-confirm-meta">
+                      <div class="meta-row">
+                        <span class="meta-label">🎟️ 挑战券</span>
+                        <span class="meta-value" :style="{ color: selectedCharBossTicketCount > 0 ? '#FF8C00' : '#EF5350' }">
+                          {{ selectedCharBossTarget.ticketName }} ×{{ selectedCharBossTicketCount }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+                  <!-- 挑战次数选择 -->
+                  <div class="boss-count-selector">
+                    <label class="count-label">挑战次数：</label>
+                    <div class="count-options">
+                      <button
+                        v-for="opt in BOSS_CHALLENGE_COUNT_OPTIONS"
+                        :key="opt"
+                        class="count-opt"
+                        :class="{ active: charBossChallengeCount === opt }"
+                        @click="charBossChallengeCount = opt"
+                      >{{ opt }} 次</button>
+                    </div>
+                    <input
+                      type="number"
+                      class="count-input"
+                      v-model.number="charBossChallengeCount"
+                      min="1"
+                      :max="selectedCharBossTicketCount"
+                      step="1"
+                    />
+                    <button class="count-max-btn" @click="charBossChallengeCount = selectedCharBossTicketCount">全部</button>
+                  </div>
+                  <!-- 挑战按钮 -->
+                  <button
+                    class="btn-execute-challenge"
+                    :disabled="selectedCharBossTicketCount <= 0 || charBossChallengeCount <= 0 || isBossChallengeInProgress"
+                    @click="executeCharBossChallenge"
+                  >
+                    ⚔️ 挑战 {{ selectedCharBossTarget.name }}（人物形态）×{{ Math.max(1, Math.floor(charBossChallengeCount) || 1) }}
+                    （消耗 {{ Math.min(Math.max(1, Math.floor(charBossChallengeCount) || 1), selectedCharBossTicketCount) }} 张挑战券）
+                  </button>
+                  <div v-if="bossChallengeResult && bossChallengeResult.success && bossChallengeResult.characterId === selectedCharBossTarget.characterId" class="boss-challenge-result">
+                    <div class="result-summary">
+                      <span class="result-victory">✅ 胜利 {{ bossChallengeResult.victories }}</span>
+                      <span class="result-defeat">❌ 失败 {{ bossChallengeResult.defeats }}</span>
+                    </div>
+                  </div>
+                  <div v-else-if="bossChallengeResult && !bossChallengeResult.success && bossChallengeResult.characterId === selectedCharBossTarget.characterId" class="boss-challenge-error">
+                    ⚠️ {{ bossChallengeResult.message }}
+                  </div>
+                </div>
+              </div>
+
+              <!-- 怪物 BOSS 选择网格（按秘境分组） -->
+              <div v-else-if="!selectedBossTarget" class="boss-groups">
               <div v-for="group in bossChallengeGroups" :key="group.zoneId" class="boss-group">
                 <div class="boss-group-title">
                   <span class="boss-group-name">{{ group.zoneName }}</span>
@@ -1010,7 +1120,8 @@ import CharacterPortraitModal from './CharacterPortraitModal.vue'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
 import { getPillsByZone } from '../plugins/pills'
-import { BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
+import { BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
+import { characterList, characterDefMap } from '../plugins/characters'
 import { getIconUrl } from '../plugins/icons'
 import BattleStage from './BattleStage.vue'
 
@@ -1070,6 +1181,7 @@ const {
   // BOSS 挑战系统
   bossChallengeResult,
   runBossChallenge,
+  runCharacterBossChallenge,
   isBossChallengeInProgress,
   bossChallengeRound,
   bossChallengeTotalRounds,

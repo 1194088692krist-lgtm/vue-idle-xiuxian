@@ -2025,6 +2025,311 @@ async function runBossChallenge(zoneId, bossId, count) {
   return result
 }
 
+// 根据角色星级挑选合适的"挑战用"秘境与难度（用于人物 BOSS 挑战券）
+// 星级越高，匹配越后期的地图，保证 BOSS 难度与产出符合角色定位
+function pickChallengeZoneForCharacter(character) {
+  if (!character) return null
+  // 3星 -> 图2（迷雾谷）；4星 -> 图5（鬼荒原）；5星 -> 图7（仙墟）
+  const starToZoneIdx = { 3: 1, 4: 4, 5: 6 }
+  const zoneIdx = starToZoneIdx[character.star] ?? 1
+  const zone = zones[Math.min(zoneIdx, zones.length - 1)]
+  if (!zone) return null
+  // 选取该图「凶险」档作为挑战基准难度（与 runBossChallenge 一致）
+  const diff = (zone.difficulties || []).find(d => d.key === 'xiongxian') || zone.difficulties?.[2]
+  if (!diff) return null
+  return { zone, diff }
+}
+
+// 实装：人物 BOSS 挑战券主动挑战
+// 与 runBossChallenge 对称，但敌人用 createCharacterBossEnemy 生成，掉落走 grantCharacterBossDrops
+async function runCharacterBossChallenge(characterId, count) {
+  const s = store()
+  const result = {
+    characterId,
+    count,
+    victories: 0,
+    defeats: 0,
+    drops: [],
+    ticketId: null,
+    ticketName: '',
+    bossName: '',
+    message: '',
+    success: false
+  }
+
+  // 校验角色
+  const character = _charList.find(c => c.id === characterId)
+  if (!character) {
+    result.message = '角色不存在'
+    return result
+  }
+  result.bossName = `${character.name}（人物形态）`
+
+  // 查找挑战券定义
+  const ticketDef = CHARACTER_BOSS_TICKETS[characterId]
+  if (!ticketDef) {
+    result.message = '该角色未配置挑战券'
+    return result
+  }
+  result.ticketId = ticketDef.id
+  result.ticketName = ticketDef.name
+
+  if (!count || count <= 0) {
+    result.message = '挑战次数必须大于 0'
+    return result
+  }
+
+  // 检查挑战券数量
+  const ticketCount = s.countMaterial('boss_ticket', ticketDef.id)
+  if (ticketCount < count) {
+    result.message = `挑战券不足，需要 ${count} 张，当前 ${ticketCount} 张`
+    return result
+  }
+
+  // 消耗挑战券
+  const consumeResult = s.consumeBossTicket(ticketDef.id, count)
+  if (!consumeResult.success) {
+    result.message = consumeResult.message
+    return result
+  }
+
+  // 选取秘境与难度
+  const picked = pickChallengeZoneForCharacter(character)
+  if (!picked) {
+    result.message = '未找到合适的挑战场景'
+    return result
+  }
+  const { zone, diff } = picked
+  const effectiveZone = buildEffectiveZone(zone, diff)
+
+  // 重置挑战会话状态（与 runBossChallenge 对齐）
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 }
+  sessionMaterials.value = {}
+  foundEquipment.value = []
+  logs.value = []
+  currentEncounterSummary.value = null
+  idleCombatLog.value = []
+  currentIdleEnemy.value = null
+  currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+  bossChallengeSummary.value = null
+  bossChallengeResult.value = null
+  ensureTeamMemberStates()
+  const team = s.getTeamMembersDetail()
+  teamMemberStates.value = team.map(member => buildTeamMemberState(member, s))
+
+  // 进入挑战状态
+  isBossChallengeInProgress.value = true
+  bossChallengeTotalRounds.value = count
+  bossChallengeBossName.value = result.bossName
+  bossChallengeZoneName.value = zone.name
+  bossChallengeRound.value = 0
+
+  addLog('header', `👑 开始挑战【人物形态】${character.name}，共 ${count} 场`)
+
+  // 逐场战斗
+  for (let i = 0; i < count; i++) {
+    bossChallengeRound.value = i + 1
+
+    if (teamMemberStates.value.every(ms => ms.hp <= 0)) {
+      addLog('defeat', `💀 全队力竭，挑战被迫提前终止（已完成 ${i}/${count} 场）`)
+      break
+    }
+
+    // 创建人物 BOSS 实体
+    const bossEnemy = createCharacterBossEnemy(character, effectiveZone, 'xiongxian')
+    bossEnemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
+    bossEnemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
+    bossEnemy.name = `${character.name}（人物形态）`
+    bossEnemy.characterBossId = character.id
+
+    // 创建玩家实体
+    const playerEntities = []
+    for (const ms of teamMemberStates.value) {
+      if (ms.hp <= 0) continue
+      const member = s.sectMembers.find(m => m.id === ms.memberId)
+      if (!member) continue
+      const entity = createMemberCombatEntity(member)
+      entity.currentHealth = Math.min(ms.hp, entity.stats.maxHealth)
+      entity.memberId = ms.memberId
+      entity.role = member.role || 'vanguard'
+      entity.avatar = getCharacterThumbnail(member)
+      playerEntities.push(entity)
+    }
+    if (playerEntities.length === 0) break
+
+    currentEncounter.value = {
+      enemy: bossEnemy,
+      players: playerEntities,
+      round: 0,
+      inProgress: true,
+      combatLog: [],
+      combatStats: {},
+      manager: null,
+      enemyData: { mainEnemy: bossEnemy, allBosses: [bossEnemy], hasBoss: true, isElite: false }
+    }
+    currentIdleEnemy.value = buildIdleEnemySnapshot(bossEnemy, bossEnemy.currentHealth)
+
+    addLog('header', `⚔️ 第 ${i + 1}/${count} 场人物形态 BOSS 挑战：${character.name}！`)
+    idleCombatLog.value.push(`—— 第 ${i + 1} 场人物 BOSS 挑战 · ${character.name} ——`)
+
+    // 推进战斗
+    let roundResult = { finished: false }
+    let roundsExecuted = 0
+    let combatLogSynced = currentEncounter.value.combatLog.length
+    while (!roundResult.finished && roundsExecuted < 50) {
+      roundsExecuted++
+      roundResult = await executeRound(effectiveZone)
+      const cl = currentEncounter.value.combatLog
+      if (cl.length > combatLogSynced) {
+        for (let j = combatLogSynced; j < cl.length; j++) idleCombatLog.value.push(cl[j])
+        combatLogSynced = cl.length
+      }
+      if (currentIdleEnemy.value) {
+        const liveHP = currentEncounter.value.enemy.currentHealth
+        const liveMax = currentEncounter.value.enemy.stats.maxHealth || 0
+        currentIdleEnemy.value.currentHealth = Math.round(liveHP)
+        currentIdleEnemy.value.hpPercent = liveMax > 0
+          ? Math.max(0, Math.min(100, (liveHP / liveMax) * 100)).toFixed(0) + '%'
+          : '0%'
+        currentIdleEnemy.value.dead = liveHP <= 0
+      }
+      await new Promise(resolve => setTimeout(resolve, 750))
+    }
+
+    const victory = roundResult.victory
+    let rewards = []
+    let loss = 0
+
+    if (victory) {
+      result.victories++
+      // 击杀事件（人物 BOSS 击杀立绘演出）
+      const killer = roundResult.lastPlayerAttacker
+        || currentEncounter.value.players.find(p => p.currentHealth > 0)
+        || currentEncounter.value.players[0]
+        || null
+      const killEvt = {
+        killerMemberId: killer?.memberId || null,
+        killerName: killer?.name || '',
+        bossName: character.name || '',
+        zoneId: zone.id || '',
+        ts: Date.now()
+      }
+      bossKillEvent.value = killEvt
+      lastBossKillTs = Date.now()
+      console.log('[useIdleSystem] 人物BOSS挑战击杀事件已发出', killEvt)
+
+      // 标准奖励（按 BOSS 计算）
+      rewards = grantReward(effectiveZone, false, true)
+      // 人物 BOSS 专属掉落（内丹碎片 + 挑战券返还）
+      const charDrops = grantCharacterBossDrops(bossEnemy)
+      for (const d of charDrops) {
+        rewards.push({ type: d.type, name: d.name, amount: d.amount || 1, ...d })
+      }
+      result.drops.push(...charDrops)
+      accumulateMaterials(rewards)
+      accumulateMaterials(charDrops)
+      runStats.value.victories++
+      // 装备掉落累计
+      rewards.forEach(r => {
+        if (r.type === 'equipment' && r.item) {
+          r.item._pickedAt = Date.now()
+          foundEquipment.value.push(r.item)
+        }
+      })
+      // 内丹碎片数量统计
+      const innerPillDrop = charDrops.find(d => d.type === 'character_inner_pill')
+      if (innerPillDrop) runStats.value.characterInnerPills += (innerPillDrop.amount || 0)
+      // 挑战券返还统计
+      const ticketDrop = charDrops.find(d => d.type === 'boss_ticket')
+      if (ticketDrop) runStats.value.bossTickets += (ticketDrop.amount || 0)
+
+      addLog('victory', `✅ 第 ${i + 1} 场挑战胜利！击杀 ${character.name}（人物形态）`)
+    } else {
+      result.defeats++
+      loss = Math.floor((s.cultivationPool || 0) * 0.05)
+      s.cultivationPool = Math.max(0, (s.cultivationPool || 0) - loss)
+      runStats.value.defeats++
+      addLog('defeat', `❌ 第 ${i + 1} 场挑战失败，损失修为 ${loss}`)
+    }
+
+    // 同步玩家血量
+    for (const p of currentEncounter.value.players) {
+      const ms = teamMemberStates.value.find(m => m.memberId === p.memberId)
+      if (ms) ms.hp = Math.max(0, Math.round(p.currentHealth))
+    }
+    // 累计真实伤害
+    for (const p of currentEncounter.value.players) {
+      const cs = currentEncounter.value.combatStats[p.memberId]
+      if (!cs) continue
+      runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
+      runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
+      runStats.value.totalShieldAbsorbed += Math.max(0, Math.round(cs.shieldAbsorbed || 0))
+    }
+
+    currentEncounterSummary.value = {
+      count: i + 1,
+      victory,
+      enemyName: result.bossName,
+      enemyTier: 'boss',
+      rewards: rewards.map(r => ({ type: r.type, name: r.name, amount: r.amount, rarity: r.rarity, info: r.info })),
+      loss,
+      teamStates: teamMemberStates.value.map(ms => ({ name: ms.name, hp: ms.hp, maxHP: ms.maxHP })),
+      buffs: []
+    }
+    currentEncounter.value = { ...currentEncounter.value, inProgress: false }
+
+    // 场次间隔
+    if (i < count - 1 && !teamMemberStates.value.every(ms => ms.hp <= 0)) {
+      const gap = lastBossKillTs > 0 && (Date.now() - lastBossKillTs) < ENCOUNTER_INTERVAL
+        ? ENCOUNTER_INTERVAL + BOSS_KILL_EXTRA_DELAY
+        : ENCOUNTER_INTERVAL
+      await new Promise(resolve => setTimeout(resolve, gap))
+    }
+  }
+
+  // 清空战斗画面
+  currentEncounter.value = { enemy: null, players: [], round: 0, inProgress: false, combatLog: [], combatStats: {}, manager: null, enemyData: null }
+
+  // 构建总结算（与 runBossChallenge 对齐）
+  bossChallengeSummary.value = {
+    zoneName: zone.name,
+    bossName: result.bossName,
+    difficulty: 'xiongxian',
+    duration: 0,
+    encounters: count,
+    victories: runStats.value.victories,
+    defeats: runStats.value.defeats,
+    totalStones: runStats.value.spiritStones,
+    totalCultivation: runStats.value.cultivation,
+    totalEquipment: runStats.value.equipment,
+    totalPhantomCrystals: runStats.value.phantomCrystals,
+    totalDamageDealt: runStats.value.totalDamageDealt,
+    totalDamageTaken: runStats.value.totalDamageTaken,
+    totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
+    totalBossTickets: runStats.value.bossTickets,
+    totalBossMaterials: runStats.value.bossMaterials,
+    totalCharacterInnerPills: runStats.value.characterInnerPills,
+    defeated: teamMemberStates.value.every(ms => ms.hp <= 0),
+    bossResult: null,
+    logs: [...logs.value],
+    equipmentList: [...foundEquipment.value],
+    materialSummary: buildMaterialSummary(),
+    teamStates: [...teamMemberStates.value]
+  }
+
+  result.success = true
+  result.message = `挑战 ${character.name}（人物形态）${count} 次：胜 ${result.victories} / 败 ${result.defeats}`
+  bossChallengeResult.value = result
+
+  addLog('header', `🎯 ${result.message}`)
+  flushAllPendingLogs()
+
+  isBossChallengeInProgress.value = false
+  s.queueSave()
+  s.saveToCurrentSlot().catch(err => console.error('人物 BOSS 挑战自动存档失败:', err))
+  return result
+}
+
 function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   const s = store()
   const rewards = []
@@ -4466,6 +4771,7 @@ export function useIdleSystem() {
     // BOSS 挑战系统
     bossChallengeResult,
     runBossChallenge,
+    runCharacterBossChallenge,
     isBossChallengeInProgress,
     bossChallengeRound,
     bossChallengeTotalRounds,

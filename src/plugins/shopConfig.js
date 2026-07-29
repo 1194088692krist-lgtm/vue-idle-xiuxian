@@ -358,14 +358,20 @@ async function _ensureCharDeps() {
  * 随机刷新 5 个人物的皮肤商品
  * @param {Object} opts
  * @param {Object} opts.unlockedShopSkins - 已购皮肤记录 { [charId]: [skinIdx, ...] }，已购全部皮肤的角色不再出现
+ * @param {Array<string>} [opts.ownedCharacterIds] - 玩家已招募角色 templateId 列表；若提供则只出售已拥有角色的皮肤（避免摆出未解锁角色）
  * @returns {Promise<Array>} 5 个商品项 { uid, characterId, characterName, star, skinIndex, price, sold }
  */
 export async function rollSkinShopItems(opts = {}) {
   const { characterList, skinMap } = await _ensureCharDeps()
   const unlocked = opts.unlockedShopSkins || {}
-  // 候选池：所有 skinMap 中皮肤数 >= 6 的角色
+  // 仅展示玩家已招募角色的皮肤，避免"摆出角色不存在的皮肤"
+  const ownedSet = Array.isArray(opts.ownedCharacterIds) && opts.ownedCharacterIds.length > 0
+    ? new Set(opts.ownedCharacterIds)
+    : null
+  // 候选池：所有 skinMap 中皮肤数 >= 6 的角色（且玩家已招募）
   const candidates = []
   for (const char of characterList) {
+    if (ownedSet && !ownedSet.has(char.id)) continue
     const skinCount = skinMap[char.id] || 0
     if (skinCount < SKIN_SHOP_CONFIG.minSkinCount) continue
     // 该角色可购买的皮肤 = purchasableSkins 中未购买的
