@@ -22,9 +22,14 @@ function isSkinAssetUrl(url) {
 // 检查资源版本号是否变化；变化时清除所有 skin 立绘缓存，确保旧 skin3 不再出现
 async function checkAssetVersionAndInvalidate(cache) {
   try {
+    // 加动态时间戳绕过 Service Worker 的 SWR 缓存：
+    // SW 的 staleWhileRevalidate 会 cache.match(req) 返回旧版 skins.json(count=3)，
+    // 导致版本号检测拿到旧 _version，误判"版本一致"不清理缓存。
+    // 时间戳使 URL 每次不同，cache.match 永不命中，必定走网络拿最新版本。
+    const ts = Date.now()
     const [skinsRes, petSkinsRes] = await Promise.all([
-      fetch(urlFromPath('./portraits/skins.json'), { cache: 'no-store' }),
-      fetch(urlFromPath('./pets/skins.json'), { cache: 'no-store' })
+      fetch(urlFromPath(`./portraits/skins.json?v=5&_t=${ts}`), { cache: 'no-store' }),
+      fetch(urlFromPath(`./pets/skins.json?v=5&_t=${ts}`), { cache: 'no-store' })
     ])
     let serverVersion = ''
     if (skinsRes.ok) {
@@ -119,7 +124,7 @@ async function collectResourceUrls() {
     './monsters/manifest.json',
     './portraits/skins.json?v=5',
     './pets/manifest.json',
-    './pets/skins.json'
+    './pets/skins.json?v=5'
   ]
   for (const m of manifestUrls) {
     urls.push(m)
@@ -132,8 +137,18 @@ async function collectResourceUrls() {
   urls.push('./fx-manifest.json')
   // 3. 从立绘清单提取所有图片 URL
   try {
+    // fetch 时对 skins.json 加动态时间戳绕过 SW 的 SWR 缓存：
+    // SW 的 staleWhileRevalidate 会返回缓存的旧版 skins.json(count=3)，
+    // 导致 collectResourceUrls 只收集 skin1-3 的 URL，漏掉 skin4/skin5。
+    // 时间戳使 URL 每次不同，cache.match 永不命中，必定走网络拿最新 count=5。
+    // 注意：下载列表 urls 里存的仍是固定 ?v=5 的 URL（上方 manifestUrls），
+    // 时间戳版本仅用于本次 fetch 拿最新数据，不加入缓存列表。
+    const bustTs = Date.now()
+    const fetchUrls = manifestUrls.map(u =>
+      u.includes('skins.json') ? `${u}&_t=${bustTs}` : u
+    )
     const [portraitsRes, monstersRes, skinsRes, petManifestRes, petSkinsRes, fxManifestRes] = await Promise.all(
-      manifestUrls.map(u => fetch(urlFromPath(u))).concat([fetch(urlFromPath('./fx-manifest.json'))])
+      fetchUrls.map(u => fetch(urlFromPath(u))).concat([fetch(urlFromPath('./fx-manifest.json'))])
     )
     const portraitsData = await portraitsRes.json()
     const monstersData = await monstersRes.json()
