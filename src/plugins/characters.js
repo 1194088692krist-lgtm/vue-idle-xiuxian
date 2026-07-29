@@ -191,9 +191,9 @@ export async function loadSkinsManifest() {
   if (skinsLoaded) return
   skinsLoaded = true
   const base = import.meta.env.BASE_URL || './'
-  // ?v=3 硬缓存破坏：与 skins.json 内 _version v3 对应，升级到 v4 时改此参数
+  // ?v=5 硬缓存破坏：与 skins.json 内 _version v5 对应，升级到 v6 时改此参数
   // no-cache：发 conditional request，服务器 304 才用缓存，200 用新版本
-  fetch(`${base}portraits/skins.json?v=3`, { cache: 'no-cache' })
+  fetch(`${base}portraits/skins.json?v=5`, { cache: 'no-cache' })
     .then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()

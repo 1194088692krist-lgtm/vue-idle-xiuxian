@@ -112,10 +112,12 @@ function urlFromPath(p) {
 async function collectResourceUrls() {
   const urls = []
   // 1. 立绘清单（人物/怪物/灵宠 + 人物皮肤清单）
+  // portraits/skins.json 带 ?v=5 缓存破坏参数：与 characters.js loadSkinsManifest 一致，
+  // 确保收集到 count=5 的新版，从而把 skin4/skin5 URL 加入下载列表
   const manifestUrls = [
     './portraits/manifest.json',
     './monsters/manifest.json',
-    './portraits/skins.json',
+    './portraits/skins.json?v=5',
     './pets/manifest.json',
     './pets/skins.json'
   ]
