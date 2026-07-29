@@ -1058,6 +1058,8 @@ export const usePlayerStore = defineStore('player', {
       // 开发者模式仅用本地存档、无真实账号 token，不支持云同步（静默跳过，不报错）
       if (auth.devMode && !auth.token) return
       if (this._cloudSyncing) return  // 已有同步进行中，跳过本次
+      // 互斥锁：migrate 进行中时跳过自动同步，避免两者并发读写 IndexedDB 造成竞态
+      if (this._migrating) { console.warn('[syncToCloud] migrate 进行中，跳过本次自动同步'); return }
       this._cloudSyncing = true
       this.cloudSyncStatus = '同步中…'
       const failures = []
@@ -1152,6 +1154,7 @@ export const usePlayerStore = defineStore('player', {
 
         const slots = [0, 1, 2, 3, 4, 5]
         const conflicts = []
+        let downloadedAny = false  // 追踪本次是否真正下载了云端数据到本地
         for (const slot of slots) {
           checkAbort()
           const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
@@ -1171,9 +1174,14 @@ export const usePlayerStore = defineStore('player', {
           const cloudTime = cloudSlot?.updated_at || 0
 
           if (cloudBlob && !localBlob) {
-            // ② 云端有、本地无 → 下载
-            checkAbort()
-            await GameDB.setData(key, cloudBlob)
+            // ② 云端有、本地无：仅交互模式下载（用户显式同步到新设备），非交互跳过避免误覆盖
+            if (interactive) {
+              checkAbort()
+              await GameDB.setData(key, cloudBlob)
+              downloadedAny = true
+            } else {
+              console.warn(`[migrate] slot=${slot} 云端有本地无，非交互模式跳过下载（避免误覆盖）`)
+            }
           } else if (!cloudBlob && localBlob) {
             // ① 本地有、云端无 → 上传（仅当本地时间戳有效时上传，避免污染云端）
             if (localTime > 0) {
@@ -1190,29 +1198,16 @@ export const usePlayerStore = defineStore('player', {
                 cloudTime
               })
             } else {
-              // 多字段保护：在用云端覆盖本地之前，先比较关键进度字段。
-              // 若本地在任一关键字段上显著领先（等级/灵石/装备/灵宠/修为池），
-              // 即使云端时间戳较新也拒绝覆盖，改为上传本地保住进度。
-              // 历史缺陷：旧版只保护 cultivationPool 一个字段，玩家下午炼丹/打装备/升灵宠
-              // 但修为池没怎么涨时保护不触发，下午进度被上午云端静默覆盖。
-              const localDecoded = decryptData(localBlob)
-              const cloudDecoded = decryptData(cloudBlob)
-              const protectionResult = _shouldProtectLocal(localDecoded, cloudDecoded)
-              const localWins = protectionResult.shouldProtect
-              if (localWins) {
-                checkAbort()
-                await this.pushSlotToCloud(slot, localBlob, localTime > 0 ? localTime : Date.now())
-                console.warn(`[migrate] slot=${slot} 保护本地存档：${protectionResult.reason}`)
-              } else if (localTime < 0 && cloudTime > 0) {
-                // 本地旧版存档无 _saveTime：保守策略，保留本地不上传不下载，等用户手动同步
-                console.warn(`[migrate] slot=${slot} 本地无 _saveTime，保留本地不进行云同步`)
-              } else if (cloudTime >= localTime) {
-                checkAbort()
-                // 真正的云端较新：覆盖本地
-                await GameDB.setData(key, cloudBlob)
-              } else {
-                // 本地较新：上传覆盖云端
+              // ⚠️ 彻底修复回档：非交互模式下本地永远是唯一可信源，绝不下载覆盖本地。
+              //   原实现当 cloudTime >= localTime 时用云端数据覆盖 IndexedDB，
+              //   但云端可能是较早的弱档（多设备时间戳不一致 / _shouldProtectLocal 字段不足），
+              //   覆盖后 $reset() 内存清空重载 = 回档。
+              //   现策略：非交互模式只上传本地到云端备份，不下载。
+              //   仅当本地时间戳有效时上传，避免污染云端 last-write-wins。
+              if (localTime > 0) {
                 await this.pushSlotToCloud(slot, localBlob, localTime)
+              } else {
+                console.warn(`[migrate] slot=${slot} 本地无 _saveTime，保留本地不进行云同步`)
               }
             }
           }
@@ -1223,12 +1218,14 @@ export const usePlayerStore = defineStore('player', {
           this.cloudConflicts = conflicts
           return { conflicts }
         }
-        // ⚠️ 关键修复：仅在未中断时执行 $reset + initializePlayer，
-        // 否则会在用户已开始游玩后把"下午状态"清空重载为"上午状态"，造成"突然回档"。
+        // ⚠️ 关键修复：仅在未中断 且 真正下载了云端数据时才 $reset + initializePlayer，
+        // 否则会在用户已开始游玩后把内存状态清空重载，造成"突然回档"。
+        // 非交互模式只上传不下载，downloadedAny 恒为 false，永远不会 $reset。
         checkAbort()
-        // 无冲突，统一重新初始化
-        this.$reset()
-        await this.initializePlayer()
+        if (downloadedAny) {
+          this.$reset()
+          await this.initializePlayer()
+        }
         this.cloudConflicts = []
         return { conflicts: [] }
       } finally {

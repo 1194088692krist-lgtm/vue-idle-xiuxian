@@ -3299,11 +3299,15 @@ async function executeRound(effectiveZone) {
   // 本回合收集的技能释放事件：循环内同步赋值会被 Vue watch batching 合并只触发一次
   // 改为收集到数组，循环结束后逐个延时触发，让每个角色的技能演出都能显示
   const roundSkillEvents = []
-  // 刷新每个成员的实时 buff 标记（hasShield/hasBuff），供 chooseMemberAction 智能选目标
+  // 刷新每个成员的实时 buff 标记（hasShield/hasBuff）与实时血量，供 chooseMemberAction 智能选目标
   // player.buffs 是实时战斗实体上的 buff 列表，shield/buff 施加后立即可见
+  // 修复 BUG D：原仅同步 hasShield/hasBuff，未同步 ms.hp → AI 用上一回合的旧 HP 判定 selfHPpct，
+  // 导致盾系角色 HP 已跌破 50% 仍走"保护模式"给队友加盾，不触发 HP<50% 自救加盾逻辑
   for (const ms of teamMemberStates.value) {
     const p = players.find(pl => pl.memberId === ms.memberId)
-    if (!p || !Array.isArray(p.buffs)) { ms.hasShield = false; ms.hasBuff = {}; continue }
+    if (!p || !Array.isArray(p.buffs)) { ms.hasShield = false; ms.hasBuff = {}; ms.hp = p ? Math.max(0, Math.round(p.currentHealth)) : 0; continue }
+    // 同步实时血量（applyBuffs/tickDebuffs 已在本回合结算 DoT，须让 AI 看到结算后血量）
+    ms.hp = Math.max(0, Math.round(p.currentHealth))
     const active = p.buffs.filter(b => b.duration > 0)
     // 修复 BUG A：护盾必须同时满足 value > 0，否则耗尽/0 值护盾会让 AI 误判"已有盾"而跳过补盾
     ms.hasShield = active.some(b => b.type === 'shield' && (b.value === undefined || b.value > 0))

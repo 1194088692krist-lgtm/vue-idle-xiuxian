@@ -425,7 +425,7 @@ const handleDownloadFromCloud = () => {
 const handleSmartSync = () => {
   dialog.info({
     title: '智能同步',
-    content: '将自动比较各槽位时间戳，取最新者胜。是否继续？',
+    content: '将本地存档上传至云端备份（不会用云端覆盖本地，防止回档）。是否继续？',
     positiveText: '开始同步',
     negativeText: '取消',
     onPositiveClick: async () => {
@@ -433,7 +433,7 @@ const handleSmartSync = () => {
       try {
         const res = await playerStore.migrate({ interactive: false })
         const n = res?.conflicts?.length || 0
-        message.success(n ? `已合并（${n} 个槽位云端较新已覆盖）` : '已是最新')
+        message.success(n ? `已上传，${n} 个槽位存在冲突需手动处理` : '本地存档已备份到云端')
         await loadSlots()
       } catch (e) {
         message.error('同步失败：' + (e.message || e))

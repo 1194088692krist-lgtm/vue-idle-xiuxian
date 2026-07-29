@@ -372,23 +372,19 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
       console.error('初始化存档失败，尝试继续:', e)
     }
 
-    // 已登录且非开发者模式：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
-    // 开发者模式：跳过云同步，仅使用本地存档
-    // ⚠️ 历史缺陷修复：原实现用 Promise.race 让 migrate 在后台跑，2s 超时不会取消它。
-    //   migrate 几秒后完成时会执行 this.$reset() + initializePlayer()，把用户正在玩的"下午状态"
-    //   清空并重载为可能已被云端覆盖的"上午状态"，表现为"突然回档"。
-    //   修复方案：用 AbortSignal 让 migrate 在超时后自检放弃，绝不进入 $reset 分支。
+    // 已登录且非开发者模式：启动仅上传本地存档到云端备份，绝不下载覆盖本地。
+    // ⚠️ 彻底修复回档 bug：原实现启动时后台 migrate({interactive:false}) 会下载云端存档，
+    //   当 cloudTime >= localTime 时用云端旧数据覆盖 IndexedDB 并 $reset() 内存状态，
+    //   导致用户最新进度被旧云端数据覆盖（"回档"）。即使用 AbortSignal 也无法阻止
+    //   中途已执行的 setData 污染 IndexedDB。
+    //   现改为：启动只做 syncToCloud()（纯上传，不下载、不 $reset），本地 IndexedDB
+    //   始终是唯一可信源。云端下载仅在用户显式进入设置页交互式同步时触发。
     const authStore = useAuthStore()
     if (authStore.isLoggedIn && !authStore.devMode) {
-      const migrateAbort = new AbortController()
-      const MIGRATE_TIMEOUT_MS = 2000
-      // 超时触发 abort，migrate 内部会检查 signal 并提前 return（不执行 $reset）
-      const timeoutTimer = setTimeout(() => migrateAbort.abort(new Error('云同步超时')), MIGRATE_TIMEOUT_MS)
-      // 后台执行：成功/失败/超时都不阻塞加载流程
+      // 仅上传本地到云端备份，绝不覆盖本地
       playerStore
-        .migrate({ interactive: false, signal: migrateAbort.signal })
-        .catch(e => console.warn('启动云同步失败（不影响本地游玩）:', e?.message || e))
-        .finally(() => clearTimeout(timeoutTimer))
+        .syncToCloud()
+        .catch(e => console.warn('启动云备份失败（不影响本地游玩）:', e?.message || e))
       // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点（完全后台，不等待）
       playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
     } else if (authStore.devMode) {
@@ -591,6 +587,8 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
   onMounted(() => {
     startAutoGain()
     window.addEventListener('beforeunload', flushSave)
+    // pagehide 在移动端 Safari / bfcache 场景比 beforeunload 更可靠，作为备份保底
+    window.addEventListener('pagehide', flushSave)
     window.addEventListener('keydown', handleEscKey)
     // 注：人物立绘定义已在 loadGame() 中通过 await initCharacterDefs() 加载完成
     // 此处不再重复调用，避免与加载流程竞争造成 race condition（曾导致头像立绘 5 分钟后才显示）
@@ -606,6 +604,7 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     if (stonesRaf.value) cancelAnimationFrame(stonesRaf.value)
     if (cultivationRaf.value) cancelAnimationFrame(cultivationRaf.value)
     window.removeEventListener('beforeunload', flushSave)
+    window.removeEventListener('pagehide', flushSave)
     window.removeEventListener('keydown', handleEscKey)
   })
 
