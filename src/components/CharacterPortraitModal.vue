@@ -248,8 +248,11 @@ watch(
 
 // 最大可切换索引 = 按突破次数限制（0 原立绘不在计数内）
 // skin1/skin2：突破 >=1 次解锁；skin3：突破 >=2 次解锁；skinN(>=3)：突破 >= N-1 次
+// 突破满级(5/5)：解锁全部皮肤（含双皮肤变体 skin7_guzhuang 等）
 const maxSkinIndex = computed(() => {
   if (!canSwitch.value) return 0
+  // 突破满级 5 次：解锁全部皮肤（含古装变体），让双皮肤角色的 guzhuang 也可切换
+  if (breakThrough.value >= 5) return skinCount.value
   // 突破 1 次：解锁前 2 个皮肤；突破 2 次起：每多 1 次突破再解锁 1 个
   const byBreak = breakThrough.value >= 2 ? Math.min(skinCount.value, 1 + breakThrough.value) : Math.min(skinCount.value, 2)
   return Math.min(byBreak, skinCount.value)
