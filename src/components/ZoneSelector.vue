@@ -306,6 +306,10 @@
               <span class="dash-label">🩸 总受伤</span>
               <span class="dash-value" style="color:#e53935">{{ formatNumber(idleDashboard.totalDamageTaken) }}</span>
             </div>
+            <div class="dash-item" v-if="idleDashboard.totalShieldAbsorbed > 0">
+              <span class="dash-label">🛡️ 护盾吸收</span>
+              <span class="dash-value" style="color:#03a9f4">{{ formatNumber(idleDashboard.totalShieldAbsorbed) }}</span>
+            </div>
           </div>
           <!-- 生效中的小剧场 Buff -->
           <div v-if="idleDashboard.activeBuffs.length" class="dash-buffs">
@@ -459,6 +463,10 @@
         <div class="summary-item">
           <span class="summary-label">总受伤</span>
           <span class="summary-value" style="color:#e53935">{{ formatNumber(lastSummary.totalDamageTaken || 0) }}</span>
+        </div>
+        <div class="summary-item" v-if="(lastSummary.totalShieldAbsorbed || 0) > 0">
+          <span class="summary-label">🛡️ 护盾吸收</span>
+          <span class="summary-value" style="color:#03a9f4">{{ formatNumber(lastSummary.totalShieldAbsorbed || 0) }}</span>
         </div>
       </div>
 
@@ -708,6 +716,10 @@
                     <span class="dash-label">🩸 总受伤</span>
                     <span class="dash-value" style="color:#e53935">{{ formatNumber(idleDashboard.totalDamageTaken) }}</span>
                   </div>
+                  <div class="dash-item" v-if="idleDashboard.totalShieldAbsorbed > 0">
+                    <span class="dash-label">🛡️ 护盾吸收</span>
+                    <span class="dash-value" style="color:#03a9f4">{{ formatNumber(idleDashboard.totalShieldAbsorbed) }}</span>
+                  </div>
                 </div>
                 <!-- 当前 BOSS 怪物信息面板 -->
                 <div v-if="idleDashboard.enemy" class="dash-enemy no-hp boss-emphasis">
@@ -801,6 +813,10 @@
                 <div class="summary-item">
                   <span class="summary-label">总受伤</span>
                   <span class="summary-value" style="color:#e53935">{{ formatNumber(bossChallengeSummary.totalDamageTaken || 0) }}</span>
+                </div>
+                <div class="summary-item" v-if="(bossChallengeSummary.totalShieldAbsorbed || 0) > 0">
+                  <span class="summary-label">🛡️ 护盾吸收</span>
+                  <span class="summary-value" style="color:#03a9f4">{{ formatNumber(bossChallengeSummary.totalShieldAbsorbed || 0) }}</span>
                 </div>
               </div>
               <div v-if="bossChallengeSummary.materialSummary && bossChallengeSummary.materialSummary.length" class="material-detail-section">

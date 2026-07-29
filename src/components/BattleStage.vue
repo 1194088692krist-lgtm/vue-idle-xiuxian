@@ -77,6 +77,10 @@
             <div v-if="floaters['m-' + m.memberId]" class="float-damage" :class="floaters['m-' + m.memberId].cls">
               {{ floaters['m-' + m.memberId].text }}
             </div>
+            <!-- 护盾吸收伤害飘字：怪物攻击玩家被护盾吸收时显示，独立于主伤害飘字 -->
+            <div v-if="floaters['shield-' + m.memberId]" class="float-damage shield-floater" :class="floaters['shield-' + m.memberId].cls">
+              {{ floaters['shield-' + m.memberId].text }}
+            </div>
             <div v-if="comboShadows.includes(m.memberId)" class="combo-shadow"></div>
           </div>
           <div class="fighter-info">
@@ -530,6 +534,13 @@ function showEvent(e) {
       else if (roll < 0.75) bleedingTargets.push(defenderId)
       else poisonTargets.push(defenderId)
     }
+  }
+  // 护盾吸收伤害飘字：怪物攻击玩家时若护盾吸收了伤害，在玩家头像上方显示「护盾-X」蓝色飘字
+  // 与主伤害飘字并存，让玩家清晰感知护盾的实战价值
+  if (!e.isPlayerAttack && (e.shieldAbsorbed || 0) > 0 && defIsPlayer) {
+    shieldTarget.value = defenderId
+    floaters['shield-' + memberIdByName(e.defender)] = { text: '🛡-' + e.shieldAbsorbed, cls: 'shield-absorb' }
+    if (!effectBadge.value) effectBadge.value = { text: '护盾吸收', cls: 'badge-shield' }
   }
   if (e.isCrit) {
     effectBadge.value = { text: '暴击！', cls: 'badge-crit' }
@@ -1437,6 +1448,18 @@ onUnmounted(() => {
   animation: dodgeFloat 0.8s ease-out forwards;
 }
 .float-damage.vampire { color: #86efac; }
+.float-damage.shield-absorb {
+  color: #38bdf8;
+  font-size: 12px;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 1px 2px rgba(0,0,0,0.8);
+  animation: floatUp 1.2s ease-out forwards;
+}
+/* 护盾吸收飘字定位偏移：避免与主伤害飘字重叠 */
+.float-damage.shield-floater {
+  top: -22px;
+  left: 65%;
+  animation-delay: 0.1s;
+}
 
 @keyframes floatUp {
   0% { opacity: 1; transform: translateX(-50%) translateY(0); }

@@ -64,7 +64,7 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, bossTickets: 0, bossMaterials: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
@@ -1510,7 +1510,7 @@ async function runBossChallenge(zoneId, bossId, count) {
   const effectiveZone = buildEffectiveZone(zone, diff)
 
   // ===== 重置挑战会话状态（与挂机 startIdle 对齐，确保仪表盘/结算栏从 0 开始累积） =====
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, bossTickets: 0, bossMaterials: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
   sessionMaterials.value = {}
   foundEquipment.value = []
   logs.value = []
@@ -1666,12 +1666,13 @@ async function runBossChallenge(zoneId, bossId, count) {
       if (ms) ms.hp = Math.max(0, Math.round(p.currentHealth))
     }
 
-    // 累计本场真实伤害到总统计（仪表盘「总伤害/总受伤」）
+    // 累计本场真实伤害到总统计（仪表盘「总伤害/总受伤/总护盾吸收」）
     for (const p of currentEncounter.value.players) {
       const cs = currentEncounter.value.combatStats[p.memberId]
       if (!cs) continue
       runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
       runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
+      runStats.value.totalShieldAbsorbed += Math.max(0, Math.round(cs.shieldAbsorbed || 0))
     }
 
     // 实时更新当前结算画面（单场结算）
@@ -1718,6 +1719,7 @@ async function runBossChallenge(zoneId, bossId, count) {
     totalExp: runStats.value.exp,
     totalDamageDealt: runStats.value.totalDamageDealt,
     totalDamageTaken: runStats.value.totalDamageTaken,
+    totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,
     defeated: teamMemberStates.value.every(ms => ms.hp <= 0),
@@ -2107,23 +2109,25 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
       const cs = combatResult?.combatStats
       const damage = cs?.playerDamage || 0
       const tookDamage = cs?.playerTookDamage || 0
+      const shieldAbsorbed = cs?.shieldAbsorbed || 0
       const critCount = cs?.critCount || 0
       const comboCount = cs?.comboCount || 0
       const dodgeCount = cs?.dodgeCount || 0
       const vampireCount = cs?.vampireCount || 0
       const stunCount = cs?.stunCount || 0
       const rounds = cs?.rounds || 0
-      
+
       const damageText = damage > 0 ? `造成 ${Math.floor(damage)} 点伤害` : ''
       const tookDamageText = tookDamage > 0 ? `受到 ${Math.floor(tookDamage)} 点伤害` : ''
+      const shieldAbsorbedText = shieldAbsorbed > 0 ? `护盾吸收 ${Math.floor(shieldAbsorbed)} 点` : ''
       const critText = critCount > 0 ? `暴击×${critCount}` : ''
       const comboText = comboCount > 0 ? `连击×${comboCount}` : ''
       const dodgeText = dodgeCount > 0 ? `闪避×${dodgeCount}` : ''
       const vampireText = vampireCount > 0 ? `吸血×${vampireCount}` : ''
       const stunText = stunCount > 0 ? `眩晕×${stunCount}` : ''
       const roundsText = rounds > 0 ? `${rounds}回合` : ''
-      
-      const damageInfo = [damageText, tookDamageText, critText, comboText, dodgeText, vampireText, stunText, roundsText].filter(Boolean).join('，')
+
+      const damageInfo = [damageText, tookDamageText, shieldAbsorbedText, critText, comboText, dodgeText, vampireText, stunText, roundsText].filter(Boolean).join('，')
       
       if (extras.length > 0 || damageInfo) {
         text += '（' + [...extras, damageInfo].filter(Boolean).join('·') + '）'
@@ -2153,7 +2157,14 @@ function logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatRe
               if (rd.isDodged) {
                 roundText += `${rd.defender}闪避了${rd.attacker}的攻击`
               } else {
-                roundText += `${rd.attacker}→${rd.defender} ${rd.damage}伤害`
+                // 怪物攻击玩家：显示原始伤害 → 护盾吸收 → 实际扣血明细
+                const rawDmg = rd.rawDamage !== undefined ? rd.rawDamage : rd.damage
+                const shieldAbs = rd.shieldAbsorbed || 0
+                if (shieldAbs > 0) {
+                  roundText += `${rd.attacker}→${rd.defender} 造成${rawDmg}伤害(护盾吸收${shieldAbs},实际扣血${rd.damage})`
+                } else {
+                  roundText += `${rd.attacker}→${rd.defender} ${rd.damage}伤害`
+                }
                 if (rd.isCounter) roundText += ' [反击]'
               }
               roundText += ` (${rd.defender}剩余${hpPercent}%`
@@ -2645,6 +2656,7 @@ async function executeRound(effectiveZone) {
         playerHeal: 0,
         playerTookDamage: 0,
         enemyDamage: 0,
+        shieldAbsorbed: 0,
         rounds: 0,
         critCount: 0,
         comboCount: 0,
@@ -2873,8 +2885,13 @@ async function executeRound(effectiveZone) {
       } else if (defenderPlayer) {
         const cs = encounter.combatStats[defenderPlayer.memberId]
         if (cs) {
+          // 受到怪物攻击时：实际扣血计入 playerTookDamage/enemyDamage；护盾吸收部分单独统计
+          // r.damage 为实际扣血，r.shieldAbsorbed 为护盾吸收的原始伤害
           cs.playerTookDamage += r.damage
           cs.enemyDamage += r.damage
+          if (r.shieldAbsorbed > 0) {
+            cs.shieldAbsorbed += r.shieldAbsorbed
+          }
           if (r.isCounter) cs.counterCount++
         }
       }
@@ -2892,6 +2909,8 @@ async function executeRound(effectiveZone) {
             attacker: r.attacker,
             defender: r.defender,
             damage: Math.round(r.damage),
+            rawDamage: Math.round(r.rawDamage !== undefined ? r.rawDamage : r.damage),
+            shieldAbsorbed: Math.round(r.shieldAbsorbed || 0),
             isCrit: r.isCrit || false,
             isCombo: r.isCombo || false,
             isDodged: r.isDodged || false,
@@ -2912,9 +2931,22 @@ async function executeRound(effectiveZone) {
       if (r.isDodged) {
         roundLog.push(`💨 ${r.attacker}${skillName ? '施展「' + skillName + '」' : '攻击'}${r.defender}被闪避`)
       } else {
-        let txt = skillName
-          ? `🔥 ${r.attacker}施展「${skillName}」对${r.defender}造成${Math.floor(r.damage)}点伤害`
-          : `⚔️ ${r.attacker}对${r.defender}造成${Math.floor(r.damage)}点伤害`
+        // 怪物攻击玩家时显示伤害明细：原始伤害 → 护盾吸收 → 实际扣血
+        // 玩家攻击怪物时保持原样简洁（仅显示实际伤害）
+        const isEnemyAttack = !isPlayerAttacker
+        const shieldAbs = r.shieldAbsorbed || 0
+        const rawDmg = r.rawDamage !== undefined ? r.rawDamage : r.damage
+        let txt
+        if (isEnemyAttack && shieldAbs > 0) {
+          // 怪物攻击玩家且有护盾吸收：完整显示「造成X(护盾吸收Y,实际扣血Z)」
+          txt = skillName
+            ? `🔥 ${r.attacker}施展「${skillName}」对${r.defender}造成${Math.floor(rawDmg)}点伤害（护盾吸收${Math.floor(shieldAbs)}，实际扣血${Math.floor(r.damage)}）`
+            : `⚔️ ${r.attacker}对${r.defender}造成${Math.floor(rawDmg)}点伤害（护盾吸收${Math.floor(shieldAbs)}，实际扣血${Math.floor(r.damage)}）`
+        } else {
+          txt = skillName
+            ? `🔥 ${r.attacker}施展「${skillName}」对${r.defender}造成${Math.floor(r.damage)}点伤害`
+            : `⚔️ ${r.attacker}对${r.defender}造成${Math.floor(r.damage)}点伤害`
+        }
         if (r.isCrit) txt += ' [暴击]'
         if (r.isCombo) txt += ' [连击]'
         if (r.isVampire) txt += ' [吸血]'
@@ -3371,12 +3403,13 @@ async function runIdleEncounter() {
         })
       }
 
-      // 累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害」）
+      // 累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害/总护盾吸收」）
       for (const p of encounter.players) {
         const cs = encounter.combatStats[p.memberId]
         if (!cs) continue
         runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
         runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
+        runStats.value.totalShieldAbsorbed += Math.max(0, Math.round(cs.shieldAbsorbed || 0))
       }
 
       logEncounter(zone, diff, count, enemy, victory, rewards, loss, combatResults, roleEffects, enemyStatusEffects)
@@ -3437,12 +3470,13 @@ async function runIdleEncounter() {
         if (ms) ms.hp = Math.max(0, Math.round(p.currentHealth))
       }
 
-      // 僵局同样累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害」）
+      // 僵局同样累加本场遭遇的真实伤害数据到挂机总统计（仪表盘「总造成伤害/总受到伤害/总护盾吸收」）
       for (const p of encounter.players) {
         const cs = encounter.combatStats[p.memberId]
         if (!cs) continue
         runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
         runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
+        runStats.value.totalShieldAbsorbed += Math.max(0, Math.round(cs.shieldAbsorbed || 0))
       }
 
       s.updateIdleExploration({ encounterCount: count, lastEncounterTime: Date.now() })
@@ -3761,7 +3795,7 @@ function startIdle(durationMinutes) {
   encounterAborted = false
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, bossTickets: 0, bossMaterials: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
   foundEquipment.value = []
   logs.value = []
   currentEncounterSummary.value = null
@@ -3833,6 +3867,7 @@ function finishIdle() {
     totalExp: runStats.value.exp,
     totalDamageDealt: runStats.value.totalDamageDealt,
     totalDamageTaken: runStats.value.totalDamageTaken,
+    totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,
     defeated: allDead,
@@ -3947,7 +3982,7 @@ function initIdle() {
       const probe = createPlayerEntity()
       idlePlayerMaxHP.value = probe.stats.maxHealth
       idlePlayerHP.value = probe.stats.maxHealth
-      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, bossTickets: 0, bossMaterials: 0 }
+      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
       logs.value = []
       // 先启动定时器，让 UI 立即显示挂机进行中的状态
       startIdleTimers()
@@ -4004,9 +4039,10 @@ const idleDashboard = computed(() => {
     encounterCount: idleEncounterCount.value,
     buildRatio: buildRatio.value,
     totalPhantomCrystals: runStats.value.phantomCrystals,
-    // 真实伤害统计（仪表盘「总造成伤害/总受到伤害」，按场累加）
+    // 真实伤害统计（仪表盘「总造成伤害/总受到伤害/总护盾吸收」，按场累加）
     totalDamageDealt: runStats.value.totalDamageDealt,
     totalDamageTaken: runStats.value.totalDamageTaken,
+    totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
     // BOSS 挑战券与 BOSS 素材获得统计（仪表盘显示）
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,

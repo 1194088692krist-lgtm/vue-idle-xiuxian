@@ -166,10 +166,27 @@ class CombatEntity {
     const actualDodgeRate = Math.max(0, Math.min(1, this.stats.dodgeRate - (source ? source.stats.dodgeResist : 0)))
     // 闪避判定
     if (Math.random() < actualDodgeRate) {
-      return { dodged: true, damage: 0 }
+      return { dodged: true, damage: 0, shieldAbsorbed: 0 }
     }
     // 计算实际伤害（取整，避免 HP 出现小数尾）
-    const reducedDamage = Math.floor(this.stats.calculateDamageReduction(amount))
+    let reducedDamage = Math.floor(this.stats.calculateDamageReduction(amount))
+    // 护盾吸收：优先使用 shield 类型 buff 吸收伤害，剩余伤害再扣减生命值
+    // 多个护盾按剩余吸收量从大到小依次消耗（让最厚的护盾先扛，避免碎片护盾被一次清空浪费）
+    let shieldAbsorbed = 0
+    const shields = (this.buffs || []).filter(b => b.type === 'shield' && b.duration > 0 && b.value > 0)
+      .sort((a, b) => b.value - a.value)
+    for (const shield of shields) {
+      if (reducedDamage <= 0) break
+      const absorb = Math.min(reducedDamage, shield.value)
+      shield.value -= absorb
+      reducedDamage -= absorb
+      shieldAbsorbed += absorb
+    }
+    // 移除已耗尽的护盾（value<=0），避免下一击继续被当作可用护盾
+    if (shields.length > 0) {
+      this.buffs = this.buffs.filter(b => !(b.type === 'shield' && b.value <= 0))
+    }
+    // 扣减生命值
     this.currentHealth = Math.max(0, Math.floor(this.currentHealth - reducedDamage))
     // 计算反击（考虑攻击方的抗反击）
     let isCounter = false
@@ -182,6 +199,8 @@ class CombatEntity {
     return {
       dodged: false,
       damage: reducedDamage,
+      rawDamage: Math.floor(this.stats.calculateDamageReduction(amount)),
+      shieldAbsorbed,
       currentHealth: this.currentHealth,
       isDead: this.currentHealth <= 0,
       isCounter: isCounter
@@ -286,7 +305,12 @@ class CombatManager {
       if (result.dodged) {
         attackLog += `，被闪避了！`
       } else {
-        attackLog += `，造成${result.damage.toFixed(1)}点伤害`
+        // 显示伤害明细：原始伤害 → 护盾吸收 → 实际扣血
+        const totalDmg = (result.rawDamage !== undefined ? result.rawDamage : result.damage) + (result.shieldAbsorbed || 0)
+        attackLog += `，造成${totalDmg.toFixed(1)}点伤害`
+        if (result.shieldAbsorbed > 0) {
+          attackLog += `（护盾吸收${result.shieldAbsorbed.toFixed(1)}点，实际扣血${result.damage.toFixed(1)}点）`
+        }
         if (attack.isCrit) attackLog += `（暴击！）`
         if (attack.isCombo) attackLog += `（连击！）`
         if (attack.isVampire) attackLog += `（吸血恢复${(result.damage * 0.3).toFixed(1)}点生命值！）`
@@ -298,6 +322,8 @@ class CombatManager {
         attacker: attacker.name,
         defender: defender.name,
         damage: result.damage,
+        rawDamage: result.rawDamage !== undefined ? result.rawDamage : result.damage,
+        shieldAbsorbed: result.shieldAbsorbed || 0,
         isCrit: attack.isCrit,
         isCombo: attack.isCombo,
         isDodged: result.dodged,
