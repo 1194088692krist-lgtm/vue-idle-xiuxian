@@ -260,16 +260,17 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false })
     const textures = await Promise.all(frames.map(loadTexture))
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
-    // 校验纹理有效性：逐帧检查 source.valid，定位具体哪一帧出问题
-    // 失败原因常见：dataURL 经 PixiJS Worker 路径 createImageBitmap 损坏（已通过主线程加载规避）
+    // 校验纹理有效性：PixiJS 8 的 TextureSource 没有 valid 属性（那是 v7 BaseTexture 的 API），
+    // 改用 source 存在 + width/height > 0 判断。dataURL 经主线程 Image+decode 加载，
+    // onload 触发即代表解码完成，Texture.from(img) 同步构造，纹理必然有效。
     const badIndices = []
     textures.forEach((t, i) => {
-      if (!t || !t.source || !t.source.valid) badIndices.push(i)
+      if (!t || !t.source || !t.source.width || !t.source.height) badIndices.push(i)
     })
     if (badIndices.length > 0) {
       console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS。失败帧索引:', badIndices,
         '总数:', textures.length,
-        '首帧详情:', textures[0] ? { hasSource: !!textures[0].source, valid: textures[0].source?.valid, width: textures[0].source?.width } : 'null')
+        '首帧详情:', textures[0] ? { hasSource: !!textures[0].source, width: textures[0].source?.width, height: textures[0].source?.height } : 'null')
       return false
     }
 
