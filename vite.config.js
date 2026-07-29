@@ -38,6 +38,9 @@ export default defineConfig({
       output: {
         manualChunks: id => {
           if (id.includes('node_modules')) {
+            // pixi.js 独立 chunk：仅在使用动态 import('pixi.js') 时才加载
+            // 避免把 ~860KB PixiJS 塞进 vendor 拖慢首屏
+            if (id.includes('pixi.js')) return 'pixi-fx'
             if (id.includes('naive-ui')) return 'naive-ui'
             if (id.includes('vue')) return 'vue-vendor'
             if (id.includes('pinia')) return 'pinia-vendor'

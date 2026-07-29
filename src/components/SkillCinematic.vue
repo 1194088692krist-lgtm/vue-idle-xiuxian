@@ -16,7 +16,9 @@
         <div class="vortex-core" :style="{ background: glowBg }"></div>
       </div>
       <!-- 火系：腾起火焰粒子 -->
-      <div v-else-if="skillFx === 'flames'" :key="`fx-${animKey}`" class="fx-flames">
+      <!-- PixiJS 序列帧优先（WebGL 可用时）：usePixiFlames=true 时不渲染此 CSS 分支 -->
+      <!-- CSS fallback：WebGL 不可用或 PixiJS 初始化失败时仍走原 CSS 火焰粒子 -->
+      <div v-else-if="skillFx === 'flames' && !usePixiFlames" :key="`fx-${animKey}`" class="fx-flames">
         <div v-for="i in 7" :key="i" class="flame-particle"
           :style="{ '--c': skillColor, left: `${15 + i * 10}%`, animationDelay: `${i * 0.08}s` }"></div>
       </div>
@@ -119,9 +121,19 @@
 import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
+import { usePixiFx } from '../composables/usePixiFx'
+import { generateFlameFrames } from '../composables/generateFxFrames'
 
 const { skillCastEvent } = useIdleSystem()
 const route = useRoute()
+
+// PixiJS 序列帧播放器（单例）
+const fx = usePixiFx()
+// 火系：是否走 PixiJS 路径。true=已成功初始化并准备播放；false=回退 CSS
+// 注意：初始为 false（不阻塞首屏），等首次火系演出触发时异步 ensureReady
+const usePixiFlames = ref(false)
+// 缓存生成的火系帧 dataURL（只生成一次，后续复用）
+let flameFrames = null
 
 const show = ref(false)
 const skillName = ref('')
@@ -202,7 +214,7 @@ function scheduleAutoHide() {
   }, 4600)
 }
 
-watch(skillCastEvent, (evt) => {
+watch(skillCastEvent, async (evt) => {
   if (!evt || !evt.ts || !evt.isBoss) return
   // 仅在探索挂机页显示技能演出：切到背包/炼丹等其他页面时不弹特效
   if (route.path !== '/exploration') return
@@ -227,6 +239,36 @@ watch(skillCastEvent, (evt) => {
   // 下一帧再加 fade-out class，让 Vue 先渲染新字再触发淡出动画
   nextTick(() => { skillFadeClass.value = 'skill-fade-out' })
   scheduleAutoHide()
+
+  // PixiJS 火系试点：仅火系走 WebGL 序列帧，其余 12 系保留 CSS
+  // 异步触发，不阻塞主流程；任何环节失败自动回退 CSS（usePixiFlames 保持 false）
+  if (c.fx === 'flames') {
+    try {
+      const ready = await fx.ensureReady()
+      if (!ready) {
+        // WebGL 不可用，回退 CSS（usePixiFlames 仍为 false，模板自动走 CSS 分支）
+        usePixiFlames.value = false
+        return
+      }
+      // 懒生成火系帧（首次调用时生成，后续复用）
+      if (!flameFrames) flameFrames = generateFlameFrames()
+      usePixiFlames.value = true
+      await fx.play({
+        frames: flameFrames,
+        fps: 24,
+        tint: c.color,           // 按属性色染色（火系红橙）
+        scale: 1,
+        loop: false
+      })
+    } catch (e) {
+      console.warn('[SkillCinematic] PixiJS flames failed, fallback to CSS:', e)
+      usePixiFlames.value = false
+    }
+  } else {
+    // 非火系：立即停止任何残留的 PixiJS 播放
+    usePixiFlames.value = false
+    fx.stop()
+  }
 }, { deep: true })
 
 // 监听路由变化：特效播放中途切走到其他页面时立即隐藏
@@ -235,11 +277,26 @@ watch(() => route.path, (newPath) => {
     show.value = false
     skillFadeClass.value = ''
     if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
+    // 同步停止 PixiJS 播放（避免切页后 WebGL canvas 残留）
+    usePixiFlames.value = false
+    fx.stop()
+  }
+})
+
+// 兜底隐藏触发时：show 变为 false 后，同步停止 PixiJS 播放
+// 通过 watch show 而非直接改 scheduleAutoHide，保证所有隐藏路径都覆盖
+watch(show, (v) => {
+  if (!v && usePixiFlames.value) {
+    usePixiFlames.value = false
+    fx.stop()
   }
 })
 
 onUnmounted(() => {
   if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
+  // 组件卸载：彻底停止 PixiJS 播放（Application 保留为单例供下次使用，避免重建开销）
+  usePixiFlames.value = false
+  fx.stop()
 })
 </script>
 
