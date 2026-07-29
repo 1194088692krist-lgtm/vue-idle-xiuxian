@@ -2475,12 +2475,15 @@ function chooseMemberAction(memberState, teamStates, enemy) {
   const attackersWithoutShield = attackers.filter(t => !t.hasShield)
   // 全员有盾时无目标，需降级普攻避免盾系角色无限互相刷盾不攻击
 
-  // 紧急优先 1：医者（herb）有伤员时优先治疗（避免队伍减员）
-  if (role === 'herb' && wounded.length > 0) {
+  // 紧急优先 1：医者（herb）有危急伤员（HP<30%）时优先治疗（避免队伍减员）
+  // 注意：原条件 wounded（HP<50%）范围太宽，导致医者每回合都治疗从不普攻
+  // 收紧到 HP<30% 才走紧急治疗，HP 在 30-50% 之间走轮询（含普攻 + 主动技能）
+  const criticalWounded = teamStates.filter(t => t.hp > 0 && hpPct(t) < 0.3)
+  if (role === 'herb' && criticalWounded.length > 0) {
     const healSkill = activeSkills.find(s => s.category === 'heal' && !s.effect?.resurrect)
     if (healSkill) {
-      wounded.sort((a, b) => hpPct(a) - hpPct(b))
-      const target = wounded[0]
+      criticalWounded.sort((a, b) => hpPct(a) - hpPct(b))
+      const target = criticalWounded[0]
       const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
       const isTeam = getSkillEffectValue(healSkill, 'target', 'single') === 'team'
       const healAmount = Math.floor((memberState.attack || memberState.damage || 0) * healPercent)
@@ -2488,41 +2491,59 @@ function chooseMemberAction(memberState, teamStates, enemy) {
     }
   }
 
-  // 紧急优先 2：守护者（shield）优先给无盾的攻击手加盾
-  // 这是盾系角色的核心职责：保护输出核心（vanguard/assassin），而不是仅在危急时才加盾
-  // 修复问题：原逻辑只在 weakAlly 血量<40% 时才加盾，平时走轮询导致攻击手长期无盾
+  // 紧急优先 2：守护者（shield）行为策略
+  // - 自身 HP < 50%：优先给自己加盾（自救保命）
+  // - 自身 HP ≥ 50%：优先给队友加盾（保护输出核心 vanguard/assassin）
+  // 找不到合适盾目标时进入轮询（可能轮到普攻），避免盾系每回合都刷盾从不普攻
   if (role === 'shield') {
     const shieldSkill = activeSkills.find(s => s.category === 'shield')
     if (shieldSkill) {
-      // 优先级：无盾的攻击手（输出核心需保护）> 无盾的危急队友（血量<50%）> 无盾的任意队友
+      const selfHPpct = hpPct(memberState)
       const aliveAllies = teamStates.filter(t => t.hp > 0)
       const noShieldAllies = aliveAllies.filter(t => !t.hasShield)
       let shieldTarget = null
-      if (noShieldAllies.length > 0) {
-        // 1. 无盾的攻击手（攻击力最高的优先，他们是主要输出）
-        shieldTarget = noShieldAllies.find(t => t.role === 'vanguard' || t.role === 'assassin')
-        // 2. 无盾的危急队友（血量<50%）
-        if (!shieldTarget) {
-          shieldTarget = noShieldAllies.find(t => hpPct(t) < 0.5)
+
+      if (selfHPpct < 0.5) {
+        // 自救模式：HP < 50% 优先给自己加盾
+        // 若自己已有盾则降级给无盾队友（避免重复刷盾）
+        if (!memberState.hasShield) {
+          shieldTarget = memberState
+        } else if (noShieldAllies.length > 0) {
+          // 自己有盾时退而给无盾攻击手加盾
+          shieldTarget = noShieldAllies.find(t => t.role === 'vanguard' || t.role === 'assassin')
+            || noShieldAllies.find(t => hpPct(t) < 0.5)
+            || noShieldAllies[0]
         }
-        // 3. 无盾的任意队友（含盾系自己，避免浪费回合）
-        if (!shieldTarget) {
-          shieldTarget = noShieldAllies[0]
+      } else {
+        // 保护模式：HP ≥ 50% 优先给无盾的队友加盾
+        if (noShieldAllies.length > 0) {
+          // 1. 无盾的攻击手（输出核心需保护，攻击力最高优先）
+          shieldTarget = noShieldAllies.find(t => t.role === 'vanguard' || t.role === 'assassin')
+          // 2. 无盾的危急队友（血量<50%）
+          if (!shieldTarget) {
+            shieldTarget = noShieldAllies.find(t => hpPct(t) < 0.5)
+          }
+          // 3. 无盾的任意队友（不含盾系自己，避免给自己刷盾空转）
+          if (!shieldTarget) {
+            shieldTarget = noShieldAllies.find(t => t.memberId !== memberState.memberId)
+          }
         }
       }
+
       if (shieldTarget) {
         const shieldPercent = getSkillEffectValue(shieldSkill, 'shieldPercent', 1.0)
         const duration = getSkillEffectValue(shieldSkill, 'duration', 2)
         const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
         return { type: 'shield', target: shieldTarget, value: shieldValue, duration, skillName: shieldSkill.name }
       }
-      // 全员有盾：降级普攻，避免盾系角色互相刷盾空转不攻击
-      return { type: 'attack' }
+      // 找不到合适盾目标（全员有盾 / 自保模式下自己已有盾且全员有盾）
+      // 不直接 return attack，落入下方轮询机制：可能轮到普攻，避免盾系从不普攻
     }
   }
 
   // 紧急优先 3：自身低血量优先使用防御类技能或自救
-  if (selfLowHP) {
+  // 注意：盾系角色已在上方「优先 2」处理自保加盾，这里跳过避免重复
+  if (selfLowHP && role !== 'shield') {
     const defensiveSkill = activeSkills.find(s =>
       s.category === 'shield' || (s.category === 'buff' && s.effect?.stat === 'defense')
     )
@@ -2863,7 +2884,11 @@ async function executeRound(effectiveZone) {
     encounter.manager = new CombatManager(null, null)
     encounter.manager.start()
   }
-  const turnResult = encounter.manager.executeTurn(attackingPlayers, enemy)
+  // 关键修复：怪物选目标时必须从「所有存活玩家」里选，不能只从 attackingPlayers 里选
+  // 否则只加盾/治疗不普攻的盾系、医者角色永远不会被怪物攻击，70% 嘲讽逻辑形同虚设
+  // executeTurn 内部会用 players 数组做 alive 过滤和嘲讽目标筛选
+  const allAlivePlayers = players.filter(p => p && p.currentHealth > 0)
+  const turnResult = encounter.manager.executeTurn(attackingPlayers, enemy, allAlivePlayers)
 
   // 收集 executeTurn 结果到 combatStats 和 roundLog
   let lastPlayerAttacker = null  // 追踪最后一击的玩家攻击者（用于击杀BOSS立绘突入）

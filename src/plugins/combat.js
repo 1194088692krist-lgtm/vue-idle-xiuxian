@@ -244,9 +244,14 @@ class CombatManager {
     return this.state
   }
   // 执行回合（支持多玩家）
-  executeTurn(players, enemy) {
+  // 参数：players 本回合参与攻击的玩家；enemy 敌人；allPlayers 用于怪物选目标的完整存活列表
+  // （allPlayers 与 players 分离，让只加盾/治疗不普攻的盾系/医者也能被怪物攻击）
+  executeTurn(players, enemy, allPlayers) {
     const activePlayers = players || this.players || (this.player ? [this.player] : [])
     const activeEnemy = enemy || this.enemy
+    // 怪物选目标的候选池：优先用调用方传入的 allPlayers（含未参与攻击的盾系/医者），
+    // 没传则退化为 activePlayers（保持向后兼容）
+    const targetPool = (allPlayers && allPlayers.length > 0) ? allPlayers : activePlayers
     if (this.state !== CombatState.IN_PROGRESS) return null
     if (!activeEnemy) return null
     this.round++
@@ -273,14 +278,15 @@ class CombatManager {
       let defender
       const isEnemy = attacker === activeEnemy
       if (isEnemy) {
-        const alivePlayers = activePlayers.filter(p => p && p.currentHealth > 0)
+        // 怪物选目标从 targetPool（含盾系/医者）中选，而非只从 attackingPlayers 中选
+        const alivePlayers = targetPool.filter(p => p && p.currentHealth > 0)
         if (alivePlayers.length === 0) break
         // 嘲讽机制：防御型角色(role='shield')天生吸引仇恨，怪物优先攻击他们
-        // - 70% 概率优先选防御型角色（嘲讽被动效果）
-        // - 30% 概率随机攻击（保留一定不确定性，避免完全可预测）
+        // - 50% 概率优先选防御型角色（嘲讽被动效果）
+        // - 50% 概率随机攻击（保留不确定性，避免完全可预测）
         // - 无防御型角色存活时退化为随机
         const tanks = alivePlayers.filter(p => p.role === 'shield')
-        if (tanks.length > 0 && Math.random() < 0.7) {
+        if (tanks.length > 0 && Math.random() < 0.5) {
           defender = tanks[Math.floor(Math.random() * tanks.length)]
         } else {
           defender = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
@@ -342,7 +348,8 @@ class CombatManager {
           this.state = CombatState.VICTORY
           this.log.push(`${attacker.name}击败了${defender.name}！`)
         } else {
-          const allPlayersDead = activePlayers.every(p => !p || p.currentHealth <= 0)
+          // 团灭判定：检查 targetPool（含盾系/医者）所有玩家是否全灭
+          const allPlayersDead = targetPool.every(p => !p || p.currentHealth <= 0)
           if (allPlayersDead) {
             this.state = CombatState.DEFEAT
             this.log.push(`全队阵亡，${attacker.name}获得胜利！`)
