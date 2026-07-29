@@ -54,30 +54,58 @@ function detectWebGL() {
 /**
  * 动态加载 PixiJS 并初始化 Application
  * 幂等：已初始化直接返回
+ * @param {HTMLCanvasElement} [externalCanvas]  外部传入的 canvas 元素
+ *   若提供，则 PixiJS 使用该 canvas（推荐：由 Vue 组件提供，z-index 自然正确）
+ *   若不提供，则自建 canvas 挂到 body 末尾（z-index:9998，与 .skill-cinematic 同级）
  * @returns {Promise<boolean>} true=可用，false=不可用（调用方应回退 CSS）
  */
-async function ensureReady() {
+async function ensureReady(externalCanvas) {
   if (!detectWebGL()) return false
-  if (pixiApp) return true
+  if (pixiApp) {
+    // 已初始化：如果传入新 canvas，需要销毁重建
+    if (externalCanvas && externalCanvas !== canvasEl) {
+      cleanup()
+    } else {
+      return true
+    }
+  }
 
   try {
     // 动态 import：vite 会自动把这个 chunk 拆出来，首屏不加载
     pixiModule = await import('pixi.js')
     const { Application } = pixiModule
 
-    // 创建 canvas 并挂到 body（teleport 风格，避免被父组件样式干扰）
-    canvasEl = document.createElement('canvas')
-    canvasEl.style.cssText = [
-      'position:fixed',
-      'inset:0',
-      'width:100vw',
-      'height:100vh',
-      'pointer-events:none',
-      'z-index:9998',           // 与 .skill-cinematic 同级，但层叠顺序在它之上
-      'opacity:0',              // 空闲时不可见，演出开始才 opacity:1
-      'transition:opacity 0.1s'
-    ].join(';')
-    document.body.appendChild(canvasEl)
+    if (externalCanvas) {
+      // 使用外部 canvas：由 Vue 组件提供
+      // position:fixed 覆盖整个视口；z-index 9997 低于 .skill-cinematic(9998)
+      // 火焰是背景特效，技能名字/光晕在火焰之上显示
+      canvasEl = externalCanvas
+      canvasEl.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'width:100vw',
+        'height:100vh',
+        'pointer-events:none',
+        'z-index:9997',
+        'opacity:0',              // 空闲时不可见，演出开始才 opacity:1
+        'transition:opacity 0.1s'
+      ].join(';')
+    } else {
+      // 兜底：自建 canvas 挂到 body 末尾
+      canvasEl = document.createElement('canvas')
+      canvasEl.dataset.pixiOwned = 'true'  // 标记为自建，cleanup 时才移除 DOM
+      canvasEl.style.cssText = [
+        'position:fixed',
+        'inset:0',
+        'width:100vw',
+        'height:100vh',
+        'pointer-events:none',
+        'z-index:9998',
+        'opacity:0',
+        'transition:opacity 0.1s'
+      ].join(';')
+      document.body.appendChild(canvasEl)
+    }
 
     // 创建 Application：用现有 canvas，透明背景，antialias=false（特效不需要抗锯齿，省 GPU）
     pixiApp = new Application()
@@ -104,6 +132,7 @@ async function ensureReady() {
 
 /**
  * 清理 Application 与 DOM（彻底失败或组件卸载时调用）
+ * 注意：externalCanvas 模式下不删除 canvas DOM（由 Vue 组件管理生命周期）
  */
 function cleanup() {
   if (currentSprite) {
@@ -115,7 +144,8 @@ function cleanup() {
     try { pixiApp.destroy(true, { children: true }) } catch (_) {}
     pixiApp = null
   }
-  if (canvasEl?.parentNode) {
+  // 自建 canvas 才移除 DOM；外部 canvas 由 Vue 管理，不删除
+  if (canvasEl && canvasEl.dataset.pixiOwned === 'true' && canvasEl.parentNode) {
     canvasEl.parentNode.removeChild(canvasEl)
   }
   canvasEl = null

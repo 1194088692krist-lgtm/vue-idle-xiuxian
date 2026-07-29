@@ -1,6 +1,9 @@
 <template>
   <!-- 技能释放全屏特写演出：仅 BOSS 战时触发，技能名四字大字 + 属性色光闪 + 专属图形特效 -->
   <teleport to="body">
+    <!-- PixiJS WebGL canvas：独立于 .skill-cinematic 的 v-if，保证预热时 canvas 已存在 -->
+    <!-- z-index 与 .skill-cinematic 同级(9998)，DOM 顺序在 .skill-cinematic 之前（canvas 在下，特效在上） -->
+    <canvas ref="pixiCanvasRef" class="pixi-fx-canvas"></canvas>
     <div v-if="show" class="skill-cinematic" aria-hidden="true">
       <!-- 全屏属性色光闪 -->
       <div :key="`flash-${animKey}`" class="skill-flash" :style="{ background: flashBg }"></div>
@@ -129,11 +132,44 @@ const route = useRoute()
 
 // PixiJS 序列帧播放器（单例）
 const fx = usePixiFx()
+// PixiJS canvas ref：模板提供，传给 fx.ensureReady(canvas)
+// 独立于 v-if="show"，保证预热时 canvas 已存在
+const pixiCanvasRef = ref(null)
 // 火系：是否走 PixiJS 路径。true=已成功初始化并准备播放；false=回退 CSS
-// 注意：初始为 false（不阻塞首屏），等首次火系演出触发时异步 ensureReady
+// 初始为 false（不阻塞首屏），预热完成后置 true
 const usePixiFlames = ref(false)
 // 缓存生成的火系帧 dataURL（只生成一次，后续复用）
 let flameFrames = null
+// 预热状态：true=PixiJS 已就绪 + 帧已生成，可直接 play
+let pixiReady = false
+
+// 应用启动后空闲时预热 PixiJS（避免首次演出卡顿）
+// 只在 exploration 页面预热（其他页面用不到）
+function warmupPixi() {
+  if (pixiReady) return Promise.resolve(true)
+  // 等待 canvas ref 就绪（teleport 渲染后）
+  if (!pixiCanvasRef.value) {
+    nextTick(() => warmupPixi())
+    return Promise.resolve(false)
+  }
+  return fx.ensureReady(pixiCanvasRef.value).then(ready => {
+    if (!ready) return false
+    if (!flameFrames) flameFrames = generateFlameFrames()
+    pixiReady = true
+    usePixiFlames.value = true
+    return true
+  }).catch(() => false)
+}
+
+// 监听路由：进入 /exploration 时触发预热（首次挂载 + 后续导航都覆盖）
+// 用 watch immediate 替代 onMounted，避免组件挂载时路由还不是 exploration 的场景
+watch(() => route.path, (newPath) => {
+  if (newPath === '/exploration' && !pixiReady) {
+    // 延迟到 idle，不阻塞路由切换动画
+    const scheduleIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500))
+    scheduleIdle(() => warmupPixi())
+  }
+}, { immediate: true })  // immediate: 组件挂载时若已在 exploration 也立即触发
 
 const show = ref(false)
 const skillName = ref('')
@@ -241,28 +277,47 @@ watch(skillCastEvent, async (evt) => {
   scheduleAutoHide()
 
   // PixiJS 火系试点：仅火系走 WebGL 序列帧，其余 12 系保留 CSS
-  // 异步触发，不阻塞主流程；任何环节失败自动回退 CSS（usePixiFlames 保持 false）
+  // 关键修复：演出时机紧凑，必须用预热好的资源零延迟播放
   if (c.fx === 'flames') {
-    try {
-      const ready = await fx.ensureReady()
-      if (!ready) {
-        // WebGL 不可用，回退 CSS（usePixiFlames 仍为 false，模板自动走 CSS 分支）
+    if (pixiReady && flameFrames) {
+      // 预热已完成：直接同步播放
+      try {
+        const ok = await fx.play({
+          frames: flameFrames,
+          fps: 24,
+          tint: c.color,
+          scale: 1,
+          loop: false
+        })
+        usePixiFlames.value = ok  // true=隐藏 CSS 分支，false=回退 CSS
+      } catch (e) {
+        console.warn('[SkillCinematic] PixiJS flames play failed, fallback to CSS:', e)
         usePixiFlames.value = false
-        return
       }
-      // 懒生成火系帧（首次调用时生成，后续复用）
-      if (!flameFrames) flameFrames = generateFlameFrames()
-      usePixiFlames.value = true
-      await fx.play({
-        frames: flameFrames,
-        fps: 24,
-        tint: c.color,           // 按属性色染色（火系红橙）
-        scale: 1,
-        loop: false
-      })
-    } catch (e) {
-      console.warn('[SkillCinematic] PixiJS flames failed, fallback to CSS:', e)
-      usePixiFlames.value = false
+    } else {
+      // 预热未完成：尝试立即同步预热（不等 idle），最多等 500ms
+      // 500ms 内初始化成功 → 走 WebGL；超时 → 回退 CSS
+      usePixiFlames.value = false  // 先显示 CSS 火焰粒子（不空白）
+      const ready = await Promise.race([
+        warmupPixi(),
+        new Promise(resolve => setTimeout(() => resolve(false), 500))
+      ])
+      if (ready && flameFrames) {
+        // WebGL 就绪：切到 PixiJS（CSS 火焰粒子会被 usePixiFlames=true 隐藏）
+        try {
+          const ok = await fx.play({
+            frames: flameFrames,
+            fps: 24,
+            tint: c.color,
+            scale: 1,
+            loop: false
+          })
+          usePixiFlames.value = ok
+        } catch (e) {
+          usePixiFlames.value = false
+        }
+      }
+      // 否则保持 CSS fallback
     }
   } else {
     // 非火系：立即停止任何残留的 PixiJS 播放
@@ -301,6 +356,19 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
+/* PixiJS WebGL canvas：放在 .skill-cinematic 之前（teleport 根级）
+   z-index 9997 低于 .skill-cinematic(9998) 和 BossKillCinematic(9999)
+   火焰是背景特效，技能名字/光晕在火焰之上显示
+   注意：实际样式由 usePixiFx.ensureReady() 通过 inline style 设置，
+   scoped CSS 仅作占位，避免 canvas 闪烁 */
+.pixi-fx-canvas {
+  position: fixed;
+  inset: 0;
+  pointer-events: none;
+  z-index: 9997;
+  opacity: 0;
+}
+
 .skill-cinematic {
   position: fixed;
   inset: 0;

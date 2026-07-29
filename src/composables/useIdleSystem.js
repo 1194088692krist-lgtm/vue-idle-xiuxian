@@ -34,6 +34,19 @@ const bossKillEvent = ref(null)
 // 技能释放事件总线：技能攻击时写入 { skillName, casterName, isBoss, ts }
 // SkillCinematic watch 此 ref 触发技能名全屏特写演出（仅 BOSS 战触发，避免普通战斗喧宾夺主）
 const skillCastEvent = ref(null)
+
+// Dev 调试：浏览器 console 可手动触发技能演出（仅 dev 模式暴露）
+// 用法：在 /exploration 页面 console 执行 testSkillFx('火球术', '测试角色')
+if (import.meta.env?.DEV && typeof window !== 'undefined') {
+  window.testSkillFx = (skillName = '火球术', casterName = '测试角色') => {
+    skillCastEvent.value = { skillName, casterName, isBoss: true, ts: Date.now() }
+    console.log('[testSkillFx] 已触发:', skillName, casterName)
+  }
+  window.testBossKill = (bossName = '测试BOSS', killerMemberId = null) => {
+    bossKillEvent.value = { bossName, killerMemberId, ts: Date.now() }
+    console.log('[testBossKill] 已触发:', bossName)
+  }
+}
 const isIdling = ref(false)
 const logs = ref([])                 // 挂机日志（仅内存，不写入存档）
 // 日志自增 id：用于 v-for 稳定 key，避免 slice 截断后 index key 错位导致 DOM 全量 patch 跳动
