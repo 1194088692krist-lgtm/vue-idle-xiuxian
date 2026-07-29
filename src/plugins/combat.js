@@ -428,6 +428,17 @@ function generateEnemy(level, type = CombatType.NORMAL, difficulty = 1) {
           }
         }
       })
+      // 平衡调整：盾系实装后 BOSS 普遍偏弱，所有能力值再统一提升 50%
+      // 在原 ×2 强化基础上叠加，百分比类上限放宽到 95% 避免必然暴击/闪避
+      Object.keys(baseStats).forEach(key => {
+        if (typeof baseStats[key] !== 'number') return
+        const boosted = baseStats[key] * 1.5
+        if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
+          baseStats[key] = Math.min(0.95, boosted)
+        } else {
+          baseStats[key] = boosted
+        }
+      })
       break
   }
   // 根据类型和等级生成敌人名称

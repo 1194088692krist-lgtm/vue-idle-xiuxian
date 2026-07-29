@@ -1174,6 +1174,20 @@ function createBossEnemy(bossData, effectiveZone) {
     combatBoost: bossCombatBoost,
     resistanceBoost: 0
   }
+  // 平衡调整：盾系实装后 BOSS 普遍偏弱，所有能力值统一提升 50%
+  // 应用在最终 baseStats 上，HP/攻防/速度/暴击率/抗性/最终增减伤/战斗提升全部 ×1.5
+  // 百分比类字段若超过 0.95 用 Math.min 钳制，避免出现 100% 必然暴击/必然闪避等极端数值
+  const BOSS_STRENGTH_MULT = 1.5
+  Object.keys(baseStats).forEach(key => {
+    if (typeof baseStats[key] !== 'number') return
+    const boosted = baseStats[key] * BOSS_STRENGTH_MULT
+    if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
+      baseStats[key] = Math.min(0.95, boosted)
+    } else {
+      baseStats[key] = boosted
+    }
+  })
+
   const enemy = new CombatEntity(bossData.name, effectiveZone.minLevel, baseStats, 'BOSS')
   enemy.tier = 'boss'
   enemy.bossId = bossData.id
