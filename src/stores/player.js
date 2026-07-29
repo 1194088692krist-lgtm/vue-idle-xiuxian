@@ -28,7 +28,8 @@ import {
   rollBlackMarketItems,
   getManualRefreshCost,
   getSeekMaterialPrice
-, BOUNTY_CONFIG, rollBountyBoard, getBountyRerollCost, BARTER_CONFIG, getBarterTargets } from '../plugins/shopConfig'
+, BOUNTY_CONFIG, rollBountyBoard, getBountyRerollCost, BARTER_CONFIG, getBarterTargets,
+  SKIN_SHOP_CONFIG, rollSkinShopItems, getSkinShopRefreshCost } from '../plugins/shopConfig'
 import { getPhaseByLevel } from '../plugins/cultivationSystem'
 
 // 装备出售/分解相关常量
@@ -299,6 +300,18 @@ export const usePlayerStore = defineStore('player', {
     activeBuffs: [],
     // 商店系统：已解锁外观/称号（黑市购买记录）
     unlockedAppearances: [],
+    // 皮肤商店系统
+    //   unlockedShopSkins: { [characterId: string]: number[] }
+    //   key = 角色 templateId（如 char_001），value = 已购买解锁的皮肤索引数组（如 [6, 7]）
+    //   解锁后写入此字段，CharacterPortraitModal.vue 的 maxSkinIndex 会读取它合并突破解锁范围
+    unlockedShopSkins: {},
+    // 灵石阁皮肤商店状态：当前刷新的商品列表 + 刷新次数计数（按天重置）
+    skinShopState: {
+      items: [],              // 当前刷新出的 5 个皮肤商品，每项 { uid, characterId, skinIndex, name, price, sold }
+      refreshedAt: 0,         // 上次刷新时间戳
+      refreshCount: 0,        // 当日手动刷新次数
+      refreshResetDay: 0,     // 刷新计数重置日期（按天）
+    },
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
     runes: [], // 灵纹库存（M1，镶嵌用的灵纹实例数组）
@@ -2494,6 +2507,76 @@ export const usePlayerStore = defineStore('player', {
       this.shopState.blackMarketItems = items
       this.queueSave()
       return { success: true, message: `成功购买 ${item.name}，消耗 ${item.price} 灵石` }
+    },
+    // ===== 皮肤商店（灵石阁·皮肤阁） =====
+    // 加载/获取当前皮肤商店商品（首次或跨日时自动刷新）
+    async getSkinShopItems() {
+      const now = Date.now()
+      const today = Math.floor(now / (24 * 3600 * 1000))
+      if (!this.skinShopState) {
+        this.skinShopState = { items: [], refreshedAt: 0, refreshCount: 0, refreshResetDay: today }
+      }
+      if (this.skinShopState.refreshResetDay !== today) {
+        this.skinShopState.refreshCount = 0
+        this.skinShopState.refreshResetDay = today
+      }
+      // 首次加载或上次刷新距今超过 24 小时 → 自动刷新
+      if (this.skinShopState.items.length === 0 || now - this.skinShopState.refreshedAt >= 24 * 3600 * 1000) {
+        await this.refreshSkinShop({ autoRefresh: true })
+      }
+      return this.skinShopState.items
+    },
+    // 手动刷新皮肤商店（消耗灵石）。autoRefresh=true 时为系统自动刷新，不扣费
+    async refreshSkinShop({ autoRefresh = false } = {}) {
+      const now = Date.now()
+      if (!this.skinShopState) {
+        this.skinShopState = { items: [], refreshedAt: 0, refreshCount: 0, refreshResetDay: 0 }
+      }
+      let cost = 0
+      if (!autoRefresh) {
+        cost = getSkinShopRefreshCost()
+        if (this.spiritStones < cost) {
+          return { success: false, message: `灵石不足，刷新需要 ${cost} 灵石` }
+        }
+      }
+      const items = await rollSkinShopItems({ unlockedShopSkins: this.unlockedShopSkins || {} })
+      this.skinShopState.items = items
+      this.skinShopState.refreshedAt = now
+      if (!autoRefresh) {
+        this.skinShopState.refreshCount += 1
+        this.spiritStones -= cost
+      }
+      this.queueSave()
+      return { success: true, message: autoRefresh ? '皮肤阁已自动刷新' : `皮肤阁已刷新，消耗 ${cost} 灵石` }
+    },
+    // 购买皮肤商品：解锁该角色的指定皮肤索引
+    async buySkinShopItem(uid) {
+      if (!this.skinShopState || !Array.isArray(this.skinShopState.items)) {
+        return { success: false, message: '皮肤阁尚未加载' }
+      }
+      const idx = this.skinShopState.items.findIndex(i => i.uid === uid)
+      if (idx < 0) return { success: false, message: '商品不存在或已下架' }
+      const item = this.skinShopState.items[idx]
+      if (item.sold) return { success: false, message: '该商品已售罄' }
+      if (this.spiritStones < item.price) {
+        return { success: false, message: `灵石不足，需要 ${item.price} 灵石` }
+      }
+      // 写入已购皮肤记录
+      if (!this.unlockedShopSkins) this.unlockedShopSkins = {}
+      if (!Array.isArray(this.unlockedShopSkins[item.characterId])) {
+        this.unlockedShopSkins[item.characterId] = []
+      }
+      if (this.unlockedShopSkins[item.characterId].includes(item.skinIndex)) {
+        return { success: false, message: '该皮肤已解锁，无需重复购买' }
+      }
+      this.unlockedShopSkins[item.characterId].push(item.skinIndex)
+      this.spiritStones -= item.price
+      this.skinShopState.items[idx].sold = true
+      this.queueSave()
+      return {
+        success: true,
+        message: `成功解锁 ${item.characterName} 的皮肤 ${item.skinIndex}，消耗 ${item.price} 灵石`
+      }
     },
     // 消耗 BOSS 挑战券（按 id 删除指定数量，从后往前删避免索引错位）
     consumeBossTicket(ticketId, count) {

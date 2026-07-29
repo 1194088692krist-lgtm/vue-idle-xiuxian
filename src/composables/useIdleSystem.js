@@ -3,13 +3,13 @@ import { usePlayerStore, computePetMultiplier } from '../stores/player'
 import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugins/combat'
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
-import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial, getRandomZoneMaterial } from '../plugins/materials'
+import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial, getRandomZoneMaterial, characterInnerPillList } from '../plugins/materials'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '../plugins/craftCurrency'
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
-import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId } from '../plugins/cultivationSystem'
-import { getCharacterThumbnail } from '../plugins/characters'
+import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
+import { getCharacterThumbnail, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -113,6 +113,15 @@ const bossSpawnTime = ref(0)           // BOSS 刷出时刻（ms 时间戳），
 const bossRoundsCleared = ref(0)       // 已击杀 BOSS 的轮次数（通过核心挑战的轮次）
 const bossRoundsFailed = ref(0)        // BOSS 未击杀（失败/超时）的轮次数
 const bossTimeRemaining = ref('')     // BOSS 限时剩余（mm:ss），供 UI 倒计时展示
+// 人物 BOSS 系统：每次挂机结束后随机刷新各图各难度的"最终 BOSS"为某个人物形态
+// 结构：{ [zoneId]: { [difficultyKey]: { characterId, characterName, star } | null } }
+// null 表示该图该难度本轮未刷新人物 BOSS（仍走原怪物 BOSS）
+const characterBosses = ref({})
+// 人物 BOSS 出现概率：60%~80%，难度越高概率越高
+// 公式：base 0.6 + difficulty_index × 0.05，封顶 0.8
+const CHARACTER_BOSS_BASE_CHANCE = 0.6
+const CHARACTER_BOSS_CHANCE_STEP = 0.05
+const CHARACTER_BOSS_MAX_CHANCE = 0.8
 let encounterAborted = false           // 由 1 分钟超时触发，令进行中的遭遇循环立即中断（不结束挂机）
 const idleBuffs = ref([])            // 本次挂机中生效的小剧场 buff
 const sessionMaterials = ref({})    // 本次挂机获得的各类素材累计（type -> 数量）
@@ -1195,6 +1204,168 @@ function createBossEnemy(bossData, effectiveZone) {
   return enemy
 }
 
+// ==================== 人物 BOSS 系统 ====================
+// 用户需求：八大秘境最终 BOSS 改为人物形态，比原地图 BOSS 难 50%。
+//   - 图 1-4：3星/4星人物作为 BOSS（按难度递进）
+//   - 图 5-6：4星人物作为 BOSS
+//   - 图 7-8：5星人物作为 BOSS
+//   - 出现概率 60%~80%，难度越高概率越高
+//   - 击败后掉落该角色的"内丹碎片"（至宝类）和"挑战券"
+
+// 按地图 id + 难度 key 决定可担任 BOSS 的人物星级范围
+// 难度档顺序：youli(0) shilian(1) xiongxian(2) juejing(3) mieshi(4) lunhui(5) tianjie(6) tiandao(7)
+function getCharacterBossStarRange(zoneId, difficultyKey) {
+  const zoneIndex = zones.findIndex(z => z.id === zoneId)
+  if (zoneIndex < 0) return [3, 3]
+  const diffOrder = ['youli', 'shilian', 'xiongxian', 'juejing', 'mieshi', 'lunhui', 'tianjie', 'tiandao']
+  const diffIdx = diffOrder.indexOf(difficultyKey)
+  if (diffIdx < 0) return [3, 3]
+
+  // 前 4 张图（zoneIndex 0-3）：低难 3星、高难 4星
+  // 第 5-6 张图（zoneIndex 4-5）：4星为主，灭世及以上才出 5星
+  // 第 7-8 张图（zoneIndex 6-7）：5星为主
+  if (zoneIndex <= 3) {
+    // 图 1-4：低难档（游历/试炼/凶险）用 3星，高难档（绝境及以上）用 4星
+    if (diffIdx <= 2) return [3, 3]
+    return [4, 4]
+  } else if (zoneIndex <= 5) {
+    // 图 5-6：游历-灭世 用 4星；轮回及以上 用 5星
+    if (diffIdx <= 4) return [4, 4]
+    return [5, 5]
+  } else {
+    // 图 7-8：全部用 5星
+    return [5, 5]
+  }
+}
+
+// 从 characterList 中按星级范围随机挑选一个角色
+function pickRandomCharacterByStar(minStar, maxStar) {
+  const candidates = _charList.filter(c => c.star >= minStar && c.star <= maxStar)
+  if (candidates.length === 0) return null
+  return candidates[Math.floor(Math.random() * candidates.length)]
+}
+
+// 计算人物 BOSS 出现概率（60%~80%，难度越高概率越高）
+function getCharacterBossChance(difficultyKey) {
+  const diffOrder = ['youli', 'shilian', 'xiongxian', 'juejing', 'mieshi', 'lunhui', 'tianjie', 'tiandao']
+  const diffIdx = diffOrder.indexOf(difficultyKey)
+  if (diffIdx < 0) return CHARACTER_BOSS_BASE_CHANCE
+  const chance = CHARACTER_BOSS_BASE_CHANCE + diffIdx * CHARACTER_BOSS_CHANCE_STEP
+  return Math.min(CHARACTER_BOSS_MAX_CHANCE, chance)
+}
+
+// 创建人物形态的 BOSS 实体（基于角色模板 + 地图难度，比原地图 BOSS 难 50%）
+function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
+  const secretLv = effectiveZone.difficulty
+  const scale = effectiveZone.enemyScale || 1
+  const lateMult = getLateZoneMult(effectiveZone.id)
+  // 人物 BOSS 比普通 BOSS 难 50%（在 totalBossMult 基础上再 ×1.5）
+  const CHARACTER_BOSS_DIFFICULTY_MULT = 1.5
+  const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult * CHARACTER_BOSS_DIFFICULTY_MULT
+
+  // 基础 HP：基于角色星级和地图推荐血量
+  // 3星角色 HP 较低、5星角色 HP 较高，让人物 BOSS 与星级匹配
+  const starMult = _starCfg[character.star]?.multiplier || 1
+  const recHealth = (effectiveZone.recommendedStats?.health || 8000) * scale
+  const baseCharHealth = Math.floor(recHealth * 1.5 * starMult)  // 比普通 BOSS HP 高 50%
+  const scaledHealth = Math.floor(baseCharHealth * totalBossMult / CHARACTER_BOSS_DIFFICULTY_MULT) // 避免重复乘 1.5
+  const scaledDefense = Math.floor((effectiveZone.recommendedStats?.defense || 100) * scale * lateMult * 1.2) // 人物 BOSS 防御略高
+  const scaledSpeed = Math.floor(((character.baseStats?.speed || 10) * 1.5 + 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
+
+  // 攻击力：比普通 BOSS 高 50%（按 recHealth × 0.18 × 1.5）
+  const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
+  const bossAtkRatio = 0.18 * CHARACTER_BOSS_DIFFICULTY_MULT
+  const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
+
+  // 战斗属性：高难 BOSS 附加额外属性，比普通 BOSS 略强
+  const bossCombatBoost = Math.min(0.5, Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.1)
+  const bossFinalDamageBoost = Math.min(0.35, 0.05 + Math.max(0, (scale - 1) * 0.1) + (lateMult - 1) * 0.05)
+  const bossFinalDamageReduce = Math.min(0.5, Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.1)
+
+  const baseStats = {
+    health: scaledHealth,
+    maxHealth: scaledHealth,
+    damage: scaledAttack,
+    defense: scaledDefense,
+    speed: scaledSpeed,
+    critRate: Math.min(0.4, 0.08 + secretLv * 0.025),
+    comboRate: Math.min(0.25, 0.03 + secretLv * 0.012),
+    counterRate: Math.min(0.25, 0.03 + secretLv * 0.012),
+    stunRate: Math.min(0.2, 0.03 + secretLv * 0.008),
+    dodgeRate: Math.min(0.25, 0.04 + secretLv * 0.018),
+    vampireRate: Math.min(0.2, 0.03 + secretLv * 0.008),
+    critResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    comboResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    counterResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    stunResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    dodgeResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    vampireResist: Math.min(0.3, 0.06 + secretLv * 0.025),
+    healBoost: 0,
+    critDamageBoost: 0.6,
+    critDamageReduce: 0,
+    finalDamageBoost: bossFinalDamageBoost,
+    finalDamageReduce: bossFinalDamageReduce,
+    combatBoost: bossCombatBoost,
+    resistanceBoost: 0
+  }
+
+  const enemy = new CombatEntity(character.name, effectiveZone.minLevel, baseStats, 'BOSS')
+  enemy.tier = 'boss'
+  enemy.bossId = 'character_' + character.id  // 用 character_ 前缀区分
+  enemy.bossData = {
+    id: 'character_' + character.id,
+    name: character.name,
+    description: character.description || '人物形态 BOSS',
+    traits: ['人物形态', `${character.star}星`],
+    stats: { attack: scaledAttack, health: scaledHealth, defense: scaledDefense, speed: scaledSpeed },
+    drops: [],  // 人物 BOSS 掉落由专用函数处理
+    dropRateBonus: 1.0
+  }
+  // 关键字段：标记为人物 BOSS，供掉落系统识别
+  enemy.isCharacterBoss = true
+  enemy.characterBossId = character.id
+  enemy.characterBossStar = character.star
+  return enemy
+}
+
+// 刷新所有图所有难度的人物 BOSS（每次挂机结束后调用一次）
+function refreshCharacterBosses() {
+  const result = {}
+  for (const zone of zones) {
+    result[zone.id] = {}
+    const diffList = zone.difficulties || []
+    for (const diff of diffList) {
+      const chance = getCharacterBossChance(diff.key)
+      if (Math.random() < chance) {
+        // 刷新人物 BOSS
+        const [minStar, maxStar] = getCharacterBossStarRange(zone.id, diff.key)
+        const character = pickRandomCharacterByStar(minStar, maxStar)
+        if (character) {
+          result[zone.id][diff.key] = {
+            characterId: character.id,
+            characterName: character.name,
+            star: character.star
+          }
+        } else {
+          result[zone.id][diff.key] = null
+        }
+      } else {
+        result[zone.id][diff.key] = null  // 未刷新人物 BOSS，走原怪物 BOSS
+      }
+    }
+  }
+  characterBosses.value = result
+  return result
+}
+
+// 查询某图某难度的人物 BOSS（用于 runIdleEncounter 决策）
+// 返回 null 表示该图该难度本轮走原怪物 BOSS
+function getCharacterBossForZoneDifficulty(zoneId, difficultyKey) {
+  const zoneMap = characterBosses.value?.[zoneId]
+  if (!zoneMap) return null
+  return zoneMap[difficultyKey] || null
+}
+
 function generateBossEnemies(effectiveZone, difficultyKey) {
   const bosses = []
   if (!effectiveZone.bosses || effectiveZone.bosses.length === 0) return bosses
@@ -1343,7 +1514,16 @@ function grantCombatDrops(enemy, zoneId = null) {
         if (zm) { s.gainMaterial(zm); drops.push(zm) }
       }
     }
-    if (zoneId) {
+    // 人物 BOSS：掉落该角色「内丹碎片」(至宝) + 该角色「挑战券」，跳过原怪物 BOSS 素材/挑战券
+    if (enemy && enemy.isCharacterBoss && enemy.characterBossId) {
+      const charDrops = grantCharacterBossDrops(enemy)
+      if (charDrops.length > 0) {
+        // 内丹碎片计入 bossMaterials，挑战券计入 bossTickets
+        runStats.value.bossMaterials += charDrops.filter(d => d.type === 'boss_material').reduce((sum, d) => sum + (d.amount || 1), 0)
+        runStats.value.bossTickets += charDrops.filter(d => d.type === 'boss_ticket').reduce((sum, d) => sum + (d.amount || 1), 0)
+      }
+      drops.push(...charDrops)
+    } else if (zoneId) {
       const bossDrops = grantBossMaterialDrops(enemy, zoneId)
       // 统计 BOSS 素材获得次数（用于仪表盘/结算栏）
       if (bossDrops.length > 0) {
@@ -1395,6 +1575,53 @@ function grantBossTicketDrops(enemy, zoneId) {
       description: ticketDef.description,
       baseValue: 50,
       source: 'boss'
+    }
+    for (let i = 0; i < amount; i++) s.gainMaterial(ticketItem)
+    drops.push({ ...ticketItem, type: 'boss_ticket', amount })
+  }
+  return drops
+}
+
+// 人物 BOSS 专属掉落（仅在挂机击杀人物形态 BOSS 时触发）
+// - 必掉 1~2 个该角色「内丹碎片」(至宝类，后续可炼化专属至宝)
+// - 30% 概率额外掉落 1~2 张该角色「挑战券」（用于直接挑战该人物 BOSS）
+// 内丹碎片 id: inner_pill_char_{数字部分}；挑战券定义见 CHARACTER_BOSS_TICKETS
+function grantCharacterBossDrops(enemy) {
+  const s = store()
+  const drops = []
+  const charId = enemy?.characterBossId
+  if (!charId) return drops
+  // 解析角色 id 数字部分（char_001 -> 001），构造内丹碎片 id
+  const numPart = String(charId).replace(/^char_/, '')
+  const numStr = numPart.padStart(3, '0')
+  const pillId = 'inner_pill_char_' + numStr
+  const pillDef = characterInnerPillList.find(p => p.id === pillId)
+  if (pillDef) {
+    const pillCount = 1 + (Math.random() < 0.4 ? 1 : 0) // 1~2 个
+    const pillItem = {
+      id: pillDef.id,
+      name: pillDef.name,
+      kind: 'boss_material', // 归入 BOSS 素材类别，便于仪表盘/结算栏统一展示
+      quality: pillDef.quality,
+      description: pillDef.description,
+      baseValue: pillDef.baseValue,
+      source: 'character_boss'
+    }
+    for (let i = 0; i < pillCount; i++) s.gainMaterial(pillItem)
+    drops.push({ ...pillItem, type: 'boss_material', amount: pillCount })
+  }
+  // 人物挑战券：30% 概率掉 1~2 张
+  const ticketDef = CHARACTER_BOSS_TICKETS[charId]
+  if (ticketDef && Math.random() < 0.30) {
+    const amount = Math.floor(Math.random() * 2) + 1 // 1~2 张
+    const ticketItem = {
+      id: ticketDef.id,
+      name: ticketDef.name,
+      kind: 'boss_ticket',
+      quality: 'rare',
+      description: ticketDef.description,
+      baseValue: 50,
+      source: 'character_boss'
     }
     for (let i = 0; i < amount; i++) s.gainMaterial(ticketItem)
     drops.push({ ...ticketItem, type: 'boss_ticket', amount })
@@ -3173,8 +3400,15 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-        enemy = createBossEnemy(bossData, effectiveZone)
+        // 优先刷新人物形态 BOSS（每次挂机结束后随机指派）；无则退化为原秘境怪物 BOSS
+        const charBoss = getCharacterBossForZoneDifficulty(zone.id, selectedDifficultyKey.value)
+        const charTemplate = charBoss ? _charList.find(c => c.id === charBoss.characterId) : null
+        if (charBoss && charTemplate) {
+          enemy = createCharacterBossEnemy(charTemplate, effectiveZone, selectedDifficultyKey.value)
+        } else {
+          const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+          enemy = createBossEnemy(bossData, effectiveZone)
+        }
         enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
         addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${enemy.name}！限时 1 分钟内击杀，失败则进入下一轮！`)
@@ -3187,8 +3421,15 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-        enemy = createBossEnemy(bossData, effectiveZone)
+        // 偶遇 BOSS 同样优先使用刷新的人物形态 BOSS
+        const charBoss = getCharacterBossForZoneDifficulty(zone.id, selectedDifficultyKey.value)
+        const charTemplate = charBoss ? _charList.find(c => c.id === charBoss.characterId) : null
+        if (charBoss && charTemplate) {
+          enemy = createCharacterBossEnemy(charTemplate, effectiveZone, selectedDifficultyKey.value)
+        } else {
+          const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+          enemy = createBossEnemy(bossData, effectiveZone)
+        }
         enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
         addLog('header', `👑【${zone.name}·${diff.label}】偶遇 BOSS：${enemy.name}！限时 1 分钟内击杀！`)
@@ -3922,6 +4163,8 @@ function finishIdle() {
   isIdling.value = false
   idleProgress.value = 100
   idleTimeRemaining.value = '已完成'
+  // 挂机结束后随机刷新各图各难度的人物形态 BOSS（下一轮挂机生效）
+  refreshCharacterBosses()
   
   if (foundEquipment.value.length > 0) {
     logs.value.push({ id: ++logIdCounter, type: 'reward-equipment', text: `🎁 获得装备：${foundEquipment.value.map(e => `${e.name}(${e.rarity})`).join('、')}`, time: new Date().toLocaleTimeString() })
@@ -4007,6 +4250,10 @@ async function catchUpMissedEncounters({ forceFinish = false } = {}) {
 function initIdle() {
   const s = store()
   s.regenerateSpirit()
+  // 初始化时若人物 BOSS 尚未刷新（首次进入游戏），先刷新一轮，确保首场挂机即可遇到人物形态 BOSS
+  if (!characterBosses.value || Object.keys(characterBosses.value).length === 0) {
+    refreshCharacterBosses()
+  }
   const idleState = s.idleExploration
   if (idleState && idleState.isActive) {
     const zone = getZoneById(idleState.zoneId)
@@ -4161,6 +4408,8 @@ export function useIdleSystem() {
     bossRoundsCleared,
     bossRoundsFailed,
     idleDiag,
+    // 人物形态 BOSS 刷新状态：{ [zoneId]: { [difficultyKey]: {characterId,characterName,star}|null } }
+    characterBosses,
     // BOSS 挑战系统
     bossChallengeResult,
     runBossChallenge,

@@ -39,10 +39,66 @@ const cores = [
   { id: 'demon_king_core', name: '妖王丹', description: '妖王修为凝丹，高阶丹辅料', quality: 'rare', baseValue: 90, tier: 'boss' }
 ]
 
+// 人物作为BOSS时掉落的内丹碎片（至宝类，每个角色一种）
+// 星级 → 品质与定价：3星=rare/200，4星=epic/500，5星=legendary/1000
+const characterInnerPills = [
+  { id: 'inner_pill_char_001', name: '苏浅雪的内丹碎片', description: '作为苏浅雪形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_002', name: '林清瑶的内丹碎片', description: '作为林清瑶形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_003', name: '炎红袖的内丹碎片', description: '作为炎红袖形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_004', name: '冷月的内丹碎片', description: '作为冷月形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_005', name: '惊鸿的内丹碎片', description: '作为惊鸿形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_006', name: '蛇姬的内丹碎片', description: '作为蛇姬形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_007', name: '熊娇娇的内丹碎片', description: '作为熊娇娇形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_008', name: '夜鸢的内丹碎片', description: '作为夜鸢形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_009', name: '云隐的内丹碎片', description: '作为云隐形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_010', name: '影杀的内丹碎片', description: '作为影杀形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_011', name: '铁扇娘的内丹碎片', description: '作为铁扇娘形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_012', name: '飞絮的内丹碎片', description: '作为飞絮形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_013', name: '血罗刹的内丹碎片', description: '作为血罗刹形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_014', name: '逆鳞的内丹碎片', description: '作为逆鳞形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_015', name: '连珠的内丹碎片', description: '作为连珠形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_016', name: '幻雾的内丹碎片', description: '作为幻雾形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_017', name: '裂魂的内丹碎片', description: '作为裂魂形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_018', name: '磐石的内丹碎片', description: '作为磐石形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_019', name: '焚天的内丹碎片', description: '作为焚天形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_020', name: '回春的内丹碎片', description: '作为回春形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'rare', baseValue: 200 },
+  { id: 'inner_pill_char_021', name: '凌霜剑姬的内丹碎片', description: '作为凌霜剑姬形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_022', name: '玄玑仙子的内丹碎片', description: '作为玄玑仙子形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_023', name: '赤焰灵尊的内丹碎片', description: '作为赤焰灵尊形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_024', name: '寒渊仙子的内丹碎片', description: '作为寒渊仙子形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_025', name: '紫电圣母的内丹碎片', description: '作为紫电圣母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_026', name: '百毒仙姑的内丹碎片', description: '作为百毒仙姑形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_027', name: '驭兽天女的内丹碎片', description: '作为驭兽天女形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_028', name: '九幽鬼母的内丹碎片', description: '作为九幽鬼母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_029', name: '净世光使的内丹碎片', description: '作为净世光使形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_030', name: '噬影魔女的内丹碎片', description: '作为噬影魔女形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_031', name: '九天玄女的内丹碎片', description: '作为九天玄女形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_032', name: '风无形的内丹碎片', description: '作为风无形形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_033', name: '血魔女的内丹碎片', description: '作为血魔女形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_034', name: '镜花影的内丹碎片', description: '作为镜花影形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_035', name: '千手修罗的内丹碎片', description: '作为千手修罗形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_036', name: '摄魂音的内丹碎片', description: '作为摄魂音形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_037', name: '天怒的内丹碎片', description: '作为天怒形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_038', name: '不灭金身的内丹碎片', description: '作为不灭金身形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_039', name: '杀生佛的内丹碎片', description: '作为杀生佛形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_040', name: '慈航道人的内丹碎片', description: '作为慈航道人形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'epic', baseValue: 500 },
+  { id: 'inner_pill_char_041', name: '太虚剑帝的内丹碎片', description: '作为太虚剑帝形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_042', name: '混元道母的内丹碎片', description: '作为混元道母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_043', name: '九阳炎皇的内丹碎片', description: '作为九阳炎皇形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_044', name: '万古冰皇的内丹碎片', description: '作为万古冰皇形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_045', name: '紫霄雷母的内丹碎片', description: '作为紫霄雷母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_046', name: '天毒圣母的内丹碎片', description: '作为天毒圣母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_047', name: '光明佛母的内丹碎片', description: '作为光明佛母形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_048', name: '洪荒兽神的内丹碎片', description: '作为洪荒兽神形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_049', name: '十殿阎罗的内丹碎片', description: '作为十殿阎罗形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 },
+  { id: 'inner_pill_char_050', name: '永夜天尊的内丹碎片', description: '作为永夜天尊形态BOSS时掉落的至宝素材，蕴含其修行精髓。后续可炼化用于专属至宝。', quality: 'legendary', baseValue: 1000 }
+]
+
 // 至宝（Boss / 奇遇专属）
 const specials = [
   { id: 'calm_spirit_pearl', name: '定灵珠', description: '凝定神魂之珠，定灵丹必需要件', quality: 'rare', baseValue: 120 },
-  { id: 'heaven_fragment', name: '天玄碎片', description: '天降玄石碎片，蕴含造化之力，天培元丹核心材料', quality: 'epic', baseValue: 500 }
+  { id: 'heaven_fragment', name: '天玄碎片', description: '天降玄石碎片，蕴含造化之力，天培元丹核心材料', quality: 'epic', baseValue: 500 },
+  ...characterInnerPills
 ]
 
 const allMaterials = [
@@ -57,6 +113,7 @@ export const oreList = ores
 export const liquidList = liquids
 export const coreList = cores
 export const specialList = specials
+export const characterInnerPillList = characterInnerPills
 
 // 标准化素材对象：统一携带 kind / source 字段
 const makeMaterial = (base, kind, source) => ({

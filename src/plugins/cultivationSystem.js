@@ -476,6 +476,61 @@ export const BOSS_TICKETS = {
   ]
 }
 
+// 人物BOSS挑战券：每个人物作为BOSS时对应一种专属挑战券
+// 命名规则：`ticket_character_<角色id>`，便于通过 characterId 反查
+export const CHARACTER_BOSS_TICKETS = {
+  char_001: { id: 'ticket_character_char_001', name: '苏浅雪的挑战券', description: '挑战苏浅雪（人物形态BOSS）的入场凭证' },
+  char_002: { id: 'ticket_character_char_002', name: '林清瑶的挑战券', description: '挑战林清瑶（人物形态BOSS）的入场凭证' },
+  char_003: { id: 'ticket_character_char_003', name: '炎红袖的挑战券', description: '挑战炎红袖（人物形态BOSS）的入场凭证' },
+  char_004: { id: 'ticket_character_char_004', name: '冷月的挑战券', description: '挑战冷月（人物形态BOSS）的入场凭证' },
+  char_005: { id: 'ticket_character_char_005', name: '惊鸿的挑战券', description: '挑战惊鸿（人物形态BOSS）的入场凭证' },
+  char_006: { id: 'ticket_character_char_006', name: '蛇姬的挑战券', description: '挑战蛇姬（人物形态BOSS）的入场凭证' },
+  char_007: { id: 'ticket_character_char_007', name: '熊娇娇的挑战券', description: '挑战熊娇娇（人物形态BOSS）的入场凭证' },
+  char_008: { id: 'ticket_character_char_008', name: '夜鸢的挑战券', description: '挑战夜鸢（人物形态BOSS）的入场凭证' },
+  char_009: { id: 'ticket_character_char_009', name: '云隐的挑战券', description: '挑战云隐（人物形态BOSS）的入场凭证' },
+  char_010: { id: 'ticket_character_char_010', name: '影杀的挑战券', description: '挑战影杀（人物形态BOSS）的入场凭证' },
+  char_011: { id: 'ticket_character_char_011', name: '铁扇娘的挑战券', description: '挑战铁扇娘（人物形态BOSS）的入场凭证' },
+  char_012: { id: 'ticket_character_char_012', name: '飞絮的挑战券', description: '挑战飞絮（人物形态BOSS）的入场凭证' },
+  char_013: { id: 'ticket_character_char_013', name: '血罗刹的挑战券', description: '挑战血罗刹（人物形态BOSS）的入场凭证' },
+  char_014: { id: 'ticket_character_char_014', name: '逆鳞的挑战券', description: '挑战逆鳞（人物形态BOSS）的入场凭证' },
+  char_015: { id: 'ticket_character_char_015', name: '连珠的挑战券', description: '挑战连珠（人物形态BOSS）的入场凭证' },
+  char_016: { id: 'ticket_character_char_016', name: '幻雾的挑战券', description: '挑战幻雾（人物形态BOSS）的入场凭证' },
+  char_017: { id: 'ticket_character_char_017', name: '裂魂的挑战券', description: '挑战裂魂（人物形态BOSS）的入场凭证' },
+  char_018: { id: 'ticket_character_char_018', name: '磐石的挑战券', description: '挑战磐石（人物形态BOSS）的入场凭证' },
+  char_019: { id: 'ticket_character_char_019', name: '焚天的挑战券', description: '挑战焚天（人物形态BOSS）的入场凭证' },
+  char_020: { id: 'ticket_character_char_020', name: '回春的挑战券', description: '挑战回春（人物形态BOSS）的入场凭证' },
+  char_021: { id: 'ticket_character_char_021', name: '凌霜剑姬的挑战券', description: '挑战凌霜剑姬（人物形态BOSS）的入场凭证' },
+  char_022: { id: 'ticket_character_char_022', name: '玄玑仙子的挑战券', description: '挑战玄玑仙子（人物形态BOSS）的入场凭证' },
+  char_023: { id: 'ticket_character_char_023', name: '赤焰灵尊的挑战券', description: '挑战赤焰灵尊（人物形态BOSS）的入场凭证' },
+  char_024: { id: 'ticket_character_char_024', name: '寒渊仙子的挑战券', description: '挑战寒渊仙子（人物形态BOSS）的入场凭证' },
+  char_025: { id: 'ticket_character_char_025', name: '紫电圣母的挑战券', description: '挑战紫电圣母（人物形态BOSS）的入场凭证' },
+  char_026: { id: 'ticket_character_char_026', name: '百毒仙姑的挑战券', description: '挑战百毒仙姑（人物形态BOSS）的入场凭证' },
+  char_027: { id: 'ticket_character_char_027', name: '驭兽天女的挑战券', description: '挑战驭兽天女（人物形态BOSS）的入场凭证' },
+  char_028: { id: 'ticket_character_char_028', name: '九幽鬼母的挑战券', description: '挑战九幽鬼母（人物形态BOSS）的入场凭证' },
+  char_029: { id: 'ticket_character_char_029', name: '净世光使的挑战券', description: '挑战净世光使（人物形态BOSS）的入场凭证' },
+  char_030: { id: 'ticket_character_char_030', name: '噬影魔女的挑战券', description: '挑战噬影魔女（人物形态BOSS）的入场凭证' },
+  char_031: { id: 'ticket_character_char_031', name: '九天玄女的挑战券', description: '挑战九天玄女（人物形态BOSS）的入场凭证' },
+  char_032: { id: 'ticket_character_char_032', name: '风无形的挑战券', description: '挑战风无形（人物形态BOSS）的入场凭证' },
+  char_033: { id: 'ticket_character_char_033', name: '血魔女的挑战券', description: '挑战血魔女（人物形态BOSS）的入场凭证' },
+  char_034: { id: 'ticket_character_char_034', name: '镜花影的挑战券', description: '挑战镜花影（人物形态BOSS）的入场凭证' },
+  char_035: { id: 'ticket_character_char_035', name: '千手修罗的挑战券', description: '挑战千手修罗（人物形态BOSS）的入场凭证' },
+  char_036: { id: 'ticket_character_char_036', name: '摄魂音的挑战券', description: '挑战摄魂音（人物形态BOSS）的入场凭证' },
+  char_037: { id: 'ticket_character_char_037', name: '天怒的挑战券', description: '挑战天怒（人物形态BOSS）的入场凭证' },
+  char_038: { id: 'ticket_character_char_038', name: '不灭金身的挑战券', description: '挑战不灭金身（人物形态BOSS）的入场凭证' },
+  char_039: { id: 'ticket_character_char_039', name: '杀生佛的挑战券', description: '挑战杀生佛（人物形态BOSS）的入场凭证' },
+  char_040: { id: 'ticket_character_char_040', name: '慈航道人的挑战券', description: '挑战慈航道人（人物形态BOSS）的入场凭证' },
+  char_041: { id: 'ticket_character_char_041', name: '太虚剑帝的挑战券', description: '挑战太虚剑帝（人物形态BOSS）的入场凭证' },
+  char_042: { id: 'ticket_character_char_042', name: '混元道母的挑战券', description: '挑战混元道母（人物形态BOSS）的入场凭证' },
+  char_043: { id: 'ticket_character_char_043', name: '九阳炎皇的挑战券', description: '挑战九阳炎皇（人物形态BOSS）的入场凭证' },
+  char_044: { id: 'ticket_character_char_044', name: '万古冰皇的挑战券', description: '挑战万古冰皇（人物形态BOSS）的入场凭证' },
+  char_045: { id: 'ticket_character_char_045', name: '紫霄雷母的挑战券', description: '挑战紫霄雷母（人物形态BOSS）的入场凭证' },
+  char_046: { id: 'ticket_character_char_046', name: '天毒圣母的挑战券', description: '挑战天毒圣母（人物形态BOSS）的入场凭证' },
+  char_047: { id: 'ticket_character_char_047', name: '光明佛母的挑战券', description: '挑战光明佛母（人物形态BOSS）的入场凭证' },
+  char_048: { id: 'ticket_character_char_048', name: '洪荒兽神的挑战券', description: '挑战洪荒兽神（人物形态BOSS）的入场凭证' },
+  char_049: { id: 'ticket_character_char_049', name: '十殿阎罗的挑战券', description: '挑战十殿阎罗（人物形态BOSS）的入场凭证' },
+  char_050: { id: 'ticket_character_char_050', name: '永夜天尊的挑战券', description: '挑战永夜天尊（人物形态BOSS）的入场凭证' }
+}
+
 // 按秘境 + boss 序号（0/1）取 BOSS 挑战券定义
 export const getBossTicketByZoneIndex = (zoneId, index) => {
   const arr = BOSS_TICKETS[zoneId]

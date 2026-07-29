@@ -247,16 +247,38 @@ watch(
 )
 
 // 最大可切换索引 = 按突破次数限制（0 原立绘不在计数内）
-// skin1/skin2：突破 >=1 次解锁；skin3：突破 >=2 次解锁；skinN(>=3)：突破 >= N-1 次
-// 突破满级(5/5)：解锁全部皮肤（含双皮肤变体 skin7_guzhuang 等）
+// ⚠️ 皮肤解锁规则（用户需求修订）：
+//   - 突破 N 级 → 解锁 skin 1~N（严格 1:1：突破1→skin1，突破2→skin2，...，突破5→skin5）
+//   - 皮肤 6、皮肤 7 → 通过灵石阁商店购买解锁（记录在 playerStore.unlockedShopSkins）
+//   - 旧的"突破1解锁 skin1+skin2 两个"逻辑已废弃
 const maxSkinIndex = computed(() => {
   if (!canSwitch.value) return 0
-  // 突破满级 5 次：解锁全部皮肤（含古装变体），让双皮肤角色的 guzhuang 也可切换
-  if (breakThrough.value >= 5) return skinCount.value
-  // 突破 1 次：解锁前 2 个皮肤；突破 2 次起：每多 1 次突破再解锁 1 个
-  const byBreak = breakThrough.value >= 2 ? Math.min(skinCount.value, 1 + breakThrough.value) : Math.min(skinCount.value, 2)
-  return Math.min(byBreak, skinCount.value)
+  // 已购皮肤集合：{ [characterId]: [skinIndex, ...] }，由灵石阁购买写入
+  const charId = (props.character && (props.character.templateId || props.character.id)) || null
+  const purchased = charId ? (playerStore.unlockedShopSkins?.[charId] || []) : []
+  // 1. 突破解锁的皮肤：skin 1 ~ breakThrough
+  let maxByBreak = breakThrough.value
+  // 2. 商店购买的皮肤：合并到候选集合
+  // 取突破解锁范围与商店购买集合的并集最大索引
+  let maxPurchased = purchased.length > 0 ? Math.max(...purchased) : 0
+  const maxAllowed = Math.max(maxByBreak, maxPurchased)
+  // 不能超过该角色实际拥有的皮肤数
+  return Math.min(maxAllowed, skinCount.value)
 })
+// 判断某个皮肤索引是否已解锁（用于 UI 标识"未解锁"状态）
+const isSkinUnlocked = (skinIdx) => {
+  if (skinIdx === 0) return true // 原立绘永远可用
+  if (skinIdx <= breakThrough.value) return true // 突破 N 解锁 skin 1~N
+  const charId = (props.character && (props.character.templateId || props.character.id)) || null
+  const purchased = charId ? (playerStore.unlockedShopSkins?.[charId] || []) : []
+  return purchased.includes(skinIdx)
+}
+// 获取皮肤解锁来源说明（用于 UI 显示）
+const getSkinUnlockSource = (skinIdx) => {
+  if (skinIdx === 0) return '原立绘'
+  if (skinIdx <= 5) return `突破 ${skinIdx} 级解锁`
+  return '灵石阁购买解锁'
+}
 const skinLabel = computed(() => {
   if (currentSkin.value === 0) return '原立绘'
   return `皮肤 ${currentSkin.value}/${skinCount.value}`

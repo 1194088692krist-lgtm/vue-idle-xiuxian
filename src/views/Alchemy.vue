@@ -794,6 +794,92 @@
             </div>
             <div v-if="blackMarketItems.length === 0" class="empty-state">黑市尚未开张…</div>
           </div>
+
+          <!-- 皮肤阁区（人物 skin6/skin7 出售） -->
+          <div class="section">
+            <div class="black-market-header">
+              <h3 class="section-title">皮肤阁（人物立绘）</h3>
+              <button
+                class="btn-small btn-refresh"
+                :disabled="playerStore.spiritStones < skinShopRefreshCost"
+                @click="refreshSkinShop"
+              >
+                刷新 - {{ formatNumber(skinShopRefreshCost) }} 灵石
+              </button>
+            </div>
+            <p class="black-market-hint">本阁随机刷新 5 位人物的限定皮肤，每张 {{ formatNumber(SKIN_SHOP_CONFIG.skinPrice) }} 灵石</p>
+            <div class="shop-grid skin-shop-grid">
+              <div
+                v-for="item in skinShopItems"
+                :key="item.uid"
+                class="shop-card skin-shop-card"
+                :class="{ sold: item.sold }"
+                @click="!item.sold && previewSkin(item)"
+              >
+                <div class="skin-card-portrait">
+                  <img
+                    v-if="getCharAvatar(item.characterId)"
+                    :src="getCharAvatar(item.characterId)"
+                    :alt="item.characterName"
+                    class="skin-avatar"
+                    @error="$event.target.style.display='none'"
+                  />
+                  <div v-else class="skin-avatar-placeholder">{{ item.characterName?.slice(0, 1) || '?' }}</div>
+                  <span class="star-badge star-{{ item.star }}">{{ item.star }}★</span>
+                </div>
+                <div class="shop-card-header">
+                  <span class="shop-name">{{ item.characterName }}</span>
+                  <span class="rarity-badge legendary">皮肤 {{ item.skinIndex }}</span>
+                </div>
+                <p class="shop-desc">点击查看皮肤立绘</p>
+                <div class="shop-card-footer">
+                  <span class="shop-price">{{ formatNumber(item.price) }} 灵石</span>
+                  <button
+                    v-if="!item.sold"
+                    class="btn-small btn-buy"
+                    :disabled="playerStore.spiritStones < item.price"
+                    @click.stop="buySkinShop(item.uid)"
+                  >购买</button>
+                  <span v-else class="sold-tag">已售罄</span>
+                </div>
+              </div>
+            </div>
+            <div v-if="!skinShopLoading && skinShopItems.length === 0" class="empty-state">皮肤阁暂无可售皮肤（所有限定皮肤已解锁）…</div>
+            <div v-if="skinShopLoading" class="empty-state">皮肤阁正在开张…</div>
+          </div>
+
+          <!-- 皮肤预览弹窗 -->
+          <div v-if="previewingSkin" class="skin-preview-mask" @click="closeSkinPreview">
+            <div class="skin-preview-modal" @click.stop>
+              <button class="skin-preview-close" @click="closeSkinPreview">×</button>
+              <h3 class="skin-preview-title">
+                {{ previewingSkin.item.characterName }} - 皮肤 {{ previewingSkin.item.skinIndex }}
+              </h3>
+              <div class="skin-preview-image-wrap">
+                <img
+                  v-if="previewingSkin.skinUrl"
+                  :src="previewingSkin.skinUrl"
+                  :alt="previewingSkin.item.characterName + ' 皮肤' + previewingSkin.item.skinIndex"
+                  class="skin-preview-image"
+                  @error="$event.target.style.display='none'"
+                />
+                <div v-else class="skin-preview-placeholder">
+                  <p>皮肤立绘加载失败</p>
+                  <p class="hint">可能尚未上线，敬请期待</p>
+                </div>
+              </div>
+              <div class="skin-preview-footer">
+                <span class="shop-price">{{ formatNumber(previewingSkin.item.price) }} 灵石</span>
+                <button
+                  v-if="!previewingSkin.item.sold"
+                  class="btn-small btn-buy"
+                  :disabled="playerStore.spiritStones < previewingSkin.item.price"
+                  @click="buySkinShop(previewingSkin.item.uid); closeSkinPreview()"
+                >购买解锁</button>
+                <span v-else class="sold-tag">已售罄</span>
+              </div>
+            </div>
+          </div>
         </template>
       </div>
     </div>
@@ -822,7 +908,8 @@
   } from '@ant-design/icons-vue'
   import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
-  import { BLACK_MARKET_CONFIG, getManualRefreshCost } from '../plugins/shopConfig'
+  import { BLACK_MARKET_CONFIG, getManualRefreshCost, SKIN_SHOP_CONFIG, getSkinShopRefreshCost } from '../plugins/shopConfig'
+  import { getCharacterAvatar, getCharacterSkinUrl } from '../plugins/characters'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -847,6 +934,7 @@
     loadRune()
     loadBounty()
     loadBarter()
+    loadSkinShop()
   }
   function loadBlackMarket() {
     blackMarketItems.value = playerStore.getBlackMarketItems()
@@ -952,6 +1040,71 @@
     loadBarter()
     shopTick.value++
   }
+
+  // ===== 皮肤阁（皮肤商店：出售人物 skin6/skin7） =====
+  const skinShopItems = ref([])
+  const skinShopLoading = ref(false)
+  const skinShopRefreshCost = computed(() => getSkinShopRefreshCost())
+  // 当前正在预览的皮肤（点击商品卡片时弹出预览）
+  const previewingSkin = ref(null)  // { item, skinUrl }
+
+  async function loadSkinShop() {
+    skinShopLoading.value = true
+    try {
+      skinShopItems.value = await playerStore.getSkinShopItems()
+    } catch (e) {
+      console.error('加载皮肤阁失败', e)
+    } finally {
+      skinShopLoading.value = false
+    }
+    shopTick.value++
+  }
+  async function refreshSkinShop() {
+    if (playerStore.spiritStones < skinShopRefreshCost.value) {
+      message.error(`灵石不足，刷新需要 ${formatNumber(skinShopRefreshCost.value)} 灵石`)
+      return
+    }
+    const r = await playerStore.refreshSkinShop()
+    r.success ? message.success(r.message) : message.error(r.message)
+    await loadSkinShop()
+  }
+  async function buySkinShop(uid) {
+    const r = await playerStore.buySkinShopItem(uid)
+    r.success ? message.success(r.message) : message.error(r.message)
+    await loadSkinShop()
+    shopTick.value++
+  }
+  // 皮肤商品卡片需要展示人物头像，从 characterList 拿模板数据
+  // 用懒加载避免循环依赖
+  const _charList = ref([])
+  async function _ensureCharList() {
+    if (_charList.value.length > 0) return
+    const m = await import('../plugins/characters.js')
+    _charList.value = m.characterList || []
+  }
+  // 通过 characterId 取人物头像 URL
+  function getCharAvatar(characterId) {
+    const char = _charList.value.find(c => c.id === characterId)
+    if (!char) return null
+    return getCharacterAvatar({ templateId: char.id, id: char.id, avatar: char.avatar })
+  }
+  // 通过 characterId + skinIndex 取皮肤立绘 URL
+  function getCharSkinUrl(characterId, skinIndex) {
+    if (!characterId || !skinIndex) return null
+    return getCharacterSkinUrl({ templateId: characterId, id: characterId }, skinIndex)
+  }
+  // 点击商品卡片预览皮肤
+  async function previewSkin(item) {
+    await _ensureCharList()
+    const url = getCharSkinUrl(item.characterId, item.skinIndex)
+    previewingSkin.value = { item, skinUrl: url }
+  }
+  // 关闭预览弹窗
+  function closeSkinPreview() {
+    previewingSkin.value = null
+  }
+  // 在 switchToShop 中并行预加载 characterList
+  ;(async () => { await _ensureCharList() })()
 
   function runeStatLabel(item) {
     const map = { attack: '攻击%', health: '生命%', defense: '防御%', speed: '速度',
@@ -2768,6 +2921,140 @@
   }
   .black-market-card {
     border-color: rgba(139, 92, 246, 0.4);
+  }
+  /* ===== 皮肤阁卡片样式 ===== */
+  .skin-shop-grid {
+    grid-template-columns: repeat(auto-fill, minmax(140px, 1fr));
+  }
+  .skin-shop-card {
+    cursor: pointer;
+    border-color: rgba(255, 215, 0, 0.4);
+    transition: transform 0.2s, box-shadow 0.2s;
+  }
+  .skin-shop-card:hover:not(.sold) {
+    transform: translateY(-4px);
+    box-shadow: 0 4px 16px rgba(255, 215, 0, 0.3);
+  }
+  .skin-shop-card.sold {
+    opacity: 0.5;
+    cursor: not-allowed;
+  }
+  .skin-card-portrait {
+    position: relative;
+    width: 100%;
+    aspect-ratio: 1;
+    border-radius: 6px;
+    overflow: hidden;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    margin-bottom: 6px;
+  }
+  .skin-avatar {
+    width: 100%;
+    height: 100%;
+    object-fit: cover;
+  }
+  .skin-avatar-placeholder {
+    width: 100%;
+    height: 100%;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    font-size: 36px;
+    font-weight: bold;
+    color: rgba(255, 215, 0, 0.6);
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+  }
+  .star-badge {
+    position: absolute;
+    top: 4px;
+    right: 4px;
+    padding: 2px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+    font-weight: bold;
+    background: rgba(0, 0, 0, 0.6);
+    color: #fff;
+  }
+  .star-badge.star-3 { color: #c0c0c0; }
+  .star-badge.star-4 { color: #4169E1; }
+  .star-badge.star-5 { color: #FFD700; }
+  /* 皮肤预览弹窗 */
+  .skin-preview-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.85);
+    z-index: 1000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .skin-preview-modal {
+    position: relative;
+    max-width: 90vw;
+    max-height: 90vh;
+    background: linear-gradient(135deg, #1a1a2e 0%, #16213e 100%);
+    border: 2px solid rgba(255, 215, 0, 0.5);
+    border-radius: 12px;
+    padding: 16px;
+    display: flex;
+    flex-direction: column;
+    align-items: center;
+  }
+  .skin-preview-close {
+    position: absolute;
+    top: 8px;
+    right: 8px;
+    width: 28px;
+    height: 28px;
+    border: none;
+    border-radius: 50%;
+    background: rgba(255, 255, 255, 0.2);
+    color: #fff;
+    font-size: 18px;
+    cursor: pointer;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+  }
+  .skin-preview-close:hover {
+    background: rgba(255, 255, 255, 0.3);
+  }
+  .skin-preview-title {
+    margin: 0 0 12px;
+    color: #FFD700;
+    font-size: 16px;
+  }
+  .skin-preview-image-wrap {
+    width: 100%;
+    max-height: 70vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    margin-bottom: 12px;
+  }
+  .skin-preview-image {
+    max-width: 100%;
+    max-height: 70vh;
+    object-fit: contain;
+    border-radius: 8px;
+  }
+  .skin-preview-placeholder {
+    color: #9ca3af;
+    text-align: center;
+    padding: 40px;
+  }
+  .skin-preview-placeholder .hint {
+    font-size: 12px;
+    color: #6b7280;
+    margin-top: 8px;
+  }
+  .skin-preview-footer {
+    display: flex;
+    align-items: center;
+    gap: 16px;
   }
   .rarity-badge {
     font-size: 10px;

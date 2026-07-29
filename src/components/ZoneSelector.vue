@@ -136,6 +136,16 @@
           <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
           <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
+        <div v-if="currentCharacterBoss" class="char-boss-hint">
+          <span class="char-boss-tag">👑 最终BOSS</span>
+          <span class="char-boss-name">{{ currentCharacterBoss.characterName }}</span>
+          <span class="char-boss-star">{{ currentCharacterBoss.star }}★</span>
+          <span class="char-boss-note">（本轮刷新，击败掉落内丹碎片与挑战券）</span>
+        </div>
+        <div v-else class="char-boss-hint muted">
+          <span class="char-boss-tag">👑 最终BOSS</span>
+          <span class="char-boss-note">本轮为秘境原怪，挂机结束后随机刷新人物形态 BOSS</span>
+        </div>
       </div>
 
       <div class="detail-stats">
@@ -1050,6 +1060,7 @@ const {
   bossChallengeBossName,
   bossChallengeZoneName,
   bossChallengeSummary,
+  characterBosses,
   currentEncounterSummary,
   displayLogs,
   clearIdleLogs
@@ -1404,6 +1415,15 @@ const currentDifficulty = computed(() =>
   selectedZone.value ? getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value) : null
 )
 
+// 当前图当前难度刷新的人物形态 BOSS（用于地图简介提示）
+// characterBosses: { [zoneId]: { [difficultyKey]: {characterId,characterName,star}|null } }
+const currentCharacterBoss = computed(() => {
+  if (!selectedZone.value || !selectedDifficultyKey.value) return null
+  const zoneMap = characterBosses.value?.[selectedZone.value.id]
+  if (!zoneMap) return null
+  return zoneMap[selectedDifficultyKey.value] || null
+})
+
 // 挂机时长选项
 const idleDurations = [
   { minutes: 5, encounters: 1 },
@@ -1751,6 +1771,46 @@ onUnmounted(() => {
 .diff-info b {
   color: #DAA520;
   font-size: 13px;
+}
+
+/* 人物形态 BOSS 提示 */
+.char-boss-hint {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  flex-wrap: wrap;
+  margin-top: 8px;
+  padding: 8px 12px;
+  font-size: 12px;
+  background: linear-gradient(90deg, rgba(218, 165, 32, 0.12), rgba(218, 165, 32, 0.03));
+  border: 1px solid rgba(218, 165, 32, 0.35);
+  border-left-width: 3px;
+  border-left-color: #DAA520;
+  border-radius: 8px;
+  color: #F5DEB3;
+}
+.char-boss-hint.muted {
+  background: rgba(255, 255, 255, 0.03);
+  border-color: rgba(255, 255, 255, 0.1);
+  border-left-color: #888;
+  color: #C9C4BA;
+}
+.char-boss-tag {
+  font-weight: bold;
+  color: #DAA520;
+}
+.char-boss-name {
+  color: #fff;
+  font-weight: bold;
+  font-size: 13px;
+}
+.char-boss-star {
+  color: #FFD700;
+  font-weight: bold;
+}
+.char-boss-note {
+  color: #C9C4BA;
+  font-size: 11px;
 }
 
 /* Build 强度提示条 */

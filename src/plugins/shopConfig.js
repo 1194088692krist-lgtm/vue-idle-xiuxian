@@ -323,6 +323,83 @@ export function rollBlackMarketItems(count = BLACK_MARKET_CONFIG.itemsPerRefresh
   return result
 }
 
+// ==================== 皮肤商店（灵石阁·皮肤阁） ====================
+// 用户需求：人物皮肤 6/7 通过灵石阁随机刷新出售，皮肤 100 万灵石一张，
+//          每次刷新 5 个人物的皮肤，刷新费用 10 万灵石/次。
+
+// 皮肤商店配置
+//   - skinPrice: 单个皮肤售价（100 万灵石）
+//   - refreshCost: 手动刷新费用（10 万灵石/次，固定不递增——皮肤是 endgame 内容，不应让刷新成本成为瓶颈）
+//   - itemsPerRefresh: 每次刷新出 5 个人物的皮肤
+//   - purchasableSkins: 商店出售的皮肤索引（6、7）
+//   - minSkinCount: 角色至少拥有该皮肤数才进入候选池（避免出现皮肤不足的角色）
+export const SKIN_SHOP_CONFIG = {
+  skinPrice: 1000000,
+  refreshCost: 100000,
+  itemsPerRefresh: 5,
+  purchasableSkins: [6, 7],
+  minSkinCount: 6  // 至少拥有 6 个皮肤的角色才可能出售 skin6/skin7
+}
+
+// 懒加载 characterList / skinMap，避免循环依赖（shopConfig 早于 characters 加载）
+let _characterList = null
+let _skinMap = null
+async function _ensureCharDeps() {
+  if (!_characterList) {
+    const m = await import('./characters.js')
+    _characterList = m.characterList
+    _skinMap = m.skinMap
+  }
+  // skinMap 是 reactive，异步 fetch 后才填充，每次 roll 时实时读取
+  return { characterList: _characterList, skinMap: _skinMap }
+}
+
+/**
+ * 随机刷新 5 个人物的皮肤商品
+ * @param {Object} opts
+ * @param {Object} opts.unlockedShopSkins - 已购皮肤记录 { [charId]: [skinIdx, ...] }，已购全部皮肤的角色不再出现
+ * @returns {Promise<Array>} 5 个商品项 { uid, characterId, characterName, star, skinIndex, price, sold }
+ */
+export async function rollSkinShopItems(opts = {}) {
+  const { characterList, skinMap } = await _ensureCharDeps()
+  const unlocked = opts.unlockedShopSkins || {}
+  // 候选池：所有 skinMap 中皮肤数 >= 6 的角色
+  const candidates = []
+  for (const char of characterList) {
+    const skinCount = skinMap[char.id] || 0
+    if (skinCount < SKIN_SHOP_CONFIG.minSkinCount) continue
+    // 该角色可购买的皮肤 = purchasableSkins 中未购买的
+    const purchased = unlocked[char.id] || []
+    const available = SKIN_SHOP_CONFIG.purchasableSkins.filter(s => !purchased.includes(s))
+    if (available.length === 0) continue // 该角色所有可购皮肤已购
+    candidates.push({ char, available, skinCount })
+  }
+  // 不放回抽取 5 个角色，每个角色再随机选一个可购皮肤
+  const result = []
+  const pool = [...candidates]
+  for (let i = 0; i < SKIN_SHOP_CONFIG.itemsPerRefresh && pool.length > 0; i++) {
+    const idx = Math.floor(Math.random() * pool.length)
+    const cand = pool.splice(idx, 1)[0]
+    const skinIndex = cand.available[Math.floor(Math.random() * cand.available.length)]
+    result.push({
+      uid: 'skin_' + Date.now() + '_' + i + '_' + cand.char.id,
+      characterId: cand.char.id,
+      characterName: cand.char.name,
+      star: cand.char.star,
+      skinIndex,
+      skinCount: cand.skinCount,
+      price: SKIN_SHOP_CONFIG.skinPrice,
+      sold: false
+    })
+  }
+  return result
+}
+
+// 计算皮肤商店刷新费用（固定 10 万，不递增）
+export function getSkinShopRefreshCost() {
+  return SKIN_SHOP_CONFIG.refreshCost
+}
+
 // 计算手动刷新成本（递增）
 export function getManualRefreshCost(currentCount) {
   return Math.round(
