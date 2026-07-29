@@ -488,6 +488,12 @@ const activePillBuffList = computed(() => {
 // 用户要求 BOSS 战斗无论是否秒杀，一轮最少 5 秒，让斩杀特效完整显示、战斗更有感觉
 // 2.5 秒间隔会让特效（立绘 1.8s + 灵宠 1s 延迟 + 逐字砸入 + 停留）来不及播完就进下一场
 const ENCOUNTER_INTERVAL = 5000
+// BOSS 击杀后下一轮延后时间：十杀文案逐字砸入+停留较长，5 秒基础间隔会让演出被截断，
+// 在 BOSS 击杀时间戳基础上额外加 2 秒，让十杀文字完整播完再进下一场
+const BOSS_KILL_EXTRA_DELAY = 2000
+// 记录最近一次 BOSS 击杀时间戳，runIdleEncounter 入口检查距此不足
+// (ENCOUNTER_INTERVAL + BOSS_KILL_EXTRA_DELAY) 则跳过本次，等待下次 setInterval 触发
+let lastBossKillTs = 0
 // 回合内动画延时：等待 BattleStage 播完当前回合的所有动作（攻击/buff/回复/技能/战场情况），
 // 每动作 1 秒(ACTION_DELAY)，3玩家队伍约 3-4 动作/回合，故等待约 3.5 秒让动画播完再进入下一回合，
 // 避免回合切换太快导致人物抖动频闪
@@ -1623,6 +1629,8 @@ async function runBossChallenge(zoneId, bossId, count) {
         ts: Date.now()
       }
       bossKillEvent.value = killEvt
+      // 标记本场为 BOSS 击杀，下方场次间隔延时额外 +2s 让十杀文案完整播完
+      lastBossKillTs = Date.now()
       // 诊断日志：确认手动挑战击杀事件已发出
       console.log('[useIdleSystem] 手动BOSS挑战击杀事件已发出', killEvt)
       // 发放 BOSS 标准奖励（10x 数量型奖励，参考挂机 BOSS）
@@ -1681,10 +1689,13 @@ async function runBossChallenge(zoneId, bossId, count) {
     // 战斗结束：仅置 inProgress=false，保留 enemy/players 让 BattleStage 显示胜负 badge
     currentEncounter.value = { ...currentEncounter.value, inProgress: false }
 
-    // 场次间隔 5s：让斩杀特效（立绘+灵宠+逐字文案+停留）完整播完再进下一场
-    // 与挂机 ENCOUNTER_INTERVAL 一致，保证 BOSS 战节奏统一
+    // 场次间隔：让斩杀特效（立绘+灵宠+逐字文案+停留）完整播完再进下一场
+    // BOSS 击杀后额外 +2s（共 7s）让十杀文案逐字砸入+停留完整播完，避免被截断
     if (i < count - 1 && !teamMemberStates.value.every(ms => ms.hp <= 0)) {
-      await new Promise(resolve => setTimeout(resolve, 5000))
+      const gap = lastBossKillTs > 0 && (Date.now() - lastBossKillTs) < ENCOUNTER_INTERVAL
+        ? ENCOUNTER_INTERVAL + BOSS_KILL_EXTRA_DELAY
+        : ENCOUNTER_INTERVAL
+      await new Promise(resolve => setTimeout(resolve, gap))
     }
   }
 
@@ -2920,6 +2931,18 @@ async function runIdleEncounter() {
   idleDiag.value.isRunningStuck = isRunning
   if (!isIdling.value) { idleDiag.value.lastStage = '跳过:isIdling=false'; idleDiag.value.skipCount++; return }
   if (isFinishingIdle) { idleDiag.value.lastStage = '跳过:待结束中'; idleDiag.value.skipCount++; return }
+  // BOSS 击杀延时保护：距上次 BOSS 击杀不足 (5s+2s=7s) 则跳过本次遭遇，
+  // 让十杀文案逐字砸入+停留演出完整播完再进入下一场，避免被截断
+  // setInterval 每 5s 触发一次，跳过本次后下次 5s 后再检查，最坏情况延后约 5s
+  if (lastBossKillTs > 0) {
+    const elapsed = Date.now() - lastBossKillTs
+    const required = ENCOUNTER_INTERVAL + BOSS_KILL_EXTRA_DELAY
+    if (elapsed < required) {
+      idleDiag.value.lastStage = `跳过:BOSS击杀延时保护(${elapsed}/${required}ms)`
+      idleDiag.value.skipCount++
+      return
+    }
+  }
   // 防御：若 selectedZone 丢失（极端情况下组件状态异常），从持久化的 idleExploration.zoneId 恢复，
   // 确保后台挂机不会因状态丢失而静默中断（切换界面不应停止挂机）
   if (!selectedZone.value) {
@@ -3163,6 +3186,9 @@ async function runIdleEncounter() {
           ts: Date.now()
         }
         bossKillEvent.value = killEvt
+        // 记录 BOSS 击杀时间戳，runIdleEncounter 入口据此延时保护，
+        // 让十杀文案演出完整播完再进下一场（额外延后 BOSS_KILL_EXTRA_DELAY=2s）
+        lastBossKillTs = Date.now()
         // 诊断日志：确认击杀事件已发出（排查挂机立绘不弹出的关键证据）
         console.log('[useIdleSystem] BOSS击杀事件已发出', killEvt)
       }
