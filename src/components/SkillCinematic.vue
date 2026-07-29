@@ -26,7 +26,7 @@
           :style="{ '--c': skillColor, left: `${15 + i * 10}%`, animationDelay: `${i * 0.08}s` }"></div>
       </div>
       <!-- 雷系：Z字闪电链 -->
-      <div v-else-if="skillFx === 'lightning'" :key="`fx-${animKey}`" class="fx-lightning">
+      <div v-else-if="skillFx === 'lightning' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-lightning">
         <svg class="lightning-svg" viewBox="0 0 100 100" preserveAspectRatio="none">
           <polyline :stroke="skillColor" points="50,0 40,30 60,35 45,65 55,70 50,100" />
           <polyline class="bolt2" :stroke="skillColor" points="30,5 20,35 40,40 25,70 35,75 30,100" />
@@ -34,7 +34,7 @@
         </svg>
       </div>
       <!-- 冰系：六角冰晶 -->
-      <div v-else-if="skillFx === 'crystal'" :key="`fx-${animKey}`" class="fx-crystal">
+      <div v-else-if="skillFx === 'crystal' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-crystal">
         <div class="crystal-shape" :style="{ borderColor: skillColor }">
           <div class="crystal-arm a1" :style="{ background: skillColor }"></div>
           <div class="crystal-arm a2" :style="{ background: skillColor }"></div>
@@ -43,42 +43,42 @@
         <div class="crystal-shape small" :style="{ borderColor: skillColor }"></div>
       </div>
       <!-- 毒系：冒泡毒气云 -->
-      <div v-else-if="skillFx === 'cloud'" :key="`fx-${animKey}`" class="fx-cloud">
+      <div v-else-if="skillFx === 'cloud' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-cloud">
         <div v-for="i in 6" :key="i" class="cloud-bubble"
           :style="{ '--c': skillColor, left: `${10 + i * 14}%`, animationDelay: `${i * 0.12}s` }"></div>
       </div>
       <!-- 木系：向上生长的藤蔓 -->
-      <div v-else-if="skillFx === 'vines'" :key="`fx-${animKey}`" class="fx-vines">
+      <div v-else-if="skillFx === 'vines' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-vines">
         <div v-for="i in 5" :key="i" class="vine" :style="{ '--c': skillColor, left: `${15 + i * 16}%`, animationDelay: `${i * 0.1}s` }">
           <div class="vine-leaf" :style="{ background: skillColor }"></div>
         </div>
       </div>
       <!-- 剑系：交叉剑光斜劈 -->
-      <div v-else-if="skillFx === 'slash'" :key="`fx-${animKey}`" class="fx-slash">
+      <div v-else-if="skillFx === 'slash' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-slash">
         <div class="slash-line s1" :style="`--c:${skillColor}`"></div>
         <div class="slash-line s2" :style="`--c:${skillColor}`"></div>
         <div class="slash-line s3" :style="`--c:${skillColor}`"></div>
       </div>
       <!-- 土系：升起岩石尖刺 -->
-      <div v-else-if="skillFx === 'spikes'" :key="`fx-${animKey}`" class="fx-spikes">
+      <div v-else-if="skillFx === 'spikes' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-spikes">
         <div v-for="i in 7" :key="i" class="spike"
           :style="{ '--c': skillColor, left: `${8 + i * 12}%`, animationDelay: `${i * 0.07}s` }"></div>
       </div>
       <!-- 风系：旋转龙卷风圈 -->
-      <div v-else-if="skillFx === 'tornado'" :key="`fx-${animKey}`" class="fx-tornado">
+      <div v-else-if="skillFx === 'tornado' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-tornado">
         <div class="tornado-ring r1" :style="{ borderColor: skillColor }"></div>
         <div class="tornado-ring r2" :style="{ borderColor: skillColor }"></div>
         <div class="tornado-ring r3" :style="{ borderColor: skillColor }"></div>
         <div class="tornado-ring r4" :style="{ borderColor: skillColor }"></div>
       </div>
       <!-- 水系：横向波纹 -->
-      <div v-else-if="skillFx === 'waves'" :key="`fx-${animKey}`" class="fx-waves">
+      <div v-else-if="skillFx === 'waves' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-waves">
         <div class="wave-line w1" :style="{ borderColor: skillColor }"></div>
         <div class="wave-line w2" :style="{ borderColor: skillColor }"></div>
         <div class="wave-line w3" :style="{ borderColor: skillColor }"></div>
       </div>
       <!-- 光系：八芒星放射 -->
-      <div v-else-if="skillFx === 'star'" :key="`fx-${animKey}`" class="fx-star" :style="{ '--c': skillColor }">
+      <div v-else-if="skillFx === 'star' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-star" :style="{ '--c': skillColor }">
         <div class="star-rays">
           <div v-for="i in 8" :key="i" class="star-ray"
             :style="{ '--rot': `${(i - 1) * 45}deg`, background: `linear-gradient(to top, transparent, ${skillColor})`, animationDelay: `${(i - 1) * 0.05}s` }"></div>
@@ -86,14 +86,14 @@
         <div class="star-core" :style="{ background: glowBg }"></div>
       </div>
       <!-- 战系：向下冲击拳印 -->
-      <div v-else-if="skillFx === 'impact'" :key="`fx-${animKey}`" class="fx-impact">
+      <div v-else-if="skillFx === 'impact' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-impact">
         <div class="impact-diamond d1" :style="{ borderColor: skillColor }"></div>
         <div class="impact-diamond d2" :style="{ borderColor: skillColor }"></div>
         <div class="impact-diamond d3" :style="{ borderColor: skillColor }"></div>
         <div class="impact-core" :style="{ background: skillColor }"></div>
       </div>
       <!-- 阵法系：旋转六芒星阵 -->
-      <div v-else-if="skillFx === 'hexagram'" :key="`fx-${animKey}`" class="fx-hexagram">
+      <div v-else-if="skillFx === 'hexagram' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-hexagram">
         <div class="hexagram-circle" :style="{ borderColor: skillColor }"></div>
         <div class="hexagram-triangle up" :style="{ borderColor: skillColor }"></div>
         <div class="hexagram-triangle down" :style="{ borderColor: skillColor }"></div>
