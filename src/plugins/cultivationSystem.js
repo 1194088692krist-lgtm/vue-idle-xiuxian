@@ -564,7 +564,11 @@ export const ENHANCE_BOSS_MATERIAL_MAP = {
   9:  { zoneId: 'ghost_wasteland', index: 0 },
   10: { zoneId: 'ghost_wasteland', index: 1 },
   11: { zoneId: 'ice_palace',      index: 0 },
-  12: { zoneId: 'ice_palace',      index: 1 }
+  12: { zoneId: 'ice_palace',      index: 1 },
+  // 专属装备 +13~15：复用冰雪宫第 3 个 BOSS（玄冰祖龙）素材，与 +12 同档难度
+  13: { zoneId: 'ice_palace',      index: 2 },
+  14: { zoneId: 'ice_palace',      index: 2 },
+  15: { zoneId: 'ice_palace',      index: 2 }
 }
 
 // 取强化某阶所需的 BOSS 素材（返回 {id,name,description} 或 null）

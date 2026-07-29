@@ -501,6 +501,7 @@ import { usePlayerStore, computePetMultiplier } from '../stores/player'
 import { ref, computed, watch, reactive } from 'vue'
 import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats, getEffortCap } from '../plugins/characters'
+import { getExclusiveMultiplier } from '../plugins/exclusiveEquipment'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
@@ -749,17 +750,20 @@ const getMemberEquipBonus = (member) => {
   const artifacts = member.equippedArtifacts || {}
   Object.values(artifacts).forEach(eq => {
     if (!eq) return
+    // 专属装备加成：对应角色穿戴时数值 ×1.3
+    const exclMult = getExclusiveMultiplier(eq, member.templateId || member.id)
     if (eq.stats) {
       Object.entries(eq.stats).forEach(([k, v]) => {
-        bonus[k] = (bonus[k] || 0) + (v || 0)
+        bonus[k] = (bonus[k] || 0) + Math.round((v || 0) * exclMult)
       })
     }
     if (eq.affixes) {
       eq.affixes.forEach(a => {
+        const adjValue = a.value * exclMult
         if (a.stat && a.valueType === 'percent') {
-          bonus['__pct_' + a.stat] = (bonus['__pct_' + a.stat] || 0) + a.value
+          bonus['__pct_' + a.stat] = (bonus['__pct_' + a.stat] || 0) + Math.round(adjValue * 1000) / 1000
         } else if (a.stat) {
-          bonus[a.stat] = (bonus[a.stat] || 0) + a.value
+          bonus[a.stat] = (bonus[a.stat] || 0) + Math.round(adjValue)
         }
       })
     }

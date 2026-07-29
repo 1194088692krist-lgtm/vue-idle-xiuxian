@@ -187,6 +187,14 @@
               <span class="tab-icon">🗑️</span>
               <span class="tab-label">分解</span>
             </div>
+            <div
+              class="forge-sub-tab"
+              :class="{ active: forgeTab === 'exclusive' }"
+              @click="forgeTab = 'exclusive'"
+            >
+              <span class="tab-icon">✨</span>
+              <span class="tab-label">专属锻打</span>
+            </div>
           </div>
 
           <div class="forge-content">
@@ -233,7 +241,7 @@
                     </div>
                     <div class="enhance-row">
                       <div class="enhance-label">目标等级</div>
-                      <div class="enhance-value">+{{ (selectedForgeEquip.enhanceLevel || 0) + 1 }}</div>
+                      <div class="enhance-value">+{{ (selectedForgeEquip.enhanceLevel || 0) + 1 }} <span class="enhance-cap-hint">（上限 +{{ getEquipMaxEnhanceLevel(selectedForgeEquip) }}）</span></div>
                     </div>
                     <div class="enhance-row">
                       <div class="enhance-label">成功率</div>
@@ -314,7 +322,7 @@
                       </div>
                     </div>
                     <div class="equip-info">
-                      <span>强化: {{ equip.enhanceLevel || 0 }}/{{ enhanceConfig.maxLevel }}</span>
+                      <span>强化: {{ equip.enhanceLevel || 0 }}/{{ getEquipMaxEnhanceLevel(equip) }}</span>
                       <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
                     </div>
                   </div>
@@ -510,6 +518,116 @@
                 </div>
                 <div v-if="forgeFilteredInventory.length === 0" class="empty-state">没有符合条件的装备</div>
               </div>
+            </template>
+
+            <!-- 专属锻打子菜单 -->
+            <template v-if="forgeTab === 'exclusive'">
+              <div class="tips-box">
+                <InfoCircleOutlined />
+                <span>消耗 1 件任意神品装备 + 100 个该角色内丹碎片，可打造对应人物的专属装备。专属装备仅神品稀有度，每个角色 6 件（头/衣/裤/鞋/肩/手），对应角色穿戴时整体数值 ×1.3，可强化至 +15（+13~15 成长与成功率与 +12 一致）。</span>
+              </div>
+
+              <!-- 人物下拉筛选 -->
+              <div class="section">
+                <h3 class="section-title">选择角色</h3>
+                <select v-model="exclSelectedCharId" class="forge-select excl-char-select" @change="onExclCharChange">
+                  <option value="">请选择角色</option>
+                  <option v-for="char in exclCraftableCharacters" :key="char.id" :value="char.id">
+                    {{ char.name }} ({{ char.star }}★)
+                  </option>
+                </select>
+              </div>
+
+              <template v-if="exclSelectedCharId">
+                <!-- 6 个部位选择 -->
+                <div class="section">
+                  <h3 class="section-title">选择部位（共 6 件专属装备）</h3>
+                  <div class="excl-slot-grid">
+                    <div
+                      v-for="slot in exclSlots"
+                      :key="slot.slot"
+                      class="excl-slot-item glass-card"
+                      :class="{ selected: exclSelectedSlot === slot.slot }"
+                      @click="exclSelectedSlot = slot.slot"
+                    >
+                      <div class="excl-slot-name">{{ slot.slotName }}</div>
+                      <div class="excl-slot-owned" v-if="exclOwnedCount(slot.slot) > 0">已打造 ×{{ exclOwnedCount(slot.slot) }}</div>
+                    </div>
+                  </div>
+                </div>
+
+                <template v-if="exclSelectedSlot">
+                  <!-- 材料需求 -->
+                  <div class="section">
+                    <h3 class="section-title">打造消耗</h3>
+                    <div class="cost-list">
+                      <div class="cost-item">
+                        <span class="cost-name">任意神品装备</span>
+                        <span class="cost-value" :class="{ insufficient: exclMythicCount < 1 }">
+                          {{ exclMythicCount }} / 1
+                        </span>
+                      </div>
+                      <div class="cost-item">
+                        <span class="cost-name">{{ exclInnerPillName }}</span>
+                        <span class="cost-value" :class="{ insufficient: exclInnerPillCount < EXCLUSIVE_EQUIP_CONFIG.innerPillCost }">
+                          {{ exclInnerPillCount }} / {{ EXCLUSIVE_EQUIP_CONFIG.innerPillCost }}
+                        </span>
+                      </div>
+                    </div>
+                  </div>
+
+                  <!-- 预览 -->
+                  <div class="section">
+                    <h3 class="section-title">装备预览</h3>
+                    <div class="excl-preview glass-card">
+                      <div class="excl-preview-name">{{ exclPreviewName }}</div>
+                      <div class="excl-preview-tags">
+                        <span class="excl-tag rarity-mythic">神品</span>
+                        <span class="excl-tag excl-tag-bind">{{ exclCharName }} 专属</span>
+                        <span class="excl-tag excl-tag-bonus">穿戴 ×1.3</span>
+                        <span class="excl-tag excl-tag-enhance">可强化 +15</span>
+                      </div>
+                      <div class="excl-preview-note">
+                        专属装备固定 5 条主属性 + 词缀；对应角色穿戴时整体数值 ×1.3；
+                        +13~15 强化成功率与 +12 一致（37%），成长倍率同为 ×1.2。
+                      </div>
+                    </div>
+                  </div>
+
+                  <div class="action-section forge-actions-section">
+                    <button
+                      class="btn-primary enhance-button"
+                      :disabled="!canCraftExclusive()"
+                      @click="handleCraftExclusive"
+                    >
+                      ✨ 打造专属装备
+                    </button>
+                  </div>
+
+                  <!-- 已拥有的该角色专属装备 -->
+                  <div class="section" v-if="exclOwnedEquipments.length > 0">
+                    <h3 class="section-title">已拥有的 {{ exclCharName }} 专属装备</h3>
+                    <div class="equipment-grid">
+                      <div v-for="eq in exclOwnedEquipments" :key="eq.id" class="equipment-card glass-card">
+                        <div class="equip-header">
+                          <span class="equip-name">{{ eq.name }}<span v-if="eq.enhanceLevel" class="equip-enhance">+{{ eq.enhanceLevel }}</span></span>
+                          <span class="equip-rarity" :style="{ color: rarityConfig['mythic']?.color }">神品</span>
+                        </div>
+                        <div class="equip-stats">
+                          <div v-for="(val, key) in eq.stats" :key="key" class="equip-stat">
+                            {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                          </div>
+                        </div>
+                        <div class="equip-info">
+                          <span>强化: {{ eq.enhanceLevel || 0 }}/{{ EXCLUSIVE_EQUIP_CONFIG.maxEnhanceLevel }}</span>
+                          <span class="equip-score-badge">评分 {{ calculateEquipmentScore(eq) }}</span>
+                        </div>
+                      </div>
+                    </div>
+                  </div>
+                </template>
+              </template>
+              <div v-else class="empty-state">请先在上方下拉选择角色</div>
             </template>
           </div>
         </template>
@@ -910,6 +1028,13 @@
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
   import { BLACK_MARKET_CONFIG, getManualRefreshCost, SKIN_SHOP_CONFIG, getSkinShopRefreshCost } from '../plugins/shopConfig'
   import { getCharacterAvatar, getCharacterSkinUrl } from '../plugins/characters'
+  import {
+    EXCLUSIVE_EQUIP_CONFIG,
+    EXCLUSIVE_EQUIP_SLOTS,
+    EXCLUSIVE_SLOT_NAMES,
+    getExclusiveCraftableCharacters,
+    getExclusiveSlotsForCharacter
+  } from '../plugins/exclusiveEquipment'
 
   const playerStore = usePlayerStore()
   const message = useMessage()
@@ -1501,6 +1626,68 @@
     }
   }
 
+  // ===== 专属装备打造 =====
+  const exclSelectedCharId = ref('')
+  const exclSelectedSlot = ref('')
+  const exclCraftResult = ref(null)
+  const exclCraftableCharacters = computed(() => getExclusiveCraftableCharacters())
+  const exclSlots = computed(() =>
+    exclSelectedCharId.value ? getExclusiveSlotsForCharacter(exclSelectedCharId.value) : []
+  )
+  const exclCharName = computed(() =>
+    exclCraftableCharacters.value.find(c => c.id === exclSelectedCharId.value)?.name || ''
+  )
+
+  // 内丹碎片 ID：inner_pill_char_XXX
+  const exclInnerPillId = computed(() => {
+    if (!exclSelectedCharId.value) return ''
+    return 'inner_pill_char_' + String(exclSelectedCharId.value).replace(/^char_/, '').padStart(3, '0')
+  })
+  const exclInnerPillName = computed(() => {
+    const id = exclInnerPillId.value
+    if (!id) return '内丹碎片'
+    const m = playerStore.materials.find(x => x.id === id)
+    return m?.name || (exclCharName.value ? `${exclCharName.value}·内丹碎片` : '内丹碎片')
+  })
+  const exclInnerPillCount = computed(() => {
+    if (!exclInnerPillId.value) return 0
+    return playerStore.materials.filter(m => m.id === exclInnerPillId.value).length
+  })
+  // 任意神品装备（非专属）数量
+  const exclMythicCount = computed(() =>
+    playerStore.items.filter(i => (i.rarity || i.quality) === 'mythic' && !i.isExclusive).length
+  )
+  // 已拥有的该角色专属装备
+  const exclOwnedEquipments = computed(() => {
+    if (!exclSelectedCharId.value) return []
+    return playerStore.items.filter(i => i.isExclusive && i.exclusiveCharId === exclSelectedCharId.value)
+  })
+  const exclOwnedCount = (slot) => exclOwnedEquipments.value.filter(e => e.slot === slot).length
+  const exclPreviewName = computed(() => {
+    if (!exclCharName.value || !exclSelectedSlot.value) return ''
+    return `${exclCharName.value}·专属${EXCLUSIVE_SLOT_NAMES[exclSelectedSlot.value] || ''}`
+  })
+  const onExclCharChange = () => {
+    exclSelectedSlot.value = ''
+    exclCraftResult.value = null
+  }
+  const canCraftExclusive = () => {
+    if (!exclSelectedCharId.value || !exclSelectedSlot.value) return false
+    if (exclMythicCount.value < 1) return false
+    if (exclInnerPillCount.value < EXCLUSIVE_EQUIP_CONFIG.innerPillCost) return false
+    return true
+  }
+  const handleCraftExclusive = () => {
+    if (!canCraftExclusive()) return
+    const result = playerStore.craftExclusiveEquipment(exclSelectedCharId.value, exclSelectedSlot.value)
+    exclCraftResult.value = result
+    if (result.success) {
+      message.success(result.message)
+    } else {
+      message.error(result.message || '打造失败')
+    }
+  }
+
   const selectAllCurrentPage = () => {
     const pageIds = forgePagedInventory.value.map(e => e.id)
     const allSelected = pageIds.every(id => selectedDisassembleIds.value.includes(id))
@@ -1512,12 +1699,16 @@
     }
   }
 
+  // 强化成功率（与 enhanceEquipment 内部计算保持一致）：
+  // base - level*0.03 + bonus；专属装备 +13~15 冻结在 +12 的水平（currentLevel=11）
   const getEnhanceSuccessRate = (equip) => {
     if (!equip) return 0
-    const level = equip.enhanceLevel || 0
-    let rate = enhanceConfig.baseSuccessRate
-    if (level >= 4) rate -= 0.05
-    if (level >= 8) rate -= 0.05
+    let level = equip.enhanceLevel || 0
+    if (equip.isExclusive && level >= enhanceConfig.exclusiveSuccessRateFreezeLevel) {
+      level = enhanceConfig.exclusiveSuccessRateFreezeLevel
+    }
+    const bonus = playerStore.enhanceBonus || 0
+    const rate = Math.min(1, enhanceConfig.baseSuccessRate - level * 0.03 + bonus)
     return Math.round(rate * 100)
   }
 
@@ -1570,10 +1761,16 @@
     return playerStore.materials.filter(m => m.kind === 'boss_material' && m.id === info.id).length
   }
 
+  // 装备最大强化等级：专属装备 +15，普通装备 +12
+  const getEquipMaxEnhanceLevel = (equip) => {
+    if (!equip) return enhanceConfig.maxLevel
+    return equip.isExclusive ? (enhanceConfig.exclusiveMaxLevel || 15) : enhanceConfig.maxLevel
+  }
+
   const canEnhance = (equip) => {
     if (!equip) return false
     const level = equip.enhanceLevel || 0
-    if (level >= enhanceConfig.maxLevel) return false
+    if (level >= getEquipMaxEnhanceLevel(equip)) return false
     if (playerStore.spiritStones < getEnhanceGoldCost(equip)) return false
     if (getEnhanceStoneCount(equip) < getEnhanceStoneNeed(equip)) return false
     // 检查 BOSS 素材是否足够
@@ -2423,6 +2620,114 @@
     background: rgba(218, 165, 32, 0.25);
     border-color: var(--color-accent-gold);
     color: #ffd700;
+  }
+
+  /* 专属装备打造样式 */
+  .excl-char-select {
+    min-width: 220px;
+    padding: 8px 12px;
+    font-size: 14px;
+  }
+
+  .excl-slot-grid {
+    display: grid;
+    grid-template-columns: repeat(auto-fill, minmax(110px, 1fr));
+    gap: 10px;
+  }
+
+  .excl-slot-item {
+    padding: 14px 10px;
+    text-align: center;
+    cursor: pointer;
+    border: 1px solid rgba(139, 69, 19, 0.4);
+    border-radius: 8px;
+    transition: all 0.2s;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .excl-slot-item:hover {
+    background: rgba(218, 165, 32, 0.12);
+    border-color: var(--color-accent-gold);
+  }
+
+  .excl-slot-item.selected {
+    background: rgba(218, 165, 32, 0.2);
+    border-color: #ffd700;
+    box-shadow: 0 0 8px rgba(255, 215, 0, 0.35);
+  }
+
+  .excl-slot-name {
+    font-size: 14px;
+    color: #F5DEB3;
+    font-weight: 500;
+  }
+
+  .excl-slot-owned {
+    margin-top: 4px;
+    font-size: 11px;
+    color: #9c8;
+  }
+
+  .excl-preview {
+    padding: 16px;
+    border: 1px solid rgba(255, 69, 0, 0.4);
+  }
+
+  .excl-preview-name {
+    font-size: 17px;
+    font-weight: 600;
+    color: #FF8C00;
+    margin-bottom: 10px;
+  }
+
+  .excl-preview-tags {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+
+  .excl-tag {
+    padding: 3px 10px;
+    border-radius: 4px;
+    font-size: 12px;
+    font-weight: 500;
+  }
+
+  .excl-tag.rarity-mythic {
+    background: rgba(255, 69, 0, 0.18);
+    color: #FF4500;
+    border: 1px solid rgba(255, 69, 0, 0.5);
+  }
+
+  .excl-tag.excl-tag-bind {
+    background: rgba(218, 165, 32, 0.18);
+    color: #ffd700;
+    border: 1px solid rgba(218, 165, 32, 0.5);
+  }
+
+  .excl-tag.excl-tag-bonus {
+    background: rgba(76, 175, 80, 0.18);
+    color: #66bb6a;
+    border: 1px solid rgba(76, 175, 80, 0.5);
+  }
+
+  .excl-tag.excl-tag-enhance {
+    background: rgba(33, 150, 243, 0.18);
+    color: #64b5f6;
+    border: 1px solid rgba(33, 150, 243, 0.5);
+  }
+
+  .excl-preview-note {
+    font-size: 13px;
+    color: #C9C4BA;
+    line-height: 1.6;
+  }
+
+  .enhance-cap-hint {
+    font-size: 12px;
+    color: #9c8;
+    margin-left: 4px;
   }
 
   .forge-pagination {

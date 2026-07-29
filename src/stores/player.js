@@ -12,6 +12,7 @@ import { getSkillsForBreakthrough, deduplicateSkills, getInitialSkills } from '.
 import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS, getBossMaterialBaseValue } from '../plugins/cultivationSystem'
 import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
+import { generateExclusiveEquipment, EXCLUSIVE_EQUIP_CONFIG, EXCLUSIVE_EQUIP_SLOTS, getExclusiveMultiplier } from '../plugins/exclusiveEquipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import { getPetSkinCount, getPetTemplateId, PET_MAX_STAR } from '../plugins/pets'
 import {
@@ -1924,6 +1925,80 @@ export const usePlayerStore = defineStore('player', {
       }
       this.queueSave()
       return result
+    },
+    // 打造专属装备：消耗任意一件神品装备 + 100 个该角色内丹碎片
+    craftExclusiveEquipment(characterId, slot, sourceEquipmentId = null) {
+      if (!EXCLUSIVE_EQUIP_SLOTS.includes(slot)) {
+        return { success: false, message: '无效的装备部位' }
+      }
+      // 查找角色定义
+      const character = characterDefMap[characterId]
+      if (!character) {
+        return { success: false, message: '角色不存在' }
+      }
+      // 检查内丹碎片数量
+      const innerPillId = 'inner_pill_char_' + String(characterId).replace(/^char_/, '').padStart(3, '0')
+      const pills = (this.materials || []).filter(m => m.id === innerPillId)
+      if (pills.length < EXCLUSIVE_EQUIP_CONFIG.innerPillCost) {
+        return { success: false, message: `内丹碎片不足，需要 ${EXCLUSIVE_EQUIP_CONFIG.innerPillCost} 个` }
+      }
+      // 查找可消耗的神品装备（指定 sourceEquipmentId 或自动选取评分最低的神品）
+      let sourceEquip = null
+      let sourceSlot = null
+      if (sourceEquipmentId) {
+        // 从背包查找
+        sourceEquip = this.items.find(i => i.id === sourceEquipmentId && i.rarity === 'mythic' && !i.isExclusive)
+        if (!sourceEquip) {
+          // 从已装备查找
+          for (const s of EQUIPMENT_SLOTS) {
+            const eq = this.equippedArtifacts[s]
+            if (eq && eq.id === sourceEquipmentId && eq.rarity === 'mythic' && !eq.isExclusive) {
+              sourceEquip = eq
+              sourceSlot = s
+              break
+            }
+          }
+        }
+      } else {
+        // 自动选取：背包中评分最低的神品装备（非专属）
+        const candidates = this.items.filter(i => i.rarity === 'mythic' && !i.isExclusive)
+        if (candidates.length > 0) {
+          candidates.sort((a, b) => calculateEquipmentScore(a) - calculateEquipmentScore(b))
+          sourceEquip = candidates[0]
+        }
+      }
+      if (!sourceEquip) {
+        return { success: false, message: '需要一件神品装备作为材料' }
+      }
+      // 生成专属装备
+      const playerLevel = this.level || 50
+      const newEquip = generateExclusiveEquipment(character, slot, playerLevel)
+      if (!newEquip) {
+        return { success: false, message: '生成专属装备失败' }
+      }
+      // 消耗神品装备：从背包或已装备槽位移除
+      if (sourceSlot) {
+        this.equippedArtifacts[sourceSlot] = null
+      } else {
+        const idx = this.items.findIndex(i => i.id === sourceEquip.id)
+        if (idx >= 0) this.items.splice(idx, 1)
+      }
+      // 消耗 100 个内丹碎片
+      let remaining = EXCLUSIVE_EQUIP_CONFIG.innerPillCost
+      for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+        if (this.materials[i].id === innerPillId) {
+          this.materials.splice(i, 1)
+          remaining--
+        }
+      }
+      // 添加专属装备到背包
+      this.items.push(newEquip)
+      this.queueSave()
+      return {
+        success: true,
+        message: `成功打造 ${newEquip.name}，消耗 1 件神品装备与 ${EXCLUSIVE_EQUIP_CONFIG.innerPillCost} 个内丹碎片`,
+        equipment: newEquip
+      }
     },
     // 洗练装备
     reforgeEquipmentItem(equipment, targetStat = null) {

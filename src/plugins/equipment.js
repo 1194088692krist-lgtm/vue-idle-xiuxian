@@ -21,12 +21,19 @@ const enhanceConfig = {
     9: { type: 'supreme_enhance_stone', count: 2 },
     10: { type: 'supreme_enhance_stone', count: 4 },
     11: { type: 'supreme_enhance_stone', count: 8 },
-    12: { type: 'supreme_enhance_stone', count: 16 }
+    12: { type: 'supreme_enhance_stone', count: 16 },
+    // 专属装备 +13~15：与 +12 同为至尊强化石，数量递增
+    13: { type: 'supreme_enhance_stone', count: 20 },
+    14: { type: 'supreme_enhance_stone', count: 24 },
+    15: { type: 'supreme_enhance_stone', count: 28 }
   },
   // 12 阶强化每阶需对应难度 BOSS 素材 2 个（原 1 个）
   // bossMaterialCount = 每阶所需 BOSS 素材数量
   bossMaterialCount: 2,
-  enhanceMult: 1.2
+  enhanceMult: 1.2,
+  // 专属装备 +13~15 成功率冻结在 +12 的水平（currentLevel=11 → 37%）
+  exclusiveSuccessRateFreezeLevel: 11,
+  exclusiveMaxLevel: 15
 }
 
 // 大洗练配置（八卦炉，消耗「高级洗炼石」；效果较强，可改变词条种类并冲击高数值）
@@ -154,7 +161,9 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
     return { success: false, message: '无效的装备' }
   }
   const currentLevel = equipment.enhanceLevel || 0
-  if (currentLevel >= enhanceConfig.maxLevel) {
+  // 专属装备上限 +15，普通装备上限 +12
+  const maxLevel = equipment.isExclusive ? enhanceConfig.exclusiveMaxLevel : enhanceConfig.maxLevel
+  if (currentLevel >= maxLevel) {
     return { success: false, message: '装备已达到最大强化等级' }
   }
   const goldCost = getEnhanceSpiritStoneCost(currentLevel)
@@ -174,7 +183,11 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
       return { success: false, message: `BOSS素材【${bossCost.name}】不足` }
     }
   }
-  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - currentLevel * 0.03 + (enhanceBonus || 0))
+  // 专属装备 +13~15 成功率冻结在 +12 的水平（currentLevel=11 → 37%）
+  const effectiveLevel = (equipment.isExclusive && currentLevel >= enhanceConfig.exclusiveSuccessRateFreezeLevel)
+    ? enhanceConfig.exclusiveSuccessRateFreezeLevel
+    : currentLevel
+  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - effectiveLevel * 0.03 + (enhanceBonus || 0))
   const isSuccess = Math.random() < successRate
   if (!isSuccess) {
     const lockLevel = getLockLevel(currentLevel)

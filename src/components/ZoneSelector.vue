@@ -137,10 +137,10 @@
           <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
         <div v-if="currentCharacterBoss" class="char-boss-hint">
-          <span class="char-boss-tag">👑 最终BOSS</span>
+          <span class="char-boss-tag">👑 可能刷新</span>
           <span class="char-boss-name">{{ currentCharacterBoss.characterName }}</span>
           <span class="char-boss-star">{{ currentCharacterBoss.star }}★</span>
-          <span class="char-boss-note">（本轮刷新，击败掉落内丹碎片与挑战券）</span>
+          <span class="char-boss-note">（60%-80% 概率出现，击败掉落内丹碎片与挑战券）</span>
         </div>
         <div v-else class="char-boss-hint muted">
           <span class="char-boss-tag">👑 最终BOSS</span>

@@ -4,6 +4,7 @@ import { zones, getZoneById, getZoneDifficulty } from '../plugins/zones'
 import { CombatManager, CombatEntity, CombatType, isBattleOver } from '../plugins/combat'
 import { getAllResonanceEffects, applyResonanceToCombatStats } from '../plugins/schoolResonance'
 import { getRandomHerb, getRandomOre, getRandomLiquid, getRandomCore, getRandomSpecial, getRandomZoneMaterial, characterInnerPillList } from '../plugins/materials'
+import { getExclusiveMultiplier } from '../plugins/exclusiveEquipment'
 import { getAffixesForSlot, setBonuses, rarityConfig, calculateEquipmentScore } from '../plugins/buildSystem'
 import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '../plugins/craftCurrency'
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
@@ -1328,29 +1329,26 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   return enemy
 }
 
-// 刷新所有图所有难度的人物 BOSS（每次挂机结束后调用一次）
+// 刷新所有图所有难度的人物 BOSS 候选（每次挂机结束后调用一次）
+// 注意：此处始终为每个图+难度分配一个人物 BOSS 候选，不在此处做概率判定。
+// 实际是否以人物形态出现，在 runIdleEncounter 中按 60%-80% 概率（难度越高越高）现场掷骰。
 function refreshCharacterBosses() {
   const result = {}
   for (const zone of zones) {
     result[zone.id] = {}
     const diffList = zone.difficulties || []
     for (const diff of diffList) {
-      const chance = getCharacterBossChance(diff.key)
-      if (Math.random() < chance) {
-        // 刷新人物 BOSS
-        const [minStar, maxStar] = getCharacterBossStarRange(zone.id, diff.key)
-        const character = pickRandomCharacterByStar(minStar, maxStar)
-        if (character) {
-          result[zone.id][diff.key] = {
-            characterId: character.id,
-            characterName: character.name,
-            star: character.star
-          }
-        } else {
-          result[zone.id][diff.key] = null
+      // 始终刷新一个候选
+      const [minStar, maxStar] = getCharacterBossStarRange(zone.id, diff.key)
+      const character = pickRandomCharacterByStar(minStar, maxStar)
+      if (character) {
+        result[zone.id][diff.key] = {
+          characterId: character.id,
+          characterName: character.name,
+          star: character.star
         }
       } else {
-        result[zone.id][diff.key] = null  // 未刷新人物 BOSS，走原怪物 BOSS
+        result[zone.id][diff.key] = null
       }
     }
   }
@@ -1364,6 +1362,20 @@ function getCharacterBossForZoneDifficulty(zoneId, difficultyKey) {
   const zoneMap = characterBosses.value?.[zoneId]
   if (!zoneMap) return null
   return zoneMap[difficultyKey] || null
+}
+
+// 尝试生成人物形态 BOSS：按 60%-80% 概率（难度越高越高）掷骰决定是否以人物形态出现。
+// 成功返回人物 BOSS 实体，失败返回 null（调用方退化为原秘境怪物 BOSS）。
+// 每轮（5 分钟）最多 1 次人物 BOSS：由于 bossAttemptedRound 已保证每轮仅 1 次 BOSS 遭遇，
+// 此处的掷骰即等价于"本轮是否遇到人物 BOSS"的概率判定。
+function tryCreateCharacterBossEnemy(effectiveZone, difficultyKey) {
+  const charBoss = getCharacterBossForZoneDifficulty(effectiveZone.id, difficultyKey)
+  if (!charBoss) return null
+  const chance = getCharacterBossChance(difficultyKey)
+  if (Math.random() >= chance) return null // 未命中，走原怪物 BOSS
+  const charTemplate = _charList.find(c => c.id === charBoss.characterId)
+  if (!charTemplate) return null
+  return createCharacterBossEnemy(charTemplate, effectiveZone, difficultyKey)
 }
 
 function generateBossEnemies(effectiveZone, difficultyKey) {
@@ -2595,17 +2607,20 @@ function buildMemberCombatStats(member) {
   const artifacts = member.equippedArtifacts || {}
   Object.values(artifacts).forEach(eq => {
     if (!eq) return
+    // 专属装备加成：对应角色穿戴时数值 ×1.3
+    const exclMult = getExclusiveMultiplier(eq, member.templateId || member.id)
     if (eq.stats) {
       Object.entries(eq.stats).forEach(([k, v]) => {
-        equipBonus[k] = (equipBonus[k] || 0) + v
+        equipBonus[k] = (equipBonus[k] || 0) + Math.round(v * exclMult)
       })
     }
     if (eq.affixes) {
       eq.affixes.forEach(a => {
+        const adjValue = a.value * exclMult
         if (a.valueType === 'percent') {
-          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
+          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + Math.round(adjValue * 1000) / 1000
         } else if (a.stat) {
-          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
+          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + Math.round(adjValue)
         }
       })
     }
@@ -3400,12 +3415,9 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        // 优先刷新人物形态 BOSS（每次挂机结束后随机指派）；无则退化为原秘境怪物 BOSS
-        const charBoss = getCharacterBossForZoneDifficulty(zone.id, selectedDifficultyKey.value)
-        const charTemplate = charBoss ? _charList.find(c => c.id === charBoss.characterId) : null
-        if (charBoss && charTemplate) {
-          enemy = createCharacterBossEnemy(charTemplate, effectiveZone, selectedDifficultyKey.value)
-        } else {
+        // 尝试生成人物形态 BOSS（按 60%-80% 概率掷骰）；未命中则退化为原秘境怪物 BOSS
+        enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+        if (!enemy) {
           const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
           enemy = createBossEnemy(bossData, effectiveZone)
         }
@@ -3421,12 +3433,9 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        // 偶遇 BOSS 同样优先使用刷新的人物形态 BOSS
-        const charBoss = getCharacterBossForZoneDifficulty(zone.id, selectedDifficultyKey.value)
-        const charTemplate = charBoss ? _charList.find(c => c.id === charBoss.characterId) : null
-        if (charBoss && charTemplate) {
-          enemy = createCharacterBossEnemy(charTemplate, effectiveZone, selectedDifficultyKey.value)
-        } else {
+        // 偶遇 BOSS 同样按 60%-80% 概率掷骰决定是否为人物形态
+        enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+        if (!enemy) {
           const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
           enemy = createBossEnemy(bossData, effectiveZone)
         }
@@ -3929,17 +3938,20 @@ function buildTeamMemberState(member, s) {
   const artifacts = member.equippedArtifacts || {}
   Object.values(artifacts).forEach(eq => {
     if (!eq) return
+    // 专属装备加成：对应角色穿戴时数值 ×1.3
+    const exclMult = getExclusiveMultiplier(eq, member.templateId || member.id)
     if (eq.stats) {
       Object.entries(eq.stats).forEach(([k, v]) => {
-        equipBonus[k] = (equipBonus[k] || 0) + v
+        equipBonus[k] = (equipBonus[k] || 0) + Math.round(v * exclMult)
       })
     }
     if (eq.affixes) {
       eq.affixes.forEach(a => {
+        const adjValue = a.value * exclMult
         if (a.valueType === 'percent') {
-          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + a.value
+          equipBonus['__pct_' + a.stat] = (equipBonus['__pct_' + a.stat] || 0) + Math.round(adjValue * 1000) / 1000
         } else if (a.stat) {
-          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + a.value
+          equipBonus[a.stat] = (equipBonus[a.stat] || 0) + Math.round(adjValue)
         }
       })
     }
