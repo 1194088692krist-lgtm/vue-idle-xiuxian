@@ -256,7 +256,16 @@ class CombatManager {
       if (isEnemy) {
         const alivePlayers = activePlayers.filter(p => p && p.currentHealth > 0)
         if (alivePlayers.length === 0) break
-        defender = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
+        // 嘲讽机制：防御型角色(role='shield')天生吸引仇恨，怪物优先攻击他们
+        // - 70% 概率优先选防御型角色（嘲讽被动效果）
+        // - 30% 概率随机攻击（保留一定不确定性，避免完全可预测）
+        // - 无防御型角色存活时退化为随机
+        const tanks = alivePlayers.filter(p => p.role === 'shield')
+        if (tanks.length > 0 && Math.random() < 0.7) {
+          defender = tanks[Math.floor(Math.random() * tanks.length)]
+        } else {
+          defender = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
+        }
       } else {
         if (activeEnemy.currentHealth <= 0) break
         defender = activeEnemy

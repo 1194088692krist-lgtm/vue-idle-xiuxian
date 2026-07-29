@@ -2463,14 +2463,36 @@ function chooseMemberAction(memberState, teamStates, enemy) {
     }
   }
 
-  // 紧急优先 2：守护者（shield）有危急队友时优先护盾（仅当目标无盾时才给，避免重复刷盾）
-  if (role === 'shield' && weakAlly && !weakAlly.hasShield) {
+  // 紧急优先 2：守护者（shield）优先给无盾的攻击手加盾
+  // 这是盾系角色的核心职责：保护输出核心（vanguard/assassin），而不是仅在危急时才加盾
+  // 修复问题：原逻辑只在 weakAlly 血量<40% 时才加盾，平时走轮询导致攻击手长期无盾
+  if (role === 'shield') {
     const shieldSkill = activeSkills.find(s => s.category === 'shield')
     if (shieldSkill) {
-      const shieldPercent = getSkillEffectValue(shieldSkill, 'shieldPercent', 1.0)
-      const duration = getSkillEffectValue(shieldSkill, 'duration', 2)
-      const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
-      return { type: 'shield', target: weakAlly, value: shieldValue, duration, skillName: shieldSkill.name }
+      // 优先级：无盾的攻击手（输出核心需保护）> 无盾的危急队友（血量<50%）> 无盾的任意队友
+      const aliveAllies = teamStates.filter(t => t.hp > 0)
+      const noShieldAllies = aliveAllies.filter(t => !t.hasShield)
+      let shieldTarget = null
+      if (noShieldAllies.length > 0) {
+        // 1. 无盾的攻击手（攻击力最高的优先，他们是主要输出）
+        shieldTarget = noShieldAllies.find(t => t.role === 'vanguard' || t.role === 'assassin')
+        // 2. 无盾的危急队友（血量<50%）
+        if (!shieldTarget) {
+          shieldTarget = noShieldAllies.find(t => hpPct(t) < 0.5)
+        }
+        // 3. 无盾的任意队友（含盾系自己，避免浪费回合）
+        if (!shieldTarget) {
+          shieldTarget = noShieldAllies[0]
+        }
+      }
+      if (shieldTarget) {
+        const shieldPercent = getSkillEffectValue(shieldSkill, 'shieldPercent', 1.0)
+        const duration = getSkillEffectValue(shieldSkill, 'duration', 2)
+        const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
+        return { type: 'shield', target: shieldTarget, value: shieldValue, duration, skillName: shieldSkill.name }
+      }
+      // 全员有盾：降级普攻，避免盾系角色互相刷盾空转不攻击
+      return { type: 'attack' }
     }
   }
 
