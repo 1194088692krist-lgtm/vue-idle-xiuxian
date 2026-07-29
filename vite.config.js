@@ -3,14 +3,26 @@ import AutoImport from 'unplugin-auto-import/vite'
 import { NaiveUiResolver } from 'unplugin-vue-components/resolvers'
 import Components from 'unplugin-vue-components/vite'
 import { defineConfig } from 'vite'
+import { execSync } from 'child_process'
 import pkg from './package.json'
 import fs from 'fs'
 import path from 'path'
 import { fileURLToPath } from 'url'
 
+// 构建时读取最新 Git 提交短 hash，注入到前端用于版本号下方展示
+// 读取失败（非 git 仓库等）回退为 'unknown'，不影响构建
+function readCommitHash() {
+  try {
+    return execSync('git rev-parse --short HEAD').toString().trim() || 'unknown'
+  } catch (_) {
+    return 'unknown'
+  }
+}
+
 export default defineConfig({
   define: {
-    __APP_VERSION__: JSON.stringify(pkg.version)
+    __APP_VERSION__: JSON.stringify(pkg.version),
+    __COMMIT_HASH__: JSON.stringify(readCommitHash())
   },
   base: './',
   server: {

@@ -8,6 +8,7 @@
         <div class="title-main">修仙问道</div>
         <div class="title-sub">Idle Cultivation</div>
         <div class="title-version">v{{ GAME_VERSION }} · {{ GAME_VERSION_NAME }}</div>
+        <div class="title-commit">#{{ COMMIT_HASH }}</div>
         <div class="title-ornament bottom">✦ ✦ ✦</div>
       </div>
 
@@ -233,7 +234,7 @@ import { useMessage, useDialog } from 'naive-ui'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
 import { loadTheme } from '../plugins/theme'
-import { GAME_VERSION, GAME_VERSION_NAME } from '../plugins/version'
+import { GAME_VERSION, GAME_VERSION_NAME, COMMIT_HASH } from '../plugins/version'
 
 const router = useRouter()
 const playerStore = usePlayerStore()
@@ -669,6 +670,16 @@ onMounted(() => {
     0 1px 2px rgba(0, 0, 0, 0.8),
     0 0 8px rgba(255, 215, 0, 0.4);
   margin-top: 4px;
+}
+
+/* 版本号下方的提交编号小字：快速确认当前部署对应的 Git 提交 */
+.title-commit {
+  font-size: 10px;
+  color: rgba(218, 165, 32, 0.55);
+  letter-spacing: 1px;
+  font-family: 'Courier New', monospace;
+  margin-top: 2px;
+  text-shadow: 0 1px 2px rgba(0, 0, 0, 0.8);
 }
 
 /* ===== 登录/注册面板 ===== */
