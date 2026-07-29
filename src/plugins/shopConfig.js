@@ -370,8 +370,9 @@ export async function rollSkinShopItems(opts = {}) {
     if (skinCount < SKIN_SHOP_CONFIG.minSkinCount) continue
     // 该角色可购买的皮肤 = purchasableSkins 中未购买的
     const purchased = unlocked[char.id] || []
-    const available = SKIN_SHOP_CONFIG.purchasableSkins.filter(s => !purchased.includes(s))
-    if (available.length === 0) continue // 该角色所有可购皮肤已购
+    // 仅保留该角色实际存在的可购皮肤（避免给 count=6 的角色摆出不存在的 skin7）
+    const available = SKIN_SHOP_CONFIG.purchasableSkins.filter(s => s <= skinCount && !purchased.includes(s))
+    if (available.length === 0) continue // 该角色所有可购皮肤已购（或不存在）
     candidates.push({ char, available, skinCount })
   }
   // 不放回抽取 5 个角色，每个角色再随机选一个可购皮肤

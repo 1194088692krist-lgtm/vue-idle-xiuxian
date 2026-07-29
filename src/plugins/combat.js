@@ -153,7 +153,8 @@ class CombatEntity {
         buff.duration--
       }
     }
-    this.buffs = this.buffs.filter(b => b.duration > 0)
+    // 修复护盾滞留：duration 归零或 value<=0 的护盾一律清除
+    this.buffs = this.buffs.filter(b => b.duration > 0 && !(b.type === 'shield' && b.value <= 0))
     return totalDamage
   }
   // 检查是否被眩晕
@@ -183,9 +184,8 @@ class CombatEntity {
       shieldAbsorbed += absorb
     }
     // 移除已耗尽的护盾（value<=0），避免下一击继续被当作可用护盾
-    if (shields.length > 0) {
-      this.buffs = this.buffs.filter(b => !(b.type === 'shield' && b.value <= 0))
-    }
+    // 修复 BUG B：原条件 shields.length > 0 会导致所有护盾耗尽时不清理，残留空壳护盾让 hasShield 误报
+    this.buffs = this.buffs.filter(b => !(b.type === 'shield' && b.value <= 0))
     // 扣减生命值
     this.currentHealth = Math.max(0, Math.floor(this.currentHealth - reducedDamage))
     // 计算反击（考虑攻击方的抗反击）

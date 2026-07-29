@@ -127,8 +127,9 @@ const currentSkin = ref(0)
 // 含图片重试缓存破坏参数：imgRetryCount > 0 时追加 ?r=N
 const displaySrc = computed(() => {
   let url
-  // 仅可切换到已解锁的皮肤（受 maxSkinIndex 限制）
-  if (currentSkin.value >= 1 && currentSkin.value <= maxSkinIndex.value) {
+  // 仅展示已解锁的皮肤：皮肤0(原立绘)恒可；skin1~breakThrough 由突破解锁；skin6/7 由商店购买
+  // 修复：原逻辑仅用 maxSkinIndex 连续上界判断，会暴露未购买的 skin4/5
+  if (currentSkin.value >= 1 && isSkinUnlocked(currentSkin.value)) {
     const u = getCharacterSkinUrl(props.character, currentSkin.value)
     if (u) url = u
   }
@@ -283,15 +284,30 @@ const skinLabel = computed(() => {
   if (currentSkin.value === 0) return '原立绘'
   return `皮肤 ${currentSkin.value}/${skinCount.value}`
 })
-// 左右切换皮肤：循环 [0 原立绘, 1 skin1, 2 skin2, ...]
+// 左右切换皮肤：仅在已解锁皮肤集合中循环跳转（0 原立绘 + 突破解锁 + 商店购买）
+// 修复：原逻辑用连续上界 maxSkinIndex 循环，会切到未购买的 skin4/5
+const unlockedSkinList = computed(() => {
+  if (!canSwitch.value) return [0]
+  const list = [0]
+  for (let i = 1; i <= skinCount.value; i++) {
+    if (isSkinUnlocked(i)) list.push(i)
+  }
+  return list
+})
 const prevSkin = () => {
   if (!canSwitch.value) return
-  currentSkin.value = currentSkin.value === 0 ? maxSkinIndex.value : currentSkin.value - 1
+  const list = unlockedSkinList.value
+  const idx = list.indexOf(currentSkin.value)
+  const next = idx <= 0 ? list[list.length - 1] : list[idx - 1]
+  currentSkin.value = next
   avatarLoaded.value = false
 }
 const nextSkin = () => {
   if (!canSwitch.value) return
-  currentSkin.value = currentSkin.value === maxSkinIndex.value ? 0 : currentSkin.value + 1
+  const list = unlockedSkinList.value
+  const idx = list.indexOf(currentSkin.value)
+  const next = idx < 0 || idx >= list.length - 1 ? list[0] : list[idx + 1]
+  currentSkin.value = next
   avatarLoaded.value = false
 }
 
@@ -546,4 +562,22 @@ onBeforeUnmount(() => {
 }
 @keyframes fadeIn { from { opacity: 0; } to { opacity: 1; } }
 @keyframes scaleIn { from { transform: scale(0.8); opacity: 0; } to { transform: scale(1); opacity: 1; } }
+
+/* 移动端：立绘弹窗靠下显示，避免每次点击头像都要往上滑才能看到立绘 */
+@media (max-width: 600px) {
+  .char-modal-overlay {
+    align-items: flex-end;
+    padding-bottom: env(safe-area-inset-bottom, 0);
+  }
+  .char-modal {
+    width: 92%;
+    max-width: 360px;
+    margin-bottom: 2vh;
+    transform-origin: bottom center;
+  }
+  @keyframes scaleIn {
+    from { transform: translateY(40px) scale(0.92); opacity: 0; }
+    to { transform: translateY(0) scale(1); opacity: 1; }
+  }
+}
 </style>

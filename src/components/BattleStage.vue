@@ -444,7 +444,11 @@ const enemyAvatar = computed(() => {
   monsterManifestVersion.value  // 建立响应式依赖
   const enemy = props.encounter?.enemy
   if (!enemy) return ''
-  // 优先用怪物名实时获取（manifest 就绪后返回真实 URL，未就绪返回 emoji）
+  // 人物 BOSS：直接用已赋值的人物头像（不查怪物 manifest）
+  if (enemy.isCharacterBoss && (enemy.avatar || enemy.portrait)) {
+    return enemy.avatar || enemy.portrait || ''
+  }
+  // 普通怪物：用怪物名实时获取（manifest 就绪后返回真实 URL，未就绪返回 emoji）
   const url = getMonsterAvatarSync(enemy.name, 'thumbnail')
   return url
 })
@@ -453,6 +457,9 @@ const enemyPortrait = computed(() => {
   monsterManifestVersion.value
   const enemy = props.encounter?.enemy
   if (!enemy) return ''
+  if (enemy.isCharacterBoss && (enemy.portrait || enemy.avatar)) {
+    return enemy.portrait || enemy.avatar || ''
+  }
   return getMonsterAvatarSync(enemy.name, 'full')
 })
 const tierText = computed(() => {

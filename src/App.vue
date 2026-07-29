@@ -145,6 +145,8 @@
 
             <!-- 击杀BOSS立绘演出：全局挂载，任意页面挂机/挑战击杀BOSS都能弹出 -->
             <BossKillCinematic />
+            <!-- 人物 BOSS 入场演出：立绘从上而下在屏幕中间展示后从下方滑出 -->
+            <CharacterBossIntro />
             <!-- 突破境界演出：全局挂载，监听 breakthroughCount 变化自动触发 -->
             <BreakthroughEffect
               :visible="breakthroughVisible"
@@ -220,6 +222,7 @@ import { initCharacterDefs } from './plugins/characters'
 import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
 import BossKillCinematic from './components/BossKillCinematic.vue'
+import CharacterBossIntro from './components/CharacterBossIntro.vue'
 import BreakthroughEffect from './components/BreakthroughEffect.vue'
 
   // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）

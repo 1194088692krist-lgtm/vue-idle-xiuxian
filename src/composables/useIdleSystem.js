@@ -10,7 +10,7 @@ import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '.
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
-import { getCharacterThumbnail, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterThumbnail, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -65,7 +65,9 @@ const lastSummary = ref(null)
 const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
-const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 })
+// 人物 BOSS 入场演出：从屏幕上方滑入、居中展示后向下滑出
+const characterBossIntro = ref({ show: false, characterId: null, name: '', portrait: '', star: 0 })
+const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
 const currentIdleEnemy = ref(null) // 实时显示当前挂机遭遇的怪物（用于挂机仪表盘怪物状态面板）
@@ -141,7 +143,7 @@ const bossChallengeSummary = ref(null)        // 全部挑战结束后的总结�
 // 素材类型展示信息（用于结算栏汇总显示）
 // 注：原 fortune(奇遇材料) 类型已废弃——奇遇奖励内部的素材（定灵珠/天玄碎片/灵草等）
 // 已在发放时按其本身 kind 累计到对应类别（herb/ore/liquid/special），不再单独存在
-const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal', 'boss_material', 'boss_ticket', 'craft_currency', 'rune']
+const MATERIAL_ORDER = ['herb', 'ore', 'liquid', 'core', 'special', 'pet_fragment', 'phantom_crystal', 'boss_material', 'boss_ticket', 'craft_currency', 'rune', 'character_inner_pill']
 const MATERIAL_DISPLAY = {
   herb: { name: '灵草', icon: getIconUrl('reward_mat_herb.png') },
   ore: { name: '矿料', icon: getIconUrl('reward_mat_ore.png') },
@@ -153,7 +155,8 @@ const MATERIAL_DISPLAY = {
   boss_material: { name: 'BOSS素材', icon: getIconUrl('reward_mat_core.png') },
   boss_ticket: { name: '挑战券', icon: getIconUrl('reward_mat_core.png') },
   craft_currency: { name: '工艺货币', icon: getIconUrl('reward_mat_ore.png') },
-  rune: { name: '灵纹', icon: getIconUrl('reward_mat_core.png') }
+  rune: { name: '灵纹', icon: getIconUrl('reward_mat_core.png') },
+  character_inner_pill: { name: '人物内丹碎片', icon: getIconUrl('reward_mat_core.png') }
 }
 // 将一次遭遇的奖励累计进本次挂机素材统计
 // 支持 reward.type 字段（如 herb/ore/liquid/phantom_crystal）以及 material 对象的 kind 字段
@@ -1326,7 +1329,29 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.isCharacterBoss = true
   enemy.characterBossId = character.id
   enemy.characterBossStar = character.star
+  // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
+  enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
+  enemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
   return enemy
+}
+
+// 人物 BOSS 入场演出：立绘从屏幕上方滑入、居中展示后从下方滑出
+// 通过 characterBossIntro ref 驱动 UI 组件播放，2.4s 后自动关闭
+function triggerCharacterBossIntro(enemy) {
+  if (!enemy || !enemy.isCharacterBoss) return
+  const portrait = enemy.portrait || enemy.avatar
+  if (!portrait) return
+  characterBossIntro.value = {
+    show: true,
+    characterId: enemy.characterBossId,
+    name: enemy.name,
+    portrait,
+    star: enemy.characterBossStar || 0
+  }
+  // 2.4s 后关闭（与 CSS 动画时长对齐：0.6s 入场 + 1.2s 停留 + 0.6s 离场）
+  setTimeout(() => {
+    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0 }
+  }, 2400)
 }
 
 // 刷新所有图所有难度的人物 BOSS 候选（每次挂机结束后调用一次）
@@ -1530,8 +1555,8 @@ function grantCombatDrops(enemy, zoneId = null) {
     if (enemy && enemy.isCharacterBoss && enemy.characterBossId) {
       const charDrops = grantCharacterBossDrops(enemy)
       if (charDrops.length > 0) {
-        // 内丹碎片计入 bossMaterials，挑战券计入 bossTickets
-        runStats.value.bossMaterials += charDrops.filter(d => d.type === 'boss_material').reduce((sum, d) => sum + (d.amount || 1), 0)
+        // 人物内丹碎片独立统计（character_inner_pill），不再计入 bossMaterials
+        runStats.value.characterInnerPills += charDrops.filter(d => d.type === 'character_inner_pill').reduce((sum, d) => sum + (d.amount || 1), 0)
         runStats.value.bossTickets += charDrops.filter(d => d.type === 'boss_ticket').reduce((sum, d) => sum + (d.amount || 1), 0)
       }
       drops.push(...charDrops)
@@ -1613,14 +1638,16 @@ function grantCharacterBossDrops(enemy) {
     const pillItem = {
       id: pillDef.id,
       name: pillDef.name,
-      kind: 'boss_material', // 归入 BOSS 素材类别，便于仪表盘/结算栏统一展示
+      // kind=special：归入背包「奇遇素材」分类（与 materials.js 定义一致）
+      kind: 'special',
       quality: pillDef.quality,
       description: pillDef.description,
       baseValue: pillDef.baseValue,
       source: 'character_boss'
     }
     for (let i = 0; i < pillCount; i++) s.gainMaterial(pillItem)
-    drops.push({ ...pillItem, type: 'boss_material', amount: pillCount })
+    // drops 用独立 type，便于结算栏单独统计「人物内丹碎片」获得量
+    drops.push({ ...pillItem, type: 'character_inner_pill', amount: pillCount })
   }
   // 人物挑战券：30% 概率掉 1~2 张
   const ticketDef = CHARACTER_BOSS_TICKETS[charId]
@@ -1763,7 +1790,7 @@ async function runBossChallenge(zoneId, bossId, count) {
   const effectiveZone = buildEffectiveZone(zone, diff)
 
   // ===== 重置挑战会话状态（与挂机 startIdle 对齐，确保仪表盘/结算栏从 0 开始累积） =====
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 }
   sessionMaterials.value = {}
   foundEquipment.value = []
   logs.value = []
@@ -1975,6 +2002,7 @@ async function runBossChallenge(zoneId, bossId, count) {
     totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,
+    totalCharacterInnerPills: runStats.value.characterInnerPills,
     defeated: teamMemberStates.value.every(ms => ms.hp <= 0),
     bossResult: null,
     logs: [...logs.value],
@@ -2174,8 +2202,8 @@ async function runManualBattle(effectiveZone) {
 
   const enemyData = generateZoneEnemy(effectiveZone, 1, selectedDifficultyKey.value)
   const enemy = enemyData.mainEnemy
-  enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
-  enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
+  enemy.avatar = enemy.isCharacterBoss ? enemy.avatar : getMonsterAvatarSync(enemy.name, 'thumbnail')
+  enemy.portrait = enemy.isCharacterBoss ? enemy.portrait : getMonsterAvatarSync(enemy.name, 'full')
 
   const playerEntities = []
   for (const ms of teamMemberStates.value) {
@@ -2972,7 +3000,8 @@ async function executeRound(effectiveZone) {
     const p = players.find(pl => pl.memberId === ms.memberId)
     if (!p || !Array.isArray(p.buffs)) { ms.hasShield = false; ms.hasBuff = {}; continue }
     const active = p.buffs.filter(b => b.duration > 0)
-    ms.hasShield = active.some(b => b.type === 'shield')
+    // 修复 BUG A：护盾必须同时满足 value > 0，否则耗尽/0 值护盾会让 AI 误判"已有盾"而跳过补盾
+    ms.hasShield = active.some(b => b.type === 'shield' && (b.value === undefined || b.value > 0))
     const buffMap = {}
     for (const b of active) {
       if (b.type && b.type.endsWith('_up')) buffMap[b.type] = true
@@ -3100,8 +3129,10 @@ async function executeRound(effectiveZone) {
     } else if (action.type === 'shield') {
       // 护盾技能：给目标添加护盾 buff（吸收伤害）
       const targetEntity = players.find(pl => pl.name === action.target?.name) || p
-      targetEntity.addBuff({ type: 'shield', value: action.value, duration: action.duration, source: p.name })
-      roundLog.push(`🛡️ ${p.name}施展${action.skillName || '护盾'}，为${targetEntity.name}添加${action.value}点护盾（持续${action.duration}回合）`)
+      // 修复 BUG C：防御过低时 shieldValue 可能为 0，0 值护盾不吸收伤害且滞留导致 hasShield 误报
+      const shieldValue = Math.max(1, Math.floor(action.value || 0))
+      targetEntity.addBuff({ type: 'shield', value: shieldValue, duration: action.duration, source: p.name })
+      roundLog.push(`🛡️ ${p.name}施展${action.skillName || '护盾'}，为${targetEntity.name}添加${shieldValue}点护盾（持续${action.duration}回合）`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
         roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'shield', casterSide: 'player', ts: Date.now() })
@@ -3423,6 +3454,8 @@ async function runIdleEncounter() {
         }
         enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+        // 人物 BOSS 入场演出：立绘从上而下在屏幕中间展示后，从下方滑出
+        if (enemy.isCharacterBoss) triggerCharacterBossIntro(enemy)
         addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${enemy.name}！限时 1 分钟内击杀，失败则进入下一轮！`)
         // 在完整战斗日志中插入本轮 BOSS 分隔符，便于「查看完整日志」按场次区分
         idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${enemy.name} ——`)
@@ -3441,6 +3474,8 @@ async function runIdleEncounter() {
         }
         enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+        // 人物 BOSS 入场演出：立绘从上而下在屏幕中间展示后，从下方滑出
+        if (enemy.isCharacterBoss) triggerCharacterBossIntro(enemy)
         addLog('header', `👑【${zone.name}·${diff.label}】偶遇 BOSS：${enemy.name}！限时 1 分钟内击杀！`)
         idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${enemy.name} ——`)
       } else {
@@ -3457,8 +3492,11 @@ async function runIdleEncounter() {
         }
         idleDiag.value.lastEnemyName = enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
       }
-      enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
-      enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
+      // 人物 BOSS 已在 createCharacterBossEnemy 中赋好人物立绘，此处不覆盖
+      if (!enemy.isCharacterBoss) {
+        enemy.avatar = getMonsterAvatarSync(enemy.name, 'thumbnail')
+        enemy.portrait = getMonsterAvatarSync(enemy.name, 'full')
+      }
 
       // 创建玩家 CombatEntity（继承 teamMemberStates 当前血量）
       const playerEntities = []
@@ -4085,7 +4123,7 @@ function startIdle(durationMinutes) {
   encounterAborted = false
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
-  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
+  runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 }
   foundEquipment.value = []
   logs.value = []
   currentEncounterSummary.value = null
@@ -4160,6 +4198,7 @@ function finishIdle() {
     totalShieldAbsorbed: runStats.value.totalShieldAbsorbed,
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,
+    totalCharacterInnerPills: runStats.value.characterInnerPills,
     defeated: allDead,
     bossResult: (bossRoundsCleared.value > 0 || bossRoundsFailed.value > 0)
       ? { cleared: bossRoundsCleared.value, failed: bossRoundsFailed.value }
@@ -4278,7 +4317,7 @@ function initIdle() {
       const probe = createPlayerEntity()
       idlePlayerMaxHP.value = probe.stats.maxHealth
       idlePlayerHP.value = probe.stats.maxHealth
-      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0 }
+      runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 }
       logs.value = []
       // 先启动定时器，让 UI 立即显示挂机进行中的状态
       startIdleTimers()
@@ -4342,6 +4381,7 @@ const idleDashboard = computed(() => {
     // BOSS 挑战券与 BOSS 素材获得统计（仪表盘显示）
     totalBossTickets: runStats.value.bossTickets,
     totalBossMaterials: runStats.value.bossMaterials,
+    totalCharacterInnerPills: runStats.value.characterInnerPills,
     // 角色定位效果统计
     roleEffects: {
       healAmount: runStats.value.healAmount,
@@ -4400,6 +4440,7 @@ export function useIdleSystem() {
     combatState,
     animState,
     treasureFlash,
+    characterBossIntro,
     canStartIdle,
     teamMemberStates,
     foundEquipment,
