@@ -99,4 +99,87 @@ export function generateFlameFrames() {
   return frames
 }
 
+/**
+ * 生成鬼宗/暗系黑洞漩涡单帧
+ * 设计：中心暗核 + 3 圈虚线旋转环 + 螺旋吸入粒子
+ * 白底素材，经 PIXI tint 染色为暗紫等属性色
+ */
+function drawVortexFrame(ctx, frameIdx) {
+  const size = FRAME_SIZE
+  const cx = size / 2
+  const cy = size / 2
+  const t = frameIdx / FRAME_COUNT  // 0..1 进度
+
+  ctx.clearRect(0, 0, size, size)
+
+  // 进度：0→1→0（起爆→最强→消散）
+  const progress = Math.sin(t * Math.PI)
+
+  // 1. 中心暗核：白色径向渐变，随进度膨胀
+  const coreR = Math.max(2, 6 + progress * 18)
+  const coreGrad = ctx.createRadialGradient(cx, cy, 0, cx, cy, coreR)
+  coreGrad.addColorStop(0, 'rgba(255, 255, 255, 0.95)')
+  coreGrad.addColorStop(0.5, 'rgba(255, 255, 255, 0.55)')
+  coreGrad.addColorStop(1, 'rgba(255, 255, 255, 0)')
+  ctx.fillStyle = coreGrad
+  ctx.beginPath()
+  ctx.arc(cx, cy, coreR, 0, Math.PI * 2)
+  ctx.fill()
+
+  // 2. 3 圈虚线环：白色描边，旋转制造漩涡感
+  const baseAngle = t * Math.PI * 4  // 总共转 2 圈
+  for (let r = 0; r < 3; r++) {
+    const ringR = Math.max(4, 18 + r * 14 + progress * 8)
+    ctx.strokeStyle = `rgba(255, 255, 255, ${0.75 - r * 0.18})`
+    ctx.lineWidth = 1.8
+    ctx.setLineDash([7, 4])
+    ctx.lineDashOffset = -baseAngle * 20 - r * 5
+    ctx.beginPath()
+    ctx.arc(cx, cy, ringR, 0, Math.PI * 2)
+    ctx.stroke()
+  }
+  ctx.setLineDash([])
+
+  // 3. 螺旋吸入粒子：从外围向中心螺旋
+  const rand = mulberry32(frameIdx * 1000 + 7)
+  ctx.fillStyle = 'rgba(255, 255, 255, 0.9)'
+  for (let i = 0; i < 10; i++) {
+    const ang0 = (i / 10) * Math.PI * 2
+    const spiralAngle = ang0 + t * Math.PI * 3
+    const radius = Math.max(2, 48 - progress * 28 + (rand() - 0.5) * 8)
+    const px = cx + Math.cos(spiralAngle) * radius
+    const py = cy + Math.sin(spiralAngle) * radius
+    const pr = Math.max(0.5, 1 + rand() * 1.5)
+    ctx.beginPath()
+    ctx.arc(px, py, pr, 0, Math.PI * 2)
+    ctx.fill()
+  }
+}
+
+export function generateVortexFrames() {
+  const frames = []
+  const canvas = document.createElement('canvas')
+  canvas.width = FRAME_SIZE
+  canvas.height = FRAME_SIZE
+  const ctx = canvas.getContext('2d')
+  for (let i = 0; i < FRAME_COUNT; i++) {
+    drawVortexFrame(ctx, i)
+    frames.push(canvas.toDataURL('image/png'))
+  }
+  return frames
+}
+
+/**
+ * 通用工厂：按 fx 类型生成对应序列帧
+ * @param {string} fxType  fx 类型（flames/vortex/...）
+ * @returns {string[]|null}  dataURL 数组，未知类型返回 null（调用方回退 CSS）
+ */
+export function generateFxFramesByType(fxType) {
+  switch (fxType) {
+    case 'flames': return generateFlameFrames()
+    case 'vortex': return generateVortexFrames()
+    default: return null
+  }
+}
+
 export { FRAME_COUNT, FRAME_SIZE }

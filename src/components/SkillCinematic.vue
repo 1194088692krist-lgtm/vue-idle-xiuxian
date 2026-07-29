@@ -11,17 +11,17 @@
       <div :key="`glow-${animKey}`" class="skill-glow" :style="{ background: glowBg }"></div>
 
       <!-- 专属图形特效：按技能属性系渲染不同图形，纯 transform/opacity 走 GPU 合成层 -->
-      <!-- 暗系：旋转黑洞漩涡 -->
-      <div v-if="skillFx === 'vortex'" :key="`fx-${animKey}`" class="fx-vortex">
+      <!-- 暗系：旋转黑洞漩涡（PixiJS 序列帧优先，回退 CSS） -->
+      <div v-if="skillFx === 'vortex' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-vortex">
         <div class="vortex-ring r1" :style="{ borderColor: skillColor, '--c': skillColor }"></div>
         <div class="vortex-ring r2" :style="{ borderColor: skillColor }"></div>
         <div class="vortex-ring r3" :style="{ borderColor: skillColor }"></div>
         <div class="vortex-core" :style="{ background: glowBg }"></div>
       </div>
       <!-- 火系：腾起火焰粒子 -->
-      <!-- PixiJS 序列帧优先（WebGL 可用时）：usePixiFlames=true 时不渲染此 CSS 分支 -->
+      <!-- PixiJS 序列帧优先（WebGL 可用时）：usePixiFxFlag=true 时不渲染此 CSS 分支 -->
       <!-- CSS fallback：WebGL 不可用或 PixiJS 初始化失败时仍走原 CSS 火焰粒子 -->
-      <div v-else-if="skillFx === 'flames' && !usePixiFlames" :key="`fx-${animKey}`" class="fx-flames">
+      <div v-else-if="skillFx === 'flames' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-flames">
         <div v-for="i in 7" :key="i" class="flame-particle"
           :style="{ '--c': skillColor, left: `${15 + i * 10}%`, animationDelay: `${i * 0.08}s` }"></div>
       </div>
@@ -125,7 +125,7 @@ import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePixiFx } from '../composables/usePixiFx'
-import { generateFlameFrames } from '../composables/generateFxFrames'
+import { generateFxFramesByType } from '../composables/generateFxFrames'
 
 const { skillCastEvent } = useIdleSystem()
 const route = useRoute()
@@ -135,13 +135,28 @@ const fx = usePixiFx()
 // PixiJS canvas ref：模板提供，传给 fx.ensureReady(canvas)
 // 独立于 v-if="show"，保证预热时 canvas 已存在
 const pixiCanvasRef = ref(null)
-// 火系：是否走 PixiJS 路径。true=已成功初始化并准备播放；false=回退 CSS
-// 初始为 false（不阻塞首屏），预热完成后置 true
-const usePixiFlames = ref(false)
-// 缓存生成的火系帧 dataURL（只生成一次，后续复用）
-let flameFrames = null
-// 预热状态：true=PixiJS 已就绪 + 帧已生成，可直接 play
+// 当前演出是否走 PixiJS 路径。true=隐藏 CSS 分支；false=回退 CSS
+// 初始为 false（不阻塞首屏），演出触发时按需置 true
+const usePixiFxFlag = ref(false)
+// 序列帧缓存：按 fx 类型缓存（只生成一次，后续复用）
+// 已支持类型由 generateFxFramesByType 决定，未知类型返回 null → 回退 CSS
+const fxFramesCache = new Map()
+// 预热状态：true=PixiJS Application 已就绪，可直接 play
 let pixiReady = false
+
+/**
+ * 获取指定 fx 类型的序列帧（懒生成 + 缓存）
+ * @param {string} fxType
+ * @returns {string[]|null}  dataURL 数组；null=该类型未实现 PixiJS 序列帧，回退 CSS
+ */
+function getFxFrames(fxType) {
+  if (!fxFramesCache.has(fxType)) {
+    const frames = generateFxFramesByType(fxType)
+    if (frames) fxFramesCache.set(fxType, frames)
+    else return null
+  }
+  return fxFramesCache.get(fxType)
+}
 
 // 应用启动后空闲时预热 PixiJS（避免首次演出卡顿）
 // 只在 exploration 页面预热（其他页面用不到）
@@ -154,9 +169,7 @@ function warmupPixi() {
   }
   return fx.ensureReady(pixiCanvasRef.value).then(ready => {
     if (!ready) return false
-    if (!flameFrames) flameFrames = generateFlameFrames()
     pixiReady = true
-    usePixiFlames.value = true
     return true
   }).catch(() => false)
 }
@@ -276,52 +289,54 @@ watch(skillCastEvent, async (evt) => {
   nextTick(() => { skillFadeClass.value = 'skill-fade-out' })
   scheduleAutoHide()
 
-  // PixiJS 火系试点：仅火系走 WebGL 序列帧，其余 12 系保留 CSS
+  // PixiJS 序列帧播放（通用）：按 skillFx 类型查找已实现的序列帧
+  // 已实现 flames/vortex 走 WebGL，其余类型 generateFxFramesByType 返回 null → 回退 CSS
   // 关键修复：演出时机紧凑，必须用预热好的资源零延迟播放
-  if (c.fx === 'flames') {
-    if (pixiReady && flameFrames) {
-      // 预热已完成：直接同步播放
+  const frames = getFxFrames(c.fx)
+  if (frames) {
+    if (pixiReady) {
+      // 预热已完成：直接播放
       try {
         const ok = await fx.play({
-          frames: flameFrames,
+          frames,
           fps: 24,
           tint: c.color,
           scale: 1,
           loop: false
         })
-        usePixiFlames.value = ok  // true=隐藏 CSS 分支，false=回退 CSS
+        usePixiFxFlag.value = ok  // true=隐藏 CSS 分支，false=回退 CSS
       } catch (e) {
-        console.warn('[SkillCinematic] PixiJS flames play failed, fallback to CSS:', e)
-        usePixiFlames.value = false
+        console.warn('[SkillCinematic] PixiJS play failed, fallback to CSS:', e)
+        usePixiFxFlag.value = false
       }
     } else {
       // 预热未完成：尝试立即同步预热（不等 idle），最多等 500ms
       // 500ms 内初始化成功 → 走 WebGL；超时 → 回退 CSS
-      usePixiFlames.value = false  // 先显示 CSS 火焰粒子（不空白）
+      usePixiFxFlag.value = false  // 先显示 CSS 分支（不空白）
       const ready = await Promise.race([
         warmupPixi(),
         new Promise(resolve => setTimeout(() => resolve(false), 500))
       ])
-      if (ready && flameFrames) {
-        // WebGL 就绪：切到 PixiJS（CSS 火焰粒子会被 usePixiFlames=true 隐藏）
+      if (ready) {
+        // WebGL 就绪：切到 PixiJS（CSS 分支会被 usePixiFxFlag=true 隐藏）
         try {
           const ok = await fx.play({
-            frames: flameFrames,
+            frames,
             fps: 24,
             tint: c.color,
             scale: 1,
             loop: false
           })
-          usePixiFlames.value = ok
+          usePixiFxFlag.value = ok
         } catch (e) {
-          usePixiFlames.value = false
+          usePixiFxFlag.value = false
         }
       }
       // 否则保持 CSS fallback
     }
   } else {
-    // 非火系：立即停止任何残留的 PixiJS 播放
-    usePixiFlames.value = false
+    // 未实现 PixiJS 序列帧的 fx 类型：立即停止任何残留的 PixiJS 播放，走 CSS
+    usePixiFxFlag.value = false
     fx.stop()
   }
 }, { deep: true })
@@ -333,7 +348,7 @@ watch(() => route.path, (newPath) => {
     skillFadeClass.value = ''
     if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
     // 同步停止 PixiJS 播放（避免切页后 WebGL canvas 残留）
-    usePixiFlames.value = false
+    usePixiFxFlag.value = false
     fx.stop()
   }
 })
@@ -341,8 +356,8 @@ watch(() => route.path, (newPath) => {
 // 兜底隐藏触发时：show 变为 false 后，同步停止 PixiJS 播放
 // 通过 watch show 而非直接改 scheduleAutoHide，保证所有隐藏路径都覆盖
 watch(show, (v) => {
-  if (!v && usePixiFlames.value) {
-    usePixiFlames.value = false
+  if (!v && usePixiFxFlag.value) {
+    usePixiFxFlag.value = false
     fx.stop()
   }
 })
@@ -350,7 +365,7 @@ watch(show, (v) => {
 onUnmounted(() => {
   if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
   // 组件卸载：彻底停止 PixiJS 播放（Application 保留为单例供下次使用，避免重建开销）
-  usePixiFlames.value = false
+  usePixiFxFlag.value = false
   fx.stop()
 })
 </script>
