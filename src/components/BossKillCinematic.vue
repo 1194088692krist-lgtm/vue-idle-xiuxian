@@ -55,7 +55,7 @@
             v-for="(ch, i) in comboTextChars"
             :key="i"
             class="combo-char"
-            :style="{ animationDelay: (i * 0.24) + 's' }"
+            :style="{ animationDelay: (i * 0.168) + 's' }"
           >{{ ch }}</span>
         </div>
       </div>
@@ -100,12 +100,12 @@ const comboTextChars = computed(() => Array.from(comboText.value || ''))
 // count 也拆字竖排：每个字单独 span，逐字淡入
 const comboCountChars = computed(() => Array.from(comboCount.value || ''))
 // 整体淡出延迟：等所有字逐字砸入完成 + 停留后，整体一起消失
-// 节奏调快：逐字间隔 0.36→0.24，入场 0.9→0.6，停留 2.4→1.6
-// 10 字文案总时长 = 9*0.24 + 0.6 + 1.6 = 4.36s，7s 间隔下完整显示+淡出完毕留 2.6s 余量
+// 节奏再次调快30%：逐字间隔 0.24→0.168，入场 0.6→0.42，停留 1.6→1.12
+// 10 字文案总时长 = 9*0.168 + 0.42 + 1.12 = 3.05s，7s 间隔下充裕
 const comboFadeDelay = computed(() => {
   const n = comboTextChars.value.length
   if (n === 0) return 0
-  return (n - 1) * 0.24 + 0.6 + 1.6
+  return (n - 1) * 0.168 + 0.42 + 1.12
 })
 // 字号自适应：仅针对 text 行（竖排），字数越多字号越小，避免竖排过高超出屏幕
 // 竖排时每字占一行，10字 + gap 会很高，需要更激进的字号缩减
@@ -706,8 +706,8 @@ const onPetAnimEnd = () => {
   line-height: 1;
   opacity: 0;
   /* 逐字砸入：纯 translateY + opacity，无 scale/blur 避免残影
-     时长 0.6s，逐字间隔 0.24s，确保 10 字文案在 7s 间隔内完整播完 */
-  animation: combo-char-in 0.6s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
+     时长 0.42s，逐字间隔 0.168s，10字文案总时长约 3s，7s间隔下充裕 */
+  animation: combo-char-in 0.42s cubic-bezier(0.2, 0.8, 0.3, 1) forwards;
   /* 刚硬描边：四方向粗黑描边 + 立体投影 */
   text-shadow:
     -2px -2px 0 rgba(0, 0, 0, 0.95),
