@@ -2439,15 +2439,22 @@ function chooseMemberAction(memberState, teamStates, enemy) {
     return skill.effect[key] !== undefined ? skill.effect[key] : fallback
   }
 
-  const wounded = teamStates.filter(t => t.hp > 0 && t.hp / (t.maxHP || t.maxHealth || 1) < 0.5)
-  const weakAlly = teamStates.find(t => t.memberId !== memberState.memberId && t.hp > 0 && t.hp / (t.maxHP || 1) < 0.4)
+  const hpPct = t => t.hp / (t.maxHP || t.maxHealth || 1)
+  const wounded = teamStates.filter(t => t.hp > 0 && hpPct(t) < 0.5)
+  const weakAlly = teamStates.find(t => t.memberId !== memberState.memberId && t.hp > 0 && hpPct(t) < 0.4)
   const selfLowHP = hpPercent < 0.3
+  // 攻击手：负责输出的角色（vanguard 前锋/assassin 刺客），盾应优先保护他们
+  const attackers = teamStates.filter(t => t.hp > 0 && (t.role === 'vanguard' || t.role === 'assassin'))
+    .sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))
+  // 无盾的攻击手：盾系角色应优先给这些人加盾，避免全员有盾时互相刷盾卡死
+  const attackersWithoutShield = attackers.filter(t => !t.hasShield)
+  // 全员有盾时无目标，需降级普攻避免盾系角色无限互相刷盾不攻击
 
   // 紧急优先 1：医者（herb）有伤员时优先治疗（避免队伍减员）
   if (role === 'herb' && wounded.length > 0) {
     const healSkill = activeSkills.find(s => s.category === 'heal' && !s.effect?.resurrect)
     if (healSkill) {
-      wounded.sort((a, b) => (a.hp / (a.maxHP || a.maxHealth || 1)) - (b.hp / (b.maxHP || b.maxHealth || 1)))
+      wounded.sort((a, b) => hpPct(a) - hpPct(b))
       const target = wounded[0]
       const healPercent = getSkillEffectValue(healSkill, 'healPercent', 1.0)
       const isTeam = getSkillEffectValue(healSkill, 'target', 'single') === 'team'
@@ -2456,8 +2463,8 @@ function chooseMemberAction(memberState, teamStates, enemy) {
     }
   }
 
-  // 紧急优先 2：守护者（shield）有危急队友时优先护盾
-  if (role === 'shield' && weakAlly) {
+  // 紧急优先 2：守护者（shield）有危急队友时优先护盾（仅当目标无盾时才给，避免重复刷盾）
+  if (role === 'shield' && weakAlly && !weakAlly.hasShield) {
     const shieldSkill = activeSkills.find(s => s.category === 'shield')
     if (shieldSkill) {
       const shieldPercent = getSkillEffectValue(shieldSkill, 'shieldPercent', 1.0)
@@ -2487,16 +2494,25 @@ function chooseMemberAction(memberState, teamStates, enemy) {
 
   // 轮询机制：确保每个已装备主动技能都有释放机会
   // _skillRotation 是一个待释放技能 ID 队列，耗尽时按 activeSkills 顺序重新填充
-  // 这样每 N 回合（N = 主动技能数）每个技能都至少被尝试一次
+  // 队列末尾追加 null 代表普攻轮换：避免角色有技能就一直放、从不普攻
+  // （后续接入法力值后，普攻将用于回蓝；当前先保证输出职业不空转）
   if (!Array.isArray(memberState._skillRotation) || memberState._skillRotation.length === 0) {
-    memberState._skillRotation = activeSkills.map(s => s.id)
+    // 攻击类职业（vanguard/assassin）普攻权重更高（1技能1普攻交替），
+    // 辅助类职业（herb/shield/support）普攻权重低（所有技能后1次普攻）
+    const isAttacker = role === 'vanguard' || role === 'assassin'
+    memberState._skillRotation = isAttacker
+      ? activeSkills.flatMap(s => [s.id, null])
+      : [...activeSkills.map(s => s.id), null]
   }
   // 取队首技能 ID
   let nextSkillId = memberState._skillRotation.shift()
+  // null = 普攻轮换：直接返回普攻，不消耗技能
+  if (nextSkillId === null) return { type: 'attack' }
   let skill = activeSkills.find(s => s.id === nextSkillId)
   // 防御性：若 ID 找不到（装备变更等），跳过直到找到有效技能或队列耗尽
   while (!skill && memberState._skillRotation.length > 0) {
     nextSkillId = memberState._skillRotation.shift()
+    if (nextSkillId === null) return { type: 'attack' }
     skill = activeSkills.find(s => s.id === nextSkillId)
   }
   if (!skill) return { type: 'attack' }
@@ -2533,10 +2549,25 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
       const value = getSkillEffectValue(skill, 'value', 0.1)
       const duration = getSkillEffectValue(skill, 'duration', 3)
       const isTeam = getSkillEffectValue(skill, 'target', 'single') === 'team'
-      const target = isTeam
-        ? null
-        : (teamStates.filter(t => t.hp > 0).sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0] || memberState)
-      return { type: 'buff', target, buffType: stat + '_up', value, duration, skillName: skill.name, isTeam }
+      // 攻击增益优先给攻击手且未挂该 buff 的，避免给已有 buff 的角色重复刷
+      // 防御增益优先给承伤角色（无盾优先），避免辅助职业互相刷 buff 空转
+      const aliveAllies = teamStates.filter(t => t.hp > 0)
+      const buffTypeKey = stat + '_up'
+      let target
+      if (isTeam) {
+        target = null
+      } else if (stat === 'attack' || stat === 'crit' || stat === 'combo') {
+        // 攻击向 buff：优先无该 buff 的最高攻击手
+        const candidates = aliveAllies.filter(t => !t.hasBuff?.[buffTypeKey])
+        target = (candidates.length > 0 ? candidates : aliveAllies)
+          .sort((a, b) => (b.attack || b.damage || 0) - (a.attack || a.damage || 0))[0]
+      } else {
+        // 防御向 buff：优先无盾的承伤角色，其次血量最低者
+        const noShield = aliveAllies.filter(t => !t.hasShield)
+        target = (noShield.length > 0 ? noShield : aliveAllies)
+          .sort((a, b) => (a.hp / (a.maxHP || 1)) - (b.hp / (b.maxHP || 1)))[0]
+      }
+      return { type: 'buff', target: target || memberState, buffType: buffTypeKey, value, duration, skillName: skill.name, isTeam }
     }
     case 'debuff': {
       const statDebuff = getSkillEffectValue(skill, 'statDebuff', 'attack')
@@ -2555,7 +2586,19 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
       const shieldPercent = getSkillEffectValue(skill, 'shieldPercent', 1.0)
       const duration = getSkillEffectValue(skill, 'duration', 2)
       const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
-      return { type: 'shield', target: memberState, value: shieldValue, duration, skillName: skill.name }
+      // 智能目标选择：盾优先给攻击手（输出核心需保护）且无盾的角色；
+      // 若所有攻击手都有盾，给任意无盾队友；
+      // 若全员都有盾，降级为普攻，避免盾系角色互相刷盾空转不攻击导致战斗卡死
+      const aliveAllies = teamStates.filter(t => t.hp > 0)
+      const noShield = aliveAllies.filter(t => !t.hasShield)
+      // 优先无盾的攻击手
+      let target = noShield.find(t => t.role === 'vanguard' || t.role === 'assassin')
+        || noShield[0]
+      if (!target) {
+        // 全员有盾：降级普攻，不浪费回合刷重复盾
+        return { type: 'attack' }
+      }
+      return { type: 'shield', target, value: shieldValue, duration, skillName: skill.name }
     }
     default:
       return { type: 'skill_attack', skill, skillName: skill.name }
@@ -2614,6 +2657,19 @@ async function executeRound(effectiveZone) {
   // 本回合收集的技能释放事件：循环内同步赋值会被 Vue watch batching 合并只触发一次
   // 改为收集到数组，循环结束后逐个延时触发，让每个角色的技能演出都能显示
   const roundSkillEvents = []
+  // 刷新每个成员的实时 buff 标记（hasShield/hasBuff），供 chooseMemberAction 智能选目标
+  // player.buffs 是实时战斗实体上的 buff 列表，shield/buff 施加后立即可见
+  for (const ms of teamMemberStates.value) {
+    const p = players.find(pl => pl.memberId === ms.memberId)
+    if (!p || !Array.isArray(p.buffs)) { ms.hasShield = false; ms.hasBuff = {}; continue }
+    const active = p.buffs.filter(b => b.duration > 0)
+    ms.hasShield = active.some(b => b.type === 'shield')
+    const buffMap = {}
+    for (const b of active) {
+      if (b.type && b.type.endsWith('_up')) buffMap[b.type] = true
+    }
+    ms.hasBuff = buffMap
+  }
   for (const p of players) {
     if (p.currentHealth <= 0) continue
     const memberState = teamMemberStates.value.find(ms => ms.memberId === p.memberId)
