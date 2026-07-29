@@ -230,4 +230,102 @@ describe('executeRound 契约：HP 跨场保留 + 逐回合实时渲染', () => 
     expect(hasSkillAttack).toBe(true)
     expect(hasNormalAttack).toBe(true)
   })
+
+  it('契约6：装备多个主动技能时所有技能都会被释放（修复「只放第一个技能」恶性 bug）', async () => {
+    // 给攻击手装备 3 个主动技能（2 个 damage + 1 个 buff）
+    // 旧实现：紧急优先级分支用 activeSkills.find() 永远返回第一个匹配技能，二三技能永远放不出
+    // 新实现：所有技能都通过 _skillRotation 队列依次轮换释放
+    teamMemberStates.value = [
+      { memberId: 'm1', name: 'P_m1', hp: 100, maxHP: 100, role: 'vanguard',
+        skills: [
+          { id: 'sk1', type: 'active', category: 'damage', name: '剑气斩', effect: { damagePercent: 1.5 } },
+          { id: 'sk2', type: 'active', category: 'damage', name: '万剑斩', effect: { damagePercent: 2.0 } },
+          { id: 'sk3', type: 'active', category: 'buff', name: '战意', effect: { stat: 'attack', value: 0.2, duration: 3 } }
+        ] }
+    ]
+    const player = makePlayer('m1', 100, 40)
+    const enemy = makeEnemy(100000, 5)
+    currentEncounter.value = {
+      enemy,
+      players: [player],
+      round: 0,
+      inProgress: true,
+      combatLog: [],
+      combatStats: {},
+      manager: null,
+      enemyData: null,
+    }
+
+    // 跑 10 回合收集日志（3 技能 + 普攻轮换，10 回合足够覆盖所有技能）
+    const logs = []
+    for (let i = 0; i < 10; i++) {
+      currentEncounter.value.combatLog = []
+      await executeRound({})
+      logs.push(...currentEncounter.value.combatLog)
+    }
+
+    // 关键断言：3 个技能都应被释放过
+    // 日志格式有两种：
+    //   - damage 类：「P_m1施展「剑气斩」对Enemy造成58点伤害」
+    //   - buff 类：「P_m1施展战意，P_m1获得attack_up（持续3回合）」
+    // 所以直接用 includes 判断技能名是否在日志中出现
+    const hasSkill1 = logs.some(l => l.includes('施展') && l.includes('剑气斩'))
+    const hasSkill2 = logs.some(l => l.includes('施展') && l.includes('万剑斩'))
+    const hasSkill3 = logs.some(l => l.includes('施展') && l.includes('战意'))
+    expect(hasSkill1).toBe(true)
+    expect(hasSkill2).toBe(true)
+    expect(hasSkill3).toBe(true)
+  })
+
+  it('契约7：盾系装备多个盾技能时所有盾技能都会被释放', async () => {
+    // 给盾系装备 2 个 shield 技能（冰墙、冰盾）
+    // 旧实现：activeSkills.find(s => s.category === 'shield') 永远返回第一个，第二个永远放不出
+    // 新实现：所有 shield 技能都通过队列轮换释放
+    teamMemberStates.value = [
+      { memberId: 'm1', name: 'P_m1', hp: 100, maxHP: 100, role: 'vanguard', skills: [], hasShield: false },
+      { memberId: 'm2', name: 'P_m2', hp: 200, maxHP: 200, role: 'shield',
+        skills: [
+          { id: 'ss1', type: 'active', category: 'shield', name: '冰墙', effect: { shieldPercent: 1.5, duration: 2 } },
+          { id: 'ss2', type: 'active', category: 'shield', name: '冰盾', effect: { shieldPercent: 2.0, duration: 2 } }
+        ],
+        defense: 50, hasShield: false }
+    ]
+    const attacker = makePlayer('m1', 100, 40)
+    const tank = makePlayer('m2', 200, 10)
+    tank.role = 'shield'
+    tank.stats.defense = 50
+    tank.memberId = 'm2'
+    const enemy = makeEnemy(100000, 5)
+    currentEncounter.value = {
+      enemy,
+      players: [attacker, tank],
+      round: 0,
+      inProgress: true,
+      combatLog: [],
+      combatStats: {},
+      manager: null,
+      enemyData: null,
+    }
+
+    // 跑 10 回合（盾系会先给自己/队友加盾，多次后应轮换到第二、第三个技能）
+    const logs = []
+    for (let i = 0; i < 10; i++) {
+      currentEncounter.value.combatLog = []
+      await executeRound({})
+      logs.push(...currentEncounter.value.combatLog)
+    }
+
+    // 提取所有盾技能释放日志（格式如「🛡️ P_m2施展冰墙，为P_m1添加75点护盾（持续2回合）」）
+    const shieldSkillLogs = logs.filter(l => l.includes('施展') && l.includes('护盾'))
+    const releasedShieldSkills = shieldSkillLogs.map(l => {
+      // 从「施展冰墙，」中提取技能名
+      const m = l.match(/施展([^\s,，]+)/)
+      return m ? m[1] : null
+    }).filter(Boolean)
+    const uniqueShieldSkills = [...new Set(releasedShieldSkills)]
+
+    // 关键断言：两个盾技能都应被释放过
+    expect(uniqueShieldSkills).toContain('冰墙')
+    expect(uniqueShieldSkills).toContain('冰盾')
+  })
 })
