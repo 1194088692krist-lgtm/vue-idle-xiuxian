@@ -150,6 +150,15 @@ export function syncCharacterDefs(list) {
   }
   // 静态角色作为兜底，保证 map 永不为空
   characterList.forEach(c => { if (!characterDefMap[c.id]) characterDefMap[c.id] = c })
+  // 清除 GM 上传的 base64 avatar：站点已部署 JPG 立绘文件，base64 会覆盖坏数据导致"底片"显示
+  // getCharacterAvatar 优先用 sharedPortraitMap（站点文件），但 generateCharacterById 等路径
+  // 会继承 characterDefMap[id].avatar，清除后确保所有路径都走站点 JPG
+  characterList.forEach(c => {
+    const def = characterDefMap[c.id]
+    if (def && typeof def.avatar === 'string' && def.avatar.startsWith('data:')) {
+      def.avatar = null
+    }
+  })
 }
 
 // 应用启动时调用：从 IndexedDB（ gm_characters ）载入立绘定义，回退 localStorage / 静态表

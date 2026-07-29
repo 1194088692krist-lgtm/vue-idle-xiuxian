@@ -1064,9 +1064,11 @@
           </div>
 
           <!-- 角色立绘弹窗（点击商店角色头像触发，与人物立绘展示逻辑一致） -->
+          <!-- initialSkin 直接展示商品对应皮肤立绘，而非默认原立绘 -->
           <CharacterPortraitModal
             v-if="showSkinCharPortrait"
             :character="skinCharPortrait"
+            :initialSkin="skinCharPortraitInitialSkin"
             @close="closeSkinCharPortrait"
           />
         </template>
@@ -1304,20 +1306,24 @@
   ;(async () => { await _ensureCharList() })()
 
   // 立绘弹窗（与人物立绘展示逻辑一致）：点击商店角色头像打开 CharacterPortraitModal
+  // 传入 initialSkin 让弹窗直接展示商品对应皮肤立绘，而非默认原立绘
   const showSkinCharPortrait = ref(false)
   const skinCharPortrait = ref(null)
+  const skinCharPortraitInitialSkin = ref(0)
   function openSkinCharPortrait(item) {
     if (!item || !item.characterId) return
     // 用 characterDefMap 取角色定义，模态框内部依赖 templateId/name/star/breakThrough 等字段
     const char = characterDefMap[item.characterId]
     if (char) {
       skinCharPortrait.value = char
+      skinCharPortraitInitialSkin.value = Number(item.skinIndex) || 0
       showSkinCharPortrait.value = true
     }
   }
   function closeSkinCharPortrait() {
     showSkinCharPortrait.value = false
     skinCharPortrait.value = null
+    skinCharPortraitInitialSkin.value = 0
   }
 
   function runeStatLabel(item) {

@@ -90,7 +90,10 @@ import { getCharacterAvatar, getCharacterVideo, getCharacterSkinUrl, getSkinCoun
 import { usePlayerStore } from '../stores/player'
 
 const props = defineProps({
-  character: { type: Object, default: null }
+  character: { type: Object, default: null },
+  // 初始展示的皮肤索引：0=原立绘（默认），1=skin1，2=skin2…
+  // 用于商店等场景需要直接展示某皮肤立绘，而非默认原立绘
+  initialSkin: { type: Number, default: 0 }
 })
 defineEmits(['close'])
 
@@ -239,11 +242,21 @@ watch(
   }
 )
 
-// 角色或「可切换」状态变化时，重置当前皮肤：默认显示原立绘（0），用户可手动切换皮肤
+// 角色或「可切换」状态变化时，重置当前皮肤：
+// - 若传入 initialSkin（商店场景）：强制展示该皮肤立绘，不受解锁限制（这就是要卖的商品）
+// - 否则默认显示原立绘（0），用户可手动切换皮肤
 // 修复：原实现可切换时默认 skin1，导致皮肤1覆盖原立绘，用户看不到原立绘
 watch(
   () => [props.character, canSwitch.value],
-  () => { currentSkin.value = 0 },
+  () => {
+    const initSkin = Number(props.initialSkin) || 0
+    if (initSkin >= 1) {
+      // 商店场景：直接展示指定皮肤，不受 isSkinUnlocked 限制
+      currentSkin.value = initSkin
+    } else {
+      currentSkin.value = 0
+    }
+  },
   { immediate: true }
 )
 

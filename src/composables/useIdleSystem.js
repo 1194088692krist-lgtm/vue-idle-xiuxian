@@ -10,7 +10,7 @@ import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '.
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
-import { getCharacterAvatar, getCharacterThumbnail, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -1331,7 +1331,8 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.characterBossStar = character.star
   // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
   enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-  enemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
+  // 登场立绘优先用 skin1（人物形态 BOSS 的标志外观），不存在时回退原立绘
+  enemy.portrait = getCharacterSkinUrl({ id: character.id }, 1) || getCharacterAvatar({ id: character.id }, 'full')
   return enemy
 }
 
@@ -2138,7 +2139,8 @@ async function runCharacterBossChallenge(characterId, count) {
     // 创建人物 BOSS 实体
     const bossEnemy = createCharacterBossEnemy(character, effectiveZone, 'xiongxian')
     bossEnemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-    bossEnemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
+    // 登场立绘优先用 skin1（人物形态 BOSS 的标志外观），不存在时回退原立绘
+    bossEnemy.portrait = getCharacterSkinUrl({ id: character.id }, 1) || getCharacterAvatar({ id: character.id }, 'full')
     bossEnemy.name = `${character.name}（人物形态）`
     bossEnemy.characterBossId = character.id
 
@@ -3201,9 +3203,10 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
       return { type: 'control', isStun, isConfusion, duration, chance, skillName: skill.name }
     }
     case 'shield': {
-      // 盾系行为策略：根据自身 HP 决定给谁加盾
-      // - HP < 50%：优先给自己加盾（自救保命）
-      // - HP ≥ 50%：优先给无盾队友加盾（保护输出核心 vanguard/assassin）
+      // 盾系行为策略（按优先级）：
+      // 1. 上一回合自己受到伤害 → 本回合给自己加盾（自保反应）
+      // 2. HP < 50% → 给自己加盾（自救保命）
+      // 3. HP ≥ 50% → 优先给无盾队友加盾（保护输出核心 vanguard/assassin）
       const shieldPercent = getSkillEffectValue(skill, 'shieldPercent', 1.0)
       const duration = getSkillEffectValue(skill, 'duration', 2)
       const shieldValue = Math.floor((memberState.defense || 0) * shieldPercent)
@@ -3212,8 +3215,11 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
       const noShield = aliveAllies.filter(t => !t.hasShield)
       let target = null
 
-      if (selfHPpct < 0.5) {
-        // 自救模式：HP < 50% 优先给自己加盾
+      // 优先级 1：上一回合受到伤害 → 给自己加盾（自保反应）
+      if (memberState._tookDamageLastRound) {
+        target = memberState
+      } else if (selfHPpct < 0.5) {
+        // 优先级 2：自救模式：HP < 50% 优先给自己加盾
         if (!memberState.hasShield) {
           target = memberState
         } else if (noShield.length > 0) {
@@ -3223,7 +3229,7 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
             || noShield[0]
         }
       } else {
-        // 保护模式：HP ≥ 50% 优先给无盾队友加盾
+        // 优先级 3：保护模式：HP ≥ 50% 优先给无盾队友加盾
         if (noShield.length > 0) {
           // 1. 无盾的攻击手（输出核心需保护）
           target = noShield.find(t => t.role === 'vanguard' || t.role === 'assassin')
@@ -3470,6 +3476,9 @@ async function executeRound(effectiveZone) {
   const allAlivePlayers = players.filter(p => p && p.currentHealth > 0)
   const turnResult = encounter.manager.executeTurn(attackingPlayers, enemy, allAlivePlayers)
 
+  // 追踪本回合受到伤害的玩家（供下一回合盾系AI判定"上回合是否受伤害→给自己加盾"）
+  const tookDamageThisRound = new Set()
+
   // 收集 executeTurn 结果到 combatStats 和 roundLog
   let lastPlayerAttacker = null  // 追踪最后一击的玩家攻击者（用于击杀BOSS立绘突入）
   let killBlowAttacker = null    // 精确追踪致命一击者（defenderHP 降为 0 的那次攻击的攻击者）
@@ -3512,6 +3521,10 @@ async function executeRound(effectiveZone) {
             cs.shieldAbsorbed += r.shieldAbsorbed
           }
           if (r.isCounter) cs.counterCount++
+        }
+        // 追踪本回合受到伤害的玩家（非闪避且有实际扣血或护盾吸收）
+        if (!r.isDodged && (r.damage > 0 || (r.shieldAbsorbed || 0) > 0)) {
+          tookDamageThisRound.add(defenderPlayer.memberId)
         }
       }
       if (r.isDodged) {
@@ -3593,11 +3606,18 @@ async function executeRound(effectiveZone) {
       roundLog.push(`🔥 ${p.name}受到${dotDmg}点持续伤害`)
       const cs = encounter.combatStats[p.memberId]
       if (cs) cs.playerTookDamage += dotDmg
+      // DoT 也算受到伤害，纳入盾系AI追踪
+      tookDamageThisRound.add(p.memberId)
     }
   }
   const enemyDot = enemy.tickDebuffs()
   if (enemyDot > 0) {
     roundLog.push(`🔥 ${enemy.name}受到${enemyDot}点持续伤害`)
+  }
+
+  // 更新每个成员的"上一回合是否受到伤害"标记，供下一回合盾系AI判定
+  for (const ms of teamMemberStates.value) {
+    ms._tookDamageLastRound = tookDamageThisRound.has(ms.memberId)
   }
 
   // 5. 播报战场状态
