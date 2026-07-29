@@ -371,14 +371,21 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
 
     // 已登录且非开发者模式：启动即从云端拉取/合并最新存档（分支①②③④，非交互，较新者胜）
     // 开发者模式：跳过云同步，仅使用本地存档
-    // 优化：云同步改为完全后台（不 await），用 2 秒短超时，失败也不阻塞加载
+    // ⚠️ 历史缺陷修复：原实现用 Promise.race 让 migrate 在后台跑，2s 超时不会取消它。
+    //   migrate 几秒后完成时会执行 this.$reset() + initializePlayer()，把用户正在玩的"下午状态"
+    //   清空并重载为可能已被云端覆盖的"上午状态"，表现为"突然回档"。
+    //   修复方案：用 AbortSignal 让 migrate 在超时后自检放弃，绝不进入 $reset 分支。
     const authStore = useAuthStore()
     if (authStore.isLoggedIn && !authStore.devMode) {
-      // 云同步后台执行，不阻塞加载流程；失败/超时均不影响本地游玩
-      Promise.race([
-        playerStore.migrate({ interactive: false }),
-        new Promise((_, reject) => setTimeout(() => reject(new Error('云同步超时')), 2000))
-      ]).catch(e => console.warn('启动云同步失败（不影响本地游玩）:', e))
+      const migrateAbort = new AbortController()
+      const MIGRATE_TIMEOUT_MS = 2000
+      // 超时触发 abort，migrate 内部会检查 signal 并提前 return（不执行 $reset）
+      const timeoutTimer = setTimeout(() => migrateAbort.abort(new Error('云同步超时')), MIGRATE_TIMEOUT_MS)
+      // 后台执行：成功/失败/超时都不阻塞加载流程
+      playerStore
+        .migrate({ interactive: false, signal: migrateAbort.signal })
+        .catch(e => console.warn('启动云同步失败（不影响本地游玩）:', e?.message || e))
+        .finally(() => clearTimeout(timeoutTimer))
       // 启动即拉取 GM 礼包收件箱，驱动顶部铃铛红点（完全后台，不等待）
       playerStore.loadGifts().catch(e => console.warn('拉取礼包失败（不影响游玩）:', e))
     } else if (authStore.devMode) {

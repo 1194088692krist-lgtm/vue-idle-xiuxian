@@ -101,6 +101,44 @@ export function computePetMultiplier(pet) {
 // 云同步节流计时器（模块级，不进入存档）
 let cloudSyncTimer = null
 
+// 多字段保护：判断本地存档是否在关键进度上显著领先云端，从而拒绝云端覆盖。
+// 修复历史缺陷：旧版 migrate 只看 cultivationPool 一个字段，玩家下午炼丹/打装备/升灵宠
+// 但修为池没怎么涨时保护不触发，下午进度被上午云端静默覆盖。
+// 现扩展为多字段综合判定：任一关键字段显著领先即触发保护。
+function _shouldProtectLocal(local, cloud) {
+  if (!local || !cloud) return { shouldProtect: false }
+  const num = v => (typeof v === 'number' && isFinite(v) ? v : 0)
+
+  // 关键进度字段（数值越大越领先）
+  const fields = [
+    { key: 'level',          label: '等级',     ratio: 1.2 },   // 本地 > 云端 1.2 倍触发保护
+    { key: 'spiritStones',   label: '灵石',     ratio: 2.0 },
+    { key: 'cultivationPool',label: '修为池',   ratio: 1.5 },
+    { key: 'gold',           label: '金币',     ratio: 2.0 },
+  ]
+  for (const f of fields) {
+    const lv = num(local[f.key])
+    const cv = num(cloud[f.key])
+    if (lv > 0 && lv > cv * f.ratio) {
+      return { shouldProtect: true, reason: `${f.label} 本地=${lv} 云端=${cv}（本地 > 云端×${f.ratio}）` }
+    }
+  }
+  // 装备数量：本地明显比云端多 → 保护
+  const localEquipCount = Array.isArray(local.equipments) ? local.equipments.length : 0
+  const cloudEquipCount = Array.isArray(cloud.equipments) ? cloud.equipments.length : 0
+  if (localEquipCount > cloudEquipCount + 3) {
+    return { shouldProtect: true, reason: `装备数量 本地=${localEquipCount} 云端=${cloudEquipCount}` }
+  }
+  // 灵宠等级总和：本地比云端高 50% 以上 → 保护
+  const petLevelSum = pets => Array.isArray(pets) ? pets.reduce((s, p) => s + num(p?.level), 0) : 0
+  const localPetLevel = petLevelSum(local.pets)
+  const cloudPetLevel = petLevelSum(cloud.pets)
+  if (localPetLevel > 0 && localPetLevel > cloudPetLevel * 1.5) {
+    return { shouldProtect: true, reason: `灵宠等级总和 本地=${localPetLevel} 云端=${cloudPetLevel}` }
+  }
+  return { shouldProtect: false }
+}
+
 export const usePlayerStore = defineStore('player', {
   state: () => ({
     // 保存防抖计时器（不持久化）
@@ -1015,25 +1053,42 @@ export const usePlayerStore = defineStore('player', {
         // 否则云端 updated_at 永远晚于本地 _saveTime（_scheduleCloudSync 有 3s 延迟），
         // 下次 migrate 时 cloudTime >= localTime 恒成立，导致云端（可能是较早的弱档）
         // 反复覆盖本地较强档，表现为刷新后战斗力骤降。
+        // ⚠️ 时间戳回退修复：原 `|| Date.now()` 在旧档无 _saveTime 时用当前时间戳上传，
+        //   导致云端拿到"新时间戳 + 旧数据"，下次 migrate 必然走 cloudTime >= localTime 覆盖本地。
+        //   现改为：缺失时间戳时不上传该槽位（保存到本地等下次有效 _saveTime 再上传），
+        //   避免污染云端 last-write-wins 决策。
         const mainDecoded = blob ? decryptData(blob) : null
-        const mainTime = mainDecoded?._saveTime || Date.now()
+        const mainTime = (typeof mainDecoded?._saveTime === 'number' && mainDecoded._saveTime > 0)
+          ? mainDecoded._saveTime
+          : 0
         if (blob) {
-          try {
-            await this.pushSlotToCloud(0, blob, mainTime)
-          } catch (e) {
-            failures.push(`活动档：${e.message}`)
+          // 时间戳无效时跳过上传：避免后端用 Date.now() 兜底导致云端拿到"新时间戳+旧数据"
+          if (mainTime > 0) {
+            try {
+              await this.pushSlotToCloud(0, blob, mainTime)
+            } catch (e) {
+              failures.push(`活动档：${e.message}`)
+            }
+          } else {
+            console.warn('[syncToCloud] 活动档无有效 _saveTime，跳过本次上传避免污染云端时间戳')
           }
         }
         const slot = this.currentSlot || this.autoSaveSlot
         if (slot) {
           const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
           const slotDecoded = slotBlob ? decryptData(slotBlob) : null
-          const slotTime = slotDecoded?._saveTime || Date.now()
+          const slotTime = (typeof slotDecoded?._saveTime === 'number' && slotDecoded._saveTime > 0)
+            ? slotDecoded._saveTime
+            : 0
           if (slotBlob) {
-            try {
-              await this.pushSlotToCloud(slot, slotBlob, slotTime)
-            } catch (e) {
-              failures.push(`槽位${slot}：${e.message}`)
+            if (slotTime > 0) {
+              try {
+                await this.pushSlotToCloud(slot, slotBlob, slotTime)
+              } catch (e) {
+                failures.push(`槽位${slot}：${e.message}`)
+              }
+            } else {
+              console.warn(`[syncToCloud] 槽位${slot} 无有效 _saveTime，跳过本次上传`)
             }
           }
         }
@@ -1056,82 +1111,115 @@ export const usePlayerStore = defineStore('player', {
     // 迁移决策树（登录后调用）
     // interactive=true 时，分支③(本地+云端都有) 收集为冲突交由 UI 弹窗抉择；
     // interactive=false（启动自动）时以 updated_at 较新者胜（最后写入获胜）。
-    async migrate({ interactive = false } = {}) {
+    // signal：可选 AbortSignal，超时/取消时调用方触发 abort；migrate 内部在每个关键节点
+    // 检查 signal.aborted，若已中断则提前 return 且不执行末尾的 $reset()+initializePlayer()，
+    // 避免后台 migrate 几秒后完成时把用户正在玩的"下午状态"清空重载为"上午状态"。
+    async migrate({ interactive = false, signal } = {}) {
       const auth = useAuthStore()
       if (!auth.isLoggedIn) throw new Error('请先登录')
-      // fetchCloudSaves 失败时已抛出带原因的 Error
-      const cloud = await this.fetchCloudSaves()
-
-      const slots = [0, 1, 2, 3, 4, 5]
-      const conflicts = []
-      for (const slot of slots) {
-        const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
-        const localBlob = await GameDB.getData(key)
-        let localTime = 0
-        if (localBlob) {
-          const d = decryptData(localBlob)
-          localTime = d?._saveTime || 0
+      // 互斥锁：多个 migrate 入口（启动 / StartScreen 登录 / Settings 同步）必须串行，
+      // 否则两个 migrate 都执行 $reset()+initializePlayer() 会互相覆盖。
+      if (this._migrating) {
+        console.warn('[migrate] 已有迁移进行中，跳过本次')
+        return { conflicts: [], skipped: true }
+      }
+      this._migrating = true
+      // 中断检查辅助：被 abort 时抛出，让外层 try/finally 走 finally 释放锁
+      const checkAbort = () => {
+        if (signal?.aborted) {
+          const reason = signal.reason instanceof Error ? signal.reason : new Error(String(signal.reason || '已中断'))
+          throw reason
         }
-        const cloudSlot = cloud[slot]
-        const cloudBlob = cloudSlot?.data
-        const cloudTime = cloudSlot?.updated_at || 0
+      }
+      try {
+        // fetchCloudSaves 失败时已抛出带原因的 Error
+        const cloud = await this.fetchCloudSaves()
+        checkAbort()  // 网络往返最慢的一步，超时大概率在这里发生
 
-        if (cloudBlob && !localBlob) {
-          // ② 云端有、本地无 → 下载
-          await GameDB.setData(key, cloudBlob)
-        } else if (!cloudBlob && localBlob) {
-          // ① 本地有、云端无 → 上传
-          await this.pushSlotToCloud(slot, localBlob, localTime || Date.now())
-        } else if (cloudBlob && localBlob) {
-          // ③ 两边都有 → 冲突
-          if (interactive) {
-            conflicts.push({
-              slot,
-              local: this._slotInfo(localBlob),
-              cloud: this._slotInfo(cloudBlob),
-              localTime,
-              cloudTime
-            })
-          } else if (localTime === 0 && cloudTime > 0) {
-            // 本地有数据但无 _saveTime（旧版存档），无法判断新旧。
-            // 此时按"本地优先"处理：保留本地、上传到云端，避免云端覆盖本地较强档。
-            await this.pushSlotToCloud(slot, localBlob, Date.now())
-            console.warn(`[migrate] slot=${slot} 本地无 _saveTime，保留本地并上传云端`)
-          } else if (cloudTime >= localTime) {
-            // 兜底保护：若本地修为池显著大于云端（>1.5 倍），即便云端时间戳较新
-            // 也保留本地较大值，避免因时间戳异常（如旧版未写 _saveTime）造成 cultivationPool 回滚损失
-            const localDecoded = decryptData(localBlob)
-            const cloudDecoded = decryptData(cloudBlob)
-            const localPool = typeof localDecoded?.cultivationPool === 'number' ? localDecoded.cultivationPool : 0
-            const cloudPool = typeof cloudDecoded?.cultivationPool === 'number' ? cloudDecoded.cultivationPool : 0
-            if (localPool > cloudPool * 1.5 && localPool > 0) {
-              cloudDecoded.cultivationPool = localPool
-              cloudDecoded._saveTime = cloudDecoded._saveTime || Date.now()
-              const mergedBlob = encryptData(cloudDecoded)
-              await GameDB.setData(key, mergedBlob || cloudBlob)
-              if (mergedBlob) {
-                await this.pushSlotToCloud(slot, mergedBlob, cloudDecoded._saveTime)
-              }
-              console.warn(`[migrate] slot=${slot} 保护本地 cultivationPool=${localPool}（云端仅 ${cloudPool}）`)
-            } else {
-              await GameDB.setData(key, cloudBlob)
-            }
-          } else {
-            await this.pushSlotToCloud(slot, localBlob, localTime)
+        const slots = [0, 1, 2, 3, 4, 5]
+        const conflicts = []
+        for (const slot of slots) {
+          checkAbort()
+          const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
+          const localBlob = await GameDB.getData(key)
+          let localTime = 0
+          if (localBlob) {
+            const d = decryptData(localBlob)
+            // ⚠️ 时间戳回退修复：原 `d?._saveTime || 0` 用 0 表示"未知旧档"，
+            //   会落入 `localTime === 0 && cloudTime > 0` 分支按"本地优先"上传；
+            //   但若云端时间戳也异常回退成 Date.now()（见 syncToCloud），就会被判定"云端更新"覆盖本地。
+            //   这里改为：缺失 _saveTime 时记为 -1（标记为"未知"，下方判定中视为远古旧档），
+            //   不再触发上传，避免把未知时间戳数据推到云端污染 last-write-wins。
+            localTime = (typeof d?._saveTime === 'number' && d._saveTime > 0) ? d._saveTime : -1
           }
-        }
-        // ④ 都没有 → 跳过
-      }
+          const cloudSlot = cloud[slot]
+          const cloudBlob = cloudSlot?.data
+          const cloudTime = cloudSlot?.updated_at || 0
 
-      if (conflicts.length) {
-        this.cloudConflicts = conflicts
-        return { conflicts }
+          if (cloudBlob && !localBlob) {
+            // ② 云端有、本地无 → 下载
+            checkAbort()
+            await GameDB.setData(key, cloudBlob)
+          } else if (!cloudBlob && localBlob) {
+            // ① 本地有、云端无 → 上传（仅当本地时间戳有效时上传，避免污染云端）
+            if (localTime > 0) {
+              await this.pushSlotToCloud(slot, localBlob, localTime)
+            }
+          } else if (cloudBlob && localBlob) {
+            // ③ 两边都有 → 冲突
+            if (interactive) {
+              conflicts.push({
+                slot,
+                local: this._slotInfo(localBlob),
+                cloud: this._slotInfo(cloudBlob),
+                localTime,
+                cloudTime
+              })
+            } else {
+              // 多字段保护：在用云端覆盖本地之前，先比较关键进度字段。
+              // 若本地在任一关键字段上显著领先（等级/灵石/装备/灵宠/修为池），
+              // 即使云端时间戳较新也拒绝覆盖，改为上传本地保住进度。
+              // 历史缺陷：旧版只保护 cultivationPool 一个字段，玩家下午炼丹/打装备/升灵宠
+              // 但修为池没怎么涨时保护不触发，下午进度被上午云端静默覆盖。
+              const localDecoded = decryptData(localBlob)
+              const cloudDecoded = decryptData(cloudBlob)
+              const protectionResult = _shouldProtectLocal(localDecoded, cloudDecoded)
+              const localWins = protectionResult.shouldProtect
+              if (localWins) {
+                checkAbort()
+                await this.pushSlotToCloud(slot, localBlob, localTime > 0 ? localTime : Date.now())
+                console.warn(`[migrate] slot=${slot} 保护本地存档：${protectionResult.reason}`)
+              } else if (localTime < 0 && cloudTime > 0) {
+                // 本地旧版存档无 _saveTime：保守策略，保留本地不上传不下载，等用户手动同步
+                console.warn(`[migrate] slot=${slot} 本地无 _saveTime，保留本地不进行云同步`)
+              } else if (cloudTime >= localTime) {
+                checkAbort()
+                // 真正的云端较新：覆盖本地
+                await GameDB.setData(key, cloudBlob)
+              } else {
+                // 本地较新：上传覆盖云端
+                await this.pushSlotToCloud(slot, localBlob, localTime)
+              }
+            }
+          }
+          // ④ 都没有 → 跳过
+        }
+
+        if (conflicts.length) {
+          this.cloudConflicts = conflicts
+          return { conflicts }
+        }
+        // ⚠️ 关键修复：仅在未中断时执行 $reset + initializePlayer，
+        // 否则会在用户已开始游玩后把"下午状态"清空重载为"上午状态"，造成"突然回档"。
+        checkAbort()
+        // 无冲突，统一重新初始化
+        this.$reset()
+        await this.initializePlayer()
+        this.cloudConflicts = []
+        return { conflicts: [] }
+      } finally {
+        this._migrating = false
       }
-      // 无冲突，统一重新初始化
-      this.$reset()
-      await this.initializePlayer()
-      this.cloudConflicts = []
-      return { conflicts: [] }
     },
     // 分支③：用户抉择某一槽位用本地还是云端
     async resolveConflict(slot, useCloud) {
@@ -1144,7 +1232,10 @@ export const usePlayerStore = defineStore('player', {
         const localBlob = await GameDB.getData(key)
         if (localBlob) {
           const d = decryptData(localBlob)
-          await this.pushSlotToCloud(slot, localBlob, d?._saveTime || Date.now())
+          // 时间戳无效时用当前时间上传：这是用户显式选择"用本地"的交互操作，
+          // 此时本地存档必然是用户期望保留的最新状态，用当前时间作为时间戳是合理的。
+          const ts = (typeof d?._saveTime === 'number' && d._saveTime > 0) ? d._saveTime : Date.now()
+          await this.pushSlotToCloud(slot, localBlob, ts)
         }
       }
       this.cloudConflicts = this.cloudConflicts.filter(c => c.slot !== slot)
