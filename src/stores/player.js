@@ -1970,9 +1970,9 @@ export const usePlayerStore = defineStore('player', {
       if (!sourceEquip) {
         return { success: false, message: '需要一件神品装备作为材料' }
       }
-      // 生成专属装备
+      // 生成专属装备：继承来源神品装备的数值词条
       const playerLevel = this.level || 50
-      const newEquip = generateExclusiveEquipment(character, slot, playerLevel)
+      const newEquip = generateExclusiveEquipment(character, slot, playerLevel, sourceEquip)
       if (!newEquip) {
         return { success: false, message: '生成专属装备失败' }
       }

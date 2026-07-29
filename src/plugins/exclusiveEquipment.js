@@ -49,7 +49,7 @@ const STAR_AFFIX_COUNT = {
  * @param {number} playerLevel - 玩家等级（影响属性值范围）
  * @returns {Object} 专属装备对象
  */
-export function generateExclusiveEquipment(character, slot, playerLevel = 50) {
+export function generateExclusiveEquipment(character, slot, playerLevel = 50, sourceEquipment = null) {
   if (!character || !EXCLUSIVE_EQUIP_SLOTS.includes(slot)) return null
 
   const starMult = STAR_STAT_MULT[character.star] || 1.0
@@ -57,28 +57,47 @@ export function generateExclusiveEquipment(character, slot, playerLevel = 50) {
   const statCount = 5 // 神品固定 5 条属性
   const affixCount = STAR_AFFIX_COUNT[character.star] || 4
 
-  // 随机选取属性
-  const allStats = Object.keys(equipmentStatPool)
-  const selectedStats = []
-  while (selectedStats.length < statCount && allStats.length > 0) {
-    const idx = Math.floor(Math.random() * allStats.length)
-    selectedStats.push(allStats.splice(idx, 1)[0])
+  // 属性生成：优先继承神品装备的数值词条，缺失的条目才随机补齐
+  // 这样专属装备直接继承材料神品装备的数值，玩家可定向打造
+  let stats = {}
+  let sourceStats = null
+  if (sourceEquipment && sourceEquipment.stats && typeof sourceEquipment.stats === 'object') {
+    sourceStats = { ...sourceEquipment.stats }
   }
 
-  // 生成属性值（基于神品 × 星级倍率）
-  const stats = {}
+  const allStats = Object.keys(equipmentStatPool)
+  const selectedStats = []
+  // 优先从 sourceStats 取
+  if (sourceStats) {
+    Object.keys(sourceStats).forEach(k => {
+      if (equipmentStatPool[k] && selectedStats.length < statCount) {
+        selectedStats.push(k)
+      }
+    })
+  }
+  // 不足的随机补齐
+  const pool = allStats.filter(s => !selectedStats.includes(s))
+  while (selectedStats.length < statCount && pool.length > 0) {
+    const idx = Math.floor(Math.random() * pool.length)
+    selectedStats.push(pool.splice(idx, 1)[0])
+  }
+
   selectedStats.forEach(stat => {
-    const config = equipmentStatPool[stat]
-    const minVal = config.min[0] + (config.min[1] - config.min[0]) * (playerLevel / 100)
-    const maxVal = config.max[0] + (config.max[1] - config.max[0]) * (playerLevel / 100)
-    let value = minVal + Math.random() * (maxVal - minVal)
-    value *= mythicMult * starMult
-
-    const cap = config.cap
-    if (cap !== undefined) {
-      value = Math.min(value, cap)
+    // 继承来源装备的数值；否则按神品 × 星级倍率随机生成
+    let value
+    if (sourceStats && sourceStats[stat] !== undefined) {
+      value = sourceStats[stat]
+    } else {
+      const config = equipmentStatPool[stat]
+      const minVal = config.min[0] + (config.min[1] - config.min[0]) * (playerLevel / 100)
+      const maxVal = config.max[0] + (config.max[1] - config.max[0]) * (playerLevel / 100)
+      value = minVal + Math.random() * (maxVal - minVal)
+      value *= mythicMult * starMult
+      const cap = config.cap
+      if (cap !== undefined) {
+        value = Math.min(value, cap)
+      }
     }
-
     if (['critRate', 'comboRate', 'dodgeRate', 'vampireRate'].includes(stat)) {
       stats[stat] = Math.round(value * 1000) / 1000
     } else {
@@ -86,11 +105,15 @@ export function generateExclusiveEquipment(character, slot, playerLevel = 50) {
     }
   })
 
-  // 生成词缀（从 buildSystem 获取，按 slot 过滤）
-  let affixes = getAffixesForSlot(slot, 'mythic')
-  // 限制词缀数量
-  if (affixes.length > affixCount) {
-    affixes = affixes.slice(0, affixCount)
+  // 词缀：优先继承来源神品装备的词缀；否则随机生成
+  let affixes
+  if (sourceEquipment && Array.isArray(sourceEquipment.affixes) && sourceEquipment.affixes.length > 0) {
+    affixes = sourceEquipment.affixes.slice(0, affixCount)
+  } else {
+    affixes = getAffixesForSlot(slot, 'mythic')
+    if (affixes.length > affixCount) {
+      affixes = affixes.slice(0, affixCount)
+    }
   }
 
   // 专属装备名称：{角色名}·{部位名}

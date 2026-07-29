@@ -1116,9 +1116,9 @@ function createPlayerEntity() {
 }
 
 // BOSS 整体实力倍率：统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度）
-// 平衡修复（v2）：原 1.8 倍 + LATE_ZONE_ENEMY_MULT 让 BOSS 过强，玩家 build 133% 仍打不过首轮。
-// 降至 1.2，配合 HP 公式调整让 BOSS 战更可控（HP 和 DEF 用此倍率，ATK 已单独基于 recommendedStats.health）
-const BOSS_POWER_MULTIPLIER = 1.2
+// 平衡修复（v3）：1.2 倍偏弱，玩家反馈各地图各难度 BOSS 血量太低、过简单。
+// 上调至 1.5，配合小怪整体强化，让 BOSS 战更具挑战性（HP 和 DEF 用此倍率，ATK 单独基于 recommendedStats.health）
+const BOSS_POWER_MULTIPLIER = 1.5
 
 // 后期秘境额外强化系数（小怪与 BOSS 共用）
 // 难度提升：最后 3 张图大幅强化，避免玩家轻松毕业
@@ -1149,11 +1149,11 @@ function createBossEnemy(bossData, effectiveZone) {
   const scaledDefense = Math.floor((bossData.stats.defense || 0) * scale * totalBossMult)
   const scaledSpeed = Math.floor((bossData.stats.speed || 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
   // BOSS 攻击力：基于推荐血量的固定比例，后期秘境温和增长
-  // 凶险档每回合打推荐血量玩家约 15-18%（5-7 回合击杀），给玩家反击时间
+  // 凶险档每回合打推荐血量玩家约 20-24%（4-6 回合击杀），给玩家反击时间但更具威胁
   // boss 间差异体现在 HP/DEF/速度/技能上，攻击力同图统一以保证数值可控
   const recHealth = (effectiveZone.recommendedStats?.health || bossData.stats.health * 0.1) * scale
   const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
-  const bossAtkRatio = 0.18
+  const bossAtkRatio = 0.22
   const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
   // 高难度档 boss 附加额外战斗属性，让其对高 build 玩家有真实威胁
   const bossCombatBoost = Math.min(0.4, Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.08)
@@ -1276,9 +1276,9 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   const scaledDefense = Math.floor((effectiveZone.recommendedStats?.defense || 100) * scale * lateMult * 1.2) // 人物 BOSS 防御略高
   const scaledSpeed = Math.floor(((character.baseStats?.speed || 10) * 1.5 + 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult))
 
-  // 攻击力：比普通 BOSS 高 50%（按 recHealth × 0.18 × 1.5）
+  // 攻击力：比普通 BOSS 高 50%（按 recHealth × 0.22 × 1.5）
   const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
-  const bossAtkRatio = 0.18 * CHARACTER_BOSS_DIFFICULTY_MULT
+  const bossAtkRatio = 0.22 * CHARACTER_BOSS_DIFFICULTY_MULT
   const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
 
   // 战斗属性：高难 BOSS 附加额外属性，比普通 BOSS 略强
@@ -1439,15 +1439,15 @@ function generateZoneEnemy(effectiveZone, encounterCount, difficultyKey = 'xiong
     return { mainEnemy: bossEnemies[0], allBosses: bossEnemies, hasBoss: true, isElite: false }
   }
   
-  // 小怪整体强化（用户反馈小怪实力羸弱）：
-  // - HP 倍率 0.7 → 0.85（+21%）
-  // - ATK 倍率 0.5 → 0.6（+20%）
-  // - DEF 倍率 0.12 → 0.15（+25%）
+  // 小怪整体强化（v3，用户反馈各地图各难度怪物血量太低、过简单）：
+  // - HP 倍率 0.85 → 1.10（+29%）
+  // - ATK 倍率 0.6 → 0.80（+33%）
+  // - DEF 倍率 0.15 → 0.20（+33%）
   // 后期秘境额外应用 LATE_ZONE_ENEMY_MULT，重点强化凤凰窟之后的怪物
   const lateMult = getLateZoneMult(effectiveZone.id)
-  const smallHpBase = Math.floor(effectiveZone.recommendedStats.health * 0.85 * scale * lateMult)
-  const smallAtkBase = Math.floor(effectiveZone.recommendedStats.attack * 0.6 * scale * lateMult)
-  const smallDefBase = Math.floor(effectiveZone.recommendedStats.attack * 0.15 * scale * lateMult)
+  const smallHpBase = Math.floor(effectiveZone.recommendedStats.health * 1.10 * scale * lateMult)
+  const smallAtkBase = Math.floor(effectiveZone.recommendedStats.attack * 0.80 * scale * lateMult)
+  const smallDefBase = Math.floor(effectiveZone.recommendedStats.attack * 0.20 * scale * lateMult)
   // 后期秘境小怪速度小幅提升，让其能跟上后期玩家
   const smallSpeedBonus = Math.floor((lateMult - 1) * 8)
   const baseStats = {
@@ -1482,9 +1482,9 @@ function generateZoneEnemy(effectiveZone, encounterCount, difficultyKey = 'xiong
   let monsterName
   if (isElite) {
     monsterName = effectiveZone.monsters[Math.floor(Math.random() * effectiveZone.monsters.length)]
-    baseStats.health = Math.floor(baseStats.health * 1.5)
+    baseStats.health = Math.floor(baseStats.health * 1.7)
     baseStats.maxHealth = baseStats.health
-    baseStats.damage = Math.floor(baseStats.damage * 1.3)
+    baseStats.damage = Math.floor(baseStats.damage * 1.45)
     baseStats.critRate = Math.min(0.2, baseStats.critRate + 0.05)
   } else {
     monsterName = effectiveZone.monsters[Math.floor(Math.random() * effectiveZone.monsters.length)]

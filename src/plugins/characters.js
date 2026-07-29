@@ -272,20 +272,26 @@ export async function loadSharedPortraits() {
 
 export function getCharacterAvatar(member, size = 'full') {
   if (!member) return null
-  if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
-    return member.avatar
-  }
   const id = member.templateId || member.id
   if (!id) return null
-  if (characterDefMap[id] && characterDefMap[id].avatar) {
-    return characterDefMap[id].avatar
-  }
+  // 修复头像底片 bug：站点共享立绘包（manifest.json 中已登记的 JPG/webp 文件）
+  // 优先于旧的 base64 自定义头像。这样重新生成并发布的文件总能覆盖浏览器中
+  // 持久化的旧 base64 数据，避免「底片式」头像残留。
+  // 仅当 sharedPortraitMap 未登记该角色时，才回退使用 base64 自定义头像。
   if (sharedPortraitMap[id]) {
     const portrait = sharedPortraitMap[id]
     if (typeof portrait === 'object') {
       return size === 'thumbnail' && portrait.thumbnail ? portrait.thumbnail : portrait.full
     }
     return portrait
+  }
+  // 旧 base64 自定义头像（仅对站点未发布文件的角色生效）
+  if (member.avatar && typeof member.avatar === 'string' && member.avatar.startsWith('data:')) {
+    return member.avatar
+  }
+  if (characterDefMap[id] && characterDefMap[id].avatar) {
+    const av = characterDefMap[id].avatar
+    if (typeof av === 'string' && av.startsWith('data:')) return av
   }
   // 静态回退：sharedPortraitMap 尚未加载完成时，构造默认 URL（假设图片文件存在）
   // 这样头像可以立即显示，无需等待 manifest.json 加载完成

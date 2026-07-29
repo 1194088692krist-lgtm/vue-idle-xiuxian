@@ -561,11 +561,15 @@
                   <div class="section">
                     <h3 class="section-title">打造消耗</h3>
                     <div class="cost-list">
-                      <div class="cost-item">
-                        <span class="cost-name">任意神品装备</span>
-                        <span class="cost-value" :class="{ insufficient: exclMythicCount < 1 }">
-                          {{ exclMythicCount }} / 1
-                        </span>
+                      <div class="cost-item excl-source-row">
+                        <span class="cost-name">神品装备</span>
+                        <button
+                          class="excl-source-btn"
+                          :class="{ insufficient: exclMythicCount < 1 && !exclSelectedSourceId }"
+                          @click="openExclSourcePicker"
+                        >
+                          {{ exclSelectedSourceLabel }}
+                        </button>
                       </div>
                       <div class="cost-item">
                         <span class="cost-name">{{ exclInnerPillName }}</span>
@@ -629,6 +633,66 @@
               </template>
               <div v-else class="empty-state">请先在上方下拉选择角色</div>
             </template>
+          </div>
+
+          <!-- 神品装备来源选择菜单 -->
+          <div v-if="exclSourcePickerVisible" class="excl-source-picker-mask" @click.self="exclSourcePickerVisible = false">
+            <div class="excl-source-picker glass-card">
+              <div class="excl-source-picker-header">
+                <h3 class="excl-source-picker-title">选择神品装备作为材料</h3>
+                <button class="excl-source-picker-close" @click="exclSourcePickerVisible = false">×</button>
+              </div>
+              <div class="excl-source-filter">
+                <input
+                  v-model="exclSourceKeyword"
+                  class="excl-filter-input"
+                  placeholder="输入装备名称搜索"
+                />
+                <select v-model="exclSourceFilterSlot" class="excl-filter-select">
+                  <option value="">全部部位</option>
+                  <option v-for="slot in EXCLUSIVE_EQUIP_SLOTS" :key="slot" :value="slot">
+                    {{ EXCLUSIVE_SLOT_NAMES[slot] }}
+                  </option>
+                  <option value="wrist">护腕</option>
+                  <option value="necklace">项链</option>
+                  <option value="ring1">戒指1</option>
+                  <option value="ring2">戒指2</option>
+                  <option value="belt">腰带</option>
+                  <option value="artifact">法宝</option>
+                </select>
+              </div>
+              <div class="excl-source-picker-body">
+                <div v-if="exclMythicEquipments.length === 0" class="excl-source-empty">
+                  没有符合条件的神品装备
+                </div>
+                <div
+                  v-for="equip in exclMythicEquipments"
+                  :key="equip.id"
+                  class="excl-source-item glass-card"
+                  :class="{ selected: exclSelectedSourceId === equip.id }"
+                  @click="pickExclSource(equip.id)"
+                >
+                  <div class="excl-source-item-header">
+                    <span class="excl-source-item-name">{{ equip.name }}</span>
+                    <span class="excl-source-item-rarity">神品</span>
+                  </div>
+                  <div class="excl-source-item-meta">
+                    <span>部位: {{ EXCLUSIVE_SLOT_NAMES[equip.slot] || equip.slot || '-' }}</span>
+                    <span>评分: {{ calculateEquipmentScore(equip) }}</span>
+                    <span v-if="equip.enhanceLevel">+{{ equip.enhanceLevel }}</span>
+                  </div>
+                  <div class="excl-source-item-stats">
+                    <span v-for="(val, key) in equip.stats" :key="key" class="excl-source-stat">
+                      {{ getStatName(key) }}: {{ formatStatValue(key, val) }}
+                    </span>
+                  </div>
+                </div>
+              </div>
+              <div class="excl-source-picker-footer">
+                <button class="btn-small btn-outline" @click="clearExclSource">清除选择</button>
+                <button class="btn-small btn-primary" @click="exclSourcePickerVisible = false">关闭</button>
+              </div>
+            </div>
           </div>
         </template>
 
@@ -1657,6 +1721,45 @@
   const exclMythicCount = computed(() =>
     playerStore.items.filter(i => (i.rarity || i.quality) === 'mythic' && !i.isExclusive).length
   )
+  // 神品装备来源选择（点击弹出菜单筛选）
+  const exclSelectedSourceId = ref('')
+  const exclSourcePickerVisible = ref(false)
+  const exclSourceKeyword = ref('')
+  const exclSourceFilterSlot = ref('')
+  const exclMythicEquipments = computed(() => {
+    const list = playerStore.items.filter(i => (i.rarity || i.quality) === 'mythic' && !i.isExclusive)
+    let r = list
+    if (exclSourceKeyword.value) {
+      const kw = exclSourceKeyword.value.toLowerCase()
+      r = r.filter(i => (i.name || '').toLowerCase().includes(kw))
+    }
+    if (exclSourceFilterSlot.value) {
+      r = r.filter(i => (i.slot || i.type) === exclSourceFilterSlot.value)
+    }
+    return r.slice().sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+  })
+  const exclSelectedSource = computed(() =>
+    exclSelectedSourceId.value ? playerStore.items.find(i => i.id === exclSelectedSourceId.value) : null
+  )
+  const exclSelectedSourceLabel = computed(() => {
+    if (!exclSelectedSource.value) {
+      return exclMythicCount.value > 0 ? `点击选择（共 ${exclMythicCount.value} 件）` : '无神品装备'
+    }
+    const eq = exclSelectedSource.value
+    return `${eq.name}（评分 ${calculateEquipmentScore(eq)}）`
+  })
+  const openExclSourcePicker = () => {
+    exclSourcePickerVisible.value = true
+    exclSourceKeyword.value = ''
+    exclSourceFilterSlot.value = ''
+  }
+  const pickExclSource = (equipId) => {
+    exclSelectedSourceId.value = equipId
+    exclSourcePickerVisible.value = false
+  }
+  const clearExclSource = () => {
+    exclSelectedSourceId.value = ''
+  }
   // 已拥有的该角色专属装备
   const exclOwnedEquipments = computed(() => {
     if (!exclSelectedCharId.value) return []
@@ -1670,19 +1773,26 @@
   const onExclCharChange = () => {
     exclSelectedSlot.value = ''
     exclCraftResult.value = null
+    exclSelectedSourceId.value = ''
   }
   const canCraftExclusive = () => {
     if (!exclSelectedCharId.value || !exclSelectedSlot.value) return false
-    if (exclMythicCount.value < 1) return false
+    if (!exclSelectedSourceId.value) return false
     if (exclInnerPillCount.value < EXCLUSIVE_EQUIP_CONFIG.innerPillCost) return false
     return true
   }
   const handleCraftExclusive = () => {
     if (!canCraftExclusive()) return
-    const result = playerStore.craftExclusiveEquipment(exclSelectedCharId.value, exclSelectedSlot.value)
+    const result = playerStore.craftExclusiveEquipment(
+      exclSelectedCharId.value,
+      exclSelectedSlot.value,
+      exclSelectedSourceId.value
+    )
     exclCraftResult.value = result
     if (result.success) {
       message.success(result.message)
+      // 打造成功后清除选择（材料已消耗）
+      exclSelectedSourceId.value = ''
     } else {
       message.error(result.message || '打造失败')
     }
@@ -2538,16 +2648,19 @@
 
   /* ===== 装备锻打样式 ===== */
   .forge-sub-tabs {
-    display: flex;
-    gap: 8px;
+    /* 田字分布：2x2 网格 */
+    display: grid;
+    grid-template-columns: repeat(2, 1fr);
+    gap: 10px;
     margin-bottom: 16px;
   }
 
   .forge-sub-tab {
     display: flex;
     align-items: center;
+    justify-content: center;
     gap: 8px;
-    padding: 10px 20px;
+    padding: 14px 12px;
     background: rgba(0, 0, 0, 0.3);
     border-radius: 8px;
     cursor: pointer;
@@ -2722,6 +2835,199 @@
     font-size: 13px;
     color: #C9C4BA;
     line-height: 1.6;
+  }
+
+  /* 神品装备来源按钮（消耗行内） */
+  .excl-source-row {
+    flex-direction: row;
+    align-items: center;
+    gap: 12px;
+  }
+
+  .excl-source-btn {
+    flex: 1;
+    padding: 8px 12px;
+    background: rgba(255, 69, 0, 0.12);
+    border: 1px solid rgba(255, 69, 0, 0.45);
+    border-radius: 6px;
+    color: #FF8C00;
+    font-size: 13px;
+    cursor: pointer;
+    transition: all 0.2s;
+    text-align: left;
+  }
+
+  .excl-source-btn:hover {
+    background: rgba(255, 69, 0, 0.2);
+    border-color: #FF4500;
+  }
+
+  .excl-source-btn.insufficient {
+    color: #888;
+    border-color: rgba(136, 136, 136, 0.4);
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  /* 神品装备来源选择菜单 */
+  .excl-source-picker-mask {
+    position: fixed;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: rgba(0, 0, 0, 0.7);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 2000;
+    padding: 20px;
+  }
+
+  .excl-source-picker {
+    width: 100%;
+    max-width: 680px;
+    max-height: 85vh;
+    display: flex;
+    flex-direction: column;
+    background: rgba(20, 12, 8, 0.96);
+    border: 1px solid rgba(255, 69, 0, 0.5);
+    border-radius: 12px;
+    padding: 18px;
+  }
+
+  .excl-source-picker-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 12px;
+  }
+
+  .excl-source-picker-title {
+    font-size: 16px;
+    color: #FF8C00;
+    font-weight: 600;
+    margin: 0;
+  }
+
+  .excl-source-picker-close {
+    background: none;
+    border: none;
+    color: #C9C4BA;
+    font-size: 24px;
+    cursor: pointer;
+    line-height: 1;
+    padding: 0 6px;
+  }
+
+  .excl-source-picker-close:hover {
+    color: #fff;
+  }
+
+  .excl-source-filter {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 12px;
+  }
+
+  .excl-filter-input,
+  .excl-filter-select {
+    padding: 6px 10px;
+    background: rgba(0, 0, 0, 0.4);
+    border: 1px solid rgba(139, 69, 19, 0.5);
+    border-radius: 6px;
+    color: #F5DEB3;
+    font-size: 13px;
+  }
+
+  .excl-filter-input {
+    flex: 1;
+  }
+
+  .excl-filter-select {
+    min-width: 130px;
+  }
+
+  .excl-source-picker-body {
+    flex: 1;
+    overflow-y: auto;
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+    padding-right: 4px;
+  }
+
+  .excl-source-empty {
+    text-align: center;
+    color: #888;
+    padding: 30px 10px;
+    font-size: 13px;
+  }
+
+  .excl-source-item {
+    padding: 10px 12px;
+    border: 1px solid rgba(139, 69, 19, 0.35);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.2s;
+    background: rgba(0, 0, 0, 0.3);
+  }
+
+  .excl-source-item:hover {
+    background: rgba(255, 69, 0, 0.12);
+    border-color: rgba(255, 69, 0, 0.6);
+  }
+
+  .excl-source-item.selected {
+    background: rgba(255, 69, 0, 0.2);
+    border-color: #FF4500;
+    box-shadow: 0 0 8px rgba(255, 69, 0, 0.35);
+  }
+
+  .excl-source-item-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    margin-bottom: 4px;
+  }
+
+  .excl-source-item-name {
+    font-size: 14px;
+    color: #FF8C00;
+    font-weight: 600;
+  }
+
+  .excl-source-item-rarity {
+    font-size: 11px;
+    color: #FF4500;
+    padding: 1px 6px;
+    border: 1px solid rgba(255, 69, 0, 0.5);
+    border-radius: 4px;
+  }
+
+  .excl-source-item-meta {
+    display: flex;
+    gap: 12px;
+    font-size: 12px;
+    color: #C9C4BA;
+    margin-bottom: 4px;
+    flex-wrap: wrap;
+  }
+
+  .excl-source-item-stats {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 4px 10px;
+    font-size: 11px;
+    color: #9c8;
+  }
+
+  .excl-source-picker-footer {
+    display: flex;
+    justify-content: flex-end;
+    gap: 8px;
+    margin-top: 12px;
+    padding-top: 12px;
+    border-top: 1px solid rgba(139, 69, 19, 0.3);
   }
 
   .enhance-cap-hint {
