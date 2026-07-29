@@ -3,6 +3,11 @@ import { createPinia } from 'pinia'
 import App from './App.vue'
 import router from './router'
 import './styles/theme.css'
+import { installDebugLog } from './composables/useDebugLog'
+
+// 启用日志收集（环形缓冲 200 条，dev/prod 都启用，供调试面板查看）
+// 必须在 createApp 之前安装，才能拦截到 Vue 初始化期间的日志
+installDebugLog()
 
 const app = createApp(App)
 const pinia = createPinia()

@@ -42,7 +42,7 @@
             <!-- 顶部状态栏 -->
             <header class="top-bar">
               <div class="player-info">
-                <div class="player-name-only">{{ playerStore.name }}</div>
+                <div class="player-name-only" @click="onSectNameClick" title="">{{ playerStore.name }}</div>
               </div>
               <div class="resource-bar">
                 <div class="resource-item crystal">
@@ -78,7 +78,16 @@
             <!-- 修为池 -->
             <div class="cultivation-bar">
               <div class="cultivation-info">
-                <span class="cultivation-label">修为池</span>
+                <span class="cultivation-label">
+                  修为池
+                  <!-- 调试按钮：连击洞府名 5 次后出现在动作名旁，再连击 5 次消失 -->
+                  <span
+                    v-if="showDebugBtn"
+                    class="debug-btn"
+                    @click="showDebugPanel = true"
+                    title="查看近期程序日志"
+                  >🐛 调试</span>
+                </span>
                 <span class="cultivation-text">{{ formatNumber(animatedCultivation) }}</span>
               </div>
               <div class="cultivation-progress">
@@ -145,6 +154,38 @@
             />
             <!-- 技能释放全屏特写演出：仅 BOSS 战中释放技能时触发 -->
             <SkillCinematic />
+
+            <!-- 调试日志面板：连击洞府名 5 次显示按钮，点按钮打开此面板 -->
+            <teleport to="body">
+              <div v-if="showDebugPanel" class="debug-panel-overlay" @click.self="onDebugPanelClose">
+                <div class="debug-panel">
+                  <div class="debug-panel-header">
+                    <span class="debug-panel-title">近期程序日志（最近 {{ debugLogs.length }} 条）</span>
+                    <div class="debug-panel-actions">
+                      <button class="debug-btn-copy" @click="copyDebugLogs">
+                        {{ logCopied ? '已复制 ✓' : '一键复制' }}
+                      </button>
+                      <button class="debug-btn-clear" @click="onDebugClearLogs" title="清空日志">清空</button>
+                      <button class="debug-btn-close" @click="onDebugPanelClose" title="关闭">✕</button>
+                    </div>
+                  </div>
+                  <div class="debug-panel-body">
+                    <div v-if="debugLogs.length === 0" class="debug-empty">暂无日志</div>
+                    <div v-else class="debug-log-list">
+                      <div
+                        v-for="(log, i) in debugLogs"
+                        :key="i"
+                        class="debug-log-line"
+                        :class="'log-' + log.level"
+                      >[{{ log.ts }}] [{{ log.level.toUpperCase() }}] {{ log.text }}</div>
+                    </div>
+                  </div>
+                  <div class="debug-panel-footer">
+                    <span class="debug-hint">提示：复制后粘贴给开发者分析 bug，仅含最近 {{ debugLogs.length }} 条日志</span>
+                  </div>
+                </div>
+              </div>
+            </teleport>
           </div>
       </n-dialog-provider>
     </n-message-provider>
@@ -176,6 +217,7 @@
   import { formatNumber } from './utils/formatNumber.js'
   import { getRealmName } from './plugins/realm'
 import { useIdleSystem } from './composables/useIdleSystem'
+import { useDebugLog, exportLogs, clearLogs } from './composables/useDebugLog'
 import { initCharacterDefs } from './plugins/characters'
 import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
@@ -221,6 +263,71 @@ import SkillCinematic from './components/SkillCinematic.vue'
   const loadingProgress = ref(0)
   const loadingText = ref('正在初始化...')
   const isFirstLoad = ref(false)
+
+  // ===== 调试按钮：连击洞府名 5 次显示，再连击 5 次隐藏 =====
+  // 用于现场抓日志分析 bug，避免用户开 devtools
+  const DEBUG_CLICK_THRESHOLD = 5
+  const DEBUG_CLICK_RESET_MS = 1500  // 1.5s 内未连续点击则重置计数
+  const showDebugBtn = ref(false)
+  let sectNameClicks = 0
+  let sectNameClickTimer = null
+  const { logs: debugLogs } = useDebugLog()
+  const showDebugPanel = ref(false)
+  const logCopied = ref(false)
+  let logCopyTimer = null
+
+  function onSectNameClick() {
+    sectNameClicks++
+    if (sectNameClickTimer) clearTimeout(sectNameClickTimer)
+    sectNameClickTimer = setTimeout(() => {
+      sectNameClicks = 0
+      sectNameClickTimer = null
+    }, DEBUG_CLICK_RESET_MS)
+    if (sectNameClicks >= DEBUG_CLICK_THRESHOLD) {
+      // 达到阈值：切换显示状态，并重置计数
+      showDebugBtn.value = !showDebugBtn.value
+      sectNameClicks = 0
+      if (sectNameClickTimer) { clearTimeout(sectNameClickTimer); sectNameClickTimer = null }
+      // 隐藏按钮时同步关闭面板
+      if (!showDebugBtn.value) showDebugPanel.value = false
+    }
+  }
+
+  function copyDebugLogs() {
+    const text = exportLogs()
+    // 一键复制：优先 navigator.clipboard，回退 textarea 兜底
+    if (navigator.clipboard && navigator.clipboard.writeText) {
+      navigator.clipboard.writeText(text).then(() => {
+        logCopied.value = true
+        if (logCopyTimer) clearTimeout(logCopyTimer)
+        logCopyTimer = setTimeout(() => { logCopied.value = false }, 2000)
+      }).catch(() => fallbackCopy(text))
+    } else {
+      fallbackCopy(text)
+    }
+  }
+  function fallbackCopy(text) {
+    try {
+      const ta = document.createElement('textarea')
+      ta.value = text
+      ta.style.cssText = 'position:fixed;top:-9999px;left:-9999px;opacity:0'
+      document.body.appendChild(ta)
+      ta.select()
+      document.execCommand('copy')
+      document.body.removeChild(ta)
+      logCopied.value = true
+      if (logCopyTimer) clearTimeout(logCopyTimer)
+      logCopyTimer = setTimeout(() => { logCopied.value = false }, 2000)
+    } catch (e) {
+      console.warn('复制日志失败:', e)
+    }
+  }
+  function onDebugPanelClose() {
+    showDebugPanel.value = false
+  }
+  function onDebugClearLogs() {
+    clearLogs()
+  }
   const animatedSpirit = ref(0)
   const animatedStones = ref(0)
   const animatedCultivation = ref(0)
@@ -1347,5 +1454,118 @@ import SkillCinematic from './components/SkillCinematic.vue'
     bottom: -2px;
     left: 25%;
     animation: charStar5Float 2.2s ease-in-out 1.1s infinite;
+  }
+
+  /* ===== 调试按钮 + 调试面板（连击洞府名 5 次激活） ===== */
+  .debug-btn {
+    display: inline-block;
+    margin-left: 8px;
+    padding: 1px 8px;
+    font-size: 11px;
+    color: #FFD700;
+    background: rgba(255, 215, 0, 0.12);
+    border: 1px solid rgba(255, 215, 0, 0.4);
+    border-radius: 4px;
+    cursor: pointer;
+    user-select: none;
+    vertical-align: middle;
+    transition: background 0.15s;
+  }
+  .debug-btn:hover { background: rgba(255, 215, 0, 0.25); }
+  .debug-btn:active { transform: scale(0.95); }
+
+  /* 调试面板：全屏遮罩 + 中央卡片 */
+  .debug-panel-overlay {
+    position: fixed;
+    inset: 0;
+    background: rgba(0, 0, 0, 0.6);
+    z-index: 100000;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .debug-panel {
+    width: 100%;
+    max-width: 720px;
+    max-height: 80vh;
+    background: #1e1e1e;
+    color: #d4d4d4;
+    border: 1px solid #444;
+    border-radius: 8px;
+    display: flex;
+    flex-direction: column;
+    overflow: hidden;
+    font-family: 'SF Mono', Monaco, Menlo, Consolas, 'Courier New', monospace;
+    font-size: 12px;
+  }
+  .debug-panel-header {
+    display: flex;
+    align-items: center;
+    justify-content: space-between;
+    padding: 10px 14px;
+    background: #252526;
+    border-bottom: 1px solid #3c3c3c;
+    flex-shrink: 0;
+  }
+  .debug-panel-title {
+    color: #FFD700;
+    font-weight: 600;
+  }
+  .debug-panel-actions {
+    display: flex;
+    gap: 8px;
+  }
+  .debug-panel-actions button {
+    padding: 4px 10px;
+    font-size: 11px;
+    border: 1px solid #555;
+    background: #333;
+    color: #ddd;
+    border-radius: 3px;
+    cursor: pointer;
+    transition: background 0.15s;
+  }
+  .debug-panel-actions button:hover { background: #444; }
+  .debug-btn-copy { border-color: #4a8a4a !important; color: #8fbc8f !important; }
+  .debug-btn-copy:hover { background: #2d4a2d !important; }
+  .debug-btn-clear { border-color: #8a4a4a !important; color: #bc8f8f !important; }
+  .debug-btn-close { border-color: #555 !important; }
+  .debug-panel-body {
+    flex: 1;
+    overflow-y: auto;
+    padding: 10px 14px;
+    min-height: 200px;
+  }
+  .debug-empty {
+    color: #777;
+    text-align: center;
+    padding: 40px 0;
+  }
+  .debug-log-list {
+    display: flex;
+    flex-direction: column;
+    gap: 2px;
+  }
+  .debug-log-line {
+    white-space: pre-wrap;
+    word-break: break-all;
+    line-height: 1.5;
+    padding: 2px 0;
+    border-bottom: 1px solid rgba(255,255,255,0.04);
+  }
+  .debug-log-line.log-log { color: #d4d4d4; }
+  .debug-log-line.log-warn { color: #FFA500; background: rgba(255, 165, 0, 0.05); }
+  .debug-log-line.log-error { color: #FF5252; background: rgba(255, 82, 82, 0.08); }
+  .debug-panel-footer {
+    padding: 8px 14px;
+    background: #252526;
+    border-top: 1px solid #3c3c3c;
+    flex-shrink: 0;
+  }
+  .debug-hint {
+    color: #777;
+    font-size: 11px;
   }
 </style>
