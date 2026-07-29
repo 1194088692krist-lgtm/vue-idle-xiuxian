@@ -1,10 +1,8 @@
 <template>
-  <!-- 技能释放全屏特写演出：仅 BOSS 战时触发，技能名四字大字 + 属性色光闪 + 专属图形特效 -->
-  <teleport to="body">
-    <!-- PixiJS WebGL canvas：独立于 .skill-cinematic 的 v-if，保证预热时 canvas 已存在 -->
-    <!-- z-index 与 .skill-cinematic 同级(9998)，DOM 顺序在 .skill-cinematic 之前（canvas 在下，特效在上） -->
-    <canvas ref="pixiCanvasRef" class="pixi-fx-canvas"></canvas>
-    <div v-if="show" class="skill-cinematic" aria-hidden="true">
+  <!-- 技能释放特写演出：嵌入 BattleStage 内，按技能类型分方位（攻击/debuff靠敌方，治疗/buff靠我方） -->
+  <!-- PixiJS canvas：独立于 .skill-cinematic 的 v-if，保证预热时 canvas 已存在 -->
+  <canvas ref="pixiCanvasRef" class="pixi-fx-canvas"></canvas>
+  <div v-if="show" class="skill-cinematic" :class="sideClass" aria-hidden="true">
       <!-- 全屏属性色光闪 -->
       <div :key="`flash-${animKey}`" class="skill-flash" :style="{ background: flashBg }"></div>
       <!-- 中心光晕 -->
@@ -117,18 +115,15 @@
         </div>
       </div>
     </div>
-  </teleport>
 </template>
 
 <script setup>
-import { ref, computed, watch, nextTick, onUnmounted } from 'vue'
-import { useRoute } from 'vue-router'
+import { ref, computed, watch, nextTick, onMounted, onUnmounted } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePixiFx } from '../composables/usePixiFx'
 import { generateFxFramesByType } from '../composables/generateFxFrames'
 
 const { skillCastEvent } = useIdleSystem()
-const route = useRoute()
 
 // PixiJS 序列帧播放器（单例）
 const fx = usePixiFx()
@@ -158,11 +153,9 @@ function getFxFrames(fxType) {
   return fxFramesCache.get(fxType)
 }
 
-// 应用启动后空闲时预热 PixiJS（避免首次演出卡顿）
-// 只在 exploration 页面预热（其他页面用不到）
+// 组件挂载后空闲时预热 PixiJS（避免首次演出卡顿）
 function warmupPixi() {
   if (pixiReady) return Promise.resolve(true)
-  // 等待 canvas ref 就绪（teleport 渲染后）
   if (!pixiCanvasRef.value) {
     nextTick(() => warmupPixi())
     return Promise.resolve(false)
@@ -174,15 +167,11 @@ function warmupPixi() {
   }).catch(() => false)
 }
 
-// 监听路由：进入 /exploration 时触发预热（首次挂载 + 后续导航都覆盖）
-// 用 watch immediate 替代 onMounted，避免组件挂载时路由还不是 exploration 的场景
-watch(() => route.path, (newPath) => {
-  if (newPath === '/exploration' && !pixiReady) {
-    // 延迟到 idle，不阻塞路由切换动画
-    const scheduleIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500))
-    scheduleIdle(() => warmupPixi())
-  }
-}, { immediate: true })  // immediate: 组件挂载时若已在 exploration 也立即触发
+onMounted(() => {
+  // 延迟到 idle，不阻塞渲染
+  const scheduleIdle = window.requestIdleCallback || ((cb) => setTimeout(cb, 1500))
+  scheduleIdle(() => warmupPixi())
+})
 
 const show = ref(false)
 const skillName = ref('')
@@ -192,6 +181,20 @@ const skillColor = ref('#DAA520')
 const skillFx = ref('star')
 const flashBg = ref('rgba(255, 215, 0, 0.4)')
 const glowBg = ref('radial-gradient(circle, rgba(255, 215, 0, 0.5) 0%, transparent 70%)')
+// 当前技能类型（决定方位）与对应的 CSS class
+const skillType = ref('skill_attack')
+const fxSide = ref('right')  // 'left'=我方一侧，'right'=敌方一侧
+const sideClass = computed(() => fxSide.value === 'left' ? 'fx-side-left' : 'fx-side-right')
+
+/**
+ * 按技能类型解析特效方位
+ * 攻击/减益/控制类作用于敌方 → 靠右（敌方一侧）
+ * 治疗/增益/防御/护盾类作用于我方 → 靠左（我方一侧）
+ */
+function resolveSide(type) {
+  if (['skill_attack', 'debuff', 'control'].includes(type)) return 'right'
+  return 'left'
+}
 
 // 技能名拆字：实现一字一字弹出效果（与 BossKillCinematic 一致，节奏更紧凑）
 const skillNameChars = computed(() => Array.from(skillName.value || ''))
@@ -265,8 +268,6 @@ function scheduleAutoHide() {
 
 watch(skillCastEvent, async (evt) => {
   if (!evt || !evt.ts || !evt.isBoss) return
-  // 仅在探索挂机页显示技能演出：切到背包/炼丹等其他页面时不弹特效
-  if (route.path !== '/exploration') return
   // 同技能冷却：5 秒内同名同角色不重复（避免每回合都弹同一个技能）
   const skillKey = `${evt.casterName}-${evt.skillName}`
   if (skillKey === lastSkillKey && evt.ts - lastCastTs < SAME_SKILL_COOLDOWN_MS) return
@@ -281,6 +282,9 @@ watch(skillCastEvent, async (evt) => {
   skillFx.value = c.fx || 'star'
   flashBg.value = c.flash
   glowBg.value = c.glow
+  // 按技能类型决定方位：攻击/debuff/control 靠敌方一侧，其余靠我方一侧
+  skillType.value = evt.skillType || 'skill_attack'
+  fxSide.value = resolveSide(skillType.value)
   // 重置淡出 class：先移除再在下一次 tick 加回，确保 animation-delay 重新计算
   skillFadeClass.value = ''
   animKey.value++
@@ -290,7 +294,7 @@ watch(skillCastEvent, async (evt) => {
   scheduleAutoHide()
 
   // PixiJS 序列帧播放（通用）：按 skillFx 类型查找已实现的序列帧
-  // 已实现 flames/vortex 走 WebGL，其余类型 generateFxFramesByType 返回 null → 回退 CSS
+  // 已实现 13 系全部走 WebGL，未知类型 generateFxFramesByType 返回 null → 回退 CSS
   // 关键修复：演出时机紧凑，必须用预热好的资源零延迟播放
   const frames = getFxFrames(c.fx)
   if (frames) {
@@ -302,7 +306,8 @@ watch(skillCastEvent, async (evt) => {
           fps: 24,
           tint: c.color,
           scale: 1,
-          loop: false
+          loop: false,
+          side: fxSide.value
         })
         usePixiFxFlag.value = ok  // true=隐藏 CSS 分支，false=回退 CSS
       } catch (e) {
@@ -325,7 +330,8 @@ watch(skillCastEvent, async (evt) => {
             fps: 24,
             tint: c.color,
             scale: 1,
-            loop: false
+            loop: false,
+            side: fxSide.value
           })
           usePixiFxFlag.value = ok
         } catch (e) {
@@ -340,18 +346,6 @@ watch(skillCastEvent, async (evt) => {
     fx.stop()
   }
 }, { deep: true })
-
-// 监听路由变化：特效播放中途切走到其他页面时立即隐藏
-watch(() => route.path, (newPath) => {
-  if (newPath !== '/exploration' && show.value) {
-    show.value = false
-    skillFadeClass.value = ''
-    if (hideTimerId) { clearTimeout(hideTimerId); hideTimerId = null }
-    // 同步停止 PixiJS 播放（避免切页后 WebGL canvas 残留）
-    usePixiFxFlag.value = false
-    fx.stop()
-  }
-})
 
 // 兜底隐藏触发时：show 变为 false 后，同步停止 PixiJS 播放
 // 通过 watch show 而非直接改 scheduleAutoHide，保证所有隐藏路径都覆盖
@@ -371,33 +365,34 @@ onUnmounted(() => {
 </script>
 
 <style scoped>
-/* PixiJS WebGL canvas：放在 .skill-cinematic 之前（teleport 根级）
-   z-index 9997 低于 .skill-cinematic(9998) 和 BossKillCinematic(9999)
-   火焰是背景特效，技能名字/光晕在火焰之上显示
-   注意：实际样式由 usePixiFx.ensureReady() 通过 inline style 设置，
-   scoped CSS 仅作占位，避免 canvas 闪烁 */
+/* PixiJS WebGL canvas：嵌入 BattleStage 内，absolute 覆盖战斗窗口
+   z-index 40 低于 .skill-cinematic(41)，特效在文字/光晕之下
+   position/inset 由 CSS 控制，usePixiFx.ensureReady 只设 opacity/transition */
 .pixi-fx-canvas {
-  position: fixed;
+  position: absolute;
   inset: 0;
+  width: 100%;
+  height: 100%;
   pointer-events: none;
-  z-index: 9997;
+  z-index: 40;
   opacity: 0;
 }
 
+/* 技能演出容器：嵌入 BattleStage，absolute 覆盖战斗窗口
+   --fx-x 控制特效横向锚点（左/右），由 .fx-side-left/right 切换 */
 .skill-cinematic {
-  position: fixed;
+  position: absolute;
   inset: 0;
-  z-index: 9998; /* 略低于 BossKillCinematic(9999)，避免击杀演出被技能演出遮挡 */
-  display: flex;
-  /* 偏下方显示：不遮挡顶部回合信息/HP条等，但也别太靠下 */
-  align-items: flex-end;
-  justify-content: center;
-  padding-bottom: 22vh;
+  z-index: 41;
   pointer-events: none;
   overflow: hidden;
-  /* 性能优化：强制创建合成层，整层 GPU 加速 */
+  --fx-x: 50%;
   transform: translateZ(0);
 }
+/* 攻击/debuff/control 靠敌方一侧（右侧） */
+.skill-cinematic.fx-side-right { --fx-x: 72%; }
+/* 治疗/buff/防御/shield 靠我方一侧（左侧） */
+.skill-cinematic.fx-side-left { --fx-x: 28%; }
 
 /* 全屏属性色光闪：0.4s 闪一下 */
 .skill-flash {
@@ -413,11 +408,15 @@ onUnmounted(() => {
   100% { opacity: 0; }
 }
 
-/* 中心光晕：聚气时的辐射光 */
+/* 中心光晕：聚气时的辐射光，锚点跟随方位 */
 .skill-glow {
   position: absolute;
-  width: 50vmin;
-  height: 50vmin;
+  left: var(--fx-x, 50%);
+  top: 50%;
+  width: 40vmin;
+  height: 40vmin;
+  margin-left: -20vmin;
+  margin-top: -20vmin;
   border-radius: 50%;
   opacity: 0;
   animation: skill-glow-anim 1.8s ease-out forwards;
@@ -431,10 +430,10 @@ onUnmounted(() => {
 }
 
 /* ============ 13 种属性系专属图形特效 ============ */
-/* 所有 fx 容器统一居中绝对定位 */
+/* 所有 fx 容器统一锚点跟随方位（--fx-x），垂直居中 */
 [class^="fx-"] {
   position: absolute;
-  left: 50%;
+  left: var(--fx-x, 50%);
   top: 50%;
   transform: translate(-50%, -50%);
   width: 0;

@@ -137,6 +137,9 @@
       </div>
     </div>
 
+    <!-- 技能释放特写演出：嵌入战斗窗口内，按技能类型分方位（攻击/debuff靠敌方一侧，治疗/buff/防御靠我方一侧） -->
+    <SkillCinematic />
+
     <!-- 吸血血链特效 -->
     <svg v-if="vampireChain.show" class="vampire-chain" viewBox="0 0 100 100" preserveAspectRatio="none">
       <path class="chain-path" d="M10,50 Q50,10 90,50" />
@@ -249,6 +252,7 @@ import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem.js'
 import { usePlayerStore } from '../stores/player.js'
 import { getMonsterAvatarSync, monsterManifestVersion } from '../plugins/monsters'
+import SkillCinematic from './SkillCinematic.vue'
 
 const props = defineProps({
   encounter: { type: Object, default: null }

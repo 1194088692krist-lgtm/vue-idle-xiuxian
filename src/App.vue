@@ -152,8 +152,6 @@
               :realm-color="breakthroughRealmColor"
               @complete="breakthroughVisible = false"
             />
-            <!-- 技能释放全屏特写演出：仅 BOSS 战中释放技能时触发 -->
-            <SkillCinematic />
 
             <!-- 调试日志面板：连击洞府名 5 次显示按钮，点按钮打开此面板 -->
             <teleport to="body">
@@ -223,7 +221,6 @@ import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
 import BossKillCinematic from './components/BossKillCinematic.vue'
 import BreakthroughEffect from './components/BreakthroughEffect.vue'
-import SkillCinematic from './components/SkillCinematic.vue'
 
   // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）
   const lightThemeOverrides = {

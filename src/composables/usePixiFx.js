@@ -26,6 +26,7 @@ let pixiModule = null       // PIXI 模块对象（动态 import 后缓存）
 let canvasEl = null         // 挂载到 body 的 canvas DOM
 let currentSprite = null    // 当前播放中的 AnimatedSprite
 let currentTextures = []    // 当前 sprite 的纹理数组（销毁用）
+let currentSide = 'center' // 当前精灵方位（resize 时复用）
 let tickerStarted = false   // ticker 是否运行中
 
 // Vue 响应式状态：暴露给组件判断
@@ -49,6 +50,23 @@ function detectWebGL() {
     webglAvailable.value = false
   }
   return webglAvailable.value
+}
+
+/**
+ * 获取 canvas 的实际显示尺寸（CSS 像素）
+ * - 外部 canvas（嵌入 BattleStage）：用 clientWidth/clientHeight，反映战斗窗口真实尺寸
+ *   这样 PixiJS 渲染分辨率与显示尺寸 1:1，精灵不会因全屏分辨率而被放大过巨
+ * - 自建 canvas（兜底全屏）：用 window.innerWidth/innerHeight
+ * - 0 尺寸兜底（组件刚挂载布局未结算）：回退 window 尺寸
+ * @returns {{width:number, height:number}}
+ */
+function getCanvasSize() {
+  if (canvasEl) {
+    const w = canvasEl.clientWidth
+    const h = canvasEl.clientHeight
+    if (w > 0 && h > 0) return { width: w, height: h }
+  }
+  return { width: window.innerWidth, height: window.innerHeight }
 }
 
 /**
@@ -76,20 +94,13 @@ async function ensureReady(externalCanvas) {
     const { Application } = pixiModule
 
     if (externalCanvas) {
-      // 使用外部 canvas：由 Vue 组件提供
-      // position:fixed 覆盖整个视口；z-index 9997 低于 .skill-cinematic(9998)
-      // 火焰是背景特效，技能名字/光晕在火焰之上显示
+      // 使用外部 canvas：由 Vue 组件提供，嵌入 BattleStage 内
+      // position/inset/z-index 由组件 scoped CSS 控制（absolute 定位覆盖 battle-stage）
+      // 此处只设运行时需要的 opacity/transition，避免 inline style 覆盖 CSS
       canvasEl = externalCanvas
-      canvasEl.style.cssText = [
-        'position:fixed',
-        'inset:0',
-        'width:100vw',
-        'height:100vh',
-        'pointer-events:none',
-        'z-index:9997',
-        'opacity:0',              // 空闲时不可见，演出开始才 opacity:1
-        'transition:opacity 0.1s'
-      ].join(';')
+      canvasEl.style.pointerEvents = 'none'
+      canvasEl.style.opacity = '0'
+      canvasEl.style.transition = 'opacity 0.1s'
     } else {
       // 兜底：自建 canvas 挂到 body 末尾
       canvasEl = document.createElement('canvas')
@@ -108,11 +119,13 @@ async function ensureReady(externalCanvas) {
     }
 
     // 创建 Application：用现有 canvas，透明背景，antialias=false（特效不需要抗锯齿，省 GPU）
+    // 渲染尺寸取 canvas 实际显示尺寸（嵌入 BattleStage 时为战斗窗口大小，非全屏）
+    const size = getCanvasSize()
     pixiApp = new Application()
     await pixiApp.init({
       canvas: canvasEl,
-      width: window.innerWidth,
-      height: window.innerHeight,
+      width: size.width,
+      height: size.height,
       backgroundAlpha: 0,
       antialias: false,
       resolution: 1,            // 不用 devicePixelRatio，避免移动端高清屏吃显存
@@ -162,19 +175,32 @@ function destroyTextures() {
 }
 
 /**
- * 处理窗口缩放：重新设置 renderer 尺寸
+ * 处理窗口缩放：重新设置 renderer 尺寸（取 canvas 实际显示尺寸）
  */
 function handleResize() {
   if (!pixiApp) return
-  pixiApp.renderer.resize(window.innerWidth, window.innerHeight)
+  const size = getCanvasSize()
+  pixiApp.renderer.resize(size.width, size.height)
   if (currentSprite) {
-    centerSprite(currentSprite)
+    centerSprite(currentSprite, currentSide)
   }
 }
 
-function centerSprite(sprite) {
+/**
+ * 定位精灵到指定方位
+ * @param {PIXI.Sprite} sprite
+ * @param {'left'|'right'|'center'} side  横向方位：
+ *   left=我方一侧，right=敌方一侧，center=居中
+ */
+function centerSprite(sprite, side = 'center') {
   sprite.anchor.set(0.5)
-  sprite.x = pixiApp.screen.width / 2
+  if (side === 'left') {
+    sprite.x = pixiApp.screen.width * 0.25
+  } else if (side === 'right') {
+    sprite.x = pixiApp.screen.width * 0.75
+  } else {
+    sprite.x = pixiApp.screen.width / 2
+  }
   // 略偏下：与 .skill-cinematic 的 padding-bottom:22vh 一致
   sprite.y = pixiApp.screen.height * 0.78
 }
@@ -246,9 +272,10 @@ async function loadTexture(url) {
  * @param {number}   opts.scale   缩放，默认 1
  * @param {Function} opts.onDone  播完回调
  * @param {boolean}  opts.loop    是否循环，默认 false（一次性演出）
+ * @param {'left'|'right'|'center'} opts.side  精灵横向方位：left=我方一侧，right=敌方一侧，默认 center
  * @returns {Promise<boolean>}    true=成功播放，false=加载失败
  */
-async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false }) {
+async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false, side = 'center' }) {
   if (!pixiApp || !pixiModule) return false
   if (!frames || frames.length === 0) return false
 
@@ -278,10 +305,21 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false })
     const sprite = new AnimatedSprite(textures)
     sprite.animationSpeed = fps / 60  // PIXI 8 以 60fps 为基准
     sprite.loop = loop
-    centerSprite(sprite)
+    currentSide = side
+    // 渲染分辨率同步：canvas 实际显示尺寸可能与初始化时不同
+    // （warmup 时 canvas 尺寸为 0 回退了窗口尺寸，或窗口缩放后未触发 resize）
+    // 播放前对齐一次，确保精灵坐标/缩放基于真实战斗窗口尺寸
+    const cur = getCanvasSize()
+    if (Math.abs(cur.width - pixiApp.screen.width) > 1 || Math.abs(cur.height - pixiApp.screen.height) > 1) {
+      pixiApp.renderer.resize(cur.width, cur.height)
+    }
+    centerSprite(sprite, side)
 
-    // 缩放：限制最大纹理尺寸后，根据屏幕高度自适应
-    const targetH = Math.min(window.innerHeight * 0.6, MAX_TEXTURE_SIZE * 2)
+    // 缩放：按 canvas（战斗窗口）高度自适应，限制最大纹理尺寸防爆显存
+    // 嵌入 BattleStage 后 canvas 高度远小于窗口，必须用 pixiApp.screen.height 而非 window.innerHeight，
+    // 否则精灵会被放得过大溢出战斗窗口
+    const canvasH = pixiApp.screen.height
+    const targetH = Math.min(canvasH * 0.6, MAX_TEXTURE_SIZE * 2)
     const baseH = textures[0]?.height || 256
     const autoScale = targetH / baseH
     sprite.scale.set(scale * autoScale)

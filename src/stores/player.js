@@ -3706,8 +3706,19 @@ export const usePlayerStore = defineStore('player', {
                   }
                 }
               }
-              breakthroughCount++
-              didBreakthrough = true
+              // 真正执行突破：递增 member.breakThrough、×1.2 数值、发放新技能
+              // 复用 breakThroughCharacter 统一逻辑（材料/灵石已在上方扣除，此处不重复扣）
+              if ((member.breakThrough || 0) < 5) {
+                const r = this.breakThroughCharacter(member.id)
+                if (r && r.success) {
+                  breakthroughCount++
+                  didBreakthrough = true
+                }
+              } else {
+                // 已封顶：仅计次数提示
+                breakthroughCount++
+                didBreakthrough = true
+              }
             }
           }
         }

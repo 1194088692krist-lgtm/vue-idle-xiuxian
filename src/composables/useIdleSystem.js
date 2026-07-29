@@ -2626,6 +2626,8 @@ async function executeRound(effectiveZone) {
           skillName: action.skillName,
           casterName: p.name,
           isBoss: true,
+          skillType: 'skill_attack',
+          casterSide: 'player',
           ts: Date.now()
         })
       }
@@ -2661,7 +2663,7 @@ async function executeRound(effectiveZone) {
       // 治疗/增益/防御类技能也收集事件，让所有角色的技能都能显示特写
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'heal', casterSide: 'player', ts: Date.now() })
       }
     } else if (action.type === 'buff') {
       // 增益技能：isTeam 时给全队加 buff，否则给目标
@@ -2679,7 +2681,7 @@ async function executeRound(effectiveZone) {
         roundLog.push(`✨ ${p.name}施展${action.skillName || '增益'}，${targetEntity.name}获得${action.buffType}（持续${action.duration}回合）`)
       }
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'buff', casterSide: 'player', ts: Date.now() })
       }
     } else if (action.type === 'defend') {
       const targetEntity = players.find(pl => pl.name === action.target?.name) || p
@@ -2687,7 +2689,7 @@ async function executeRound(effectiveZone) {
       roundLog.push(`🛡️ ${p.name}施展${action.skillName || '防御'}，为${targetEntity.name}展开防御姿态，防御提升`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'defend', casterSide: 'player', ts: Date.now() })
       }
     } else if (action.type === 'debuff') {
       // 减益技能：给敌人施加属性降低效果
@@ -2697,7 +2699,7 @@ async function executeRound(effectiveZone) {
       roundLog.push(`💀 ${p.name}施展${action.skillName || '减益'}，敌人${debuffName}降低（持续${action.duration}回合）`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'debuff', casterSide: 'player', ts: Date.now() })
       }
     } else if (action.type === 'control') {
       // 控制技能：眩晕 / 混乱（受概率判定）
@@ -2717,7 +2719,7 @@ async function executeRound(effectiveZone) {
         roundLog.push(`🔮 ${p.name}施展${action.skillName || '控制'}，但被敌人抵抗了`)
       }
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'control', casterSide: 'player', ts: Date.now() })
       }
     } else if (action.type === 'shield') {
       // 护盾技能：给目标添加护盾 buff（吸收伤害）
@@ -2726,7 +2728,7 @@ async function executeRound(effectiveZone) {
       roundLog.push(`🛡️ ${p.name}施展${action.skillName || '护盾'}，为${targetEntity.name}添加${action.value}点护盾（持续${action.duration}回合）`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
-        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, ts: Date.now() })
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'shield', casterSide: 'player', ts: Date.now() })
       }
     }
   }
