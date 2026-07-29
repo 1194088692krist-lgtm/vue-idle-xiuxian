@@ -389,10 +389,14 @@ onUnmounted(() => {
   --fx-x: 50%;
   transform: translateZ(0);
 }
-/* 攻击/debuff/control 靠敌方一侧（右侧） */
-.skill-cinematic.fx-side-right { --fx-x: 72%; }
-/* 治疗/buff/防御/shield 靠我方一侧（左侧） */
-.skill-cinematic.fx-side-left { --fx-x: 28%; }
+/* 攻击/debuff/control 靠敌方一侧（右侧）
+   BattleStage 布局：enemy-side max-width 30% 靠右，头像在 enemy-side 内居中，
+   实际头像中心约在 85% 处，特效锚点对齐到此位置贴近怪物头像 */
+.skill-cinematic.fx-side-right { --fx-x: 85%; }
+/* 治疗/buff/防御/shield 靠我方一侧（左侧）
+   BattleStage 布局：team-side max-width 46% 靠左，头像在 team-side 内居中，
+   实际头像中心约在 23% 处，特效锚点对齐到此位置贴近队员头像 */
+.skill-cinematic.fx-side-left { --fx-x: 23%; }
 
 /* 全屏属性色光闪：0.4s 闪一下 */
 .skill-flash {

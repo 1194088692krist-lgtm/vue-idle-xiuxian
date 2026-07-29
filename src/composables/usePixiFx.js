@@ -190,19 +190,23 @@ function handleResize() {
  * 定位精灵到指定方位
  * @param {PIXI.Sprite} sprite
  * @param {'left'|'right'|'center'} side  横向方位：
- *   left=我方一侧，right=敌方一侧，center=居中
+ *   left=我方一侧（贴近队员头像），right=敌方一侧（贴近怪物头像），center=居中
+ *   百分比与 SkillCinematic.vue 的 --fx-x 保持一致，确保 WebGL 精灵与 CSS 特效同位
  */
 function centerSprite(sprite, side = 'center') {
   sprite.anchor.set(0.5)
   if (side === 'left') {
-    sprite.x = pixiApp.screen.width * 0.25
+    // team-side(46%) 内头像居中，约在 23% 处
+    sprite.x = pixiApp.screen.width * 0.23
   } else if (side === 'right') {
-    sprite.x = pixiApp.screen.width * 0.75
+    // enemy-side(30% 靠右) 内头像居中，约在 85% 处
+    sprite.x = pixiApp.screen.width * 0.85
   } else {
     sprite.x = pixiApp.screen.width / 2
   }
-  // 略偏下：与 .skill-cinematic 的 padding-bottom:22vh 一致
-  sprite.y = pixiApp.screen.height * 0.78
+  // 垂直居中：与 SkillCinematic CSS 特效的 top:50% 对齐，
+  // 让 WebGL 精灵与 CSS 光晕/图形特效在同一垂直位置
+  sprite.y = pixiApp.screen.height / 2
 }
 
 // 纹理缓存：同一 url 不重复加载

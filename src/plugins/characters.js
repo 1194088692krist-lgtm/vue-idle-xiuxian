@@ -183,12 +183,17 @@ export const skinMap = reactive({})
 let skinsLoaded = false
 
 // 后台异步加载 skins.json（不阻塞游戏加载），填充 skinMap
-// skins.json 形如 { "char_001": 2, ... }，值为该角色可用皮肤数（不含原立绘）
+// skins.json 形如 { "char_001": 3, ... }，值为该角色可用皮肤数（不含原立绘）
+// 缓存策略修复：原用 cache:'force-cache' 会让浏览器强缓存旧版（如 count=2），
+// 导致 skinCount=2、maxSkinIndex 被钳制为 2，skin3 永远无法解锁显示。
+// 改用 cache:'no-cache' + URL 版本参数，确保每次启动都拿到最新 skins.json。
 export async function loadSkinsManifest() {
   if (skinsLoaded) return
   skinsLoaded = true
   const base = import.meta.env.BASE_URL || './'
-  fetch(`${base}portraits/skins.json`, { cache: 'force-cache' })
+  // ?v=3 硬缓存破坏：与 skins.json 内 _version v3 对应，升级到 v4 时改此参数
+  // no-cache：发 conditional request，服务器 304 才用缓存，200 用新版本
+  fetch(`${base}portraits/skins.json?v=3`, { cache: 'no-cache' })
     .then(res => {
       if (!res.ok) throw new Error(`HTTP ${res.status}`)
       return res.json()
@@ -202,7 +207,11 @@ export async function loadSkinsManifest() {
         })
       }
     })
-    .catch(e => console.warn('[skins] 加载 skins.json 失败，皮肤切换不可用:', e.message))
+    .catch(e => {
+      console.warn('[skins] 加载 skins.json 失败，皮肤切换不可用:', e.message)
+      // 失败时重置标志，允许下次重试（原实现提前置 true 导致永久不重试）
+      skinsLoaded = false
+    })
 }
 
 // 立绘资源加载状态：避免重复 fetch
