@@ -633,9 +633,12 @@ function showEvent(e) {
   }
 }
 
-// 每个动作（攻击/buff/回复/技能/战场情况）的播放时长：根据特效档位动态调整
-// high: 1秒/动作（完整节奏）；medium: 0.6秒（加速）；low: 0.3秒（极快，减少 DOM 更新频率和等待时间）
+// 每个动作（攻击/buff/回复/技能/战场情况）的播放时长
+// BOSS 战固定 1 秒/动作：3 玩家 × 1秒 + 怪物 1秒 = 4 秒/回合，降低手机负担
+// 普通战斗根据特效档位动态调整：high: 1秒；medium: 0.6秒；low: 0.3秒
 const ACTION_DELAY = computed(() => {
+  // BOSS 战不降档：每个玩家攻击占 1 秒，确保回合节奏清晰且手机负担可控
+  if (isBossFight.value) return 1000
   const q = playerStore.fxQuality
   if (q === 'low') return 300
   if (q === 'medium') return 600
@@ -1582,18 +1585,18 @@ onUnmounted(() => {
   left: 50%;
   transform: translateX(-50%);
   font-size: 16px;
-  font-weight: 700;
-  text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
-  animation: floatUp 1.6s ease-out forwards;
+  font-weight: 900;
+  font-family: "SimHei", "黑体", "Microsoft YaHei", "微软雅黑", sans-serif;
+  /* 纯黑描边，无 rgba 透明，确保任何背景下都清晰可读 */
+  text-shadow: 2px 2px 0 #000, -2px -2px 0 #000, 2px -2px 0 #000, -2px 2px 0 #000, 0 3px 4px #000;
+  animation: floatUp 3s ease-out forwards;
   z-index: 3;
   pointer-events: none;
   white-space: nowrap;
-  will-change: transform, opacity;
+  will-change: transform;
 }
 .float-damage.crit {
-  color: #fca5a5;
   font-size: 22px;
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.8), 0 1px 2px rgba(0,0,0,0.9);
 }
 .float-damage.normal { color: #fff; }
 .float-damage.counter { color: #93c5fd; }
@@ -1606,28 +1609,21 @@ onUnmounted(() => {
 .float-damage.shield-absorb {
   color: #38bdf8;
   font-size: 13px;
-  text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 1px 2px rgba(0,0,0,0.9);
   animation: floatUp 1.4s ease-out forwards;
 }
-/* 数值量级分档：<1万白色基础字号；1万~1亿橙黄色放大；>=1亿红色最大字号+强爽感动效 */
+/* 数值量级分档：<1万白色基础字号；1万~1亿橙色放大；>=1亿红色最大字号 */
 .float-damage.low { color: #fff; font-size: 16px; }
 .float-damage.mid {
   color: #f97316;
   font-size: 26px;
-  font-weight: 900;
-  font-family: "SimHei", "黑体", "Microsoft YaHei", "微软雅黑", sans-serif;
-  text-shadow: 0 0 8px rgba(249, 115, 22, 0.9), 0 0 4px rgba(249, 115, 22, 0.5), 0 2px 4px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.95);
-  animation: floatUp 2.2s ease-out forwards;
+  animation: floatUp 3s ease-out forwards;
 }
 .float-damage.high {
   color: #ef4444;
   font-size: 38px;
-  font-weight: 900;
-  font-family: "SimHei", "黑体", "Microsoft YaHei", "微软雅黑", sans-serif;
-  text-shadow: 0 0 14px rgba(239, 68, 68, 0.95), 0 0 24px rgba(239, 68, 68, 0.65), 0 0 6px rgba(239, 68, 68, 0.9), 0 2px 5px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,0.95);
-  animation: floatUpBig 2.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  animation: floatUpBig 3.4s ease-out forwards;
 }
-/* 暴击与量级叠加：暴击仍以红色描边为主，但字号跟随量级档（高量级暴击 = 极致爽感） */
+/* 暴击与量级叠加：字号跟随量级档（高量级暴击 = 极致爽感） */
 .float-damage.crit.mid { font-size: 30px; }
 .float-damage.crit.high { font-size: 44px; }
 /* 护盾吸收飘字定位偏移：避免与主伤害飘字重叠 */
@@ -1638,17 +1634,17 @@ onUnmounted(() => {
 }
 
 @keyframes floatUp {
-  0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
-  20% { transform: translateX(-50%) translateY(-8px) scale(1.05); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(1); }
+  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
+  85% { opacity: 1; transform: translateX(-50%) translateY(-35px); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-45px); }
 }
-/* 高量级（>=1亿）飘字：弹性放大→上浮淡出，强化"大数字砸下"的爽感 */
+/* 高量级（>=1亿）飘字：放大砸下→停留→消失 */
 @keyframes floatUpBig {
-  0% { opacity: 0.6; transform: translateX(-50%) translateY(8px) scale(0.5); }
-  10% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1.4); }
+  0% { opacity: 1; transform: translateX(-50%) translateY(8px) scale(0.6); }
+  12% { transform: translateX(-50%) translateY(-6px) scale(1.3); }
   25% { transform: translateX(-50%) translateY(-12px) scale(1); }
-  70% { opacity: 1; transform: translateX(-50%) translateY(-30px) scale(1); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-55px) scale(0.9); }
+  80% { opacity: 1; transform: translateX(-50%) translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-45px) scale(0.95); }
 }
 @keyframes dodgeFloat {
   0% { opacity: 1; transform: translateX(-50%) translateY(0); }
