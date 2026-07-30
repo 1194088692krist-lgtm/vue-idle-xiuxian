@@ -679,6 +679,7 @@ let idleInterval = null
 let idleTimer = null
 let visibilityHandler = null // 页面可见性监听器引用（息屏/切后台返回时补算挂机进度）
 let isRunning = false // 重入锁
+let isRunningSince = 0 // isRunning 加锁时间戳（死锁保护：超 30s 强制释放）
 let idleEncounterErrorCount = 0 // 挂机遭遇异常日志去重计数（避免刷屏）
 let isFinishingIdle = false // 挂机待结束标志：全队力竭后延迟结束期间置 true，阻止定时器再次触发遭遇
 let idleSessionId = 0 // 挂机会话 ID：每次 startIdle 递增，runIdleEncounter 捕获并校验，确保新挂机能中断上一场残留的遭遇循环
@@ -3917,8 +3918,24 @@ async function runIdleEncounter() {
     }
     if (!selectedZone.value) { idleDiag.value.lastStage = '跳过:selectedZone为空'; idleDiag.value.skipCount++; return }
   }
-  if (isRunning) { idleDiag.value.lastStage = '跳过:isRunning重入锁'; idleDiag.value.skipCount++; return }
+  // isRunning 死锁保护：后台节流可能导致 await setTimeout 长时间不返回，isRunning 卡死。
+  // 记录加锁时间，超过 30s（前台一场战斗最多 50 回合×3.5s=175s，但后台 animDelay=0 应秒完）
+  // 视为死锁，强制释放。正常战斗绝不会持续这么久（后台无动画延迟，前台有用户在看不卡）。
+  if (isRunning) {
+    if (isRunningSince > 0 && (Date.now() - isRunningSince) > 30000) {
+      console.warn('[useIdleSystem] isRunning 死锁超过 30s，强制释放', {
+        lastStage: idleDiag.value.lastStage,
+        hidden: document.hidden
+      })
+      isRunning = false
+    } else {
+      idleDiag.value.lastStage = '跳过:isRunning重入锁'
+      idleDiag.value.skipCount++
+      return
+    }
+  }
   isRunning = true
+  isRunningSince = Date.now()
   encounterAborted = false // 新一轮遭遇开始，清除上一场可能的超时中断标记
   const mySessionId = idleSessionId // 捕获当前挂机会话 ID，用于循环中校验是否已被新挂机中断
   const s = store()
@@ -4152,8 +4169,12 @@ async function runIdleEncounter() {
         currentIdleEnemy.value.dead = liveHP <= 0
       }
       // 等待 BattleStage 播完当前回合的攻击/受击动画再进入下一回合，
-      // 避免回合切换太快导致动画堆叠跳动
-      await new Promise(resolve => setTimeout(resolve, ROUND_ANIM_DELAY))
+      // 避免回合切换太快导致动画堆叠跳动。
+      // 后台/息屏时 setTimeout 被浏览器严重节流（最低 1s/次），一场 50 回合的战斗
+      // 若每回合等 3.5s 会耗时数分钟，isRunning 锁卡死导致后续遭遇全部跳过、挂机停滞。
+      // 后台时跳过动画等待（玩家看不到动画），让战斗逻辑快速推进，前台恢复正常动画延迟。
+      const animDelay = document.hidden ? 0 : ROUND_ANIM_DELAY
+      await new Promise(resolve => setTimeout(resolve, animDelay))
     }
     idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted
 
@@ -4481,14 +4502,21 @@ function startIdleTimers() {
   if (!visibilityHandler) {
     visibilityHandler = () => {
       if (document.visibilityState === 'visible') {
-        // 守卫：如果正在实时战斗中（含 BOSS 挑战），跳过补算，避免与实时战斗并发造成状态混乱
-        // 实时战斗有自己的 sessionId 校验机制，熄屏恢复后会自行继续或被新遭遇取代
-        if (isRunning || (currentEncounter.value && currentEncounter.value.inProgress)) {
+        // 修复后台挂机停滞：原逻辑在 isRunning=true 时直接 return 跳过补算，但后台时
+        // runIdleEncounter 可能卡在 await setTimeout(ROUND_ANIM_DELAY) 节流中，isRunning
+        // 长时间为 true，导致切回前台后补算永不触发、挂机彻底停滞。
+        // 现在即使 isRunning=true 也尝试补算：catchUpMissedEncounters 内部有 catchUpInProgress
+        // 防重入，且补算只补「漏掉的遭遇数」(expected - encounterCount)，不会与正在跑的
+        // 实时战斗重复发奖（实时战斗的 idleEncounterCount 已在 runIdleEncounter 入口自增）。
+        // 若正在实时战斗中（含 BOSS 挑战），跳过补算避免与实时战斗并发造成状态混乱——
+        // 实时战斗有自己的 sessionId 校验机制，熄屏恢复后会自行继续或被新遭遇取代。
+        const inRealtimeCombat = currentEncounter.value && currentEncounter.value.inProgress
+        if (inRealtimeCombat) {
           return
         }
         // 防抖：亮屏后延迟 200ms 再补算，避免某些浏览器连续触发 visibilitychange
         setTimeout(() => {
-          if (document.visibilityState === 'visible' && !isRunning) {
+          if (document.visibilityState === 'visible' && !isFinishingIdle) {
             catchUpMissedEncounters({ forceFinish: false })
           }
         }, 200)
@@ -4506,6 +4534,20 @@ function startIdleTimers() {
     const min = Math.floor(remaining / 60000)
     const sec = Math.floor((remaining % 60000) / 1000)
     idleTimeRemaining.value = `${min}:${String(sec).padStart(2, '0')}`
+    // 后台漏算主动检测：页面隐藏时 setInterval(runIdleEncounter, 5s) 被浏览器节流到可能
+    // 60s+ 才触发一次甚至不触发，遭遇数严重落后墙钟。idleTimer(1s) 虽也被节流但比 5s 间隔
+    // 更可能触发，在此检测漏掉的遭遇数，若 >= 3 场则主动补算，避免回到前台才一次性补算。
+    // 不在实时战斗中才补（inProgress=true 时实时战斗自己会推进，补算会重复发奖）。
+    if (document.hidden && !catchUpInProgress && !isFinishingIdle) {
+      const idleState = store().idleExploration
+      if (idleState && idleState.isActive) {
+        const expectedNow = Math.floor((Date.now() - idleState.startTime) / ENCOUNTER_INTERVAL)
+        const missedNow = expectedNow - idleState.encounterCount
+        if (missedNow >= 3 && !(currentEncounter.value && currentEncounter.value.inProgress)) {
+          catchUpMissedEncounters({ forceFinish: false })
+        }
+      }
+    }
     // 按轮阶段：进入某轮的 BOSS 窗口且本轮尚未刷过 BOSS 时，立即刷新 BOSS（避免等 2.5s 定时才有首场）
     const elapsedMs = Math.max(0, elapsed * 1000)
     const roundIndex = Math.floor(elapsedMs / IDLE_ROUND_MS)
