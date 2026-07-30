@@ -4194,7 +4194,10 @@ async function runIdleEncounter() {
       // 后台/息屏时 setTimeout 被浏览器严重节流（最低 1s/次），一场 50 回合的战斗
       // 若每回合等 3.5s 会耗时数分钟，isRunning 锁卡死导致后续遭遇全部跳过、挂机停滞。
       // 后台时跳过动画等待（玩家看不到动画），让战斗逻辑快速推进，前台恢复正常动画延迟。
-      const animDelay = document.hidden ? 0 : ROUND_ANIM_DELAY
+      // 低特效档位下减少等待时间（动画播放更快），减少 JS 定时器和 DOM 更新频率
+      const fxq = store().fxQuality
+      const baseDelay = fxq === 'low' ? 800 : fxq === 'medium' ? 2000 : ROUND_ANIM_DELAY
+      const animDelay = document.hidden ? 0 : baseDelay
       await new Promise(resolve => setTimeout(resolve, animDelay))
     }
     idleDiag.value.lastFinished = 'finished=' + roundResult.finished + ',victory=' + roundResult.victory + ',rounds=' + roundsExecuted

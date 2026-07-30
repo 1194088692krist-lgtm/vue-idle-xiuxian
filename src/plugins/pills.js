@@ -467,16 +467,38 @@ export const getPillsByZone = (zoneId) => {
   return recipeIds.map(id => pillRecipes.find(r => r.id === id)).filter(Boolean)
 }
 
-// 中高等级丹药（grade4+）素材需求量提升 5~10 倍：
-// grade4×5, grade5×6, grade6×7, grade7×8, grade8×10
-// 提升后高品阶丹药更难合成，拉长中后期炼丹玩法寿命，同时消耗挂机产出素材。
-// 低品阶（grade1~3）保持原量不变，保护新手体验。
-const GRADE_MATERIAL_SCALE = { grade4: 5, grade5: 6, grade6: 7, grade7: 8, grade8: 10 }
+// 丹药素材需求统一配置：
+// 1. 灵草(herb)和矿料(ore)按品阶统一数量（一品2个 → 七品25个）
+// 2. 移除灵液/妖丹/至宝等非核心素材，简化配方为"灵草+矿料+BOSS素材"
+// 3. 四品及以上需对应秘境的BOSS专属素材（kind: 'boss_material'），按秘境稀有度递增：
+//    四品→鬼荒原(骨器) / 五品→冰雪宫(玄冰龙鳞) / 六品→仙墟(太古仙髓) / 七品→混沌界(原始混沌精血)
+//    八品复用混沌界素材（最稀有BOSS素材）
+const GRADE_MATERIAL_COUNT = {
+  grade1: 2, grade2: 4, grade3: 8, grade4: 12,
+  grade5: 16, grade6: 20, grade7: 25, grade8: 30
+}
+const GRADE_BOSS_MATERIAL = {
+  grade4: { id: 'bone_artifact', name: '骨器', description: '白骨炼制的法器' },
+  grade5: { id: 'frost_dragon_scale', name: '玄冰龙鳞', description: '玄冰祖龙的鳞片，蕴含极寒龙威' },
+  grade6: { id: 'ancient_immortal_marrow', name: '太古仙髓', description: '太古仙人的精华髓液，蕴含大道之韵' },
+  grade7: { id: 'primordial_chaos_essence', name: '原始混沌精血', description: '混沌未开之前的本源精血，蕴含创世之力' },
+  grade8: { id: 'primordial_chaos_essence', name: '原始混沌精血', description: '混沌未开之前的本源精血，蕴含创世之力' }
+}
 pillRecipes.forEach(recipe => {
-  const scale = GRADE_MATERIAL_SCALE[recipe.grade]
-  if (scale && recipe.materials) {
-    recipe.materials = recipe.materials.map(m => ({ ...m, count: m.count * scale }))
+  const count = GRADE_MATERIAL_COUNT[recipe.grade]
+  if (!count || !recipe.materials) return
+  // 仅保留灵草和矿料，移除灵液/妖丹/至宝等非核心素材
+  const herbs = recipe.materials.filter(m => m.kind === 'herb')
+  const ores = recipe.materials.filter(m => m.kind === 'ore')
+  const newMaterials = []
+  herbs.forEach(h => newMaterials.push({ kind: 'herb', id: h.id, count }))
+  ores.forEach(o => newMaterials.push({ kind: 'ore', id: o.id, count }))
+  // 四品及以上添加对应秘境的BOSS专属素材
+  const bossMat = GRADE_BOSS_MATERIAL[recipe.grade]
+  if (bossMat) {
+    newMaterials.push({ kind: 'boss_material', id: bossMat.id, count: 1 })
   }
+  recipe.materials = newMaterials
 })
 
 export const getZoneByPill = (pillId) => {

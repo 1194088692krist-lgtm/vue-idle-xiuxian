@@ -389,13 +389,16 @@ const battleLogDisplay = computed(() => {
 
 // 实时战斗日志弹窗数据源：直接复用 useIdleSystem 中的 displayLogs
 // 挂机中 = logs.value（实时累积），挂机结束 = lastSummary.value.logs（本次挂机快照）
+// 限制渲染数量为最后 50 条，避免挂机久后 DOM 节点过多导致卡顿（logs 内部仍保留完整 400 条）
 const realtimeLogEntries = computed(() => {
   const arr = displayLogs.value || []
+  const MAX_RENDER = 50
+  const sliced = arr.length > MAX_RENDER ? arr.slice(-MAX_RENDER) : arr
   // 把字符串数组（手动战斗回退场景）也包装为统一结构
-  if (arr.length && typeof arr[0] === 'string') {
-    return arr.map(t => ({ time: '', text: t, type: logType(t), parts: null, avatar: null, detail: null }))
+  if (sliced.length && typeof sliced[0] === 'string') {
+    return sliced.map(t => ({ time: '', text: t, type: logType(t), parts: null, avatar: null, detail: null }))
   }
-  return arr
+  return sliced
 })
 
 // 清空实时日志：调用 useIdleSystem 暴露的方法，同步清理 logs 与 lastSummary.logs
@@ -630,8 +633,14 @@ function showEvent(e) {
   }
 }
 
-// 每个动作（攻击/buff/回复/技能/战场情况）的播放时长：1 秒/动作，节奏紧凑且不频闪
-const ACTION_DELAY = 1000
+// 每个动作（攻击/buff/回复/技能/战场情况）的播放时长：根据特效档位动态调整
+// high: 1秒/动作（完整节奏）；medium: 0.6秒（加速）；low: 0.3秒（极快，减少 DOM 更新频率和等待时间）
+const ACTION_DELAY = computed(() => {
+  const q = playerStore.fxQuality
+  if (q === 'low') return 300
+  if (q === 'medium') return 600
+  return 1000
+})
 // 播放锁：防止上一回合动画未播完时下一回合重叠调用导致人物抖动
 let isPlayingRound = false
 
@@ -707,7 +716,7 @@ async function playOneRoundEvents(roundNum) {
     // 正向展示：每播放一个事件后，根据事件快照推进显示血量
     // defenderHP/attackerHP 是事件发生后的血量快照，逐步推进实现血条渐变
     advanceDisplayHp(e)
-    await delay(ACTION_DELAY)
+    await delay(ACTION_DELAY.value)
   }
 }
 
@@ -2320,17 +2329,23 @@ html.fx-low .bleed-overlay::before, html.fx-low .bleed-overlay::after,
 html.fx-low .poison-overlay::before, html.fx-low .poison-overlay::after,
 html.fx-low .pet-aura-orb,
 html.fx-low .shield-overlay::before,
+html.fx-low .shield-overlay::after,
+html.fx-low .stun-stars,
+html.fx-low .drop-orb,
 html.fx-low .rt-log-item.drop-epic,
 html.fx-low .rt-log-item.drop-legendary,
 html.fx-low .rt-log-item.drop-mythic,
-html.fx-low .rt-log-item.drop-mythic .rt-log-part {
-  animation: none;
+html.fx-low .rt-log-item.drop-mythic .rt-log-part,
+html.fx-low .rt-log-item .rt-log-part {
+  animation: none !important;
 }
 html.fx-low .frozen-overlay,
 html.fx-low .burn-overlay,
 html.fx-low .shock-overlay::before,
-html.fx-low .shield-overlay::after,
-html.fx-low .screen-shake { animation: none; }
+html.fx-low .screen-shake { animation: none !important; }
+/* 低档：禁用日志列表 TransitionGroup 过渡动画，减少高频 DOM 操作 */
+html.fx-low .log-fade-enter-active,
+html.fx-low .log-fade-leave-active { transition: none !important; }
 
 /* 中档：装饰粒子保留但降频（周期延长 2~3 倍），减少每秒 GPU 合成刷新次数 */
 html.fx-medium .frozen-overlay::before, html.fx-medium .frozen-overlay::after,

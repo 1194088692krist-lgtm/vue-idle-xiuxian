@@ -1242,12 +1242,15 @@ const {
 const showSummaryLog = ref(false)
 const summaryLogBody = ref(null)
 // 复用 BattleStage 的数据源：挂机结束后 displayLogs 自动切换到 lastSummary.logs 快照
+// 限制渲染数量为最后 50 条，避免挂机久后 DOM 节点过多导致卡顿
 const summaryLogEntries = computed(() => {
   const arr = displayLogs.value || []
-  if (arr.length && typeof arr[0] === 'string') {
-    return arr.map(t => ({ type: 'info', text: t, time: '', avatar: null }))
+  const MAX_RENDER = 50
+  const sliced = arr.length > MAX_RENDER ? arr.slice(-MAX_RENDER) : arr
+  if (sliced.length && typeof sliced[0] === 'string') {
+    return sliced.map(t => ({ type: 'info', text: t, time: '', avatar: null }))
   }
-  return arr
+  return sliced
 })
 // 弹窗打开时滚动到底部
 watch(() => showSummaryLog.value, (v) => {
