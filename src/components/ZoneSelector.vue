@@ -1326,12 +1326,26 @@ const selectAllIdlePills = () => {
 }
 const confirmPillsAndStart = () => {
   // 服用已选丹药（全局 buff 类不需要 memberId）
+  // 用 try/catch 包裹，防止单颗丹药服用异常导致后续 startIdle 不触发卡死
   const selected = availableIdlePills.value.filter(p => p.consumed)
-  for (const p of selected) {
-    playerStore.consumePill(p.pillId)
+  try {
+    for (const p of selected) {
+      const r = playerStore.consumePill(p.pillId)
+      if (r && !r.success) {
+        // 丹药不足或未知：跳过该颗，继续下一颗，不让单颗失败阻塞挂机
+        console.warn('[丹药] 服用失败，跳过：', p.name, r.message)
+      }
+    }
+  } catch (e) {
+    console.error('[丹药] 服用异常，继续启动挂机：', e)
   }
+  // 先关闭弹窗，再启动挂机；避免弹窗未关闭时 startIdle 内部同步触发 runIdleEncounter
+  // 导致 UI 渲染阻塞，出现"点击后卡死无响应"现象
   showPillSelectModal.value = false
-  startIdle(selectedDuration.value)
+  // 用 setTimeout(0) 让弹窗关闭先渲染，再启动挂机，避免同步阻塞主线程
+  setTimeout(() => {
+    startIdle(selectedDuration.value)
+  }, 0)
 }
 
 // 匹配度配色
@@ -3821,8 +3835,19 @@ onUnmounted(() => {
   line-height: 1.4;
   vertical-align: middle;
 }
-/* 丹药选择弹窗 */
-.pill-select-modal { max-width: 420px; width: 90%; }
+/* 丹药选择弹窗：强制居中显示，避免在页面下方出现看不到 */
+.modal-overlay {
+  position: fixed;
+  inset: 0;
+  background: rgba(0, 0, 0, 0.75);
+  backdrop-filter: blur(6px);
+  z-index: 2000;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  padding: 16px;
+}
+.pill-select-modal { max-width: 420px; width: 90%; max-height: 80vh; overflow-y: auto; }
 .pill-select-tip-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
 .pill-select-tip { font-size: 13px; color: #C9C4BA; margin: 0; }
 .btn-select-all { padding: 4px 12px; font-size: 12px; white-space: nowrap; }

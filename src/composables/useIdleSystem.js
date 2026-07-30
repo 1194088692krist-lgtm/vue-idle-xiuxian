@@ -1966,10 +1966,17 @@ async function runBossChallenge(zoneId, bossId, count) {
       // 发出击杀事件：触发立绘突入动画（手动 BOSS 挑战路径）
       // 修复：原用 typeof players !== 'undefined' 检查，但 players 在本作用域未定义，
       // 永远走 null 分支。改为直接读 currentEncounter.value.players（与挂机路径一致）
-      const killer = roundResult.lastPlayerAttacker
-        || currentEncounter.value.players.find(p => p.currentHealth > 0)
-        || currentEncounter.value.players[0]
-        || null
+      // 击杀立绘展示对象：按存活出战角色概率随机选择，避免固定单个角色立绘刷屏。
+      const _alivePlayers = (currentEncounter.value.players || []).filter(p => p && p.currentHealth > 0)
+      const _lastAttacker = roundResult.lastPlayerAttacker
+      let killer
+      if (_alivePlayers.length === 0) {
+        killer = _lastAttacker || currentEncounter.value.players[0] || null
+      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.7) {
+        killer = _lastAttacker
+      } else {
+        killer = _alivePlayers[Math.floor(Math.random() * _alivePlayers.length)]
+      }
       const killEvt = {
         killerMemberId: killer?.memberId || null,
         killerName: killer?.name || '',
@@ -2278,10 +2285,17 @@ async function runCharacterBossChallenge(characterId, count) {
     if (victory) {
       result.victories++
       // 击杀事件（人物 BOSS 击杀立绘演出）
-      const killer = roundResult.lastPlayerAttacker
-        || currentEncounter.value.players.find(p => p.currentHealth > 0)
-        || currentEncounter.value.players[0]
-        || null
+      // 按存活出战角色概率随机选择展示对象，避免固定单个角色立绘刷屏。
+      const _alivePlayers = (currentEncounter.value.players || []).filter(p => p && p.currentHealth > 0)
+      const _lastAttacker = roundResult.lastPlayerAttacker
+      let killer
+      if (_alivePlayers.length === 0) {
+        killer = _lastAttacker || currentEncounter.value.players[0] || null
+      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.7) {
+        killer = _lastAttacker
+      } else {
+        killer = _alivePlayers[Math.floor(Math.random() * _alivePlayers.length)]
+      }
       const killEvt = {
         killerMemberId: killer?.memberId || null,
         killerName: killer?.name || '',
@@ -4052,9 +4066,21 @@ async function runIdleEncounter() {
         // 抛 ReferenceError 被 try/catch 静默吞掉，导致 bossKillEvent 永不赋值、立绘动画不显示，
         // 且连带跳过后续 bossSpawned 复位与奖励发放。改为使用 roundResult.lastPlayerAttacker
         // 与 encounter.players（与手动 BOSS 挑战路径 line 1594 写法一致）
-        const killer = roundResult.lastPlayerAttacker
-          || encounter.players.find(p => p.currentHealth > 0)
-          || encounter.players[0]
+        // 击杀立绘展示对象：按存活出战角色概率随机选择，避免固定单个角色立绘刷屏。
+        // 优先尊重真实最后一击者（70% 概率），否则从存活出战角色中随机挑选，
+        // 让所有参与战斗的存活角色都有机会展示立绘。
+        const alivePlayers = (encounter.players || []).filter(p => p && p.currentHealth > 0)
+        const lastAttacker = roundResult.lastPlayerAttacker
+        let killer
+        if (alivePlayers.length === 0) {
+          killer = lastAttacker || encounter.players[0]
+        } else if (lastAttacker && alivePlayers.some(p => p.memberId === lastAttacker.memberId) && Math.random() < 0.7) {
+          // 70% 概率使用真实最后一击者（若其仍存活）
+          killer = lastAttacker
+        } else {
+          // 30% 概率（或最后一击者已阵亡）从存活角色中随机挑选
+          killer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
+        }
         const killEvt = {
           killerMemberId: killer?.memberId || null,
           killerName: killer?.name || '',

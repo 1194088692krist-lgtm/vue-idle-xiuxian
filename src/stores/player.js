@@ -1118,6 +1118,39 @@ export const usePlayerStore = defineStore('player', {
         delete ie.stats
         payload.idleExploration = ie
       }
+      // 5. 商店可重建 items：黑市/皮肤/BOSS券商店的商品列表由 rollXxx 生成，
+      //    登录后访问商店时自动重新刷新（items 为空或超 24h 自动刷新），无需上传云端。
+      //    仅保留当日计数（refreshCount/refreshResetDay）和刷新时间戳。
+      if (payload.shopState) {
+        const ss = { ...payload.shopState }
+        delete ss.blackMarketItems
+        payload.shopState = ss
+      }
+      if (payload.skinShopState) {
+        const sks = { ...payload.skinShopState }
+        delete sks.items
+        payload.skinShopState = sks
+      }
+      if (payload.bossTicketShopState) {
+        const bts = { ...payload.bossTicketShopState }
+        delete bts.items
+        payload.bossTicketShopState = bts
+      }
+      // 6. sectMembers 临时战斗态瘦身：currentHealth/currentSp/tempBuffs 是战斗运行时态，
+      //    重载后由 buildTeamMemberState 重置为满血满气，无需上传云端。
+      //    注意：combatAttributes/combatResistance/specialAttributes 虽为派生属性，
+      //    但 recalculateMemberBaseStats 只重算 baseStats，这些字段保留以免恢复后 NaN。
+      if (Array.isArray(payload.sectMembers) && payload.sectMembers.length > 0) {
+        payload.sectMembers = payload.sectMembers.map(m => {
+          if (!m || typeof m !== 'object') return m
+          const slim = { ...m }
+          // 临时战斗态：重载时由 buildTeamMemberState 重置
+          delete slim.currentHealth
+          delete slim.currentSp
+          delete slim.tempBuffs
+          return slim
+        })
+      }
       return payload
     },
     // 并发锁：防止手动上传与自动节流同步同时进行导致 last-write-wins 覆盖
