@@ -412,6 +412,40 @@
           </div>
         </div>
 
+        <!-- 装备区域（可直接强化，无需脱下） -->
+        <div class="attr-block" v-if="detailMember?.equippedArtifacts">
+          <h4 class="sub-title">装备（点击强化）</h4>
+          <div class="detail-equip-grid">
+            <div
+              v-for="slot in slots"
+              :key="'detail_'+slot"
+              class="detail-equip-slot"
+              :class="{
+                empty: !detailMember.equippedArtifacts?.[slot],
+                [`equip-border-${detailMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: detailMember.equippedArtifacts?.[slot]
+              }"
+            >
+              <div class="detail-equip-label">{{ slotNames[slot] }}</div>
+              <div v-if="detailMember.equippedArtifacts?.[slot]" class="detail-equip-content">
+                <div
+                  class="detail-equip-name"
+                  :style="{ color: getItemColor(detailMember.equippedArtifacts[slot]) }"
+                >
+                  {{ detailMember.equippedArtifacts[slot].name }}
+                  <span v-if="detailMember.equippedArtifacts[slot].enhanceLevel > 0" class="enhance-lv">+{{ detailMember.equippedArtifacts[slot].enhanceLevel }}</span>
+                </div>
+                <button
+                  class="btn btn-small btn-primary detail-enhance-btn"
+                  @click="handleDetailEnhance(slot)"
+                >
+                  强化
+                </button>
+              </div>
+              <div v-else class="detail-equip-empty">空</div>
+            </div>
+          </div>
+        </div>
+
         <!-- 三段式小传 -->
         <div class="attr-block" v-if="detailBiography">
           <h4 class="sub-title">人物小传</h4>
@@ -918,6 +952,18 @@ const viewMemberDetail = (id, event) => {
 
 const closeMemberDetail = () => {
   showMemberDetailModal.value = false
+}
+
+// 详情弹窗内直接强化成员装备（无需脱下）
+const handleDetailEnhance = (slot) => {
+  if (!detailMember.value?.equippedArtifacts?.[slot]) return
+  const equip = detailMember.value.equippedArtifacts[slot]
+  const result = playerStore.enhanceMemberEquipment(detailMember.value.id, slot)
+  if (result.success) {
+    message.success(`强化成功！${equip.name} +${equip.enhanceLevel}`)
+  } else {
+    message.error(`强化失败：${result.message}`)
+  }
 }
 
 // 立绘查看器：复用抽卡角色立绘大图弹窗
@@ -1909,6 +1955,29 @@ watch([allMembers, teamMembers], () => {
   background-repeat: no-repeat;
   background-position: center center;
 }
+/* 详情弹窗装备网格（含强化按钮） */
+.detail-equip-grid {
+  display: grid;
+  grid-template-columns: repeat(3, 1fr);
+  gap: 8px;
+}
+.detail-equip-slot {
+  display: flex;
+  flex-direction: column;
+  padding: 8px 6px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+  border: 1px solid rgba(218, 165, 32, 0.2);
+  min-height: 70px;
+  text-align: center;
+}
+.detail-equip-slot.empty { border-style: dashed; border-color: rgba(255,255,255,0.1); }
+.detail-equip-label { font-size: 11px; color: #C9C4BA; margin-bottom: 4px; }
+.detail-equip-content { display: flex; flex-direction: column; gap: 4px; align-items: center; }
+.detail-equip-name { font-size: 12px; font-weight: bold; line-height: 1.3; }
+.detail-equip-name .enhance-lv { color: #7CFC00; font-size: 11px; }
+.detail-equip-empty { font-size: 12px; color: #666; }
+.detail-enhance-btn { padding: 2px 12px; font-size: 12px; }
 .equip-slot:hover {
   border-color: rgba(218, 165, 32, 0.5);
   background-color: rgba(0, 0, 0, 0.3);

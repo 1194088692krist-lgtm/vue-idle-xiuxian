@@ -90,11 +90,17 @@
         <div class="impact-diamond d3" :style="{ borderColor: skillColor }"></div>
         <div class="impact-core" :style="{ background: skillColor }"></div>
       </div>
-      <!-- 阵法系：旋转六芒星阵 -->
+      <!-- 阵法系：符箓六芒星阵（双三角反向旋转 + 外圈符文 + 中心脉冲） -->
       <div v-else-if="skillFx === 'hexagram' && !usePixiFxFlag" :key="`fx-${animKey}`" class="fx-hexagram">
-        <div class="hexagram-circle" :style="{ borderColor: skillColor }"></div>
-        <div class="hexagram-triangle up" :style="{ borderColor: skillColor }"></div>
-        <div class="hexagram-triangle down" :style="{ borderColor: skillColor }"></div>
+        <div class="hex-outer-ring" :style="{ borderColor: skillColor }"></div>
+        <div class="hex-rune-ring" :style="{ borderColor: skillColor }"></div>
+        <div class="hex-tri-up" :style="{ '--tri-color': skillColor }"></div>
+        <div class="hex-tri-down" :style="{ '--tri-color': skillColor }"></div>
+        <div class="hex-core" :style="{ background: skillColor, boxShadow: '0 0 30px ' + skillColor }"></div>
+        <div class="hex-spark spark1" :style="{ background: skillColor }"></div>
+        <div class="hex-spark spark2" :style="{ background: skillColor }"></div>
+        <div class="hex-spark spark3" :style="{ background: skillColor }"></div>
+        <div class="hex-spark spark4" :style="{ background: skillColor }"></div>
       </div>
 
       <!-- 技能名四字特写：逐字砸入出现，全部到齐后整体一起消失 -->
@@ -795,65 +801,117 @@ onUnmounted(() => {
   100% { opacity: 0; transform: scale(0.5); }
 }
 
-/* 阵法系：旋转六芒星阵（外圆 + 上下三角） */
-.fx-hexagram { width: 50vmin; height: 50vmin; }
-.hexagram-circle {
+/* 阵法系：符箓六芒星阵（双三角反向旋转 + 外圈符文环 + 中心脉冲 + 灵力火花） */
+.fx-hexagram {
+  width: 50vmin;
+  height: 50vmin;
+  position: relative;
+}
+/* 外圆环：缓慢收缩旋转 */
+.hex-outer-ring {
   position: absolute;
   inset: 0;
-  border: 3px solid;
+  border: 2px solid;
   border-radius: 50%;
   opacity: 0;
-  animation: hexagram-circle-in 1.8s ease-out forwards;
-  will-change: opacity, transform;
+  animation: hex-ring-in 1.8s ease-out forwards;
 }
-.hexagram-triangle {
+/* 内符文环：虚线反向旋转，模拟符箓流转 */
+.hex-rune-ring {
   position: absolute;
-  inset: 10%;
-  border: 3px solid;
+  inset: 12%;
+  border: 2px dashed;
+  border-radius: 50%;
+  opacity: 0;
+  animation: hex-rune-in 1.8s ease-out 0.2s forwards, hex-rune-spin 3s linear 0.2s infinite;
+}
+/* 正三角（向上）：顺时针旋转，clip-path 绘制实心+描边感 */
+.hex-tri-up {
+  position: absolute;
+  inset: 18%;
+  background: var(--tri-color);
+  clip-path: polygon(50% 0%, 100% 100%, 0% 100%);
+  opacity: 0;
+  animation: hex-tri-up-in 1.6s ease-out 0.3s forwards, hex-tri-cw 4s linear 0.3s infinite;
+  mix-blend-mode: screen;
+}
+/* 倒三角（向下）：逆时针旋转，与正三角交错成六芒星 */
+.hex-tri-down {
+  position: absolute;
+  inset: 18%;
+  background: var(--tri-color);
+  clip-path: polygon(0% 0%, 100% 0%, 50% 100%);
+  opacity: 0;
+  animation: hex-tri-down-in 1.6s ease-out 0.4s forwards, hex-tri-ccw 4s linear 0.4s infinite;
+  mix-blend-mode: screen;
+}
+/* 中心阵眼：脉冲发光 */
+.hex-core {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 6vmin;
+  height: 6vmin;
+  border-radius: 50%;
+  transform: translate(-50%, -50%);
+  opacity: 0;
+  animation: hex-core-pulse 1.4s ease-in-out 0.5s infinite;
+}
+/* 灵力火花：四方向飞溅 */
+.hex-spark {
+  position: absolute;
+  top: 50%;
+  left: 50%;
+  width: 2vmin;
+  height: 2vmin;
+  border-radius: 50%;
   opacity: 0;
 }
-.hexagram-triangle.up {
-  border-bottom: 0;
-  border-left: 0;
-  border-right: 0;
-  border-top: 3px solid;
-  /* 等边三角向上 */
-  width: 0;
-  height: 0;
-  border-left: 20vmin solid transparent;
-  border-right: 20vmin solid transparent;
-  border-top: 0;
-  border-bottom: 35vmin solid;
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: hexagram-tri-in 1.6s ease-out 0.3s forwards;
+.spark1 { animation: hex-spark-fly 1.2s ease-out 0.6s forwards; --dx: 20vmin; --dy: 0; }
+.spark2 { animation: hex-spark-fly 1.2s ease-out 0.6s forwards; --dx: -20vmin; --dy: 0; }
+.spark3 { animation: hex-spark-fly 1.2s ease-out 0.6s forwards; --dx: 0; --dy: 20vmin; }
+.spark4 { animation: hex-spark-fly 1.2s ease-out 0.6s forwards; --dx: 0; --dy: -20vmin; }
+
+@keyframes hex-ring-in {
+  0% { opacity: 0; transform: scale(1.5); }
+  30% { opacity: 0.9; }
+  100% { opacity: 0; transform: scale(1); }
 }
-.hexagram-triangle.down {
-  width: 0;
-  height: 0;
-  border-left: 20vmin solid transparent;
-  border-right: 20vmin solid transparent;
-  border-top: 35vmin solid;
-  border-bottom: 0;
-  inset: auto;
-  top: 50%;
-  left: 50%;
-  transform: translate(-50%, -50%);
-  animation: hexagram-tri-in 1.6s ease-out 0.5s forwards;
-}
-@keyframes hexagram-circle-in {
-  0% { opacity: 0; transform: rotate(0) scale(0.3); }
-  30% { opacity: 1; }
-  70% { opacity: 0.8; transform: rotate(180deg) scale(1); }
-  100% { opacity: 0; transform: rotate(360deg) scale(1.2); }
-}
-@keyframes hexagram-tri-in {
+@keyframes hex-rune-in {
   0% { opacity: 0; }
-  30% { opacity: 1; }
-  70% { opacity: 0.8; }
+  30% { opacity: 0.7; }
   100% { opacity: 0; }
+}
+@keyframes hex-rune-spin {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes hex-tri-up-in {
+  0% { opacity: 0; transform: scale(0.2); }
+  25% { opacity: 0.85; }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes hex-tri-down-in {
+  0% { opacity: 0; transform: scale(0.2); }
+  25% { opacity: 0.85; }
+  100% { opacity: 0; transform: scale(1); }
+}
+@keyframes hex-tri-cw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(360deg); }
+}
+@keyframes hex-tri-ccw {
+  from { transform: rotate(0deg); }
+  to { transform: rotate(-360deg); }
+}
+@keyframes hex-core-pulse {
+  0%, 100% { opacity: 0.4; transform: translate(-50%, -50%) scale(0.8); }
+  50% { opacity: 1; transform: translate(-50%, -50%) scale(1.4); }
+}
+@keyframes hex-spark-fly {
+  0% { opacity: 0; transform: translate(-50%, -50%); }
+  30% { opacity: 1; }
+  100% { opacity: 0; transform: translate(calc(-50% + var(--dx)), calc(-50% + var(--dy))); }
 }
 
 /* 技能名文字层：负责整体淡出（animation-delay 由 JS 动态计算） */

@@ -831,7 +831,7 @@
   const handleUploadToCloud = async () => {
     dialog.warning({
       title: '上传到云端',
-      content: '确定将本地所有存档上传到云端？云端已有存档将被覆盖！',
+      content: '确定将当前存档上传到云端？云端已有存档将被覆盖！',
       positiveText: '确定上传',
       negativeText: '取消',
       onPositiveClick: async () => {

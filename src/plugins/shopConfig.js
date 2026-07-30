@@ -333,12 +333,18 @@ export function rollBlackMarketItems(count = BLACK_MARKET_CONFIG.itemsPerRefresh
 //   - itemsPerRefresh: 每次刷新出 5 个人物的皮肤
 //   - purchasableSkins: 商店出售的皮肤索引（6、7）
 //   - minSkinCount: 角色至少拥有该皮肤数才进入候选池（避免出现皮肤不足的角色）
+//   - excludedSkins: 已知图片内容错误的皮肤（立绘资源性别错配等），从候选池排除
 export const SKIN_SHOP_CONFIG = {
   skinPrice: 1000000,
   refreshCost: 100000,
   itemsPerRefresh: 5,
   purchasableSkins: [6, 7],
-  minSkinCount: 6  // 至少拥有 6 个皮肤的角色才可能出售 skin6/skin7
+  minSkinCount: 6,  // 至少拥有 6 个皮肤的角色才可能出售 skin6/skin7
+  // 排除已知立绘内容错误的皮肤：杀生佛(char_039)/裂魂(char_017) 的 skin6/7 图片为女性立绘，与角色（男）不符
+  excludedSkins: {
+    char_039: [6, 7],  // 杀生佛
+    char_017: [6, 7]   // 裂魂
+  }
 }
 
 // 懒加载 characterList / skinMap，避免循环依赖（shopConfig 早于 characters 加载）
@@ -376,8 +382,12 @@ export async function rollSkinShopItems(opts = {}) {
     if (skinCount < SKIN_SHOP_CONFIG.minSkinCount) continue
     // 该角色可购买的皮肤 = purchasableSkins 中未购买的
     const purchased = unlocked[char.id] || []
+    // 排除已知立绘内容错误的皮肤（如杀生佛/裂魂的 skin6/7 图片性别错配）
+    const excludedForChar = SKIN_SHOP_CONFIG.excludedSkins?.[char.id] || []
     // 仅保留该角色实际存在的可购皮肤（避免给 count=6 的角色摆出不存在的 skin7）
-    const available = SKIN_SHOP_CONFIG.purchasableSkins.filter(s => s <= skinCount && !purchased.includes(s))
+    const available = SKIN_SHOP_CONFIG.purchasableSkins.filter(
+      s => s <= skinCount && !purchased.includes(s) && !excludedForChar.includes(s)
+    )
     if (available.length === 0) continue // 该角色所有可购皮肤已购（或不存在）
     candidates.push({ char, available, skinCount })
   }

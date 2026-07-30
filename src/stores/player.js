@@ -1105,31 +1105,14 @@ export const usePlayerStore = defineStore('player', {
             try {
               await this.pushSlotToCloud(0, blob, mainTime)
             } catch (e) {
-              failures.push(`活动档：${e.message}`)
+              failures.push(`当前存档：${e.message}`)
             }
           } else {
-            console.warn('[syncToCloud] 活动档无有效 _saveTime，跳过本次上传避免污染云端时间戳')
+            console.warn('[syncToCloud] 当前存档无有效 _saveTime，跳过本次上传避免污染云端时间戳')
           }
         }
-        const slot = this.currentSlot || this.autoSaveSlot
-        if (slot) {
-          const slotBlob = await GameDB.getData(`saveSlot_${slot}`)
-          const slotDecoded = slotBlob ? decryptData(slotBlob) : null
-          const slotTime = (typeof slotDecoded?._saveTime === 'number' && slotDecoded._saveTime > 0)
-            ? slotDecoded._saveTime
-            : 0
-          if (slotBlob) {
-            if (slotTime > 0) {
-              try {
-                await this.pushSlotToCloud(slot, slotBlob, slotTime)
-              } catch (e) {
-                failures.push(`槽位${slot}：${e.message}`)
-              }
-            } else {
-              console.warn(`[syncToCloud] 槽位${slot} 无有效 _saveTime，跳过本次上传`)
-            }
-          }
-        }
+        // 仅上传当前活动档（slot 0，即正在玩的进度），不再自动上传 currentSlot 指向的独立槽位
+        // 用户要求：上传云端仅上传当前所选择的存档槽（活动档即为当前进度）
         if (failures.length) {
           // 收集所有失败原因，如实上报并抛出（让 UI 显示真实原因，不再假成功）
           this.cloudSyncStatus = '云同步失败：' + failures.join('；')
@@ -1929,6 +1912,49 @@ export const usePlayerStore = defineStore('player', {
         }
       }
       // 12 阶强化每阶消耗对应难度 BOSS 素材 1 个（仅成功时消耗；失败回退不消耗）
+      const bossCost = result.bossCost
+      if (bossCost) {
+        let bossRemaining = bossCost.count
+        for (let i = this.materials.length - 1; i >= 0 && bossRemaining > 0; i--) {
+          if (this.materials[i].kind === 'boss_material' && this.materials[i].id === bossCost.id) {
+            this.materials.splice(i, 1)
+            bossRemaining--
+          }
+        }
+      }
+      if (usedBonus > 0) {
+        this.enhanceBonus = 0
+      }
+      this.queueSave()
+      return result
+    },
+    // 强化宗门成员的已装备装备（无需脱下即可直接强化）
+    enhanceMemberEquipment(memberId, slot) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member || !member.equippedArtifacts) {
+        return { success: false, message: '成员或装备不存在' }
+      }
+      const targetEquip = member.equippedArtifacts[slot]
+      if (!targetEquip) {
+        return { success: false, message: '该槽位无装备' }
+      }
+      const usedBonus = this.enhanceBonus || 0
+      const result = enhanceEquipment(targetEquip, this.spiritStones, this.materials, usedBonus)
+      if (!result.success) {
+        if (result.isFailure) {
+          this.queueSave()
+        }
+        return result
+      }
+      this.spiritStones -= result.goldCost
+      const stoneType = result.stoneCost.type
+      let remaining = result.stoneCost.count
+      for (let i = this.materials.length - 1; i >= 0 && remaining > 0; i--) {
+        if (this.materials[i].kind === 'ore' && this.materials[i].id === stoneType) {
+          this.materials.splice(i, 1)
+          remaining--
+        }
+      }
       const bossCost = result.bossCost
       if (bossCost) {
         let bossRemaining = bossCost.count

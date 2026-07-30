@@ -466,9 +466,11 @@ const buildRatio = computed(() => {
   return rec > 0 ? playerBuildStrength.value / rec : 1
 })
 
-// 当前生效丹药 buff 列表（用于 UI 显示），自动清理过期项
+// 当前生效丹药 buff 列表（用于 UI 显示）
+// 注意：不要在 computed 内调用 cleanExpiredPillBuffs()——它会写 activePillBuffs，
+// .filter() 即使无过期项也返回新数组引用，导致 computed 依赖失效→重算→再写→死循环。
+// 过期清理统一由 getActivePillEffects getter（只读 filter）和 trimSaveState（action）负责。
 const activePillBuffList = computed(() => {
-  cleanExpiredPillBuffs()
   const s = store()
   const effects = s.getActivePillEffects ? s.getActivePillEffects() : []
   const now = Date.now()
@@ -519,12 +521,16 @@ function store() {
   return _store
 }
 
-// 清理已过期丹药 buff
+// 清理已过期丹药 buff（仅在确有过期项时才写回，避免无谓的新数组引用触发响应式更新）
 function cleanExpiredPillBuffs() {
   const s = store()
   if (!Array.isArray(s.activePillBuffs)) return
   const now = Date.now()
-  s.activePillBuffs = s.activePillBuffs.filter(buff => buff.expiresAt > now)
+  const remaining = s.activePillBuffs.filter(buff => buff.expiresAt > now)
+  // 仅当确实清理掉过期项时才赋值，避免 .filter() 每次返回新引用导致死循环
+  if (remaining.length !== s.activePillBuffs.length) {
+    s.activePillBuffs = remaining
+  }
 }
 
 // 丹药 buff 加成：读取 playerStore 生效效果，同类型 value 累加并封顶，返回 1 + total
@@ -535,9 +541,10 @@ const PILL_BUFF_CAPS = {
   dropRate: 0.5,
   expGain: 1.0
 }
+// 注意：此处不调用 cleanExpiredPillBuffs()，过期项由 getActivePillEffects getter 自动过滤（只读）。
+// 在响应式上下文（computed / 渲染期）调用此函数时写 state 会触发死循环。
 function getPillBuffMultiplier(type) {
   const s = store()
-  cleanExpiredPillBuffs()
   const effects = s.getActivePillEffects ? s.getActivePillEffects() : []
   const total = effects.filter(e => e.type === type).reduce((sum, e) => sum + (e.value || 0), 0)
   const cap = PILL_BUFF_CAPS[type] ?? 2.0
@@ -2420,7 +2427,8 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
           rewards.push({ type: 'fortune', amount: 1, name: '奇遇·' + pickItem.name, material: pickItem, materialKind: pickItem.kind })
         }
       } else if (rw.type === 'cultivation') {
-        const final = Math.floor(multiplied * getPillBuffMultiplier('expGain'))
+        // expGain 倍率由 s.cultivate() 内部的 expBonus 统一负责（避免双重相乘导致膨胀）
+        const final = Math.floor(multiplied)
         s.cultivate(final)
         runStats.value.cultivation += final
         rewards.push({ type: 'cultivation', amount: final, name: '修为' })

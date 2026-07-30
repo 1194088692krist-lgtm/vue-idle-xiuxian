@@ -239,10 +239,42 @@
           v-if="!isIdling"
           class="btn btn-success"
           :disabled="!canStartIdle"
-          @click="startIdle(selectedDuration)"
+          @click="openPillSelectBeforeIdle"
         >
           开始挂机（{{ selectedDuration }}分钟 · 约 {{ idleEncounterEstimate }} 场 · {{ idleStoneEstimate }} 灵石）
         </button>
+        <!-- 开始挂机前丹药选择弹窗 -->
+        <div v-if="showPillSelectModal" class="modal-overlay" @click.self="showPillSelectModal = false">
+          <div class="modal-content glass-card pill-select-modal">
+            <div class="modal-header">
+              <h3>💊 选择挂机丹药</h3>
+            </div>
+            <div class="modal-body">
+              <p class="pill-select-tip">选择本次挂机要服用的增益丹药（点击服用，可叠加不同丹药）</p>
+              <div v-if="availableIdlePills.length" class="pill-select-list">
+                <div
+                  v-for="p in availableIdlePills"
+                  :key="p.pillId"
+                  class="pill-select-item"
+                  :class="{ consumed: p.consumed }"
+                  @click="toggleIdlePill(p)"
+                >
+                  <div class="pill-select-info">
+                    <span class="pill-select-name">{{ p.name }}</span>
+                    <span class="pill-select-effect">{{ p.effectText }}</span>
+                  </div>
+                  <span class="pill-select-count">×{{ p.count }}</span>
+                  <span v-if="p.consumed" class="pill-select-check">✓</span>
+                </div>
+              </div>
+              <p v-else class="pill-select-empty">背包中没有可用的增益丹药</p>
+            </div>
+            <div class="modal-footer pill-select-footer">
+              <button class="btn btn-outline" @click="showPillSelectModal = false">取消</button>
+              <button class="btn btn-success" @click="confirmPillsAndStart">确认并开始挂机</button>
+            </div>
+          </div>
+        </div>
         <!-- 挂机进行中 -->
         <div v-if="isIdling" class="idle-running" :class="{ 'in-boss-phase': bossSpawned }">
           <div class="idle-status">
@@ -277,19 +309,19 @@
             </div>
             <div class="dash-item">
               <span class="dash-label">灵石<span v-if="spiritMult" class="pill-mult-badge">{{ spiritMult }}</span></span>
-              <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
+              <span class="dash-value gold-text">+{{ formatNumber(idleDashboard.totalSpiritStones) }}</span>
             </div>
             <div class="dash-item">
               <span class="dash-label">幻灵结晶</span>
-              <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
+              <span class="dash-value" style="color:#9370db">+{{ formatNumber(idleDashboard.totalPhantomCrystals) }}</span>
             </div>
             <div class="dash-item">
               <span class="dash-label">修为<span v-if="expMult" class="pill-mult-badge">{{ expMult }}</span></span>
-              <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
+              <span class="dash-value">+{{ formatNumber(idleDashboard.totalCultivation) }}</span>
             </div>
             <div class="dash-item">
               <span class="dash-label">装备<span v-if="dropMult" class="pill-mult-badge">{{ dropMult }}</span></span>
-              <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
+              <span class="dash-value">+{{ formatNumber(idleDashboard.totalEquipment) }}</span>
             </div>
             <!-- BOSS 挑战券获得统计（击杀 BOSS 时按 30% 掉落 1~2 张） -->
             <div class="dash-item" v-if="idleDashboard.totalBossTickets > 0">
@@ -447,19 +479,19 @@
         </div>
         <div class="summary-item">
           <span class="summary-label">获得灵石</span>
-          <span class="summary-value gold">{{ lastSummary.totalStones }}</span>
+          <span class="summary-value gold">{{ formatNumber(lastSummary.totalStones) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得幻灵结晶</span>
-          <span class="summary-value" style="color:#9370db">{{ lastSummary.totalPhantomCrystals || 0 }}</span>
+          <span class="summary-value" style="color:#9370db">{{ formatNumber(lastSummary.totalPhantomCrystals || 0) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得修为</span>
-          <span class="summary-value">{{ lastSummary.totalCultivation }}</span>
+          <span class="summary-value">{{ formatNumber(lastSummary.totalCultivation) }}</span>
         </div>
         <div class="summary-item">
           <span class="summary-label">获得装备</span>
-          <span class="summary-value">{{ lastSummary.totalEquipment }}</span>
+          <span class="summary-value">{{ formatNumber(lastSummary.totalEquipment) }}</span>
         </div>
         <div class="summary-item" v-if="lastSummary.totalBossTickets > 0">
           <span class="summary-label">🎟️ 挑战券</span>
@@ -703,19 +735,19 @@
                   </div>
                   <div class="dash-item">
                     <span class="dash-label">灵石<span v-if="spiritMult" class="pill-mult-badge">{{ spiritMult }}</span></span>
-                    <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
+                    <span class="dash-value gold-text">+{{ formatNumber(idleDashboard.totalSpiritStones) }}</span>
                   </div>
                   <div class="dash-item">
                     <span class="dash-label">幻灵结晶</span>
-                    <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
+                    <span class="dash-value" style="color:#9370db">+{{ formatNumber(idleDashboard.totalPhantomCrystals) }}</span>
                   </div>
                   <div class="dash-item">
                     <span class="dash-label">修为<span v-if="expMult" class="pill-mult-badge">{{ expMult }}</span></span>
-                    <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
+                    <span class="dash-value">+{{ formatNumber(idleDashboard.totalCultivation) }}</span>
                   </div>
                   <div class="dash-item">
                     <span class="dash-label">装备<span v-if="dropMult" class="pill-mult-badge">{{ dropMult }}</span></span>
-                    <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
+                    <span class="dash-value">+{{ formatNumber(idleDashboard.totalEquipment) }}</span>
                   </div>
                   <div class="dash-item" v-if="idleDashboard.totalBossTickets > 0">
                     <span class="dash-label">🎟️ 挑战券</span>
@@ -1120,7 +1152,7 @@ import { formatNumber } from '../utils/formatNumber.js'
 import CharacterPortraitModal from './CharacterPortraitModal.vue'
 import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
-import { getPillsByZone } from '../plugins/pills'
+import { getPillsByZone, pillRecipes } from '../plugins/pills'
 import { BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
 import { characterList, characterDefMap } from '../plugins/characters'
 import { getIconUrl } from '../plugins/icons'
@@ -1226,6 +1258,57 @@ const spiritMult = computed(() => pillMultText('spiritStoneRate'))
 const cultMult = computed(() => pillMultText('cultivationRate'))
 const dropMult = computed(() => pillMultText('dropRate'))
 const expMult = computed(() => pillMultText('expGain'))
+
+// ===== 开始挂机前丹药选择弹窗 =====
+const showPillSelectModal = ref(false)
+// 可选丹药列表：从 ownedPills 筛选全局 buff 类丹药
+const availableIdlePills = computed(() => {
+  const owned = playerStore.ownedPills || {}
+  const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain']
+  const typeNames = {
+    spiritStoneRate: '灵石获取',
+    cultivationRate: '修炼速度',
+    dropRate: '掉落加成',
+    expGain: '修为获取'
+  }
+  const result = []
+  for (const pillId in owned) {
+    const entry = owned[pillId]
+    if (!entry || entry.count <= 0) continue
+    const recipe = pillRecipes.find(r => r.id === pillId)
+    if (!recipe || !recipe.baseEffect) continue
+    if (!globalTypes.includes(recipe.baseEffect.type)) continue
+    const val = recipe.baseEffect.value || 0
+    const pct = Math.round(val * 100)
+    result.push({
+      pillId,
+      name: recipe.name,
+      effectText: `${typeNames[recipe.baseEffect.type] || recipe.baseEffect.type} +${pct}%`,
+      count: entry.count,
+      type: recipe.baseEffect.type,
+      consumed: false
+    })
+  }
+  return result
+})
+const openPillSelectBeforeIdle = () => {
+  if (!canStartIdle.value) return
+  // 重置已选状态
+  availableIdlePills.value.forEach(p => { p.consumed = false })
+  showPillSelectModal.value = true
+}
+const toggleIdlePill = (p) => {
+  p.consumed = !p.consumed
+}
+const confirmPillsAndStart = () => {
+  // 服用已选丹药（全局 buff 类不需要 memberId）
+  const selected = availableIdlePills.value.filter(p => p.consumed)
+  for (const p of selected) {
+    playerStore.consumePill(p.pillId)
+  }
+  showPillSelectModal.value = false
+  startIdle(selectedDuration.value)
+}
 
 // 匹配度配色
 const matchColor = computed(() => {
@@ -3699,6 +3782,28 @@ onUnmounted(() => {
   line-height: 1.4;
   vertical-align: middle;
 }
+/* 丹药选择弹窗 */
+.pill-select-modal { max-width: 420px; width: 90%; }
+.pill-select-tip { font-size: 13px; color: #C9C4BA; margin-bottom: 10px; }
+.pill-select-list { display: flex; flex-direction: column; gap: 8px; }
+.pill-select-item {
+  display: flex; align-items: center; gap: 8px;
+  padding: 10px 12px;
+  background: rgba(255,255,255,0.06);
+  border: 1px solid rgba(255,255,255,0.1);
+  border-radius: 8px;
+  cursor: pointer;
+  transition: all 0.15s;
+}
+.pill-select-item:hover { background: rgba(124,252,0,0.08); border-color: rgba(124,252,0,0.3); }
+.pill-select-item.consumed { background: rgba(124,252,0,0.15); border-color: #7CFC00; }
+.pill-select-info { flex: 1; display: flex; flex-direction: column; gap: 2px; }
+.pill-select-name { font-size: 14px; font-weight: bold; color: #fff; }
+.pill-select-effect { font-size: 12px; color: #7CFC00; }
+.pill-select-count { font-size: 13px; color: #DAA520; }
+.pill-select-check { font-size: 18px; color: #7CFC00; }
+.pill-select-empty { text-align: center; color: #888; padding: 20px; }
+.pill-select-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
 .dash-value {
   font-size: 16px;
   font-weight: bold;

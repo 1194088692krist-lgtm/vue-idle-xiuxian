@@ -70,7 +70,9 @@
             <h2 class="char-name-large">{{ character.name }}</h2>
             <div class="char-stars-large">{{ '⭐'.repeat(character.star || 1) }}</div>
             <!-- 设为击杀立绘：为本角色单独指定击杀BOSS时弹出的立绘（每个角色独立设置） -->
+            <!-- 仅在当前皮肤已解锁（突破或购买）时才显示，避免商店预览未购买皮肤时被设为击杀立绘 -->
             <button
+              v-if="isSkinUnlocked(currentSkin)"
               class="set-kill-portrait-btn"
               :class="{ active: isCurrentKillPortrait }"
               @click.stop="setAsKillPortrait"

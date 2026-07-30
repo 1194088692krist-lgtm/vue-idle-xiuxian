@@ -88,7 +88,7 @@
             <div class="hp-bar">
               <div class="hp-fill" :style="{ width: memberHpPct(m) + '%', background: hpBarColor(memberHpPct(m)) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(displayMemberHp[m.memberId] !== undefined ? displayMemberHp[m.memberId] : m.currentHealth) }}/{{ displayMemberMaxHp[m.memberId] > 0 ? displayMemberMaxHp[m.memberId] : m.stats.maxHealth }}</div>
+            <div class="hp-text">{{ formatNumber(Math.round(displayMemberHp[m.memberId] !== undefined ? displayMemberHp[m.memberId] : m.currentHealth)) }}/{{ formatNumber(displayMemberMaxHp[m.memberId] > 0 ? displayMemberMaxHp[m.memberId] : m.stats.maxHealth) }}</div>
           </div>
         </div>
       </div>
@@ -135,7 +135,7 @@
             <div class="hp-bar">
               <div class="hp-fill enemy-hp" :style="{ width: enemyHpPct + '%', background: hpBarColor(enemyHpPct) }"></div>
             </div>
-            <div class="hp-text">{{ Math.round(displayEnemyHp > 0 ? displayEnemyHp : encounter.enemy.currentHealth) }}/{{ displayEnemyMaxHp > 0 ? displayEnemyMaxHp : (encounter.enemy.stats.maxHealth || 0) }}</div>
+            <div class="hp-text">{{ formatNumber(Math.round(displayEnemyHp > 0 ? displayEnemyHp : encounter.enemy.currentHealth)) }}/{{ formatNumber(displayEnemyMaxHp > 0 ? displayEnemyMaxHp : (encounter.enemy.stats.maxHealth || 0)) }}</div>
           </div>
         </div>
       </div>
@@ -256,6 +256,7 @@ import { ref, reactive, watch, onUnmounted, computed, nextTick } from 'vue'
 import { useIdleSystem } from '../composables/useIdleSystem.js'
 import { usePlayerStore } from '../stores/player.js'
 import { getMonsterAvatarSync, monsterManifestVersion } from '../plugins/monsters'
+import { formatNumber } from '../utils/formatNumber.js'
 import SkillCinematic from './SkillCinematic.vue'
 
 const props = defineProps({
