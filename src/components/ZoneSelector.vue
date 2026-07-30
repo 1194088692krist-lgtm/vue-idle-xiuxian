@@ -253,7 +253,14 @@
               <h3>💊 选择挂机丹药</h3>
             </div>
             <div class="modal-body">
-              <p class="pill-select-tip">选择本次挂机要服用的增益丹药（点击服用，可叠加不同丹药）</p>
+              <div class="pill-select-tip-row">
+                <p class="pill-select-tip">选择本次挂机要服用的增益丹药（点击服用，可叠加不同丹药）</p>
+                <button
+                  v-if="availableIdlePills.length"
+                  class="btn-small btn-select-all"
+                  @click="selectAllIdlePills"
+                >{{ allIdlePillsSelected ? '取消全选' : '一键全选' }}</button>
+              </div>
               <div v-if="availableIdlePills.length" class="pill-select-list">
                 <div
                   v-for="p in availableIdlePills"
@@ -1308,6 +1315,14 @@ const openPillSelectBeforeIdle = () => {
 }
 const toggleIdlePill = (p) => {
   p.consumed = !p.consumed
+}
+// 一键全选/取消全选：所有可选丹药统一切换
+const allIdlePillsSelected = computed(() =>
+  availableIdlePills.value.length > 0 && availableIdlePills.value.every(p => p.consumed)
+)
+const selectAllIdlePills = () => {
+  const target = !allIdlePillsSelected.value
+  availableIdlePills.value.forEach(p => { p.consumed = target })
 }
 const confirmPillsAndStart = () => {
   // 服用已选丹药（全局 buff 类不需要 memberId）
@@ -3808,7 +3823,9 @@ onUnmounted(() => {
 }
 /* 丹药选择弹窗 */
 .pill-select-modal { max-width: 420px; width: 90%; }
-.pill-select-tip { font-size: 13px; color: #C9C4BA; margin-bottom: 10px; }
+.pill-select-tip-row { display: flex; justify-content: space-between; align-items: center; gap: 10px; margin-bottom: 10px; }
+.pill-select-tip { font-size: 13px; color: #C9C4BA; margin: 0; }
+.btn-select-all { padding: 4px 12px; font-size: 12px; white-space: nowrap; }
 .pill-select-list { display: flex; flex-direction: column; gap: 8px; }
 .pill-select-item {
   display: flex; align-items: center; gap: 8px;

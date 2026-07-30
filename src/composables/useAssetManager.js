@@ -13,10 +13,40 @@ const USER_CACHE = 'user-assets' // 客户端主动预下载的 cache 名（SW c
 // 强制删除所有 skin 立绘缓存条目，让 downloadOne 重新下载。
 // 这能确保「一键下载」按钮真正覆盖错误的旧 skin3 立绘，避免缓存命中导致无法修复。
 const SKIN_VERSION_KEY = 'lastAssetVersion'
+// 全量资源签名 key：存储上次成功下载时的远程清单签名，用于判断是否需要更新
+const ASSET_SIGNATURE_KEY = 'lastAssetSignature'
 
 // 判断 URL 是否为皮肤立绘（强制更新时按此模式匹配删除缓存）
 function isSkinAssetUrl(url) {
   return /\/(portraits|pets)\/[^/]*_skin\d+\.(jpg|jpeg|png|webp)$/i.test(url)
+}
+
+// 计算远程清单签名：拉取所有清单文件（cache: 'no-store' 绕过 SW），
+// 用内容长度+首尾片段拼接成签名串。签名一致 → 服务器资源未变更 → 无需更新。
+async function computeRemoteAssetSignature() {
+  const ts = Date.now()
+  const manifestPaths = [
+    `./portraits/manifest.json?_t=${ts}`,
+    `./monsters/manifest.json?_t=${ts}`,
+    `./portraits/skins.json?v=8&_t=${ts}`,
+    `./pets/manifest.json?_t=${ts}`,
+    `./pets/skins.json?v=8&_t=${ts}`,
+    `./fx-manifest.json?_t=${ts}`
+  ]
+  const responses = await Promise.all(
+    manifestPaths.map(u => fetch(urlFromPath(u), { cache: 'no-store' }).catch(() => null))
+  )
+  let sig = ''
+  for (const res of responses) {
+    if (res && res.ok) {
+      const text = await res.text()
+      // 用长度+首尾 50 字符做轻量签名，避免完整 JSON hash 的性能开销
+      sig += `${text.length}:${text.slice(0, 50)}${text.slice(-50)}|`
+    } else {
+      sig += 'MISS|'
+    }
+  }
+  return sig
 }
 
 // 检查资源版本号是否变化；变化时清除所有 skin 立绘缓存，确保旧 skin3 不再出现
@@ -316,6 +346,29 @@ export async function downloadAllAssets() {
   startSpeedMonitor()
 
   try {
+    // 预检查：拉取远程清单签名，与本地签名比对。
+    // 若签名一致且本地已有缓存文件 → 资源已是最新，跳过整个下载流程。
+    let remoteSignature = ''
+    try {
+      remoteSignature = await computeRemoteAssetSignature()
+    } catch (e) {
+      console.warn('[useAssetManager] 远程签名计算失败，继续全量检查:', e.message)
+    }
+    const localSignature = localStorage.getItem(ASSET_SIGNATURE_KEY) || ''
+    if (remoteSignature && remoteSignature === localSignature && cachedFileCount.value > 0) {
+      // 签名一致且本地已有缓存：资源已是最新，无需更新
+      lastDownloadResult.value = {
+        success: true,
+        total: 0,
+        failed: 0,
+        skipped: cachedFileCount.value,
+        bytes: 0,
+        elapsedSec: 0,
+        upToDate: true
+      }
+      return lastDownloadResult.value
+    }
+
     const urls = await collectResourceUrls()
     totalCount.value = urls.length
     if (!('caches' in window)) {
@@ -366,6 +419,10 @@ export async function downloadAllAssets() {
       skipped: skippedCount,
       bytes: totalSize.bytes,
       elapsedSec: Math.round((Date.now() - startTime.value) / 1000)
+    }
+    // 下载成功且无失败时，保存远程签名，下次可跳过全量下载
+    if (remoteSignature && failedCount === 0) {
+      localStorage.setItem(ASSET_SIGNATURE_KEY, remoteSignature)
     }
     // 刷新缓存统计
     await refreshCacheStats()
@@ -446,6 +503,8 @@ export async function clearAllAssets() {
     }
     // 2. 不注销 Service Worker —— SW 是代码，且负责缓存管理
     // 注销 SW 反而会丢失已缓存的代码文件，导致下次访问重新下载全部 JS/CSS
+    // 2.1 清除资源签名，使下次「更新本地资源」能正常走全量检查而非误判"已是最新"
+    localStorage.removeItem(ASSET_SIGNATURE_KEY)
     // 3. 刷新统计
     await refreshCacheStats()
     lastDownloadResult.value = null

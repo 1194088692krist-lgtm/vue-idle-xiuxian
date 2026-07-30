@@ -512,7 +512,10 @@
     try {
       const result = await downloadAllAssets()
       if (result?.success) {
-        if (result.failed > 0) {
+        if (result.upToDate) {
+          // 预检查通过：本地资源已是最新，无需重复下载
+          message.info('本地资源已是最新，无需更新')
+        } else if (result.failed > 0) {
           message.warning(`下载完成，但 ${result.failed} 个资源失败（可能网络中断），可重试更新`)
         } else {
           message.success(`下载完成！共 ${result.total} 个资源已缓存到本地`)

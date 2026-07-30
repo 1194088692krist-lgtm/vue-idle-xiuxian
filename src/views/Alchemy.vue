@@ -1741,8 +1741,8 @@
     const result = playerStore.craftPill(recipe.id, count)
     if (result.success) {
       const successCount = result.successCount || 1
-      window.$message?.success(`获得 ${recipe.name}${successCount > 1 ? ` ×${successCount}` : ''}`)
-      logRef.value?.addLog('success', result.message)
+      // 弹出小窗口提示结果，不再写入页底日志
+      window.$message?.success(`炼制成功！获得 ${recipe.name}${successCount > 1 ? ` ×${successCount}` : ''}`, { duration: 2000 })
       const btn = document.querySelector(btnSelector)
       if (btn) {
         btn.classList.add('success-animation')
@@ -1751,7 +1751,8 @@
         }, 1000)
       }
     } else {
-      logRef.value?.addLog('error', `炼制失败：${result.message}`)
+      // 失败也用小弹窗提示，不再写入页底日志
+      window.$message?.error(`炼制失败：${result.message}`, { duration: 2500 })
       const btn = document.querySelector(btnSelector)
       if (btn) {
         btn.classList.add('fail-animation')
