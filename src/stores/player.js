@@ -910,6 +910,14 @@ export const usePlayerStore = defineStore('player', {
     },
     // 保存数据到IndexedDB
     async saveData() {
+      // ⚠️ 回档根因修复：migrate 进行中时 $state 可能已被 $reset 清空（重载中），
+      // 此时若触发 saveData（挂机自动存档/用户操作），会把空的默认状态写入 IndexedDB，
+      // 覆盖真实存档——表现为"存档时间是对的，但人物/装备数据全变低"。
+      // migrate 期间必须跳过所有保存，等 initializePlayer 重载完成后再允许保存。
+      if (this._migrating) {
+        console.warn('[saveData] migrate 进行中，跳过本次保存避免写入空状态覆盖存档')
+        return
+      }
       // 互斥锁：防止并发写入导致旧快照覆盖新快照（回档根因）
       // saveData 是 async，encryptData 捕获的是调用瞬间的 $state 快照；
       // 若 A、B 两个 saveData 并发，A 先加密旧状态、后完成写入，会把 B 已写入的新状态覆盖掉。

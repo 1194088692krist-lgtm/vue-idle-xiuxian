@@ -559,12 +559,14 @@ const survivalRatio = computed(() => {
   const rec = currentRecommendedHP.value
   return rec > 0 ? teamAvgEffectiveHP.value / rec : 1
 })
-// 综合匹配度 = min(战力比, 生存比)，取短板反映真实战斗风险
-// 原 buildRatio 仅看战力，导致 93% 匹配度但血量不足被秒；现引入生存比修正
+// 综合匹配度 = 战力比（队伍总 Build / 推荐 Build）
+// 修复：原实现取 min(战力比, 生存比)，但 recommendedStats.health 是早期手填的固定小值
+// （如龙渊凶险 health=3000），与动态 build 完全脱钩。导致 survivalRatio 恒定偏低（~0.75），
+// 把高 build 玩家的匹配度卡死——58万和2027万 build 都显示 ~75%。
+// 现改为直接用战力比：build 高 = 匹配度高，符合玩家直觉。生存比仍保留用于胜率修正与风险日志。
 const buildRatio = computed(() => {
   const rec = currentRecommendedBuild.value
-  const br = rec > 0 ? playerBuildStrength.value / rec : 1
-  return Math.min(br, survivalRatio.value)
+  return rec > 0 ? playerBuildStrength.value / rec : 1
 })
 
 // 当前生效丹药 buff 列表（用于 UI 显示）
@@ -4141,6 +4143,17 @@ async function runIdleEncounter() {
       const victory = roundResult.victory
       const encounter = currentEncounter.value
       const enemy = encounter.enemy
+      // 防御性归零：victory 必然意味着 enemy 死亡，强制 currentHealth=0 并刷新仪表盘快照，
+      // 确保击杀立绘弹出时战斗界面血条显示 0 血 dead=true，避免"BOSS死了血还满"的视觉异常。
+      // （executeRound 返回 victory 时 enemy.currentHealth 应已为 0，此处为边界情况兜底）
+      if (victory && enemy && enemy.currentHealth > 0) {
+        enemy.currentHealth = 0
+        if (currentIdleEnemy.value) {
+          currentIdleEnemy.value.currentHealth = 0
+          currentIdleEnemy.value.hpPercent = '0%'
+          currentIdleEnemy.value.dead = true
+        }
+      }
       let rewards = []
       let loss = 0
       let roleEffects = []
