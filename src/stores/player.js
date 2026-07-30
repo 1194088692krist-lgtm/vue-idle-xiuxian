@@ -789,6 +789,8 @@ export const usePlayerStore = defineStore('player', {
       // 兼容初始化：旧存档可能没有新字段
       if (!this.ownedPills || typeof this.ownedPills !== 'object') this.ownedPills = {}
       if (!Array.isArray(this.activePillBuffs)) this.activePillBuffs = []
+      // 加载存档时清理 idleOnly buff：buff 类丹药仅持续一次挂机，不跨会话保留
+      this.activePillBuffs = this.activePillBuffs.filter(b => !b.idleOnly)
       // 关键状态对象空值保护，防止 recomputeAttributes 中 Object.keys(null) 崩溃
       if (!this.combatAttributes || typeof this.combatAttributes !== 'object') this.combatAttributes = {}
       if (!this.combatResistance || typeof this.combatResistance !== 'object') this.combatResistance = {}
@@ -3287,6 +3289,21 @@ export const usePlayerStore = defineStore('player', {
       const now = Date.now()
       return (this.activePillBuffs || []).filter(buff => buff.expiresAt > now)
     },
+    // 清理仅本次挂机生效的 buff 类丹药（idleOnly 标记）。
+    // buff 类丹药不再有 25-60 分钟持续时长，改为仅在本次挂机期间生效，挂机结束时统一清理。
+    clearIdleOnlyBuffs() {
+      if (!Array.isArray(this.activePillBuffs) || !this.activePillBuffs.length) return
+      const before = this.activePillBuffs.length
+      this.activePillBuffs = this.activePillBuffs.filter(b => !b.idleOnly)
+      // 同步清理 pillEffects 中对应的 idleOnly 条目
+      if (Array.isArray(this.pillEffects)) {
+        this.pillEffects = this.pillEffects.filter(e => {
+          const buff = this.activePillBuffs.find(b => b.pillId === e.pillId)
+          return buff // 仅保留仍有对应 activePillBuffs 的条目
+        })
+      }
+      if (this.activePillBuffs.length !== before) this.queueSave()
+    },
     // 服用丹药（从 ownedPills 消耗）
     consumePill(pillId, memberId) {
       const owned = this.ownedPills[pillId]
@@ -3302,7 +3319,10 @@ export const usePlayerStore = defineStore('player', {
       const baseEffect = recipe.baseEffect
       const effect = calculatePillEffect(recipe, this.level)
       const now = Date.now()
-      const expiresAt = now + (baseEffect.duration || 0) * 1000
+      const isGlobalBuff = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain'].includes(baseEffect.type)
+      // buff 类丹药仅持续一次挂机：expiresAt 设为 Infinity（挂机期间永不过期），
+      // 由 finishIdle 在挂机结束时统一清理 idleOnly 标记的 buff。
+      const expiresAt = isGlobalBuff ? Infinity : now + (baseEffect.duration || 0) * 1000
       const changes = []
       const statNameMap = { attack: '攻击', health: '生命', defense: '防御', speed: '速度' }
 
@@ -3319,7 +3339,8 @@ export const usePlayerStore = defineStore('player', {
           type: baseEffect.type,
           value: effect.value,
           expiresAt,
-          scope: 'global'
+          scope: 'global',
+          idleOnly: true // 仅持续本次挂机，挂机结束自动清理
         })
         // 兼容旧 getter：expGain / dropRate 同步刷新 pillEffects（按 pillId 去重，避免双写累积）
         if (baseEffect.type === 'expGain' || baseEffect.type === 'dropRate') {

@@ -22,6 +22,7 @@ vi.mock('../../stores/player', () => {
       getActivePillEffects: () => [],
       regenerateSpirit: vi.fn(),
       getCharacterBuildStrength: () => 1,
+      getTeamTotalBuild: () => 1,
       startIdleExploration: vi.fn(),
       stopIdleExploration: vi.fn(),
       updateIdleExploration: vi.fn(),
@@ -46,7 +47,7 @@ vi.mock('../../plugins/zones', () => ({
   getZoneById: () => ({ id: 'z', name: '测试秘境', monsters: ['测试妖兽'], minLevel: 1 }),
   getZoneDifficulty: () => fakeDiff,
 }))
-vi.mock('../../plugins/characters', () => ({ getCharacterThumbnail: () => '' }))
+vi.mock('../../plugins/characters', () => ({ getCharacterThumbnail: () => '', getEffectiveBaseStats: () => ({ attack: 0, health: 0, defense: 0, speed: 0 }) }))
 vi.mock('../../plugins/monsters', () => ({ getMonsterAvatarSync: () => '' }))
 
 import { useIdleSystem } from '../useIdleSystem.js'

@@ -89,6 +89,29 @@
                   <div class="recipe-status">
                     {{ selectedRecipe?.id === recipe.id ? '已选择' : '点击选择' }}
                   </div>
+                  <!-- 内联炼制行：点击该丹药后直接在其下方弹出数量选择与确认，无需到列表底部寻找 -->
+                  <div
+                    v-if="selectedRecipe?.id === recipe.id"
+                    class="craft-inline-row"
+                    @click.stop
+                  >
+                    <span class="craft-count-label">数量</span>
+                    <n-input-number
+                      v-model:value="craftCount"
+                      :min="1"
+                      :max="maxCraftCountFor(recipe)"
+                      :disabled="maxCraftCountFor(recipe) <= 1"
+                      size="small"
+                      style="width: 110px;"
+                    />
+                    <button
+                      class="btn-small btn-primary"
+                      :disabled="!checkMaterials(recipe, craftCount)"
+                      @click="craftPillInline(recipe)"
+                    >
+                      {{ !checkMaterials(recipe, craftCount) ? '材料不足' : (craftCount > 1 ? `炼制 ×${craftCount}` : '炼制') }}
+                    </button>
+                  </div>
                 </div>
               </div>
             </div>
@@ -129,28 +152,13 @@
                 </div>
                 <div class="effect-item">
                   <div class="effect-label">持续时间</div>
-                  <div class="effect-value">{{ Math.floor((currentEffect?.duration || 0) / 60) }}分钟</div>
+                  <div class="effect-value">{{ durationText }}</div>
                 </div>
                 <div class="effect-item">
                   <div class="effect-label">成功率</div>
                   <div class="effect-value">{{ (currentEffect?.successRate * 100).toFixed(1) }}%</div>
                 </div>
               </div>
-            </div>
-            <div class="craft-section">
-              <div class="craft-count-row">
-                <span class="craft-count-label">炼制数量</span>
-                <n-input-number v-model:value="craftCount" :min="1" :max="maxCraftCount" :disabled="maxCraftCount <= 1" style="width: 120px;" />
-                <button class="btn-small btn-outline" :disabled="maxCraftCount <= 1" @click="craftCount = maxCraftCount">一键拉满</button>
-              </div>
-              <button
-                class="btn btn-primary craft-button"
-                :class="{ disabled: !selectedRecipe || !checkMaterials(selectedRecipe, craftCount) }"
-                @click="craftPill"
-              >
-                <span class="btn-icon"><FireOutlined /></span>
-                <span>{{ !checkMaterials(selectedRecipe, craftCount) ? '材料不足' : (craftCount > 1 ? `批量炼制 ×${craftCount}` : '开始炼制') }}</span>
-              </button>
             </div>
           </template>
         </template>
@@ -1489,6 +1497,7 @@
 
   const selectRecipe = recipe => {
     selectedRecipe.value = recipe
+    craftCount.value = 1 // 切换丹方时重置数量，避免上一个丹药的数量带到新丹药
   }
 
   const checkMaterials = (recipe, count = 1) => {
@@ -1499,14 +1508,17 @@
     })
   }
 
-  const maxCraftCount = computed(() => {
-    if (!selectedRecipe.value) return 1
-    const maxCounts = selectedRecipe.value.materials.map(material => {
+  // 计算指定丹方可炼制的最大数量（内联炼制行按当前选中丹药实时计算）
+  const maxCraftCountFor = recipe => {
+    if (!recipe) return 1
+    const maxCounts = recipe.materials.map(material => {
       const owned = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
       return Math.floor(owned / material.count) || 0
     })
     return Math.max(1, Math.min(...maxCounts))
-  })
+  }
+
+  const maxCraftCount = computed(() => maxCraftCountFor(selectedRecipe.value))
 
   const getMaterialStatus = material => {
     const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
@@ -1553,6 +1565,17 @@
   const currentEffect = computed(() => {
     if (!selectedRecipe.value) return null
     return calculatePillEffect(selectedRecipe.value, playerStore.level)
+  })
+
+  // 持续时间文案：buff 类丹药（灵石/修炼/掉落/修为获取）仅持续本次挂机，其余按原有分钟或永久/即时
+  const durationText = computed(() => {
+    const e = currentEffect.value
+    if (!e) return '-'
+    const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain']
+    if (globalTypes.includes(e.type)) return '本次挂机'
+    const dur = e.duration || 0
+    if (dur <= 0) return '永久/即时'
+    return `${Math.floor(dur / 60)}分钟`
   })
 
   // 按丹药效果类型给出可读描述（支持新增值/突破/强化/洗练/战斗/探索类）
@@ -1608,13 +1631,21 @@
 
   const craftPill = () => {
     if (!selectedRecipe.value) return
-    const count = Math.min(Math.max(1, craftCount.value || 1), maxCraftCount.value)
-    const result = playerStore.craftPill(selectedRecipe.value.id, count)
+    craftPillFor(selectedRecipe.value, '.craft-button')
+  }
+  // 内联炼制：从丹药卡片下方直接炼制，按钮选择器限定在该卡片内
+  const craftPillInline = (recipe) => {
+    if (!recipe) return
+    craftPillFor(recipe, `.recipe-card.selected .craft-inline-row .btn-small`)
+  }
+  const craftPillFor = (recipe, btnSelector) => {
+    const count = Math.min(Math.max(1, craftCount.value || 1), maxCraftCountFor(recipe))
+    const result = playerStore.craftPill(recipe.id, count)
     if (result.success) {
       const successCount = result.successCount || 1
-      window.$message?.success(`获得 ${selectedRecipe.value.name}${successCount > 1 ? ` ×${successCount}` : ''}`)
+      window.$message?.success(`获得 ${recipe.name}${successCount > 1 ? ` ×${successCount}` : ''}`)
       logRef.value?.addLog('success', result.message)
-      const btn = document.querySelector('.craft-button')
+      const btn = document.querySelector(btnSelector)
       if (btn) {
         btn.classList.add('success-animation')
         setTimeout(() => {
@@ -1623,7 +1654,7 @@
       }
     } else {
       logRef.value?.addLog('error', `炼制失败：${result.message}`)
-      const btn = document.querySelector('.craft-button')
+      const btn = document.querySelector(btnSelector)
       if (btn) {
         btn.classList.add('fail-animation')
         setTimeout(() => {
@@ -2443,6 +2474,27 @@
     margin-top: 16px;
     padding-top: 16px;
     border-top: 1px solid rgba(139, 69, 19, 0.2);
+  }
+
+  /* 内联炼制行：点击丹药后在该丹药卡片下方直接弹出数量选择与确认 */
+  .craft-inline-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    margin-top: 12px;
+    padding: 10px 12px;
+    background: rgba(139, 69, 19, 0.12);
+    border: 1px solid rgba(218, 165, 32, 0.35);
+    border-radius: 8px;
+    animation: craftInlineIn 0.2s ease;
+  }
+  @keyframes craftInlineIn {
+    from { opacity: 0; transform: translateY(-6px); }
+    to { opacity: 1; transform: translateY(0); }
+  }
+  .craft-inline-row .craft-count-label {
+    font-size: 13px;
+    flex-shrink: 0;
   }
 
   .craft-count-row {

@@ -10,7 +10,7 @@ import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '.
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
-import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, getSkinCount, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, getSkinCount, characterList as _charList, starConfig as _starCfg, getEffectiveBaseStats } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -460,10 +460,38 @@ const currentRecommendedBuild = computed(() => {
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
   return diff ? (diff.recommendedBuild || 0) : 0
 })
-// Build 匹配度 = 自身 / 推荐，<1 表示强度不足，可能在挂机中因气血耗尽提前失败
+// 队伍平均有效生命（含基础+突破+努力+装备天赋加成），用于生存维度判定
+// 修复：原匹配度仅看 build 分（attack 权重 8 远高于 health 0.8），玩家堆攻击即可让匹配度达标，
+// 但实际血量不足，进入后期图会被 BOSS 一击秒杀。新增生存维度，取战力比与生存比的较小值。
+const teamAvgEffectiveHP = computed(() => {
+  const s = store()
+  const team = s.getTeamMembersDetail()
+  if (!team.length) return 0
+  let sum = 0
+  for (const m of team) {
+    const eff = getEffectiveBaseStats(m)
+    const ts = m.talentStats || {}
+    sum += (eff.health || 0) + (ts.health || 0)
+  }
+  return Math.round(sum / team.length)
+})
+// 当前难度的推荐血量（recommendedStats.health 已含 scale）
+const currentRecommendedHP = computed(() => {
+  if (!selectedZone.value) return 0
+  const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
+  return diff ? (diff.recommendedStats?.health || 0) : 0
+})
+// 生存比 = 队伍平均血量 / 推荐血量；<1 表示血量不足以扛住敌人攻击
+const survivalRatio = computed(() => {
+  const rec = currentRecommendedHP.value
+  return rec > 0 ? teamAvgEffectiveHP.value / rec : 1
+})
+// 综合匹配度 = min(战力比, 生存比)，取短板反映真实战斗风险
+// 原 buildRatio 仅看战力，导致 93% 匹配度但血量不足被秒；现引入生存比修正
 const buildRatio = computed(() => {
   const rec = currentRecommendedBuild.value
-  return rec > 0 ? playerBuildStrength.value / rec : 1
+  const br = rec > 0 ? playerBuildStrength.value / rec : 1
+  return Math.min(br, survivalRatio.value)
 })
 
 // 当前生效丹药 buff 列表（用于 UI 显示）
@@ -484,8 +512,10 @@ const activePillBuffList = computed(() => {
   }
   return effects.map(buff => {
     const recipe = pillRecipes.find(r => r.id === buff.pillId)
-    const remainingMs = Math.max(0, buff.expiresAt - now)
-    const remainingSec = Math.ceil(remainingMs / 1000)
+    // idleOnly buff（仅本次挂机生效）：expiresAt=Infinity，显示"本次挂机"而非剩余时间
+    const isIdleOnly = buff.idleOnly === true
+    const remainingMs = isIdleOnly ? Infinity : Math.max(0, buff.expiresAt - now)
+    const remainingSec = isIdleOnly ? 0 : Math.ceil(remainingMs / 1000)
     const minutes = Math.floor(remainingSec / 60)
     const seconds = remainingSec % 60
     return {
@@ -494,7 +524,7 @@ const activePillBuffList = computed(() => {
       description: recipe?.description || '',
       typeName: typeNames[buff.type] || buff.type,
       valueText: (buff.value > 0 ? '+' : '') + formatBuffPercent(buff.value || 0),
-      remainingText: minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`,
+      remainingText: isIdleOnly ? '本次挂机' : (minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`),
       remainingMs
     }
   })
@@ -2386,6 +2416,9 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   // Boss 奖励区分：数量型（灵石/修为/材料/结晶/碎片）Boss 是普怪的 10 倍；
   // 装备/灵宠在品质上显著区分（最高稀有度权重 ×10 + 升档概率提升），均不突破现有爆率 chance。
   const BOSS_STACKABLE = ['spirit_stone', 'cultivation', 'herb', 'ore', 'liquid', 'phantom_crystal', 'pet_fragment']
+  // 挂机产出系数调整：用户反馈修为/灵石产出过多，下调至原值的 20%；幻灵结晶下调至 50%。
+  const IDLE_RESOURCE_NERF = 0.2  // 修为/灵石产出系数
+  const IDLE_CRYSTAL_NERF = 0.5   // 幻灵结晶产出系数
   for (const rw of effectiveZone.rewards) {
     const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
       ? rw.chance
@@ -2398,7 +2431,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
       const bossAmountMult = (isBoss && BOSS_STACKABLE.includes(rw.type)) ? BOSS_REWARD_MULT : 1
       const multiplied = Math.floor(amount * bossAmountMult * effectiveZone.rewardMultiplier)
       if (rw.type === 'spirit_stone') {
-        const final = Math.floor(multiplied * getPillBuffMultiplier('spiritStoneRate'))
+        const final = Math.floor(multiplied * IDLE_RESOURCE_NERF * getPillBuffMultiplier('spiritStoneRate'))
         s.spiritStones += final
         runStats.value.spiritStones += final
         rewards.push({ type: 'spirit_stone', amount: final, name: '灵石' })
@@ -2428,7 +2461,8 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
         }
       } else if (rw.type === 'cultivation') {
         // expGain 倍率由 s.cultivate() 内部的 expBonus 统一负责（避免双重相乘导致膨胀）
-        const final = Math.floor(multiplied)
+        // 挂机产出系数调整：修为下调至原值的 20%
+        const final = Math.floor(multiplied * IDLE_RESOURCE_NERF)
         s.cultivate(final)
         runStats.value.cultivation += final
         rewards.push({ type: 'cultivation', amount: final, name: '修为' })
@@ -2470,11 +2504,12 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   }
   // 幻灵结晶：每场遭遇独立产出（青萝林·游历5min≈15，混沌界·灭世30min<1000）。
   // 此前比例偏高（2+diff*1.5+scale*3），现下调约 60%，让灵石/结晶产出更平衡。
+  // 挂机产出系数调整：幻灵结晶再下调至原值的 50%（IDLE_CRYSTAL_NERF）。
   const diff = effectiveZone.difficulty || 1
   const scale = effectiveZone.enemyScale || 1
   const crystalBase = Math.floor(1 + diff * 0.6 + scale * 1.2)
   const crystalMult = isBoss ? BOSS_REWARD_MULT : 1
-  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4) * crystalMult))
+  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4) * crystalMult * IDLE_CRYSTAL_NERF))
   s.phantomCrystals += crystalAmount
   runStats.value.phantomCrystals += crystalAmount
   rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
@@ -4586,6 +4621,8 @@ function finishIdle() {
   // 挂机结束时，flush 所有待显示日志
   flushAllPendingLogs()
   const s = store()
+  // 清理仅本次挂机生效的 buff 类丹药（idleOnly 标记）——buff 丹药不再有分钟级持续时长
+  s.clearIdleOnlyBuffs()
   const allDead = teamMemberStates.value.every(ms => ms.hp <= 0)
   
   lastSummary.value = {
