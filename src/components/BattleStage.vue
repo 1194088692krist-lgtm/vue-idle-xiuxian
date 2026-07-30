@@ -135,7 +135,7 @@
             <div class="hp-bar">
               <div class="hp-fill enemy-hp" :style="{ width: enemyHpPct + '%', background: hpBarColor(enemyHpPct) }"></div>
             </div>
-            <div class="hp-text">{{ formatNumber(Math.round(displayEnemyHp > 0 ? displayEnemyHp : encounter.enemy.currentHealth)) }}/{{ formatNumber(displayEnemyMaxHp > 0 ? displayEnemyMaxHp : (encounter.enemy.stats.maxHealth || 0)) }}</div>
+            <div class="hp-text">{{ formatNumber(encounter.enemy.currentHealth <= 0 ? 0 : Math.round(displayEnemyHp > 0 ? displayEnemyHp : encounter.enemy.currentHealth)) }}/{{ formatNumber(displayEnemyMaxHp > 0 ? displayEnemyMaxHp : (encounter.enemy.stats.maxHealth || 0)) }}</div>
           </div>
         </div>
       </div>
@@ -358,6 +358,12 @@ function isImageUrl(str) {
 const enemyHpPct = computed(() => {
   const e = props.encounter?.enemy
   if (!e || !e.stats) return 0
+  // 修复 BOSS 击杀血条不归零：executeRound 同步跑完所有回合后 enemy.currentHealth 已归零并
+  // 触发击杀立绘，但 displayEnemyHp 是 BattleStage 异步动画追赶值，还停在前几回合的血量。
+  // 原 `displayEnemyHp.value > 0 ? displayEnemyHp : e.currentHealth` 会让血条继续显示动画
+  // 追赶中的高血量，导致"立绘已弹出但血条还有很多血"。改为：enemy 真实已死（currentHealth<=0）
+  // 时直接归零，不等动画追赶。
+  if (e.currentHealth <= 0) return 0
   // 正向展示：优先用 displayEnemyHp（随攻击动画逐步推进），首次或未初始化时回退实体血量
   const hp = displayEnemyHp.value > 0 ? displayEnemyHp.value : e.currentHealth
   const max = displayEnemyMaxHp.value > 0 ? displayEnemyMaxHp.value : (e.stats.maxHealth || 1)

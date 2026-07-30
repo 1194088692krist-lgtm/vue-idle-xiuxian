@@ -2848,9 +2848,16 @@ export const usePlayerStore = defineStore('player', {
     async getSkinShopItems() {
       const now = Date.now()
       const today = Math.floor(now / (24 * 3600 * 1000))
-      if (!this.skinShopState) {
+      // 修复 TypeError: Cannot read properties of undefined (reading 'length')：
+      // trimSaveState 会删除 items 字段（存档瘦身），重载后 skinShopState 存在但 items 缺失。
+      // 此处与 getBlackMarketItems 一致做字段完整性校验，确保内部字段始终存在且类型正确。
+      if (!this.skinShopState || typeof this.skinShopState !== 'object') {
         this.skinShopState = { items: [], refreshedAt: 0, refreshCount: 0, refreshResetDay: today }
       }
+      if (!Array.isArray(this.skinShopState.items)) this.skinShopState.items = []
+      if (typeof this.skinShopState.refreshedAt !== 'number') this.skinShopState.refreshedAt = 0
+      if (typeof this.skinShopState.refreshCount !== 'number') this.skinShopState.refreshCount = 0
+      if (typeof this.skinShopState.refreshResetDay !== 'number') this.skinShopState.refreshResetDay = today
       if (this.skinShopState.refreshResetDay !== today) {
         this.skinShopState.refreshCount = 0
         this.skinShopState.refreshResetDay = today
@@ -2867,9 +2874,13 @@ export const usePlayerStore = defineStore('player', {
     // 手动刷新皮肤商店（消耗灵石）。autoRefresh=true 时为系统自动刷新，不扣费
     async refreshSkinShop({ autoRefresh = false } = {}) {
       const now = Date.now()
-      if (!this.skinShopState) {
+      // 同步校验 skinShopState 字段完整性（与 getSkinShopItems 一致，防止 trimSaveState 后字段缺失）
+      if (!this.skinShopState || typeof this.skinShopState !== 'object') {
         this.skinShopState = { items: [], refreshedAt: 0, refreshCount: 0, refreshResetDay: 0 }
       }
+      if (!Array.isArray(this.skinShopState.items)) this.skinShopState.items = []
+      if (typeof this.skinShopState.refreshCount !== 'number') this.skinShopState.refreshCount = 0
+      if (typeof this.skinShopState.refreshResetDay !== 'number') this.skinShopState.refreshResetDay = 0
       let cost = 0
       if (!autoRefresh) {
         cost = getSkinShopRefreshCost()
@@ -2924,9 +2935,14 @@ export const usePlayerStore = defineStore('player', {
     // 获取当前 BOSS 挑战券商品（首次访问或距上次刷新超 24h 自动刷新）
     getBossTicketShopItems() {
       const now = Date.now()
-      if (!this.bossTicketShopState) {
+      // 修复 TypeError: Cannot read properties of undefined (reading 'length')：
+      // trimSaveState 会删除 items 字段（存档瘦身），重载后 bossTicketShopState 存在但 items 缺失。
+      // 此处与 getBlackMarketItems/getSkinShopItems 一致做字段完整性校验。
+      if (!this.bossTicketShopState || typeof this.bossTicketShopState !== 'object') {
         this.bossTicketShopState = { items: [], refreshedAt: 0 }
       }
+      if (!Array.isArray(this.bossTicketShopState.items)) this.bossTicketShopState.items = []
+      if (typeof this.bossTicketShopState.refreshedAt !== 'number') this.bossTicketShopState.refreshedAt = 0
       if (this.bossTicketShopState.items.length === 0 || now - this.bossTicketShopState.refreshedAt >= 24 * 3600 * 1000) {
         this.bossTicketShopState.items = rollBossTicketShopItems()
         this.bossTicketShopState.refreshedAt = now
@@ -2936,6 +2952,11 @@ export const usePlayerStore = defineStore('player', {
     },
     // 手动刷新 BOSS 挑战券商店（消耗 10 万灵石）
     refreshBossTicketShop() {
+      // 同步校验 bossTicketShopState 字段完整性（防止 trimSaveState 后字段缺失导致崩溃）
+      if (!this.bossTicketShopState || typeof this.bossTicketShopState !== 'object') {
+        this.bossTicketShopState = { items: [], refreshedAt: 0 }
+      }
+      if (!Array.isArray(this.bossTicketShopState.items)) this.bossTicketShopState.items = []
       const cost = BOSS_TICKET_SHOP_CONFIG.refreshCost
       if (this.spiritStones < cost) {
         return { success: false, message: `灵石不足，刷新需要 ${cost} 灵石` }
