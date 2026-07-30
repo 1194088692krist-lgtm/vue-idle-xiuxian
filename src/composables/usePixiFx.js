@@ -221,8 +221,7 @@ function isDataUrl(url) {
 
 /**
  * 在主线程用 HTMLImageElement + decode() 加载图片，解码完成后返回 Image 元素
- * 仅用于 data URL：规避 PixiJS 8 Assets.load 对 dataURL 走 Worker 路径导致
- * createImageBitmap(blob) 在部分环境下返回 width=0 / source.valid=false 的问题
+ * 仅用于 data URL 的回退路径（首选走 createImageBitmap，见 loadTexture）
  * @param {string} dataUrl
  * @returns {Promise<HTMLImageElement>}
  */
@@ -236,59 +235,124 @@ function loadImageElement(dataUrl) {
 }
 
 /**
- * 加载单帧纹理
- * - data URL：主线程 Image+decode → Texture.from(img)，绕过 PixiJS Worker 路径
- *   （PixiJS 8 Assets.load 对 dataURL 走 WorkerManager.loadImageBitmap → fetch+createImageBitmap，
- *    在部分浏览器/Worker 环境下 createImageBitmap 返回损坏 bitmap，source.valid=false）
- * - 普通 URL：走 Assets.load 正常异步流程
+ * dataURL → Blob 转换（用于 createImageBitmap 路径）
+ * 优先用 fetch(dataUrl)（现代浏览器原生支持 data URL），失败回退 base64 手动解码
+ * @param {string} dataUrl
+ * @returns {Promise<Blob>}
+ */
+async function dataUrlToBlob(dataUrl) {
+  // 优先 fetch（简洁、原生优化）
+  if (typeof fetch === 'function') {
+    try {
+      const resp = await fetch(dataUrl)
+      if (resp.ok) return await resp.blob()
+    } catch (_) { /* fetch 失败回退手动解码 */ }
+  }
+  // 手动 base64 解码（兼容不支持 fetch(dataUrl) 的环境）
+  const [meta, b64] = dataUrl.split(',')
+  const mime = (meta.match(/data:(.*?);/) || [])[1] || 'image/png'
+  const bin = atob(b64)
+  const arr = new Uint8Array(bin.length)
+  for (let i = 0; i < bin.length; i++) arr[i] = bin.charCodeAt(i)
+  return new Blob([arr], { type: mime })
+}
+
+/**
+ * 判定一个 Texture 是否真正可用（source 存在且尺寸>0）
+ * PixiJS 8 的 TextureSource 没有 valid 属性（那是 v7 BaseTexture 的 API），
+ * 用 width>0 作为有效判据——资源未就绪时 TextureSource 构造会回退到 width=1，
+ * 但真正的有效纹理 width 来自 resourceWidth/naturalWidth，必然 >1（帧尺寸 128）
+ * @param {Object|null|undefined} tex
+ * @returns {boolean}
+ */
+function isTextureUsable(tex) {
+  return !!(tex && tex.source && tex.source.width > 1 && tex.source.height > 1)
+}
+
+/**
+ * 加载单帧纹理（彻底修复 hasSource:false）
+ *
+ * 根因分析（PixiJS 8.19.0）：
+ * 1. TextureSource 没有 valid 属性（原 waitForSourceValid 等的是不存在的属性，永远超时）
+ * 2. HTMLImageElement 的 naturalWidth 在 onload 后仍可能异步传播，导致 ImageSource
+ *    构造时取到 width=1（回退值），Texture.source.width<=0 判定失败
+ * 3. Texture.from(img) 走 PixiJS 内部 Cache，缓存损坏时返回 undefined
+ *
+ * 彻底方案：主线程 createImageBitmap 解码，ImageBitmap.width/height 立即可用且为同步数字属性，
+ * 显式传 width/height 给 ImageSource 构造，彻底消除异步传播问题。
+ *
+ * 三级降级：
+ *  - L1: dataURL → Blob → createImageBitmap → ImageSource(显式 w/h) → Texture
+ *  - L2: HTMLImageElement + decode + ImageSource(显式 naturalWidth/Height) → Texture
+ *  - L3: Texture.from(img, true) skipCache 兜底（绕过 PixiJS 内部缓存损坏）
+ *
  * @param {string} url
  * @returns {Promise<Texture>}
  */
 async function loadTexture(url) {
   if (textureCache.has(url)) {
-    // 修复：缓存中的 texture 可能因首次构造时 source 未传播而无效，校验后必要时重载
     const cached = textureCache.get(url)
-    if (cached && cached.source && cached.source.width > 0) return cached
-    // source 无效：清除缓存重新加载
+    if (isTextureUsable(cached)) return cached
     textureCache.delete(url)
   }
 
-  let tex
+  let tex = null
+
   if (isDataUrl(url)) {
-    // dataURL 路径：主线程加载并解码，确保 ImageSource 资源就绪
-    const img = await loadImageElement(url)
-    // 进一步 await decode()，确保浏览器完成图像解码
-    if (typeof img.decode === 'function') {
-      try { await img.decode() } catch (_) { /* decode 失败也继续，onload 已保证加载完成 */ }
-    }
     const { Texture, ImageSource } = pixiModule
-    // 修复 hasSource:false：原直接 Texture.from(img) 在 PixiJS 8 部分场景下
-    // 返回 source 为 null 的 texture（ImageSource 未正确从 img 构造）。
-    // 改为显式构造 ImageSource → Texture，并等待 source.valid 传播。
-    if (ImageSource) {
-      const source = new ImageSource({ resource: img })
-      // ImageSource 构造后 source.valid 可能异步传播，轮询等待最多 200ms
-      const valid = await waitForSourceValid(source, 200)
-      // 仅当 source 已就绪时才用它构造 Texture，否则回退 Texture.from
-      // （避免 source.valid=false 时构造出无效 texture，导致 play 阶段再次失败）
-      if (valid && source) {
-        tex = new Texture({ source })
-      } else {
-        tex = Texture.from(img)
-      }
-    } else {
-      tex = Texture.from(img)
-    }
-    // 兜底校验：若显式构造仍无效，回退 Texture.from
-    if (!tex || !tex.source) {
-      tex = Texture.from(img)
-    }
-    // 二次校验：source.width<=0 说明资源仍未就绪，强制重试 Texture.from 一次
-    if (tex && tex.source && tex.source.width <= 0) {
+
+    // L1: createImageBitmap 方案（首选）——主线程解码，width/height 同步可用
+    if (typeof createImageBitmap === 'function' && ImageSource) {
       try {
-        const fallback = Texture.from(img)
-        if (fallback && fallback.source && fallback.source.width > 0) tex = fallback
-      } catch (_) { /* 保留原 tex，由 play 阶段校验拦截 */ }
+        const blob = await dataUrlToBlob(url)
+        const bitmap = await createImageBitmap(blob)
+        // ImageBitmap 解码已完成，width/height 是同步数字属性
+        if (bitmap.width > 0 && bitmap.height > 0) {
+          // 显式传 width/height，避免 TextureSource 构造时读 resourceWidth getter 的不确定性
+          const source = new ImageSource({
+            resource: bitmap,
+            width: bitmap.width,
+            height: bitmap.height
+          })
+          tex = new Texture({ source })
+        }
+      } catch (_) { /* L1 失败，降级 L2 */ }
+    }
+
+    // L2: HTMLImageElement + decode + 显式 naturalWidth/Height
+    if (!isTextureUsable(tex) && ImageSource) {
+      try {
+        const img = await loadImageElement(url)
+        if (typeof img.decode === 'function') {
+          try { await img.decode() } catch (_) {}
+        }
+        const nw = img.naturalWidth || img.width || 0
+        const nh = img.naturalHeight || img.height || 0
+        // 只有 naturalWidth 真正就绪时才构造，避免 width=1 的空纹理
+        if (nw > 1 && nh > 1) {
+          const source = new ImageSource({
+            resource: img,
+            width: nw,
+            height: nh
+          })
+          tex = new Texture({ source })
+        }
+      } catch (_) { /* L2 失败，降级 L3 */ }
+    }
+
+    // L3: Texture.from(img, true) 兜底——skipCache=true 绕过 PixiJS 内部缓存损坏
+    if (!isTextureUsable(tex)) {
+      try {
+        const img = await loadImageElement(url)
+        if (typeof img.decode === 'function') {
+          try { await img.decode() } catch (_) {}
+        }
+        // skipCache=true 避免 PixiJS Cache.get 返回损坏的 undefined
+        const nw = img.naturalWidth || img.width || 0
+        if (nw > 1) {
+          tex = Texture.from(img, true)
+        }
+      } catch (_) { /* 所有方案均失败，tex 保持 null，play 阶段会回退 CSS */ }
     }
   } else {
     // 普通 URL 路径：走 PixiJS 完整异步加载
@@ -298,27 +362,6 @@ async function loadTexture(url) {
 
   textureCache.set(url, tex)
   return tex
-}
-
-/**
- * 等待 TextureSource 的 valid 状态传播（PixiJS 8 ImageSource 构造后可能异步标记 valid）
- * @param {Object} source - PixiJS TextureSource
- * @param {number} timeout - 超时 ms
- */
-function waitForSourceValid(source, timeout = 200) {
-  return new Promise(resolve => {
-    if (!source) return resolve(false)
-    if (source.valid) return resolve(true)
-    const start = Date.now()
-    const check = () => {
-      if (source.valid || Date.now() - start > timeout) {
-        resolve(!!source.valid)
-      } else {
-        requestAnimationFrame(check)
-      }
-    }
-    requestAnimationFrame(check)
-  })
 }
 
 /**
@@ -341,21 +384,29 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false, s
   stop()
 
   // 加载所有帧纹理
-  try {
+    try {
     const textures = await Promise.all(frames.map(loadTexture))
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
-    // 校验纹理有效性：与 loadTexture 缓存校验保持一致，要求 source 存在且 width>0。
-    // 仅检查 source 存在会漏掉 source 已构造但 valid=false 的边缘情况（width=0），
-    // 那种纹理传给 AnimatedSprite 仍会渲染异常，应一并判为失败回退 CSS。
+    // 校验纹理有效性：统一用 isTextureUsable（source 存在且 width/height > 1）
+    // width>1 是关键判据——PixiJS 8 TextureSource 构造时资源未就绪会回退到 width=1，
+    // 真正的有效纹理 width 来自 createImageBitmap.width 或 naturalWidth，必然 >1（帧尺寸 128）
     const badIndices = []
     textures.forEach((t, i) => {
-      if (!t || !t.source || t.source.width <= 0) badIndices.push(i)
+      if (!isTextureUsable(t)) badIndices.push(i)
     })
     if (badIndices.length > 0) {
+      // 诊断：输出 tex 的实际类型和 source 状态，定位是 L1/L2/L3 全失败还是其他问题
+      const t0 = textures[0]
       console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS。失败帧索引:', badIndices,
         '总数:', textures.length,
-        '首帧详情:', textures[0] ? { hasSource: !!textures[0].source, width: textures[0].source?.width, height: textures[0].source?.height } : 'null')
+        '首帧详情:', t0 ? {
+          isTexture: t0.isTexture === true,
+          hasSource: !!t0.source,
+          width: t0.source?.width,
+          height: t0.source?.height,
+          resourceType: t0.source?.resource?.constructor?.name || typeof t0.source?.resource
+        } : 'null')
       return false
     }
 
