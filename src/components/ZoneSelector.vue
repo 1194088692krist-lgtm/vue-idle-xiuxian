@@ -892,14 +892,16 @@
                 <div class="boss-challenge-tip" style="margin-bottom: 8px; color: #C9C4BA;">
                   人物 BOSS 挑战券来源：挂机击杀"人物形态 BOSS"时 30% 概率掉落 1~2 张。挑战胜利掉落对应角色内丹碎片（用于专属装备打造）+ 10% 概率返还挑战券。
                 </div>
-                <!-- 人物 BOSS 选择网格（按星级分组） -->
+                <!-- 人物 BOSS 选择网格（按星级分组，默认折叠，点击展开） -->
                 <div v-if="!selectedCharBossTarget" class="boss-groups">
-                  <div v-for="group in characterBossGroups" :key="group.star" class="boss-group">
-                    <div class="boss-group-title">
+                  <div v-for="group in characterBossGroups" :key="group.star" class="boss-group" :class="{ collapsed: !expandedBossGroups[group.star] }">
+                    <div class="boss-group-title" @click="toggleBossGroup(group.star)">
+                      <span class="boss-group-toggle">{{ expandedBossGroups[group.star] ? '▼' : '▶' }}</span>
                       <span class="boss-group-name">{{ group.star }} 星角色</span>
                       <span class="boss-group-badge" :style="{ backgroundColor: starColor(group.star) }">{{ group.star }}★</span>
+                      <span class="boss-group-count">{{ group.characters.length }} 名</span>
                     </div>
-                    <div class="boss-cards-row">
+                    <div v-if="expandedBossGroups[group.star]" class="boss-cards-row">
                       <div
                         v-for="cb in group.characters"
                         :key="cb.characterId"
@@ -1360,6 +1362,12 @@ const bossChallengeMode = ref('monster')
 const selectedCharBossTarget = ref(null)
 // 人物 BOSS 挑战次数（独立于怪物 BOSS 的 bossChallengeCount）
 const charBossChallengeCount = ref(1)
+// 星级分组折叠状态：默认全部折叠，点击展开（避免一屏显示太多角色卡）
+const expandedBossGroups = reactive({})
+// 切换星级分组展开/折叠
+const toggleBossGroup = (star) => {
+  expandedBossGroups[star] = !expandedBossGroups[star]
+}
 // 星级配色（3星灰、4星蓝、5星金）
 const starColor = (star) => {
   if (star === 5) return '#FFD700'
@@ -4589,6 +4597,23 @@ html:not(.dark) .equip-select-modal .attr-col-final {
   padding: 8px 12px;
   background: rgba(255, 140, 0, 0.1);
   border-bottom: 1px solid rgba(255, 140, 0, 0.2);
+  cursor: pointer;
+  user-select: none;
+  transition: background 0.15s ease;
+}
+.boss-group-title:hover {
+  background: rgba(255, 140, 0, 0.18);
+}
+.boss-group-toggle {
+  font-size: 12px;
+  color: #FFB347;
+  width: 14px;
+  text-align: center;
+}
+.boss-group-count {
+  margin-left: auto;
+  font-size: 11px;
+  color: rgba(255, 255, 255, 0.5);
 }
 .boss-group-name {
   font-weight: 600;
@@ -4604,17 +4629,31 @@ html:not(.dark) .equip-select-modal .attr-col-final {
 }
 .boss-cards-row {
   display: grid;
-  grid-template-columns: repeat(2, 1fr);
+  grid-template-columns: repeat(auto-fill, minmax(72px, 1fr));
   gap: 8px;
   padding: 10px;
 }
 .boss-target-card {
-  padding: 10px;
+  padding: 8px;
   background: rgba(255, 255, 255, 0.04);
   border: 1px solid rgba(255, 255, 255, 0.1);
   border-radius: 6px;
   cursor: pointer;
   transition: all 0.15s ease;
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 4px;
+  overflow: hidden;
+}
+/* 人物 BOSS 卡片头像：固定小方框尺寸，防止某些角色原图过大撑破布局 */
+.character-boss-avatar {
+  width: 56px;
+  height: 56px;
+  object-fit: cover;
+  object-position: center top;
+  border-radius: 4px;
+  flex-shrink: 0;
 }
 .boss-target-card:hover {
   background: rgba(255, 140, 0, 0.12);

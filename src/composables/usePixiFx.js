@@ -292,11 +292,12 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false, s
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
     // 校验纹理有效性：PixiJS 8 的 TextureSource 没有 valid 属性（那是 v7 BaseTexture 的 API），
-    // 改用 source 存在 + width/height > 0 判断。dataURL 经主线程 Image+decode 加载，
-    // onload 触发即代表解码完成，Texture.from(img) 同步构造，纹理必然有效。
+    // 改用 source 存在判断。dataURL 经主线程 Image+decode 加载后 Texture.from(img) 同步构造，
+    // source.width/height 可能在 Texture 刚构造时还未传播到 source（异步赋值），
+    // 但纹理本身已可用。仅当 t 或 t.source 完全缺失时才判定为失败。
     const badIndices = []
     textures.forEach((t, i) => {
-      if (!t || !t.source || !t.source.width || !t.source.height) badIndices.push(i)
+      if (!t || !t.source) badIndices.push(i)
     })
     if (badIndices.length > 0) {
       console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS。失败帧索引:', badIndices,

@@ -537,10 +537,13 @@ function showEvent(e) {
     effectBadge.value = { text: '闪避！', cls: 'badge-dodge' }
     return
   }
+  // 修复 ratio 作用域 bug：原 const ratio 声明在 if(e.damage>0) 块内，
+  // 但 line 577 的 if(e.isCrit) 块引用 ratio 时已超出作用域 → ReferenceError: ratio is not defined
+  // 改为在函数顶层声明，确保整个 showEvent 函数内都可访问
+  const targetMax = e.defenderMaxHP || e.attackerMaxHP || 100
+  const ratio = targetMax > 0 ? (e.damage || 0) / targetMax : 0
   if (e.damage > 0) {
     floaters[defenderId === 'enemy' ? 'enemy' : 'm-' + memberIdByName(e.defender)] = { text: e.damage, cls: e.isCrit ? 'crit' : (e.isCounter ? 'counter' : 'normal') }
-    const targetMax = e.defenderMaxHP || e.attackerMaxHP || 100
-    const ratio = targetMax > 0 ? e.damage / targetMax : 0
     if (e.isCrit || ratio > 0.25) hurtLevel.value = 'strong'
     else if (ratio > 0.1) hurtLevel.value = 'medium'
     else hurtLevel.value = 'mild'
@@ -597,7 +600,6 @@ function showEvent(e) {
     }
   }
   if (!e.isPlayerAttack && e.damage > 0 && !e.isCrit) {
-    const ratio = (e.defenderMaxHP || 100) > 0 ? e.damage / (e.defenderMaxHP || 100) : 0
     if (ratio < 0.06 && Math.random() < 0.25) {
       shieldTarget.value = defenderId
       if (!effectBadge.value) effectBadge.value = { text: '护盾', cls: 'badge-shield' }

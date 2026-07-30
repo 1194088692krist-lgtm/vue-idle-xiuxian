@@ -340,33 +340,41 @@ watch(bossKillEvent, (evt) => {
   }
 
   // ===== 人物立绘来源 =====
-  // 仅弹出存活角色立绘：阵亡角色（hp <= 0）不参与随机
-  // 按存活人数均分播放概率：3 人 → 各 1/3，2 人 → 各 1/2，1 人 → 100%
+  // 修复立绘错配 bug：原实现随机抽存活队员显示立绘，忽略 evt.killerMemberId，
+  // 导致「惊鸿击杀」却显示净世光使立绘。改为优先用 killerMemberId 反查真实击杀者，
+  // 仅当 killerMemberId 缺失或对应成员已阵亡时才回退到随机抽存活队员。
   let member = null
-  if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
-    // 从 teamMemberStates 获取实时血量，过滤阵亡角色
-    const statesMap = {}
-    if (teamMemberStates && teamMemberStates.value) {
-      for (const ms of teamMemberStates.value) {
-        statesMap[ms.memberId] = ms.hp
+  // 从 teamMemberStates 获取实时血量，用于过滤阵亡角色
+  const statesMap = {}
+  if (teamMemberStates && teamMemberStates.value) {
+    for (const ms of teamMemberStates.value) {
+      statesMap[ms.memberId] = ms.hp
+    }
+  }
+  // 优先：用事件中的 killerMemberId 反查真实击杀者
+  if (evt.killerMemberId) {
+    const killer = playerStore.sectMembers.find(m => m.id === evt.killerMemberId)
+      || playerStore.sectMembers.find(m => (m.templateId || m.id) === evt.killerMemberId)
+    if (killer) {
+      // 确认击杀者存活（hp > 0 或无状态记录时默认存活）
+      const hp = statesMap[killer.id]
+      if (hp === undefined || hp > 0) {
+        member = killer
       }
     }
+  }
+  // 回退：killerMemberId 缺失或对应成员已阵亡时，随机抽存活队员
+  if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
     const aliveMembers = playerStore.teamMembers
       .map(id => playerStore.sectMembers.find(m => m.id === id))
       .filter(m => m && m.id)
       .filter(m => {
-        // 仅保留存活角色：teamMemberStates 中 hp > 0，或无状态记录时默认存活
         const hp = statesMap[m.id]
         return hp === undefined || hp > 0
       })
     if (aliveMembers.length > 0) {
       member = aliveMembers[Math.floor(Math.random() * aliveMembers.length)]
     }
-  }
-  // 兜底：队伍为空时尝试用事件中的 killerMemberId
-  if (!member && evt.killerMemberId) {
-    member = playerStore.sectMembers.find(m => m.id === evt.killerMemberId)
-      || playerStore.sectMembers.find(m => (m.templateId || m.id) === evt.killerMemberId)
   }
   if (!member) return
 

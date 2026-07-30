@@ -28,8 +28,8 @@ async function checkAssetVersionAndInvalidate(cache) {
     // 时间戳使 URL 每次不同，cache.match 永不命中，必定走网络拿最新版本。
     const ts = Date.now()
     const [skinsRes, petSkinsRes] = await Promise.all([
-      fetch(urlFromPath(`./portraits/skins.json?v=6&_t=${ts}`), { cache: 'no-store' }),
-      fetch(urlFromPath(`./pets/skins.json?v=6&_t=${ts}`), { cache: 'no-store' })
+      fetch(urlFromPath(`./portraits/skins.json?v=8&_t=${ts}`), { cache: 'no-store' }),
+      fetch(urlFromPath(`./pets/skins.json?v=8&_t=${ts}`), { cache: 'no-store' })
     ])
     let serverVersion = ''
     if (skinsRes.ok) {
@@ -117,14 +117,14 @@ function urlFromPath(p) {
 async function collectResourceUrls() {
   const urls = []
   // 1. 立绘清单（人物/怪物/灵宠 + 人物皮肤清单）
-  // portraits/skins.json 带 ?v=6 缓存破坏参数：与 characters.js loadSkinsManifest 一致，
+  // portraits/skins.json 带 ?v=8 缓存破坏参数：与 characters.js loadSkinsManifest 一致，
   // 确保收集到 count=6/7 的新版，从而把 skin4/5/6/7 URL 加入下载列表
   const manifestUrls = [
     './portraits/manifest.json',
     './monsters/manifest.json',
-    './portraits/skins.json?v=6',
+    './portraits/skins.json?v=8',
     './pets/manifest.json',
-    './pets/skins.json?v=6'
+    './pets/skins.json?v=8'
   ]
   for (const m of manifestUrls) {
     urls.push(m)

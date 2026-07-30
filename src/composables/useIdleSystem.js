@@ -1798,8 +1798,8 @@ async function runBossChallenge(zoneId, bossId, count) {
     return result
   }
 
-  // 取该秘境「凶险」难度作为 BOSS 推荐难度基准（boss stats 与 ZONE_BUILD_BASE 对齐）
-  const diff = (zone.difficulties || []).find(d => d.key === 'xiongxian') || zone.difficulties?.[2]
+  // 取该秘境「灭世」难度作为 BOSS 挑战基准（用户要求：怪物 BOSS 不低于对应地图灭世等级）
+  const diff = (zone.difficulties || []).find(d => d.key === 'mieshi') || zone.difficulties?.[2]
   if (!diff) {
     result.message = '秘境难度配置缺失'
     bossChallengeResult.value = result
@@ -2052,13 +2052,14 @@ async function runBossChallenge(zoneId, bossId, count) {
 // 星级越高，匹配越后期的地图，保证 BOSS 难度与产出符合角色定位
 function pickChallengeZoneForCharacter(character) {
   if (!character) return null
-  // 3星 -> 图2（迷雾谷）；4星 -> 图5（鬼荒原）；5星 -> 图7（仙墟）
-  const starToZoneIdx = { 3: 1, 4: 4, 5: 6 }
-  const zoneIdx = starToZoneIdx[character.star] ?? 1
+  // 用户要求：3星≥鬼荒原级(idx4)、4星≥冰雪宫级(idx5)、5星≥仙墟级(idx6)
+  // 原映射偏低（3星→迷雾谷 idx1），导致人物 BOSS 过弱
+  const starToZoneIdx = { 3: 4, 4: 5, 5: 6 }
+  const zoneIdx = starToZoneIdx[character.star] ?? 4
   const zone = zones[Math.min(zoneIdx, zones.length - 1)]
   if (!zone) return null
-  // 选取该图「凶险」档作为挑战基准难度（与 runBossChallenge 一致）
-  const diff = (zone.difficulties || []).find(d => d.key === 'xiongxian') || zone.difficulties?.[2]
+  // 选取该图「灭世」档作为挑战基准难度，确保人物 BOSS 强度达标
+  const diff = (zone.difficulties || []).find(d => d.key === 'mieshi') || zone.difficulties?.[2]
   if (!diff) return null
   return { zone, diff }
 }
@@ -2196,6 +2197,9 @@ async function runCharacterBossChallenge(characterId, count) {
 
     addLog('header', `⚔️ 第 ${i + 1}/${count} 场人物形态 BOSS 挑战：${character.name}！`)
     idleCombatLog.value.push(`—— 第 ${i + 1} 场人物 BOSS 挑战 · ${character.name} ——`)
+
+    // 触发人物 BOSS 入场演出（与挂机路径对称，让手动挑战也有立绘登场效果）
+    triggerCharacterBossIntro(bossEnemy)
 
     // 推进战斗
     let roundResult = { finished: false }
