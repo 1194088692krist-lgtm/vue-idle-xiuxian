@@ -9,8 +9,9 @@ import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCra
 import { getRuneStats, getRandomRune, RUNE_ELEMENTS, runes } from '../plugins/runes'
 import { petNameParts } from '../plugins/gacha'
 import { getSkillsForBreakthrough, deduplicateSkills, getInitialSkills } from '../plugins/skills'
-import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS, getBossMaterialBaseValue } from '../plugins/cultivationSystem'
-import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig } from '../plugins/characters'
+import { calculateLevelExp, calculateStatIncrease, calculateBreakthroughCost, getRealmByLevel, getReforgeBossMaterial, BOSS_MATERIALS, getBossMaterialForLevel, BOSS_TICKETS, getBossMaterialBaseValue, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
+import { getEffortCap, rebirthCharacter, getEffectiveBaseStats, recalculateMemberBaseStats, isMemberBaseStatsAbnormal, GROWTH_RATE, starConfig as characterStarConfig, characterList } from '../plugins/characters'
+import { characterInnerPillList } from '../plugins/materials'
 import { enhanceEquipment, reforgeEquipment, disassembleEquipment, enhanceConfig, reforgeConfig, getEnhanceBossMaterialCost } from '../plugins/equipment'
 import { generateExclusiveEquipment, EXCLUSIVE_EQUIP_CONFIG, EXCLUSIVE_EQUIP_SLOTS, getExclusiveMultiplier } from '../plugins/exclusiveEquipment'
 import { getResonanceBuildMultiplier } from '../plugins/schoolResonance'
@@ -2679,6 +2680,112 @@ export const usePlayerStore = defineStore('player', {
     countMaterial(kind, id) {
       if (!Array.isArray(this.materials)) return 0
       return this.materials.filter(m => m.kind === kind && m.id === id).length
+    },
+    // ===== 人物挑战券兑换（商店·灵石阁）=====
+    // 按星级定价：3星 5万/张、4星 10万/张、5星 20万/张
+    // 返回所有 50 个人物的兑换目录，供商店下拉菜单使用
+    getCharacterTicketCatalog() {
+      return characterList.map(c => {
+        const ticketDef = CHARACTER_BOSS_TICKETS[c.id]
+        const price = c.star === 5 ? 200000 : (c.star === 4 ? 100000 : 50000)
+        const owned = ticketDef ? this.countMaterial('boss_ticket', ticketDef.id) : 0
+        return {
+          characterId: c.id,
+          characterName: c.name,
+          star: c.star,
+          school: c.school,
+          ticketId: ticketDef ? ticketDef.id : null,
+          ticketName: ticketDef ? ticketDef.name : `${c.name}的挑战券`,
+          price,
+          owned,
+          canBuy: this.spiritStones >= price && !!ticketDef
+        }
+      })
+    },
+    // 兑换指定人物挑战券（购买 1 张）
+    buyCharacterTicket(characterId) {
+      const char = characterList.find(c => c.id === characterId)
+      if (!char) return { success: false, message: '人物不存在' }
+      const ticketDef = CHARACTER_BOSS_TICKETS[characterId]
+      if (!ticketDef) return { success: false, message: '该角色未配置挑战券' }
+      const price = char.star === 5 ? 200000 : (char.star === 4 ? 100000 : 50000)
+      if (this.spiritStones < price) {
+        return { success: false, message: `灵石不足，需要 ${price} 灵石` }
+      }
+      this.spiritStones -= price
+      this.gainMaterial({
+        id: ticketDef.id,
+        name: ticketDef.name,
+        kind: 'boss_ticket',
+        quality: 'rare',
+        description: ticketDef.description
+      })
+      this.queueSave()
+      return { success: true, message: `成功兑换 ${ticketDef.name}，消耗 ${price} 灵石` }
+    },
+    // ===== 内丹碎片 → 幻灵结晶兑换（抽卡页）=====
+    // 1 内丹碎片 = 50 幻灵结晶；支持多选批量兑换
+    // 返回所有 50 个内丹碎片的兑换目录
+    getInnerPillExchangeCatalog() {
+      if (!Array.isArray(this.materials)) this.materials = []
+      return characterInnerPillList.map(p => {
+        const char = characterList.find(c => c.id === 'char_' + p.id.replace(/^inner_pill_char_/, ''))
+        // 内丹碎片在 materials 中以 kind='special' 存储，按 id 统计持有量
+        const owned = this.materials.filter(m => m.id === p.id).length
+        return {
+          pillId: p.id,
+          pillName: p.name,
+          quality: p.quality,
+          star: char ? char.star : 3,
+          characterName: char ? char.name : p.name.replace(/的内丹碎片$/, ''),
+          owned,
+          yield: 50 // 1 碎片 → 50 结晶
+        }
+      })
+    },
+    // 批量兑换内丹碎片 → 幻灵结晶（传入 pillId 数组，每个碎片换 50 结晶）
+    exchangeInnerPillsForCrystals(pillIds) {
+      if (!Array.isArray(pillIds) || pillIds.length === 0) {
+        return { success: false, message: '请选择要兑换的内丹碎片' }
+      }
+      if (!Array.isArray(this.materials)) this.materials = []
+      // 统计每种碎片的持有量并校验
+      const plan = [] // [{ pillId, count, name }]
+      for (const pid of pillIds) {
+        if (typeof pid !== 'string') continue
+        const def = characterInnerPillList.find(p => p.id === pid)
+        if (!def) continue
+        // 统计持有：内丹碎片在 materials 中以 kind 为 'special' 存储（grantCharacterBossDrops 未设置 kind）
+        // 为兼容历史数据，按 id 统计（不限定 kind）
+        const owned = this.materials.filter(m => m.id === pid).length
+        if (owned <= 0) continue
+        plan.push({ pillId: pid, count: owned, name: def.name })
+      }
+      if (plan.length === 0) {
+        return { success: false, message: '所选内丹碎片均不足，无法兑换' }
+      }
+      // 扣除素材（从后往前删，避免索引错位）
+      let totalCrystals = 0
+      let totalFragments = 0
+      const removedNames = []
+      for (const item of plan) {
+        let need = item.count
+        for (let i = this.materials.length - 1; i >= 0 && need > 0; i--) {
+          if (this.materials[i].id === item.pillId) {
+            this.materials.splice(i, 1)
+            need--
+          }
+        }
+        totalCrystals += item.count * 50
+        totalFragments += item.count
+        removedNames.push(`${item.name}×${item.count}`)
+      }
+      this.phantomCrystals += totalCrystals
+      this.queueSave()
+      return {
+        success: true,
+        message: `成功使用 ${totalFragments} 个内丹碎片兑换 ${totalCrystals} 幻灵结晶（${removedNames.join('、')}）`
+      }
     },
     // 召回灵宠
     recallPet() {

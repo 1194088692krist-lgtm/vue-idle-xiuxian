@@ -136,15 +136,15 @@
           <span class="gold-text">奖励 x{{ currentDifficulty.rewardMultiplier }}</span>
           <span>{{ currentDifficulty.spiritCost }} 灵石/场</span>
         </div>
-        <div v-if="currentCharacterBoss" class="char-boss-hint">
-          <span class="char-boss-tag">👑 可能刷新</span>
+        <div v-if="currentCharacterBoss && selectedDifficultyKey === 'mieshi'" class="char-boss-hint">
+          <span class="char-boss-tag">👑 灭世人物BOSS</span>
           <span class="char-boss-name">{{ currentCharacterBoss.characterName }}</span>
           <span class="char-boss-star">{{ currentCharacterBoss.star }}★</span>
-          <span class="char-boss-note">（60%-80% 概率出现，击败掉落内丹碎片与挑战券）</span>
+          <span class="char-boss-note">（灭世难度必刷，击败掉落内丹碎片与挑战券）</span>
         </div>
-        <div v-else class="char-boss-hint muted">
-          <span class="char-boss-tag">👑 最终BOSS</span>
-          <span class="char-boss-note">本轮为秘境原怪，挂机结束后随机刷新人物形态 BOSS</span>
+        <div v-else-if="selectedDifficultyKey === 'mieshi'" class="char-boss-hint muted">
+          <span class="char-boss-tag">👑 灭世人物BOSS</span>
+          <span class="char-boss-note">灭世难度必刷人物形态BOSS，挂机结束后刷新候选</span>
         </div>
       </div>
 

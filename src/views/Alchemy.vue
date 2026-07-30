@@ -935,6 +935,40 @@
             <div v-if="barterCatalog.items.length === 0" class="empty-state">尚未解锁任何秘境 BOSS 素材，先去突破吧。</div>
           </div>
 
+          <!-- 人物挑战券兑换区（下拉选择人物，按星级定价） -->
+          <div class="section">
+            <h3 class="section-title">人物挑战券（直接挑战人物 BOSS）</h3>
+            <p class="section-hint">消耗灵石直接兑换指定人物 BOSS 的挑战券：3星 5万/张、4星 10万/张、5星 20万/张。灭世难度刷出的人物 BOSS 也可掉落对应挑战券。</p>
+            <div class="char-ticket-exchange">
+              <div class="char-ticket-select-row">
+                <span class="char-ticket-label">选择人物：</span>
+                <n-select
+                  v-model:value="selectedCharacterId"
+                  :options="characterTicketOptions"
+                  placeholder="请选择拟兑换挑战券的人物"
+                  filterable
+                  class="char-ticket-select"
+                />
+              </div>
+              <div v-if="selectedTicketInfo" class="char-ticket-info glass-card">
+                <div class="char-ticket-detail">
+                  <span class="char-ticket-name">{{ selectedTicketInfo.characterName }}</span>
+                  <span class="rarity-badge" :class="starClass(selectedTicketInfo.star)">{{ selectedTicketInfo.star }}星</span>
+                  <span class="char-ticket-owned">持有券：{{ selectedTicketInfo.owned }}</span>
+                </div>
+                <div class="char-ticket-price">{{ formatNumber(selectedTicketInfo.price) }} 灵石 / 张</div>
+                <div class="char-ticket-actions">
+                  <n-input-number v-model:value="ticketBuyCount" :min="1" :max="20" class="char-ticket-count" />
+                  <button
+                    class="btn-small btn-buy"
+                    :disabled="!selectedTicketInfo.canBuy || playerStore.spiritStones < selectedTicketInfo.price * ticketBuyCount"
+                    @click="buyCharacterTicket"
+                  >兑换 ×{{ ticketBuyCount }}（{{ formatNumber(selectedTicketInfo.price * ticketBuyCount) }} 灵石）</button>
+                </div>
+              </div>
+            </div>
+          </div>
+
           <!-- 黑市区 -->
           <div class="section">
             <div class="black-market-header">
@@ -1133,6 +1167,7 @@
     loadRune()
     loadBounty()
     loadBarter()
+    loadCharacterTickets()
     loadSkinShop()
   }
   function loadBlackMarket() {
@@ -1237,6 +1272,61 @@
     const r = await playerStore.buyBarter(id)
     r.success ? message.success(r.message) : message.error(r.message)
     loadBarter()
+    shopTick.value++
+  }
+
+  // ===== 人物挑战券兑换（下拉选择人物，按星级定价） =====
+  const selectedCharacterId = ref(null)
+  const ticketBuyCount = ref(1)
+  const characterTicketCatalog = ref([])
+  function loadCharacterTickets() {
+    characterTicketCatalog.value = playerStore.getCharacterTicketCatalog()
+    shopTick.value++
+  }
+  // n-select 选项：按星级分组展示，标签含星级与价格
+  const characterTicketOptions = computed(() => {
+    const starLabels = { 3: '三星', 4: '四星', 5: '五星' }
+    return characterTicketCatalog.value.map(c => ({
+      label: `${starLabels[c.star] || ''} · ${c.characterName}（${formatNumber(c.price)} 灵石/张，持有 ${c.owned}）`,
+      value: c.characterId
+    }))
+  })
+  // 当前选中人物的兑换详情
+  const selectedTicketInfo = computed(() => {
+    if (!selectedCharacterId.value) return null
+    return characterTicketCatalog.value.find(c => c.characterId === selectedCharacterId.value) || null
+  })
+  // 星级 → rarity-badge 类名映射
+  function starClass(star) {
+    if (star === 5) return 'legendary'
+    if (star === 4) return 'epic'
+    return 'rare'
+  }
+  async function buyCharacterTicket() {
+    if (!selectedCharacterId.value || !selectedTicketInfo.value) {
+      message.error('请先选择人物')
+      return
+    }
+    const count = ticketBuyCount.value || 1
+    const totalCost = selectedTicketInfo.value.price * count
+    if (playerStore.spiritStones < totalCost) {
+      message.error(`灵石不足，需要 ${formatNumber(totalCost)} 灵石`)
+      return
+    }
+    // 逐张兑换（每张调用一次 buyCharacterTicket，保持 store 状态一致）
+    let lastMsg = ''
+    let allOk = true
+    for (let i = 0; i < count; i++) {
+      const r = await playerStore.buyCharacterTicket(selectedCharacterId.value)
+      if (!r.success) { allOk = false; lastMsg = r.message; break }
+      lastMsg = r.message
+    }
+    if (allOk) {
+      message.success(count > 1 ? `成功兑换 ${count} 张「${selectedTicketInfo.value.ticketName}」，消耗 ${formatNumber(totalCost)} 灵石` : lastMsg)
+    } else {
+      message.error(lastMsg)
+    }
+    loadCharacterTickets()
     shopTick.value++
   }
 
@@ -3548,6 +3638,71 @@
   .btn-refresh:disabled {
     opacity: 0.5;
     cursor: not-allowed;
+  }
+  /* 人物挑战券兑换区 */
+  .char-ticket-exchange {
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    padding: 12px;
+    background: rgba(255, 140, 0, 0.06);
+    border: 1px solid rgba(255, 140, 0, 0.25);
+    border-radius: 10px;
+  }
+  .char-ticket-select-row {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .char-ticket-label {
+    font-size: 14px;
+    color: #F5DEB3;
+    font-weight: 600;
+    flex-shrink: 0;
+  }
+  .char-ticket-select {
+    flex: 1;
+    min-width: 220px;
+  }
+  .char-ticket-info {
+    padding: 12px;
+    border-radius: 8px;
+  }
+  .char-ticket-detail {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    flex-wrap: wrap;
+    margin-bottom: 8px;
+  }
+  .char-ticket-name {
+    font-size: 15px;
+    font-weight: bold;
+    color: #FFD700;
+  }
+  .char-ticket-owned {
+    font-size: 12px;
+    color: #C9C4BA;
+  }
+  .char-ticket-price {
+    font-size: 14px;
+    color: #FFD700;
+    font-weight: 600;
+    margin-bottom: 8px;
+  }
+  .char-ticket-actions {
+    display: flex;
+    align-items: center;
+    gap: 8px;
+    flex-wrap: wrap;
+  }
+  .char-ticket-count {
+    width: 120px;
+  }
+  .char-ticket-actions .btn-buy {
+    padding: 8px 16px;
+    font-size: 13px;
   }
   .black-market-header {
     display: flex;

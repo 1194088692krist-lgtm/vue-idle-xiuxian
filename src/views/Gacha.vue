@@ -104,6 +104,68 @@
           </div>
         </div>
 
+        <div class="crystal-exchange inner-pill-exchange">
+          <div class="exchange-info">
+            <span class="label">内丹碎片 → 幻灵结晶</span>
+            <span class="rate">1 内丹碎片 = 50 幻灵结晶（击败灭世难度人物 BOSS 掉落）</span>
+          </div>
+          <div class="exchange-actions">
+            <button class="btn btn-info" @click="showInnerPillExchangeModal = true">选择碎片兑换</button>
+            <button class="btn btn-info" :disabled="innerPillTotalOwned <= 0" @click="exchangeAllInnerPills">全部兑换</button>
+          </div>
+        </div>
+
+        <!-- 内丹碎片多选兑换弹窗 -->
+        <teleport to="body">
+          <div v-if="showInnerPillExchangeModal" class="inner-pill-modal" @click.self="closeInnerPillModal">
+            <div class="inner-pill-modal-content">
+              <div class="modal-header">
+                <h3>选择要兑换的内丹碎片</h3>
+                <button class="btn-small" @click="closeInnerPillModal">关闭</button>
+              </div>
+              <div class="inner-pill-summary">
+                <span>1 碎片 = 50 幻灵结晶</span>
+                <span>已选 {{ selectedPillIds.length }} 种 · 预计获得 {{ estimatedCrystals }} 幻灵结晶</span>
+              </div>
+              <div class="inner-pill-toolbar">
+                <button class="btn-small" @click="selectAllOwnedPills">全选有持有</button>
+                <button class="btn-small" @click="selectedPillIds = []">清空选择</button>
+              </div>
+              <div class="inner-pill-list">
+                <label
+                  v-for="pill in innerPillCatalog"
+                  :key="pill.pillId"
+                  class="inner-pill-row"
+                  :class="{ disabled: pill.owned <= 0 }"
+                >
+                  <input
+                    type="checkbox"
+                    :value="pill.pillId"
+                    :checked="selectedPillIds.includes(pill.pillId)"
+                    :disabled="pill.owned <= 0"
+                    @change="togglePillSelection(pill.pillId)"
+                  />
+                  <div class="inner-pill-info">
+                    <span class="inner-pill-name">{{ pill.pillName }}</span>
+                    <span class="inner-pill-meta">
+                      <span class="rarity-tag" :class="pill.quality">{{ starName(pill.star) }}·{{ pill.characterName }}</span>
+                      <span class="inner-pill-owned">持有 {{ pill.owned }}</span>
+                      <span class="inner-pill-yield">→ {{ pill.owned * 50 }} 结晶</span>
+                    </span>
+                  </div>
+                </label>
+              </div>
+              <div class="inner-pill-footer">
+                <button
+                  class="btn btn-primary"
+                  :disabled="selectedPillIds.length === 0"
+                  @click="confirmExchangeInnerPills"
+                >确认兑换（获得 {{ estimatedCrystals }} 幻灵结晶）</button>
+              </div>
+            </div>
+          </div>
+        </teleport>
+
         <div v-if="gachaResults.length > 0" class="gacha-results">
           <h3 class="section-title">祈福结果</h3>
           <div class="results-grid">
@@ -596,6 +658,74 @@
     if (result.success) showMessage('success', result.message)
     else showMessage('error', result.message)
   }
+
+  // ===== 内丹碎片 → 幻灵结晶（1 碎片 = 50 结晶，多选弹窗）=====
+  const showInnerPillExchangeModal = ref(false)
+  const selectedPillIds = ref([])
+  const innerPillCatalog = ref([])
+  function refreshInnerPillCatalog() {
+    innerPillCatalog.value = playerStore.getInnerPillExchangeCatalog()
+  }
+  // 持有内丹碎片总数
+  const innerPillTotalOwned = computed(() => {
+    return innerPillCatalog.value.reduce((sum, p) => sum + (p.owned || 0), 0)
+  })
+  // 选中碎片预计获得的幻灵结晶数
+  const estimatedCrystals = computed(() => {
+    let total = 0
+    for (const pid of selectedPillIds.value) {
+      const p = innerPillCatalog.value.find(x => x.pillId === pid)
+      if (p) total += p.owned * 50
+    }
+    return total
+  })
+  function starName(star) {
+    if (star === 5) return '五星'
+    if (star === 4) return '四星'
+    return '三星'
+  }
+  function togglePillSelection(pillId) {
+    const idx = selectedPillIds.value.indexOf(pillId)
+    if (idx >= 0) selectedPillIds.value.splice(idx, 1)
+    else selectedPillIds.value.push(pillId)
+  }
+  function selectAllOwnedPills() {
+    selectedPillIds.value = innerPillCatalog.value.filter(p => p.owned > 0).map(p => p.pillId)
+  }
+  function closeInnerPillModal() {
+    showInnerPillExchangeModal.value = false
+  }
+  function confirmExchangeInnerPills() {
+    if (selectedPillIds.value.length === 0) {
+      showMessage('error', '请先选择要兑换的内丹碎片')
+      return
+    }
+    const result = playerStore.exchangeInnerPillsForCrystals([...selectedPillIds.value])
+    if (result.success) {
+      showMessage('success', result.message)
+      selectedPillIds.value = []
+      showInnerPillExchangeModal.value = false
+      refreshInnerPillCatalog()
+    } else {
+      showMessage('error', result.message)
+    }
+  }
+  function exchangeAllInnerPills() {
+    const ownedIds = innerPillCatalog.value.filter(p => p.owned > 0).map(p => p.pillId)
+    if (ownedIds.length === 0) {
+      showMessage('error', '暂无可兑换的内丹碎片')
+      return
+    }
+    const result = playerStore.exchangeInnerPillsForCrystals(ownedIds)
+    if (result.success) {
+      showMessage('success', result.message)
+      refreshInnerPillCatalog()
+    } else {
+      showMessage('error', result.message)
+    }
+  }
+  // 抽卡页初始化时加载内丹碎片目录
+  refreshInnerPillCatalog()
   const exchangeBeastCoreAll = () => {
     const all = beastCoreCount.value
     if (all <= 0) {
@@ -927,6 +1057,167 @@
   }
   .beast-core-exchange .exchange-info .label {
     color: #ff8a78;
+  }
+  .crystal-exchange.inner-pill-exchange {
+    background: rgba(255, 140, 0, 0.08);
+    border-color: rgba(255, 140, 0, 0.3);
+  }
+  .inner-pill-exchange .exchange-info .label {
+    color: #ffb866;
+  }
+  /* 内丹碎片多选兑换弹窗 */
+  .inner-pill-modal {
+    position: fixed;
+    top: 0;
+    left: 0;
+    width: 100%;
+    height: 100%;
+    background: rgba(0, 0, 0, 0.8);
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    z-index: 1000;
+    padding: 16px;
+    box-sizing: border-box;
+  }
+  .inner-pill-modal-content {
+    background: #1A1A2E;
+    border: 1px solid rgba(255, 140, 0, 0.4);
+    border-radius: 14px;
+    width: 100%;
+    max-width: 560px;
+    max-height: calc(100vh - 40px);
+    overflow-y: auto;
+    padding: 18px 20px 20px;
+    -webkit-overflow-scrolling: touch;
+    box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
+  }
+  .inner-pill-modal-content .modal-header {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-bottom: 12px;
+    padding-bottom: 10px;
+    border-bottom: 1px solid rgba(255, 140, 0, 0.3);
+  }
+  .inner-pill-modal-content .modal-header h3 {
+    margin: 0;
+    font-size: 17px;
+    color: #FFD700;
+  }
+  .inner-pill-modal-content .modal-header .btn-small {
+    min-width: 56px;
+    min-height: 34px;
+    padding: 6px 14px;
+    font-size: 13px;
+    background: rgba(220, 53, 69, 0.3);
+    color: #FFB8B8;
+    border: 1px solid rgba(220, 53, 69, 0.4);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .inner-pill-summary {
+    display: flex;
+    justify-content: space-between;
+    flex-wrap: wrap;
+    gap: 6px;
+    padding: 8px 10px;
+    background: rgba(255, 140, 0, 0.08);
+    border-radius: 6px;
+    margin-bottom: 10px;
+    font-size: 12px;
+    color: #F5DEB3;
+  }
+  .inner-pill-toolbar {
+    display: flex;
+    gap: 8px;
+    margin-bottom: 10px;
+  }
+  .inner-pill-toolbar .btn-small {
+    padding: 5px 12px;
+    font-size: 12px;
+    background: rgba(140, 80, 255, 0.3);
+    color: #d0b0ff;
+    border: 1px solid rgba(140, 80, 255, 0.5);
+    border-radius: 6px;
+    cursor: pointer;
+  }
+  .inner-pill-list {
+    display: flex;
+    flex-direction: column;
+    gap: 6px;
+    margin-bottom: 14px;
+  }
+  .inner-pill-row {
+    display: flex;
+    align-items: center;
+    gap: 10px;
+    padding: 8px 10px;
+    background: rgba(0, 0, 0, 0.25);
+    border: 1px solid rgba(139, 69, 19, 0.2);
+    border-radius: 8px;
+    cursor: pointer;
+    transition: all 0.15s;
+  }
+  .inner-pill-row:hover:not(.disabled) {
+    border-color: rgba(255, 140, 0, 0.5);
+    background: rgba(255, 140, 0, 0.06);
+  }
+  .inner-pill-row.disabled {
+    opacity: 0.45;
+    cursor: not-allowed;
+  }
+  .inner-pill-row input[type="checkbox"] {
+    width: 18px;
+    height: 18px;
+    accent-color: #FF8C00;
+    cursor: pointer;
+    flex-shrink: 0;
+  }
+  .inner-pill-info {
+    display: flex;
+    flex-direction: column;
+    gap: 3px;
+    flex: 1;
+    min-width: 0;
+  }
+  .inner-pill-name {
+    font-size: 13px;
+    font-weight: 600;
+    color: #F5DEB3;
+    word-break: break-all;
+  }
+  .inner-pill-meta {
+    display: flex;
+    gap: 8px;
+    flex-wrap: wrap;
+    font-size: 11px;
+    color: #C9C4BA;
+  }
+  .rarity-tag {
+    padding: 1px 6px;
+    border-radius: 4px;
+    font-size: 10px;
+  }
+  .rarity-tag.rare { background: rgba(125, 180, 255, 0.2); color: #7db4ff; }
+  .rarity-tag.epic { background: rgba(200, 155, 255, 0.2); color: #c89bff; }
+  .rarity-tag.legendary { background: rgba(255, 215, 0, 0.2); color: #FFD700; }
+  .inner-pill-owned { color: #DAA520; }
+  .inner-pill-yield { color: #66BB6A; }
+  .inner-pill-footer {
+    display: flex;
+    justify-content: center;
+    padding-top: 8px;
+    border-top: 1px solid rgba(139, 69, 19, 0.2);
+  }
+  .inner-pill-footer .btn {
+    min-height: 44px;
+    padding: 10px 20px;
+  }
+  /* 日间模式适配 */
+  html:not(.dark) .inner-pill-modal-content {
+    background: rgba(45, 44, 42, 0.96);
+    border-color: rgba(255, 140, 0, 0.4);
   }
   .exchange-info {
     display: flex;

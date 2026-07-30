@@ -1218,26 +1218,34 @@ function createBossEnemy(bossData, effectiveZone) {
 
 // 按地图 id + 难度 key 决定可担任 BOSS 的人物星级范围
 // 难度档顺序：youli(0) shilian(1) xiongxian(2) juejing(3) mieshi(4) lunhui(5) tianjie(6) tiandao(7)
+// 仅灭世(mieshi)难度会刷人物BOSS，故星级范围主要服务灭世难度，确保3/4/5星角色都能被随机到
 function getCharacterBossStarRange(zoneId, difficultyKey) {
   const zoneIndex = zones.findIndex(z => z.id === zoneId)
-  if (zoneIndex < 0) return [3, 3]
+  if (zoneIndex < 0) return [3, 5]
   const diffOrder = ['youli', 'shilian', 'xiongxian', 'juejing', 'mieshi', 'lunhui', 'tianjie', 'tiandao']
   const diffIdx = diffOrder.indexOf(difficultyKey)
-  if (diffIdx < 0) return [3, 3]
+  if (diffIdx < 0) return [3, 5]
 
-  // 前 4 张图（zoneIndex 0-3）：低难 3星、高难 4星
-  // 第 5-6 张图（zoneIndex 4-5）：4星为主，灭世及以上才出 5星
-  // 第 7-8 张图（zoneIndex 6-7）：5星为主
+  // 灭世难度：根据地图序号决定星级范围，确保所有50个角色都能被随机到匹配的地图
+  // 图1-3（青萝林/迷雾谷/凤凰窟）：3星为主，偶出4星
+  // 图4-5（龙渊/鬼荒原）：4星为主，偶出3星和5星
+  // 图6-7（冰雪宫/仙墟）：5星为主，偶出4星
+  // 图8（混沌界）：5星为主
+  if (difficultyKey === 'mieshi') {
+    if (zoneIndex <= 2) return [3, 4]   // 图1-3：3-4星
+    if (zoneIndex <= 4) return [3, 5]   // 图4-5：3-5星全范围
+    if (zoneIndex <= 6) return [4, 5]   // 图6-7：4-5星
+    return [5, 5]                        // 图8：5星
+  }
+
+  // 非灭世难度的星级范围（保留原逻辑供其他用途，但人物BOSS仅在灭世刷出）
   if (zoneIndex <= 3) {
-    // 图 1-4：低难档（游历/试炼/凶险）用 3星，高难档（绝境及以上）用 4星
     if (diffIdx <= 2) return [3, 3]
     return [4, 4]
   } else if (zoneIndex <= 5) {
-    // 图 5-6：游历-灭世 用 4星；轮回及以上 用 5星
     if (diffIdx <= 4) return [4, 4]
     return [5, 5]
   } else {
-    // 图 7-8：全部用 5星
     return [5, 5]
   }
 }
@@ -1361,16 +1369,19 @@ function triggerCharacterBossIntro(enemy) {
   }, 2400)
 }
 
-// 刷新所有图所有难度的人物 BOSS 候选（每次挂机结束后调用一次）
-// 注意：此处始终为每个图+难度分配一个人物 BOSS 候选，不在此处做概率判定。
-// 实际是否以人物形态出现，在 runIdleEncounter 中按 60%-80% 概率（难度越高越高）现场掷骰。
+// 刷新所有图的人物 BOSS 候选（每次挂机结束后调用一次）
+// 仅灭世(mieshi)难度会刷人物BOSS，故只为各图的灭世难度分配候选
 function refreshCharacterBosses() {
   const result = {}
   for (const zone of zones) {
     result[zone.id] = {}
     const diffList = zone.difficulties || []
     for (const diff of diffList) {
-      // 始终刷新一个候选
+      // 仅灭世难度分配人物 BOSS 候选，其他难度置 null
+      if (diff.key !== 'mieshi') {
+        result[zone.id][diff.key] = null
+        continue
+      }
       const [minStar, maxStar] = getCharacterBossStarRange(zone.id, diff.key)
       const character = pickRandomCharacterByStar(minStar, maxStar)
       if (character) {
@@ -1396,15 +1407,15 @@ function getCharacterBossForZoneDifficulty(zoneId, difficultyKey) {
   return zoneMap[difficultyKey] || null
 }
 
-// 尝试生成人物形态 BOSS：按 60%-80% 概率（难度越高越高）掷骰决定是否以人物形态出现。
+// 尝试生成人物形态 BOSS：仅灭世(mieshi)难度必刷，其他难度不刷人物形态。
+// 灭世难度下 100% 概率刷出人物 BOSS（不受 getCharacterBossChance 概率限制）。
 // 成功返回人物 BOSS 实体，失败返回 null（调用方退化为原秘境怪物 BOSS）。
-// 每轮（5 分钟）最多 1 次人物 BOSS：由于 bossAttemptedRound 已保证每轮仅 1 次 BOSS 遭遇，
-// 此处的掷骰即等价于"本轮是否遇到人物 BOSS"的概率判定。
 function tryCreateCharacterBossEnemy(effectiveZone, difficultyKey) {
+  // 仅灭世难度刷人物 BOSS，其他难度直接返回 null 走原怪物 BOSS
+  if (difficultyKey !== 'mieshi') return null
   const charBoss = getCharacterBossForZoneDifficulty(effectiveZone.id, difficultyKey)
   if (!charBoss) return null
-  const chance = getCharacterBossChance(difficultyKey)
-  if (Math.random() >= chance) return null // 未命中，走原怪物 BOSS
+  // 灭世难度必刷，不做概率判定
   const charTemplate = _charList.find(c => c.id === charBoss.characterId)
   if (!charTemplate) return null
   return createCharacterBossEnemy(charTemplate, effectiveZone, difficultyKey)
@@ -3781,27 +3792,51 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        // 尝试生成人物形态 BOSS（按 60%-80% 概率掷骰）；未命中则退化为原秘境怪物 BOSS
-        enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
-        if (!enemy) {
-          const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-          enemy = createBossEnemy(bossData, effectiveZone)
+        // 灭世难度：必刷1~2个人物BOSS；其他难度：尝试人物BOSS，未命中走原怪物BOSS
+        const allBosses = []
+        if (selectedDifficultyKey.value === 'mieshi') {
+          // 灭世难度必刷1~2个人物BOSS
+          const bossCount = Math.random() < 0.5 ? 1 : 2
+          for (let i = 0; i < bossCount; i++) {
+            // 每次重新刷新候选，确保1~2个不同的人物BOSS
+            refreshCharacterBosses()
+            const charEnemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+            if (charEnemy) {
+              allBosses.push(charEnemy)
+            } else {
+              // 兜底：人物候选缺失时退化为怪物BOSS
+              const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+              allBosses.push(createBossEnemy(bossData, effectiveZone))
+            }
+          }
+        } else {
+          // 非灭世难度走原逻辑：尝试人物BOSS，未命中走怪物BOSS
+          enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+          if (!enemy) {
+            const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
+            enemy = createBossEnemy(bossData, effectiveZone)
+          }
+          allBosses.push(enemy)
         }
-        enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
-        idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
+        enemy = allBosses[0]
+        enemyData = { mainEnemy: enemy, allBosses, hasBoss: true, isElite: false }
+        const bossNames = allBosses.map(b => b.name).join('、')
+        idleDiag.value.lastEnemyName = 'BOSS ' + bossNames + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
         // 人物 BOSS 入场演出：立绘从上而下在屏幕中间展示后，从下方滑出
-        if (enemy.isCharacterBoss) triggerCharacterBossIntro(enemy)
-        addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${enemy.name}！限时 1 分钟内击杀，失败则进入下一轮！`)
+        for (const b of allBosses) {
+          if (b.isCharacterBoss) triggerCharacterBossIntro(b)
+        }
+        addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${bossNames}！限时 1 分钟内击杀，失败则进入下一轮！`)
         // 在完整战斗日志中插入本轮 BOSS 分隔符，便于「查看完整日志」按场次区分
-        idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${enemy.name} ——`)
+        idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${bossNames} ——`)
       } else if (farmPhaseRandomBoss) {
         // ===== 前 4 分钟小怪阶段：~7% 概率偶遇 BOSS（同样计入本轮 BOSS 已刷标记，避免重复刷） =====
+        // 注意：仅灭世难度会刷人物BOSS，其他难度偶遇的仍是怪物BOSS
         isBossEncounter = true
         bossSpawned.value = true
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        // 偶遇 BOSS 同样按 60%-80% 概率掷骰决定是否为人物形态
         enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
         if (!enemy) {
           const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
