@@ -188,7 +188,7 @@ const MATERIAL_DISPLAY = {
   boss_ticket: { name: '挑战券', icon: getIconUrl('reward_mat_core.png') },
   craft_currency: { name: '工艺货币', icon: getIconUrl('reward_mat_ore.png') },
   rune: { name: '灵纹', icon: getIconUrl('reward_mat_core.png') },
-  character_inner_pill: { name: '人物内丹碎片', icon: getIconUrl('reward_mat_core.png') }
+  character_inner_pill: { name: '内丹碎片', icon: getIconUrl('reward_mat_core.png') }
 }
 // 将一次遭遇的奖励累计进本次挂机素材统计
 // 支持 reward.type 字段（如 herb/ore/liquid/phantom_crystal）以及 material 对象的 kind 字段
@@ -1668,7 +1668,8 @@ function grantBossMaterialDrops(enemy, zoneId) {
   const match = String(bossId || '').match(/_(\d+)$/)
   const idx = match ? Math.max(0, parseInt(match[1], 10) - 1) : 0
   const bossInfo = zoneBosses[idx]
-  const dropChance = bossInfo?.dropChance ?? 0.10
+  // BOSS 专属素材掉率：用户要求提升至 90%（原按 ZONE_BOSSES 配置，默认 10%）
+  const dropChance = 0.90
 
   if (Math.random() < dropChance) {
     const materialItem = {
@@ -1752,7 +1753,7 @@ function grantCombatDrops(enemy, zoneId = null, isIdleMode = false) {
   return drops
 }
 
-// BOSS 挑战券掉落：仅在挂机击杀对应秘境 BOSS 时触发，~30% 概率掉 1~2 张专属挑战券
+// BOSS 挑战券掉落：仅在挂机击杀对应秘境 BOSS 时触发，70% 概率掉 1~2 张专属挑战券
 // 返回数组项：{ type:'boss_ticket', amount, name, id, ... }，会被 accumulateMaterials 累计并展示在仪表盘/结算栏
 function grantBossTicketDrops(enemy, zoneId) {
   const s = store()
@@ -1761,7 +1762,8 @@ function grantBossTicketDrops(enemy, zoneId) {
   const bossId = enemy.bossData.id || enemy.bossId
   const ticketDef = getBossTicketByBossId(zoneId, bossId)
   if (!ticketDef) return drops
-  if (Math.random() < 0.30) {
+  // 挑战券掉率：用户要求提升至 70%（原 30%，过低导致玩家长期无法获得）
+  if (Math.random() < 0.70) {
     const amount = Math.floor(Math.random() * 2) + 1 // 1~2 张
     const ticketItem = {
       id: ticketDef.id,
@@ -1808,9 +1810,9 @@ function grantCharacterBossDrops(enemy) {
     // drops 用独立 type，便于结算栏单独统计「人物内丹碎片」获得量
     drops.push({ ...pillItem, type: 'character_inner_pill', amount: pillCount })
   }
-  // 人物挑战券：50% 概率掉 1~2 张（原30%过低导致玩家长期无法获得）
+  // 人物挑战券：70% 概率掉 1~2 张（用户要求提升，原50%偏低）
   const ticketDef = CHARACTER_BOSS_TICKETS[charId]
-  if (ticketDef && Math.random() < 0.50) {
+  if (ticketDef && Math.random() < 0.70) {
     const amount = Math.floor(Math.random() * 2) + 1 // 1~2 张
     const ticketItem = {
       id: ticketDef.id,
@@ -2546,8 +2548,8 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   const IDLE_CRYSTAL_NERF = 0.5   // 幻灵结晶产出系数
   // 挂机素材（灵草/矿料/灵液）产出系数：原无 nerf，被 rewardMultiplier(最高100) +
   // BOSS_REWARD_MULT(10) 叠加放大，单场掉几十~上百个，远超炼丹/锻造消耗。
-  // 下调至 10%（比修为/灵石更狠，因素材累积更快且用途有限）。
-  const IDLE_MATERIAL_NERF = 0.1
+  // 用户反馈 10% 仍偏多，再次下调至 3%。
+  const IDLE_MATERIAL_NERF = 0.03
   for (const rw of effectiveZone.rewards) {
     const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
       ? rw.chance

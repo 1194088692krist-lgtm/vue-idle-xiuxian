@@ -467,6 +467,18 @@ export const getPillsByZone = (zoneId) => {
   return recipeIds.map(id => pillRecipes.find(r => r.id === id)).filter(Boolean)
 }
 
+// 中高等级丹药（grade4+）素材需求量提升 5~10 倍：
+// grade4×5, grade5×6, grade6×7, grade7×8, grade8×10
+// 提升后高品阶丹药更难合成，拉长中后期炼丹玩法寿命，同时消耗挂机产出素材。
+// 低品阶（grade1~3）保持原量不变，保护新手体验。
+const GRADE_MATERIAL_SCALE = { grade4: 5, grade5: 6, grade6: 7, grade7: 8, grade8: 10 }
+pillRecipes.forEach(recipe => {
+  const scale = GRADE_MATERIAL_SCALE[recipe.grade]
+  if (scale && recipe.materials) {
+    recipe.materials = recipe.materials.map(m => ({ ...m, count: m.count * scale }))
+  }
+})
+
 export const getZoneByPill = (pillId) => {
   for (const [zoneId, recipeIds] of Object.entries(pillZoneMapping)) {
     if (recipeIds.includes(pillId)) return zoneId

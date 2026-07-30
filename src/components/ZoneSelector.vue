@@ -362,7 +362,7 @@
               <span class="dash-value" style="color:#03a9f4">{{ formatNumber(idleDashboard.totalShieldAbsorbed) }}</span>
             </div>
             <div class="dash-item" v-if="(idleDashboard.totalCharacterInnerPills || 0) > 0">
-              <span class="dash-label">🔮 人物内丹碎片</span>
+              <span class="dash-label">🔮 内丹碎片</span>
               <span class="dash-value" style="color:#ba68c8">+{{ idleDashboard.totalCharacterInnerPills }}</span>
             </div>
           </div>
@@ -512,7 +512,7 @@
           <span class="summary-value" style="color:#FF4500">+{{ lastSummary.totalBossMaterials }}</span>
         </div>
         <div class="summary-item" v-if="(lastSummary.totalCharacterInnerPills || 0) > 0">
-          <span class="summary-label">🔮 人物内丹碎片</span>
+          <span class="summary-label">🔮 内丹碎片</span>
           <span class="summary-value" style="color:#ba68c8">+{{ lastSummary.totalCharacterInnerPills }}</span>
         </div>
         <div class="summary-item">
@@ -780,7 +780,7 @@
                     <span class="dash-value" style="color:#03a9f4">{{ formatNumber(idleDashboard.totalShieldAbsorbed) }}</span>
                   </div>
                   <div class="dash-item" v-if="(idleDashboard.totalCharacterInnerPills || 0) > 0">
-                    <span class="dash-label">🔮 人物内丹碎片</span>
+                    <span class="dash-label">🔮 内丹碎片</span>
                     <span class="dash-value" style="color:#ba68c8">+{{ idleDashboard.totalCharacterInnerPills }}</span>
                   </div>
                 </div>
@@ -870,7 +870,7 @@
                   <span class="summary-value" style="color:#FF4500">+{{ bossChallengeSummary.totalBossMaterials }}</span>
                 </div>
                 <div class="summary-item" v-if="(bossChallengeSummary.totalCharacterInnerPills || 0) > 0">
-                  <span class="summary-label">🔮 人物内丹碎片</span>
+                  <span class="summary-label">🔮 内丹碎片</span>
                   <span class="summary-value" style="color:#ba68c8">+{{ bossChallengeSummary.totalCharacterInnerPills }}</span>
                 </div>
                 <div class="summary-item">
@@ -5238,5 +5238,83 @@ html:not(.dark) .boss-challenge-error {
   background: rgba(255, 82, 82, 0.12);
   border-color: rgba(255, 82, 82, 0.4);
   color: #dc2626;
+}
+
+/* ===== 移动端性能优化：挂机仪表盘的日志/装备稀有度光晕与流光是 infinite 动画，
+   挂机时多条日志/多件装备同时运行会累积触发大量 GPU 合成，是移动端发热主因。
+   移动端关闭这些装饰光晕（靠颜色/边框已可区分稀有度），并对状态脉冲降频。 ===== */
+@media (max-width: 768px) {
+  /* 日志稀有度光晕/脉冲关闭，仅保留 logIn 入场动画 */
+  .log-line.reward-epic,
+  .log-line.reward-legendary,
+  .log-line.drop-epic,
+  .log-line.drop-celestial,
+  .log-line.drop-legendary,
+  .log-line.drop-divine,
+  .log-line.drop-mythic {
+    animation: logIn 0.35s ease;
+  }
+  /* 日志文字流光关闭（background-position 持续动画消耗大） */
+  .log-line.drop-epic .log-text,
+  .log-line.drop-celestial .log-text,
+  .log-line.drop-legendary .log-text,
+  .log-line.drop-divine .log-text,
+  .log-line.drop-mythic .log-text {
+    animation: none;
+    -webkit-text-fill-color: initial;
+    background: none;
+  }
+  /* 装备项光晕/脉冲关闭，仅保留 logIn 入场 */
+  .dash-equipment-item.is-epic,
+  .dash-equipment-item.is-legendary,
+  .dash-equipment-item.is-mythic {
+    animation: logIn 0.35s ease;
+  }
+  .dash-equipment-item.is-rare .eq-name,
+  .dash-equipment-item.is-epic .eq-name,
+  .dash-equipment-item.is-legendary .eq-name,
+  .dash-equipment-item.is-mythic .eq-name {
+    animation: none;
+    -webkit-text-fill-color: initial;
+    background: none;
+  }
+  /* 状态脉冲降频：降低每秒 GPU 合成刷新次数 */
+  .boss-phase-banner { animation: bossPulse 3s ease-in-out infinite; }
+  .idle-hp-bar .hp-fill.hp-low { animation: hpPulse 2.5s ease-in-out infinite; }
+  .log-line.combat { animation: combatGlow 4s ease-in-out infinite; }
+  .log-line.fortune { animation: fortuneHue 5s linear infinite; }
+}
+
+/* 用户系统开启「降低动态效果」时：禁用仪表盘装饰性动画 */
+@media (prefers-reduced-motion: reduce) {
+  .log-line.reward-epic,
+  .log-line.reward-legendary,
+  .log-line.drop-epic,
+  .log-line.drop-celestial,
+  .log-line.drop-legendary,
+  .log-line.drop-divine,
+  .log-line.drop-mythic,
+  .dash-equipment-item.is-epic,
+  .dash-equipment-item.is-legendary,
+  .dash-equipment-item.is-mythic {
+    animation: logIn 0.35s ease;
+  }
+  .log-line.drop-epic .log-text,
+  .log-line.drop-celestial .log-text,
+  .log-line.drop-legendary .log-text,
+  .log-line.drop-divine .log-text,
+  .log-line.drop-mythic .log-text,
+  .dash-equipment-item.is-rare .eq-name,
+  .dash-equipment-item.is-epic .eq-name,
+  .dash-equipment-item.is-legendary .eq-name,
+  .dash-equipment-item.is-mythic .eq-name {
+    animation: none;
+    -webkit-text-fill-color: initial;
+    background: none;
+  }
+  .boss-phase-banner,
+  .idle-hp-bar .hp-fill.hp-low,
+  .log-line.combat,
+  .log-line.fortune { animation: none; }
 }
 </style>

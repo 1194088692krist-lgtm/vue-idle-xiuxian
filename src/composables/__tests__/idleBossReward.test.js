@@ -53,11 +53,11 @@ describe('Boss 奖励区分：数量 ×10 与高稀有度加权（不破爆率�
     const bHerb = boss.find(r => r.type === 'herb').amount
     // 灵石：BOSS_REWARD_MULT=10 倍（非素材类，不受 bossMatMult 和 IDLE_MATERIAL_NERF 影响）
     expect(bStone).toBe(nStone * 10)
-    // 素材（herb/ore/liquid）：BOSS 素材倍率从 10 降至 3，且 IDLE_MATERIAL_NERF=0.1 对普怪和 BOSS 同效。
-    // 普怪 nHerb = max(1, floor(2 * 1 * 1 * 0.1)) = max(1, 0) = 1
-    // BOSS bHerb = max(1, floor(2 * 10 * 3 * 0.1)) = max(1, 6) = 6
+    // 素材（herb/ore/liquid）：BOSS 素材倍率从 10 降至 3，且 IDLE_MATERIAL_NERF=0.03 对普怪和 BOSS 同效。
+    // 普怪 nHerb = max(1, floor(2 * 1 * 1 * 0.03)) = max(1, 0) = 1
+    // BOSS bHerb = max(1, floor(2 * 10 * 3 * 0.03)) = max(1, floor(1.8)) = max(1, 1) = 1
     expect(nHerb).toBe(1)
-    expect(bHerb).toBe(6)
+    expect(bHerb).toBe(1)
     spy.mockRestore()
   })
 

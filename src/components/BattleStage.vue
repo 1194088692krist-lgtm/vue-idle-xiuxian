@@ -74,7 +74,7 @@
             <div v-if="shockedTarget === 'member-' + m.memberId" class="shock-overlay"></div>
             <div v-if="shieldTarget === 'member-' + m.memberId" class="shield-overlay"></div>
             <div v-if="healingTargets.includes('member-' + m.memberId)" class="heal-overlay"></div>
-            <div v-if="floaters['m-' + m.memberId]" class="float-damage" :class="floaters['m-' + m.memberId].cls">
+            <div v-if="floaters['m-' + m.memberId]" class="float-damage" :class="[floaters['m-' + m.memberId].cls, floaters['m-' + m.memberId].tier]">
               {{ floaters['m-' + m.memberId].text }}
             </div>
             <!-- 护盾吸收伤害飘字：怪物攻击玩家被护盾吸收时显示，独立于主伤害飘字 -->
@@ -125,7 +125,7 @@
             <div v-if="shockedTarget === 'enemy'" class="shock-overlay"></div>
             <div v-if="shieldTarget === 'enemy'" class="shield-overlay"></div>
             <div v-if="healingTargets.includes('enemy')" class="heal-overlay"></div>
-            <div v-if="floaters.enemy" class="float-damage" :class="floaters.enemy.cls">
+            <div v-if="floaters.enemy" class="float-damage" :class="[floaters.enemy.cls, floaters.enemy.tier]">
               {{ floaters.enemy.text }}
             </div>
             <div v-if="comboShadowEnemy" class="combo-shadow"></div>
@@ -551,7 +551,19 @@ function showEvent(e) {
   const targetMax = e.defenderMaxHP || e.attackerMaxHP || 100
   const ratio = targetMax > 0 ? (e.damage || 0) / targetMax : 0
   if (e.damage > 0) {
-    floaters[defenderId === 'enemy' ? 'enemy' : 'm-' + memberIdByName(e.defender)] = { text: e.damage, cls: e.isCrit ? 'crit' : (e.isCounter ? 'counter' : 'normal') }
+    // 伤害数值格式化：<1万显示原始数字，>=1万显示「万」，>=1亿显示「亿」
+    // 同时按数值量级分档（dmgTier），驱动飘字字体大小与颜色：
+    //   low  (<1万)：白色，基础字号
+    //   mid  (1万~1亿)：橙黄色，字号放大
+    //   high (>=1亿)：红色，字号最大，强爽感
+    const dmg = e.damage
+    const dmgText = formatNumber(dmg)
+    const dmgTier = dmg >= 1e8 ? 'high' : (dmg >= 10000 ? 'mid' : 'low')
+    floaters[defenderId === 'enemy' ? 'enemy' : 'm-' + memberIdByName(e.defender)] = {
+      text: dmgText,
+      cls: e.isCrit ? 'crit' : (e.isCounter ? 'counter' : 'normal'),
+      tier: dmgTier
+    }
     if (e.isCrit || ratio > 0.25) hurtLevel.value = 'strong'
     else if (ratio > 0.1) hurtLevel.value = 'medium'
     else hurtLevel.value = 'mild'
@@ -1193,6 +1205,7 @@ onUnmounted(() => {
   height: 100%;
   transition: width 0.3s ease;
   border-radius: 3px;
+  will-change: width;
 }
 
 .hp-text {
@@ -1566,6 +1579,7 @@ onUnmounted(() => {
   z-index: 3;
   pointer-events: none;
   white-space: nowrap;
+  will-change: transform, opacity;
 }
 .float-damage.crit {
   color: #fca5a5;
@@ -1586,6 +1600,24 @@ onUnmounted(() => {
   text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 1px 2px rgba(0,0,0,0.8);
   animation: floatUp 1.2s ease-out forwards;
 }
+/* 数值量级分档：<1万白色基础字号；1万~1亿橙黄色放大；>=1亿红色最大字号+强爽感动效 */
+.float-damage.low { color: #fff; font-size: 14px; }
+.float-damage.mid {
+  color: #f97316;
+  font-size: 20px;
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.7), 0 1px 3px rgba(0,0,0,0.85);
+  animation: floatUp 1.1s ease-out forwards;
+}
+.float-damage.high {
+  color: #ef4444;
+  font-size: 28px;
+  font-weight: 800;
+  text-shadow: 0 0 10px rgba(239, 68, 68, 0.9), 0 0 18px rgba(239, 68, 68, 0.5), 0 1px 3px rgba(0,0,0,0.85);
+  animation: floatUpBig 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+}
+/* 暴击与量级叠加：暴击仍以红色描边为主，但字号跟随量级档（高量级暴击 = 极致爽感） */
+.float-damage.crit.mid { font-size: 24px; }
+.float-damage.crit.high { font-size: 32px; }
 /* 护盾吸收飘字定位偏移：避免与主伤害飘字重叠 */
 .float-damage.shield-floater {
   top: -22px;
@@ -1596,6 +1628,13 @@ onUnmounted(() => {
 @keyframes floatUp {
   0% { opacity: 1; transform: translateX(-50%) translateY(0); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+}
+/* 高量级（>=1亿）飘字：弹性放大→上浮淡出，强化"大数字砸下"的爽感 */
+@keyframes floatUpBig {
+  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.4); }
+  18% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1.25); }
+  35% { transform: translateX(-50%) translateY(-10px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-42px) scale(0.95); }
 }
 @keyframes dodgeFloat {
   0% { opacity: 1; transform: translateX(-50%) translateY(0); }
@@ -2266,5 +2305,53 @@ html:not(.dark) .rt-log-item.skit .rt-log-bullet { color: #2563eb; }
   .fighter-name { font-size: 10px; }
   .vs-zone { font-size: 18px; }
   .battle-log-text { white-space: normal; }
+}
+
+/* ===== 移动端性能优化：挂机时大量 infinite 动画持续触发 GPU 合成与重绘，
+   是移动端发热/卡顿的主因。关闭装饰性粒子动画、降低状态主特效频率、
+   禁用纯装饰持续动画，保留状态识别度（靠边框/背景色）同时大幅减少每秒合成次数。 ===== */
+@media (max-width: 768px) {
+  /* 装饰性粒子动画（overlay 的 ::before/::after）直接关闭：状态主特效靠边框/背景已可识别 */
+  .frozen-overlay::before, .frozen-overlay::after,
+  .burn-overlay::before, .burn-overlay::after,
+  .bleed-overlay::before, .bleed-overlay::after,
+  .poison-overlay::before, .poison-overlay::after {
+    animation: none;
+  }
+  /* 纯装饰持续动画关闭：灵宠灵光环绕、护盾虚线旋转、日志稀有度光晕/流光（靠颜色区分即可） */
+  .pet-aura-orb,
+  .shield-overlay::before,
+  .rt-log-item.drop-epic,
+  .rt-log-item.drop-legendary,
+  .rt-log-item.drop-mythic,
+  .rt-log-item.drop-mythic .rt-log-part {
+    animation: none;
+  }
+  /* 状态主特效降频：原 0.45~1.5s 的 infinite 周期延长至 2~3s，减少每秒 GPU 合成刷新次数 */
+  .frozen-overlay { animation: frostPulse 3s ease-in-out infinite; }
+  .burn-overlay { animation: burnFlicker 2s ease-in-out infinite alternate; }
+  .shock-overlay::before { animation: shockBolt 2s ease-in-out infinite; }
+  .shield-overlay::after { animation: shieldIcon 2.5s ease-in-out infinite alternate; }
+  /* 暴击刀光/胜负演出等全屏特效在移动端降低合成负担 */
+  .crit-slash-line, .crit-flash-radial { will-change: transform, opacity; }
+}
+
+/* 用户系统开启「降低动态效果」时：禁用装饰性动画，仅保留必要的状态/数值反馈 */
+@media (prefers-reduced-motion: reduce) {
+  .pet-aura-orb,
+  .frozen-overlay::before, .frozen-overlay::after,
+  .burn-overlay::before, .burn-overlay::after,
+  .bleed-overlay::before, .bleed-overlay::after,
+  .poison-overlay::before, .poison-overlay::after,
+  .shield-overlay::before,
+  .rt-log-item.drop-epic,
+  .rt-log-item.drop-legendary,
+  .rt-log-item.drop-mythic,
+  .rt-log-item.drop-mythic .rt-log-part {
+    animation: none;
+  }
+  .frozen-overlay { animation: frostPulse 4s ease-in-out infinite; }
+  .burn-overlay { animation: burnFlicker 3s ease-in-out infinite alternate; }
+  .screen-shake { animation: none; }
 }
 </style>
