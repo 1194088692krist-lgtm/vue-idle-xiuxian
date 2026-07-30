@@ -31,8 +31,8 @@
         v-for="zone in filteredZones"
         :key="zone.id"
         class="zone-card"
-        :class="{ selected: selectedZone?.id === zone.id }"
-        @click="selectZone(zone)"
+        :class="{ selected: selectedZone?.id === zone.id, 'is-disabled': isIdling }"
+        @click="!isIdling && selectZone(zone)"
       >
         <div class="zone-banner" :style="{ borderTopColor: zone.difficultyColor }">
           <div class="zone-icon-area">
@@ -116,17 +116,20 @@
         </div>
       </div>
 
-      <!-- 难度档选择 -->
-      <div class="difficulty-selector">
-        <div class="diff-label">试炼难度</div>
+      <!-- 难度档选择：挂机运行中禁用切换，避免改变当前挂机难度（挂机使用 startIdle 时的锁定快照） -->
+      <div class="difficulty-selector" :class="{ 'is-locked': isIdling }">
+        <div class="diff-label">
+          试炼难度
+          <span v-if="isIdling" class="diff-locked-hint">（挂机中已锁定）</span>
+        </div>
         <div class="diff-chips">
           <div
             v-for="d in selectedZone.difficulties"
             :key="d.key"
             class="diff-chip"
-            :class="{ active: selectedDifficultyKey === d.key }"
+            :class="{ active: selectedDifficultyKey === d.key, 'is-disabled': isIdling }"
             :style="{ '--chip-color': d.color }"
-            @click="setDifficulty(d.key)"
+            @click="!isIdling && setDifficulty(d.key)"
           >
             {{ d.label }}
           </div>
@@ -1254,10 +1257,16 @@ const pillMultText = (type) => {
   const mult = getPillBuffMultiplier(type)
   return mult > 1 ? `x${mult.toFixed(2).replace(/0$/, '').replace(/\.$/, '')}` : ''
 }
+// 修为增益双轨制：expGain（悟道丹，作用于 zone rewards 修为）+ cultivationRate（修炼速度类，作用于每场胜利恢复修为）
+// 仪表盘"修为" badge 需合并显示两类，否则服用修炼速度丹后增益不显示
+const expMult = computed(() => {
+  const a = pillMultText('expGain')
+  const b = pillMultText('cultivationRate')
+  if (a && b) return `${a}/${b}`
+  return a || b || ''
+})
 const spiritMult = computed(() => pillMultText('spiritStoneRate'))
-const cultMult = computed(() => pillMultText('cultivationRate'))
 const dropMult = computed(() => pillMultText('dropRate'))
-const expMult = computed(() => pillMultText('expGain'))
 
 // ===== 开始挂机前丹药选择弹窗 =====
 const showPillSelectModal = ref(false)
@@ -2067,6 +2076,21 @@ onUnmounted(() => {
   color: #fff;
   font-weight: bold;
   box-shadow: 0 0 10px var(--chip-color, #DAA520);
+}
+/* 挂机运行中禁用难度/地图切换，避免改变当前挂机难度 */
+.diff-chip.is-disabled,
+.zone-card.is-disabled {
+  opacity: 0.5;
+  cursor: not-allowed;
+  pointer-events: none;
+}
+.diff-locked-hint {
+  font-size: 11px;
+  color: #DAA520;
+  margin-left: 4px;
+}
+.difficulty-selector.is-locked .diff-label {
+  color: #DAA520;
 }
 .diff-info {
   display: flex;

@@ -30,6 +30,11 @@ const formatBuffPercent = (value) => {
 // ============ 单例状态（模块级，跨组件共享） ============
 const selectedZone = ref(null)
 const selectedDifficultyKey = ref('xiongxian')
+// 挂机锁定快照：startIdle 时捕获，挂机期间 runIdleEncounter 优先使用快照构建 effectiveZone，
+// 避免挂机中查看别的地图/点击难度导致当前挂机难度被悄悄变更。
+// 挂机结束 finishIdle 时清空。
+const lockedZone = ref(null)
+const lockedDiffKey = ref(null)
 // 击杀BOSS事件总线：击杀时写入 { killerMemberId, killerName, bossName, zoneId, ts }
 // BattleStage/挂机界面 watch 此 ref 触发立绘突入动画
 const bossKillEvent = ref(null)
@@ -2581,7 +2586,7 @@ async function runManualBattle(effectiveZone) {
     return { victory: false, enemy: null, finished: true }
   }
 
-  const enemyData = generateZoneEnemy(effectiveZone, 1, selectedDifficultyKey.value)
+  const enemyData = generateZoneEnemy(effectiveZone, 1, lockedDiffKey.value || selectedDifficultyKey.value)
   const enemy = enemyData.mainEnemy
   enemy.avatar = enemy.isCharacterBoss ? enemy.avatar : getMonsterAvatarSync(enemy.name, 'thumbnail')
   enemy.portrait = enemy.isCharacterBoss ? enemy.portrait : getMonsterAvatarSync(enemy.name, 'full')
@@ -3784,8 +3789,10 @@ async function runIdleEncounter() {
   encounterAborted = false // 新一轮遭遇开始，清除上一场可能的超时中断标记
   const mySessionId = idleSessionId // 捕获当前挂机会话 ID，用于循环中校验是否已被新挂机中断
   const s = store()
-  const zone = selectedZone.value
-  const diff = getZoneDifficulty(zone, selectedDifficultyKey.value)
+  // 修复挂机中切换难度bug：挂机运行期间优先使用 startIdle 时锁定的快照，
+  // 避免用户查看别的地图/点击难度导致当前挂机的 zone/difficulty 被悄悄变更。
+  const zone = lockedZone.value || selectedZone.value
+  const diff = getZoneDifficulty(zone, lockedDiffKey.value || selectedDifficultyKey.value)
   // 难度配置缺失则跳过本次（不卡死重入锁，也不停止挂机）
   if (!diff) { idleDiag.value.lastStage = '跳过:diff为空'; idleDiag.value.skipCount++; isRunning = false; return }
   let effectiveZone
@@ -3853,14 +3860,15 @@ async function runIdleEncounter() {
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
         // 灭世难度：必刷1~2个人物BOSS；其他难度：尝试人物BOSS，未命中走原怪物BOSS
+        // 使用挂机锁定的 diff.key（而非 selectedDifficultyKey.value），避免挂机中切难度导致判定漂移
         const allBosses = []
-        if (selectedDifficultyKey.value === 'mieshi') {
+        if (diff.key === 'mieshi') {
           // 灭世难度必刷1~2个人物BOSS（种类固定，从挂机开始时分配的候选中取）
           // 不再每轮 refreshCharacterBosses，确保种类与外部提示一致
           const bossCount = Math.random() < 0.5 ? 1 : 2
           for (let i = 0; i < bossCount; i++) {
             // 从固定候选中按索引取人物BOSS（i=0 取第一个，i=1 取第二个）
-            const charEnemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value, i)
+            const charEnemy = tryCreateCharacterBossEnemy(effectiveZone, diff.key, i)
             if (charEnemy) {
               allBosses.push(charEnemy)
             } else {
@@ -3871,7 +3879,7 @@ async function runIdleEncounter() {
           }
         } else {
           // 非灭世难度走原逻辑：尝试人物BOSS，未命中走怪物BOSS
-          enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+          enemy = tryCreateCharacterBossEnemy(effectiveZone, diff.key)
           if (!enemy) {
             const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
             enemy = createBossEnemy(bossData, effectiveZone)
@@ -3897,7 +3905,7 @@ async function runIdleEncounter() {
         bossSpawnRound.value = roundIndex
         bossAttemptedRound.value = roundIndex
         bossSpawnTime.value = Date.now()
-        enemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+        enemy = tryCreateCharacterBossEnemy(effectiveZone, diff.key)
         if (!enemy) {
           const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
           enemy = createBossEnemy(bossData, effectiveZone)
@@ -3913,7 +3921,7 @@ async function runIdleEncounter() {
           // 到达 BOSS 窗口但本秘境无 BOSS 配置：退化为普通遭遇继续刷（极少见，避免卡死）
           idleDiag.value.lastStage = 'BOSS窗口但无boss配置，退化为普通遭遇'
         }
-        enemyData = generateZoneEnemy(effectiveZone, count, selectedDifficultyKey.value)
+        enemyData = generateZoneEnemy(effectiveZone, count, diff.key)
         enemy = enemyData.mainEnemy
         // 普通遭遇也可能随机刷出 BOSS（generateZoneEnemy 按难度概率生成）
         // 必须同步标记 isBossEncounter，否则奖励与立绘演出都按普通怪处理
@@ -4540,6 +4548,10 @@ function startIdle(durationMinutes) {
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
   if (s.spiritStones < diff.spiritCost) return
   s.startIdleExploration(selectedZone.value.id, selectedDifficultyKey.value, durationMinutes)
+  // 挂机锁定快照：捕获当前 zone/difficulty，挂机期间 runIdleEncounter 优先使用快照，
+  // 避免挂机中查看别的地图/点击难度导致当前挂机难度被悄悄变更
+  lockedZone.value = selectedZone.value
+  lockedDiffKey.value = selectedDifficultyKey.value
   isIdling.value = true
   idleEncounterErrorCount = 0
   isFinishingIdle = false // 重置待结束标志，避免上次延迟的 finishIdle 影响新挂机
@@ -4624,10 +4636,16 @@ function finishIdle() {
   // 清理仅本次挂机生效的 buff 类丹药（idleOnly 标记）——buff 丹药不再有分钟级持续时长
   s.clearIdleOnlyBuffs()
   const allDead = teamMemberStates.value.every(ms => ms.hp <= 0)
-  
+  // 结算使用挂机锁定快照，避免挂机中切地图/难度导致结算显示漂移
+  const summaryZone = lockedZone.value || selectedZone.value
+  const summaryDiffKey = lockedDiffKey.value || selectedDifficultyKey.value
+  // 清空挂机锁定快照，下次挂机重新捕获
+  lockedZone.value = null
+  lockedDiffKey.value = null
+
   lastSummary.value = {
-    zoneName: selectedZone.value?.name || '未知',
-    difficulty: selectedDifficultyKey.value,
+    zoneName: summaryZone?.name || '未知',
+    difficulty: summaryDiffKey,
     duration: s.idleExploration.duration,
     encounters: idleEncounterCount.value,
     victories: runStats.value.victories,
@@ -4755,6 +4773,9 @@ function initIdle() {
     if (zone) {
       selectedZone.value = zone
       selectedDifficultyKey.value = idleState.difficultyKey || 'xiongxian'
+      // 页面恢复挂机时，同步恢复挂机锁定快照，确保 runIdleEncounter 使用挂机开始时的 zone/difficulty
+      lockedZone.value = zone
+      lockedDiffKey.value = idleState.difficultyKey || 'xiongxian'
       isIdling.value = true
       idleEncounterCount.value = idleState.encounterCount || 0
       idlePlayerDefeated.value = false

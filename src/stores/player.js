@@ -31,7 +31,8 @@ import {
   getManualRefreshCost,
   getSeekMaterialPrice
 , BOUNTY_CONFIG, rollBountyBoard, getBountyRerollCost, BARTER_CONFIG, getBarterTargets,
-  SKIN_SHOP_CONFIG, rollSkinShopItems, getSkinShopRefreshCost } from '../plugins/shopConfig'
+  SKIN_SHOP_CONFIG, rollSkinShopItems, getSkinShopRefreshCost,
+  BOSS_TICKET_SHOP_CONFIG, rollBossTicketShopItems } from '../plugins/shopConfig'
 import { getPhaseByLevel } from '../plugins/cultivationSystem'
 
 // 装备出售/分解相关常量
@@ -313,6 +314,13 @@ export const usePlayerStore = defineStore('player', {
       refreshedAt: 0,         // 上次刷新时间戳
       refreshCount: 0,        // 当日手动刷新次数
       refreshResetDay: 0,     // 刷新计数重置日期（按天）
+    },
+    // BOSS 挑战券商店状态：随机刷新秘境 BOSS 挑战券
+    //   items: [{ uid, ticketId, name, zoneId, price, maxPurchase, soldCount }]
+    //   龙渊及之前 5 万/张，龙渊之后 20 万/张，每次刷新每张最多购 20 张
+    bossTicketShopState: {
+      items: [],
+      refreshedAt: 0,
     },
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
@@ -1075,6 +1083,43 @@ export const usePlayerStore = defineStore('player', {
         this.syncToCloud().catch(() => {})
       }, 3000)
     },
+    // 云存档体积优化：剔除运行时临时态、UI 偏好、同步状态等无需上传到云端的字段。
+    // 这些字段：①登录/启动时可重建（如 gifts、cloudSyncStatus）②本质是设备级偏好（已存 localStorage），
+    // 上传云端既无意义还会跨设备污染。日志类数据本身在模块级 ref（不进 store），此处清理 store 内的冗余字段。
+    _buildCloudPayload() {
+      const payload = { ...this.$state }
+      // 1. 运行时/会话临时态（每次启动可重建）
+      delete payload.saveTimer
+      delete payload.pendingSave
+      delete payload.lastSaveTime
+      delete payload.cloudConflicts
+      delete payload.cloudSyncStatus
+      delete payload._cloudSyncing
+      delete payload._cloudSyncTimer
+      delete payload.cloudSyncTimer
+      delete payload._migrating
+      delete payload.gifts // 登录时自动从服务器拉取
+      delete payload.isNewPlayer
+      delete payload.isGMMode
+      // 2. UI 偏好（已存 localStorage，上传会覆盖其他设备的设置）
+      delete payload.isDarkMode
+      delete payload.dynamicPortrait
+      delete payload.disablePullToRefresh
+      delete payload.bossKillAnimation
+      delete payload.characterKillSkins
+      delete payload.petKillSkins
+      // 3. 临时快照/死字段
+      delete payload._petNaturalSnapshot
+      // 4. idleExploration 中的运行时态：保留 zoneId/difficultyKey/startTime/duration（断线续挂需要），
+      //    剔除 logs（恒为空数组死字段）和 stats（本次挂机累计统计，重载后会重建）
+      if (payload.idleExploration) {
+        const ie = { ...payload.idleExploration }
+        delete ie.logs
+        delete ie.stats
+        payload.idleExploration = ie
+      }
+      return payload
+    },
     // 并发锁：防止手动上传与自动节流同步同时进行导致 last-write-wins 覆盖
     async syncToCloud() {
       const auth = useAuthStore()
@@ -1088,15 +1133,9 @@ export const usePlayerStore = defineStore('player', {
       this.cloudSyncStatus = '同步中…'
       const failures = []
       try {
-        const blob = await GameDB.getData('playerData')
-        // 关键：上传时间戳必须用存档自身的 _saveTime，而非 Date.now()。
-        // 否则云端 updated_at 永远晚于本地 _saveTime（_scheduleCloudSync 有 3s 延迟），
-        // 下次 migrate 时 cloudTime >= localTime 恒成立，导致云端（可能是较早的弱档）
-        // 反复覆盖本地较强档，表现为刷新后战斗力骤降。
-        // ⚠️ 时间戳回退修复：原 `|| Date.now()` 在旧档无 _saveTime 时用当前时间戳上传，
-        //   导致云端拿到"新时间戳 + 旧数据"，下次 migrate 必然走 cloudTime >= localTime 覆盖本地。
-        //   现改为：缺失时间戳时不上传该槽位（保存到本地等下次有效 _saveTime 再上传），
-        //   避免污染云端 last-write-wins 决策。
+        // 体积优化：上传精简版存档，剔除运行时态/UI偏好/同步状态等无需云端保存的字段
+        const payload = this._buildCloudPayload()
+        const blob = encryptData(payload)
         const mainDecoded = blob ? decryptData(blob) : null
         const mainTime = (typeof mainDecoded?._saveTime === 'number' && mainDecoded._saveTime > 0)
           ? mainDecoded._saveTime
@@ -2702,6 +2741,59 @@ export const usePlayerStore = defineStore('player', {
       return {
         success: true,
         message: `成功解锁 ${item.characterName} 的皮肤 ${item.skinIndex}，消耗 ${item.price} 灵石`
+      }
+    },
+    // ===== BOSS 挑战券商店 =====
+    // 获取当前 BOSS 挑战券商品（首次访问或距上次刷新超 24h 自动刷新）
+    getBossTicketShopItems() {
+      const now = Date.now()
+      if (!this.bossTicketShopState) {
+        this.bossTicketShopState = { items: [], refreshedAt: 0 }
+      }
+      if (this.bossTicketShopState.items.length === 0 || now - this.bossTicketShopState.refreshedAt >= 24 * 3600 * 1000) {
+        this.bossTicketShopState.items = rollBossTicketShopItems()
+        this.bossTicketShopState.refreshedAt = now
+        this.queueSave()
+      }
+      return this.bossTicketShopState.items
+    },
+    // 手动刷新 BOSS 挑战券商店（消耗 10 万灵石）
+    refreshBossTicketShop() {
+      const cost = BOSS_TICKET_SHOP_CONFIG.refreshCost
+      if (this.spiritStones < cost) {
+        return { success: false, message: `灵石不足，刷新需要 ${cost} 灵石` }
+      }
+      this.spiritStones -= cost
+      this.bossTicketShopState.items = rollBossTicketShopItems()
+      this.bossTicketShopState.refreshedAt = Date.now()
+      this.queueSave()
+      return { success: true, message: `挑战券商店已刷新，消耗 ${cost} 灵石` }
+    },
+    // 购买 BOSS 挑战券（按 uid 定位商品，按 count 购买指定数量）
+    buyBossTicket(uid, count = 1) {
+      if (!this.bossTicketShopState || !Array.isArray(this.bossTicketShopState.items)) {
+        return { success: false, message: '商店未初始化' }
+      }
+      const idx = this.bossTicketShopState.items.findIndex(i => i.uid === uid)
+      if (idx < 0) return { success: false, message: '商品不存在或已下架' }
+      const item = this.bossTicketShopState.items[idx]
+      const remaining = item.maxPurchase - (item.soldCount || 0)
+      if (remaining <= 0) return { success: false, message: '该券已达本次购买上限' }
+      const buyCount = Math.min(count, remaining)
+      const totalCost = item.price * buyCount
+      if (this.spiritStones < totalCost) {
+        return { success: false, message: `灵石不足，需要 ${totalCost} 灵石` }
+      }
+      // 发放挑战券到素材库存
+      for (let i = 0; i < buyCount; i++) {
+        this.gainMaterial({ kind: 'boss_ticket', id: item.ticketId })
+      }
+      this.spiritStones -= totalCost
+      this.bossTicketShopState.items[idx].soldCount = (item.soldCount || 0) + buyCount
+      this.queueSave()
+      return {
+        success: true,
+        message: `购买 ${item.name} ×${buyCount}，消耗 ${totalCost} 灵石`
       }
     },
     // 消耗 BOSS 挑战券（按 id 删除指定数量，从后往前删避免索引错位）

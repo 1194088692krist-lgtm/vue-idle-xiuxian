@@ -1072,6 +1072,57 @@
             <div v-if="skinShopLoading" class="empty-state">皮肤阁正在开张…</div>
           </div>
 
+          <!-- BOSS 挑战券商店区：随机刷新秘境 BOSS 挑战券，越强的越难刷出 -->
+          <div class="section">
+            <div class="black-market-header">
+              <h3 class="section-title">挑战券商店（BOSS 挑战券）</h3>
+              <button
+                class="btn-small btn-refresh"
+                :disabled="playerStore.spiritStones < bossTicketRefreshCost"
+                @click="refreshBossTicketShop"
+              >
+                刷新 - {{ formatNumber(bossTicketRefreshCost) }} 灵石
+              </button>
+            </div>
+            <p class="black-market-hint">随机刷新 5 种 BOSS 挑战券，越强的 BOSS 越难刷出。龙渊及之前 5 万/张，龙渊之后 20 万/张，每张每次最多购 20 张。</p>
+            <div class="shop-grid">
+              <div
+                v-for="item in bossTicketItems"
+                :key="item.uid"
+                class="shop-card boss-ticket-card"
+                :class="{ soldout: (item.soldCount || 0) >= item.maxPurchase }"
+              >
+                <div class="shop-card-header">
+                  <span class="shop-icon">🎟️</span>
+                  <span class="shop-name">{{ item.name }}</span>
+                  <span class="rarity-badge" :class="getTicketTierClass(item.zoneId)">{{ getTicketTierLabel(item.zoneId) }}</span>
+                </div>
+                <p class="shop-desc">来自 {{ getZoneName(item.zoneId) }} 的 BOSS 挑战券</p>
+                <div class="boss-ticket-buy-row">
+                  <span class="shop-price">{{ formatNumber(item.price) }} 灵石/张</span>
+                  <span class="ticket-stock">剩余 {{ item.maxPurchase - (item.soldCount || 0) }}/{{ item.maxPurchase }}</span>
+                </div>
+                <div class="shop-card-footer boss-ticket-footer">
+                  <n-input-number
+                    v-model:value="bossTicketCountMap[item.uid]"
+                    :min="1"
+                    :max="item.maxPurchase - (item.soldCount || 0)"
+                    size="small"
+                    style="width: 90px;"
+                  />
+                  <button
+                    class="btn-small btn-buy"
+                    :disabled="(item.soldCount || 0) >= item.maxPurchase || playerStore.spiritStones < item.price * (bossTicketCountMap[item.uid] || 1)"
+                    @click="buyBossTicket(item)"
+                  >
+                    购买
+                  </button>
+                </div>
+              </div>
+            </div>
+            <div v-if="bossTicketItems.length === 0" class="empty-state">挑战券商店正在开张…</div>
+          </div>
+
           <!-- 皮肤预览弹窗 -->
           <div v-if="previewingSkin" class="skin-preview-mask" @click="closeSkinPreview">
             <div class="skin-preview-modal" @click.stop>
@@ -1131,6 +1182,7 @@
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
   import { allMaterials } from '../plugins/materials'
   import { zones, DIFFICULTY_TEMPLATES } from '../plugins/zones'
+  import { BOSS_TICKET_SHOP_CONFIG } from '../plugins/shopConfig'
   import { starConfig, getEffortCap } from '../plugins/characters'
   import LogPanel from '../components/LogPanel.vue'
   import { useMessage } from 'naive-ui'
@@ -1177,6 +1229,7 @@
     loadBarter()
     loadCharacterTickets()
     loadSkinShop()
+    loadBossTicketShop()
   }
   function loadBlackMarket() {
     blackMarketItems.value = playerStore.getBlackMarketItems()
@@ -1370,6 +1423,51 @@
     r.success ? message.success(r.message) : message.error(r.message)
     await loadSkinShop()
     shopTick.value++
+  }
+
+  // ===== BOSS 挑战券商店 =====
+  const bossTicketItems = ref([])
+  const bossTicketRefreshCost = computed(() => BOSS_TICKET_SHOP_CONFIG.refreshCost)
+  // 每个商品 uid 对应的购买数量（响应式 map）
+  const bossTicketCountMap = ref({})
+  const TIER1_ZONES = BOSS_TICKET_SHOP_CONFIG.tier1Zones
+
+  function loadBossTicketShop() {
+    bossTicketItems.value = playerStore.getBossTicketShopItems()
+    // 初始化每个商品的购买数量为 1
+    const map = {}
+    for (const item of bossTicketItems.value) {
+      map[item.uid] = 1
+    }
+    bossTicketCountMap.value = map
+    shopTick.value++
+  }
+  function refreshBossTicketShop() {
+    if (playerStore.spiritStones < bossTicketRefreshCost.value) {
+      message.error(`灵石不足，刷新需要 ${formatNumber(bossTicketRefreshCost.value)} 灵石`)
+      return
+    }
+    const r = playerStore.refreshBossTicketShop()
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBossTicketShop()
+  }
+  function buyBossTicket(item) {
+    const count = bossTicketCountMap.value[item.uid] || 1
+    const r = playerStore.buyBossTicket(item.uid, count)
+    r.success ? message.success(r.message) : message.error(r.message)
+    loadBossTicketShop()
+  }
+  // 获取秘境中文名
+  function getZoneName(zoneId) {
+    const z = zones.find(z => z.id === zoneId)
+    return z ? z.name : zoneId
+  }
+  // 挑战券分层标签
+  function getTicketTierLabel(zoneId) {
+    return TIER1_ZONES.includes(zoneId) ? '龙渊前' : '龙渊后'
+  }
+  function getTicketTierClass(zoneId) {
+    return TIER1_ZONES.includes(zoneId) ? 'rarity-badge common' : 'rarity-badge legendary'
   }
   // 皮肤商品卡片需要展示人物头像，从 characterList 拿模板数据
   // 用懒加载避免循环依赖
@@ -3653,6 +3751,24 @@
     justify-content: space-between;
     align-items: center;
     margin-top: 4px;
+  }
+  /* BOSS 挑战券商店卡片 */
+  .boss-ticket-card.soldout {
+    opacity: 0.5;
+  }
+  .boss-ticket-buy-row {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    margin-top: 6px;
+    font-size: 12px;
+  }
+  .ticket-stock {
+    color: #F5DEB3;
+  }
+  .boss-ticket-footer {
+    gap: 8px;
+    flex-wrap: nowrap;
   }
   .shop-price {
     color: #FFD700;

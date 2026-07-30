@@ -433,3 +433,80 @@ export function getManualRefreshCost(currentCount) {
     Math.pow(BLACK_MARKET_CONFIG.manualRefreshGrowth, currentCount)
   )
 }
+
+// ===== BOSS 挑战券商店 =====
+// 设计：随机刷新秘境 BOSS 挑战券，越强的 BOSS 越难被刷新出来。
+// 价格：龙渊(dragon_abyss)及之前的 BOSS 挑战券 5 万/张；之后的所有 BOSS 挑战券 20 万/张。
+// 每次刷新每张券最多可购 20 张；刷新一次消耗 10 万灵石。
+export const BOSS_TICKET_SHOP_CONFIG = {
+  refreshCost: 100000,          // 刷新一次 10 万灵石
+  maxPurchasePerTicket: 20,     // 每张券每次刷新最多购买 20 张
+  // 价格分层：龙渊及之前 5 万/张，龙渊之后 20 万/张
+  priceTier1: 50000,            // 龙渊及之前
+  priceTier2: 200000,           // 龙渊之后
+  // 龙渊及之前的秘境（tier1）：forest_edge / misty_valley / phoenix_cave / dragon_abyss
+  // 龙渊之后的秘境（tier2）：ghost_wasteland / ice_palace / immortal_ruins / chaos_realm
+  tier1Zones: ['forest_edge', 'misty_valley', 'phoenix_cave', 'dragon_abyss'],
+  tier2Zones: ['ghost_wasteland', 'ice_palace', 'immortal_ruins', 'chaos_realm'],
+  // 刷新权重：越强的 BOSS 越难被刷新出来（tier1 权重高于 tier2，同 tier 内图序越高权重越低）
+  // tier1 各图权重：forest 40 / misty 30 / phoenix 20 / dragon 10
+  // tier2 各图权重：ghost 15 / ice 10 / immortal 6 / chaos 3
+  tierWeights: {
+    forest_edge: 40,
+    misty_valley: 30,
+    phoenix_cave: 20,
+    dragon_abyss: 10,
+    ghost_wasteland: 15,
+    ice_palace: 10,
+    immortal_ruins: 6,
+    chaos_realm: 3
+  }
+}
+
+// 获取某 BOSS 挑战券的当前价格（按所在秘境分层定价）
+export function getBossTicketPrice(zoneId) {
+  return BOSS_TICKET_SHOP_CONFIG.tier2Zones.includes(zoneId)
+    ? BOSS_TICKET_SHOP_CONFIG.priceTier2
+    : BOSS_TICKET_SHOP_CONFIG.priceTier1
+}
+
+// 随机刷新 BOSS 挑战券商品列表
+// 越强的 BOSS 越难被刷新出来：按 zone 权重抽样，每次刷新出 5 种不同的券
+export function rollBossTicketShopItems(count = 5) {
+  // 构建候选池：所有秘境的所有 BOSS 挑战券
+  const pool = []
+  for (const [zoneId, tickets] of Object.entries(BOSS_TICKETS)) {
+    const weight = BOSS_TICKET_SHOP_CONFIG.tierWeights[zoneId] || 1
+    const price = getBossTicketPrice(zoneId)
+    for (const ticket of tickets) {
+      pool.push({
+        ticketId: ticket.id,
+        name: ticket.name,
+        zoneId,
+        price,
+        weight,
+        maxPurchase: BOSS_TICKET_SHOP_CONFIG.maxPurchasePerTicket
+      })
+    }
+  }
+  // 按权重不放回抽取 count 种不同的券
+  const result = []
+  const remaining = [...pool]
+  for (let i = 0; i < count && remaining.length > 0; i++) {
+    const totalWeight = remaining.reduce((sum, item) => sum + item.weight, 0)
+    let r = Math.random() * totalWeight
+    let idx = 0
+    for (let j = 0; j < remaining.length; j++) {
+      r -= remaining[j].weight
+      if (r <= 0) { idx = j; break }
+      idx = j
+    }
+    const picked = remaining.splice(idx, 1)[0]
+    result.push({
+      ...picked,
+      uid: 'bt_' + Date.now() + '_' + i, // 唯一 ID
+      soldCount: 0 // 已购数量
+    })
+  }
+  return result
+}

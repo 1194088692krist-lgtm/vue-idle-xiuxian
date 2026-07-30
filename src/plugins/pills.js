@@ -304,6 +304,36 @@ export const pillRecipes = [
     baseEffect: { type: 'dropRate', value: 0.05, duration: 1800 }
   },
   {
+    id: 'ghost_treasure_pill',
+    name: '幽冥寻宝丹',
+    description: '以鬼荒幽冥之气淬炼的寻宝丹上位，探索掉落加成显著提升',
+    grade: 'grade5',
+    type: 'special',
+    func: 'explore',
+    materials: [
+      { kind: 'herb', id: 'treasure_scent_herb', count: 3 },
+      { kind: 'herb', id: 'sun_essence_flower', count: 2 },
+      { kind: 'ore', id: 'prospect_sand', count: 2 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade5'),
+    baseEffect: { type: 'dropRate', value: 0.1, duration: 1800 }
+  },
+  {
+    id: 'immortal_treasure_pill',
+    name: '仙墟寻宝丹',
+    description: '仙墟遗珍凝聚的寻宝至宝，探索掉落加成大幅提升',
+    grade: 'grade6',
+    type: 'special',
+    func: 'explore',
+    materials: [
+      { kind: 'herb', id: 'treasure_scent_herb', count: 4 },
+      { kind: 'herb', id: 'moonlight_orchid', count: 2 },
+      { kind: 'ore', id: 'dao_essence_stone', count: 1 }
+    ],
+    fragmentsNeeded: getFragmentsNeeded('grade6'),
+    baseEffect: { type: 'dropRate', value: 0.2, duration: 1800 }
+  },
+  {
     id: 'quench_spirit_pill',
     name: '淬灵丹',
     description: '淬炼灵气，提升下次装备强化成功率',
@@ -426,9 +456,9 @@ export const pillZoneMapping = {
   misty_valley: ['cultivation_boost', 'spirit_recovery', 'forge_bone_pill', 'cleanse_pill', 'enlightenment_pill', 'foundation_pill'],
   phoenix_cave: ['thunder_power', 'essence_condensation', 'mind_clarity', 'treasure_pill', 'quench_spirit_pill', 'calm_spirit_pill', 'great_foundation_pill'],
   dragon_abyss: ['immortal_essence', 'fire_essence', 'tribulation_pill', 'extreme_foundation_pill'],
-  ghost_wasteland: ['five_elements_pill', 'heaven_foundation_pill'],
+  ghost_wasteland: ['five_elements_pill', 'heaven_foundation_pill', 'ghost_treasure_pill'],
   ice_palace: ['celestial_essence_pill'],
-  immortal_ruins: ['sun_moon_pill'],
+  immortal_ruins: ['sun_moon_pill', 'immortal_treasure_pill'],
   chaos_realm: ['phoenix_rebirth_pill']
 }
 
