@@ -71,6 +71,17 @@ function pickBossKillKiller(allPlayers, lastAttacker) {
 // SkillCinematic watch 此 ref 触发技能名全屏特写演出（仅 BOSS 战触发，避免普通战斗喧宾夺主）
 const skillCastEvent = ref(null)
 
+// 跨回合技能演出定时器清理：避免上一回合未触发的 setTimeout 与新回合堆叠
+// 原实现：每回合 roundSkillEvents.forEach 用 setTimeout(idx*1800ms) 串行触发，
+// 若新回合在上一回合定时器未跑完时开始，两组定时器叠加 → 演出指数级堆叠 → 严重卡顿
+// 修复：记录所有待触发定时器 id，新回合开始前 clearTimeout 清空
+let pendingSkillTimers = []
+function clearPendingSkillTimers() {
+  if (pendingSkillTimers.length === 0) return
+  for (const id of pendingSkillTimers) clearTimeout(id)
+  pendingSkillTimers = []
+}
+
 // Dev 调试：浏览器 console 可手动触发技能演出（仅 dev 模式暴露）
 // 用法：在 /exploration 页面 console 执行 testSkillFx('火球术', '测试角色')
 if (import.meta.env?.DEV && typeof window !== 'undefined') {
@@ -3704,14 +3715,28 @@ async function executeRound(effectiveZone) {
     }
   }
 
-  // 本回合技能事件逐个延时触发：避免 Vue watch batching 把同 tick 多次赋值合并成一次
-  // 每个事件间隔 1.8s（约一个技能演出时长），让所有角色的技能都能完整显示
+  // 本回合技能事件触发：修复"一次攻击多次显示技能效果导致卡顿"恶性 Bug
+  // 原实现：roundSkillEvents.forEach 用 setTimeout(idx*1800ms) 串行触发 N 条事件
+  //   问题1：5 人小队 BOSS 战单回合可产生 5-8 条事件，全部排队 → 演出严重堆叠
+  //   问题2：新回合开始时未清理上一回合未触发的 setTimeout → 定时器指数级堆积
+  //   问题3：事件间隔 1.8s < 单次演出 4.6s → 多次演出重叠 → GPU 负载暴涨
+  // 修复策略：
+  //   1) 新回合开始前 clearTimeout 清空上一回合所有待触发定时器
+  //   2) 每回合最多触发 1 条事件（按优先级 skill_attack > heal > buff > debuff > control > shield > defend > shield_team 选最有展示价值的）
+  //   3) 同名同施法者 5 秒内不重复（由 SkillCinematic 端节流兜底）
   if (roundSkillEvents.length > 0) {
-    roundSkillEvents.forEach((evt, idx) => {
-      setTimeout(() => {
-        skillCastEvent.value = { ...evt, ts: Date.now() }
-      }, idx * 1800)
-    })
+    clearPendingSkillTimers()
+    // 按技能类型优先级挑选本回合唯一展示事件
+    const typePriority = { skill_attack: 1, heal: 2, buff: 3, debuff: 4, control: 5, shield: 6, shield_team: 7, defend: 8 }
+    const picked = roundSkillEvents
+      .slice()
+      .sort((a, b) => (typePriority[a.skillType] || 99) - (typePriority[b.skillType] || 99))[0]
+    const id = setTimeout(() => {
+      skillCastEvent.value = { ...picked, ts: Date.now() }
+      // 触发完成后从待清理列表移除（已无需 clearTimeout）
+      pendingSkillTimers = pendingSkillTimers.filter(x => x !== id)
+    }, 200)
+    pendingSkillTimers.push(id)
   }
 
   // 3. 怪物行动 + 玩家攻击：executeTurn 按速度排序处理所有攻击者

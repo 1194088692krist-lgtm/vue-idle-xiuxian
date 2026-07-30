@@ -256,11 +256,15 @@ function resolveSkillColor(name) {
 }
 
 // ===== 同名去重：避免同一角色同名技能连续重复触发 =====
-// 全局冷却已由 useIdleSystem 侧控制（每个技能事件间隔 1.8s 逐个触发）
-// 此处只做同名去重，不再做全局冷却，让所有角色的技能都能显示
+// 上游 useIdleSystem 已修复：每回合最多触发 1 条事件 + 跨回合清理定时器
+// 此处再兜底：用 Map 记录所有 skillKey 的最后播放时间，挡住交替重复（A→B→A 序列）
+// 以及全局节流：4 秒内不论 key 只播 1 次，彻底避免演出堆叠
 const SAME_SKILL_COOLDOWN_MS = 5000
+const GLOBAL_SKILL_THROTTLE_MS = 4000   // 全局节流：4 秒内只接受 1 次事件
 let lastCastTs = 0
 let lastSkillKey = ''
+let lastGlobalCastTs = 0
+const skillCooldownMap = new Map()      // skillKey → lastTs，挡交替重复
 let hideTimerId = null
 
 function scheduleAutoHide() {
@@ -274,12 +278,27 @@ function scheduleAutoHide() {
 
 watch(skillCastEvent, async (evt) => {
   if (!evt || !evt.ts || !evt.isBoss) return
+  // 全局节流：4 秒内只接受 1 次事件，彻底避免任何形式的演出堆叠
+  if (evt.ts - lastGlobalCastTs < GLOBAL_SKILL_THROTTLE_MS) return
   // 同技能冷却：5 秒内同名同角色不重复（避免每回合都弹同一个技能）
   const skillKey = `${evt.casterName}-${evt.skillName}`
-  if (skillKey === lastSkillKey && evt.ts - lastCastTs < SAME_SKILL_COOLDOWN_MS) return
+  const prevTs = skillCooldownMap.get(skillKey) || 0
+  if (evt.ts - prevTs < SAME_SKILL_COOLDOWN_MS) return
 
+  lastGlobalCastTs = evt.ts
   lastCastTs = evt.ts
   lastSkillKey = skillKey
+  skillCooldownMap.set(skillKey, evt.ts)
+  // Map 容量保护：超过 64 条清理过期项（避免无限增长）
+  if (skillCooldownMap.size > 64) {
+    for (const [k, t] of skillCooldownMap) {
+      if (evt.ts - t > SAME_SKILL_COOLDOWN_MS * 2) skillCooldownMap.delete(k)
+    }
+  }
+
+  // 关键：新事件到来时先停止上一次未播完的 PixiJS 序列帧
+  // 原实现未 stop，多次 play 叠加在 canvas 上 → GPU 负载暴涨卡顿
+  try { fx.stop() } catch (e) { /* fx 可能未初始化，忽略 */ }
 
   skillName.value = evt.skillName || ''
   casterName.value = evt.casterName || ''
@@ -351,7 +370,8 @@ watch(skillCastEvent, async (evt) => {
     usePixiFxFlag.value = false
     fx.stop()
   }
-}, { deep: true })
+})
+// 浅 watch：事件对象是顶层整体赋值，无需 deep 递归比较，降低 watch 开销
 
 // 兜底隐藏触发时：show 变为 false 后，同步停止 PixiJS 播放
 // 通过 watch show 而非直接改 scheduleAutoHide，保证所有隐藏路径都覆盖

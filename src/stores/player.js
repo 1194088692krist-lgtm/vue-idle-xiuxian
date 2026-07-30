@@ -3560,7 +3560,12 @@ export const usePlayerStore = defineStore('player', {
         }
       }
 
-      // 一次性扣减材料：按索引从大到小删除，避免索引错位（单次 splice 批量）
+      // 一次性扣减材料：修复"炼制100个丹药+挂机导致页面卡死"恶性 Bug
+      // 原实现：for 循环里逐个 splice，每次都触发 Vue 响应式追踪
+      //   问题1：100 个材料 = 100 次 splice = 100 次响应式更新堆积（即使 Vue 批处理也极重）
+      //   问题2：与挂机系统同步 push 到 materials 冲突，数组长度频繁变化 → 依赖追踪爆炸
+      //   问题3：materials 数组可能极大（玩家存档显示 10MB+），每次 splice 都需移动 O(n) 元素
+      // 修复：用 filter 一次性重建数组，单次响应式更新
       const indicesToRemove = new Set()
       for (const [key, totalNeeded] of matConsume) {
         const indices = matIndex.get(key) || []
@@ -3570,10 +3575,9 @@ export const usePlayerStore = defineStore('player', {
           needed--
         }
       }
-      // 按索引降序删除，一次清理
-      const sortedIndices = Array.from(indicesToRemove).sort((a, b) => b - a)
-      for (const idx of sortedIndices) {
-        this.materials.splice(idx, 1)
+      // 单次 filter 重建数组：O(n) 遍历，只触发 1 次响应式更新
+      if (indicesToRemove.size > 0) {
+        this.materials = this.materials.filter((_, i) => !indicesToRemove.has(i))
       }
 
       // 一次性增加丹药

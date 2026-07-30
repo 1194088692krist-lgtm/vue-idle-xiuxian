@@ -3,10 +3,10 @@
   <teleport to="body">
     <div v-if="intro.show" class="char-boss-intro-overlay" :class="{ 'theme-wraith': intro.theme === 'wraith' }" @click="dismiss">
       <div class="char-boss-intro-stage" :key="intro.characterId + '-' + intro.name">
-        <!-- 怨灵降临：深紫色特效大字，人物 BOSS 登场时降下 -->
+        <!-- 邪修降临：深紫色特效大字，人物 BOSS 登场时降下 -->
         <div v-if="intro.theme === 'wraith'" class="char-boss-intro-title">
-          <span class="title-char">怨</span>
-          <span class="title-char">灵</span>
+          <span class="title-char">邪</span>
+          <span class="title-char">修</span>
           <span class="title-char">降</span>
           <span class="title-char">临</span>
         </div>
