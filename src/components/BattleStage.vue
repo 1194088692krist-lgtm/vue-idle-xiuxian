@@ -1613,20 +1613,23 @@ onUnmounted(() => {
 .float-damage.low { color: #fff; font-size: 16px; }
 .float-damage.mid {
   color: #f97316;
-  font-size: 24px;
-  text-shadow: 0 0 8px rgba(249, 115, 22, 0.8), 0 0 4px rgba(249, 115, 22, 0.4), 0 1px 3px rgba(0,0,0,0.9);
-  animation: floatUp 1.8s ease-out forwards;
+  font-size: 26px;
+  font-weight: 900;
+  font-family: "SimHei", "黑体", "Microsoft YaHei", "微软雅黑", sans-serif;
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.9), 0 0 4px rgba(249, 115, 22, 0.5), 0 2px 4px rgba(0,0,0,1), 0 1px 2px rgba(0,0,0,0.95);
+  animation: floatUp 2.2s ease-out forwards;
 }
 .float-damage.high {
   color: #ef4444;
-  font-size: 34px;
-  font-weight: 800;
-  text-shadow: 0 0 12px rgba(239, 68, 68, 0.95), 0 0 20px rgba(239, 68, 68, 0.6), 0 0 4px rgba(239, 68, 68, 0.8), 0 1px 3px rgba(0,0,0,0.9);
-  animation: floatUpBig 2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  font-size: 38px;
+  font-weight: 900;
+  font-family: "SimHei", "黑体", "Microsoft YaHei", "微软雅黑", sans-serif;
+  text-shadow: 0 0 14px rgba(239, 68, 68, 0.95), 0 0 24px rgba(239, 68, 68, 0.65), 0 0 6px rgba(239, 68, 68, 0.9), 0 2px 5px rgba(0,0,0,1), 0 1px 3px rgba(0,0,0,0.95);
+  animation: floatUpBig 2.4s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 /* 暴击与量级叠加：暴击仍以红色描边为主，但字号跟随量级档（高量级暴击 = 极致爽感） */
-.float-damage.crit.mid { font-size: 28px; }
-.float-damage.crit.high { font-size: 40px; }
+.float-damage.crit.mid { font-size: 30px; }
+.float-damage.crit.high { font-size: 44px; }
 /* 护盾吸收飘字定位偏移：避免与主伤害飘字重叠 */
 .float-damage.shield-floater {
   top: -22px;
@@ -1641,8 +1644,8 @@ onUnmounted(() => {
 }
 /* 高量级（>=1亿）飘字：弹性放大→上浮淡出，强化"大数字砸下"的爽感 */
 @keyframes floatUpBig {
-  0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.3); }
-  12% { opacity: 1; transform: translateX(-50%) translateY(-8px) scale(1.4); }
+  0% { opacity: 0.6; transform: translateX(-50%) translateY(8px) scale(0.5); }
+  10% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1.4); }
   25% { transform: translateX(-50%) translateY(-12px) scale(1); }
   70% { opacity: 1; transform: translateX(-50%) translateY(-30px) scale(1); }
   100% { opacity: 0; transform: translateX(-50%) translateY(-55px) scale(0.9); }

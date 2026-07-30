@@ -652,6 +652,9 @@ let lastBossKillTs = 0
 // 每动作 1 秒(ACTION_DELAY)，3玩家队伍约 3-4 动作/回合，故等待约 3.5 秒让动画播完再进入下一回合，
 // 避免回合切换太快导致人物抖动频闪
 const ROUND_ANIM_DELAY = 3500
+// BOSS 挑战每回合间隔：每轮次（含多人攻击）累计约 1.5 秒，降低手机运算负担
+// 原硬编码 750ms 在高 HP BOSS（无法秒杀）场景下回合极快，导致移动端 CPU 负担过重
+const BOSS_ROUND_INTERVAL = 1500
 
 let _store = null
 function store() {
@@ -2067,7 +2070,8 @@ async function runBossChallenge(zoneId, bossId, count) {
         currentIdleEnemy.value.dead = liveHP <= 0
       }
       // 后台时跳过动画延迟，避免 setTimeout 被节流导致战斗耗时数分钟卡死挂机
-      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, 750))
+      // 每轮次间隔 1.5s：降低高 HP BOSS 战时手机运算负担
+      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, BOSS_ROUND_INTERVAL))
     }
 
     // 处理本场战斗结果
@@ -2402,7 +2406,8 @@ async function runCharacterBossChallenge(characterId, count) {
         currentIdleEnemy.value.dead = liveHP <= 0
       }
       // 后台时跳过动画延迟，避免 setTimeout 被节流导致战斗耗时数分钟卡死挂机
-      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, 750))
+      // 每轮次间隔 1.5s：降低高 HP BOSS 战时手机运算负担
+      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, BOSS_ROUND_INTERVAL))
     }
 
     const victory = roundResult.victory
