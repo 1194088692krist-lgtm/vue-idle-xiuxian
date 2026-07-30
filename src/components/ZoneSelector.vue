@@ -5240,52 +5240,62 @@ html:not(.dark) .boss-challenge-error {
   color: #dc2626;
 }
 
-/* ===== 移动端性能优化：挂机仪表盘的日志/装备稀有度光晕与流光是 infinite 动画，
-   挂机时多条日志/多件装备同时运行会累积触发大量 GPU 合成，是移动端发热主因。
-   移动端关闭这些装饰光晕（靠颜色/边框已可区分稀有度），并对状态脉冲降频。 ===== */
-@media (max-width: 768px) {
-  /* 日志稀有度光晕/脉冲关闭，仅保留 logIn 入场动画 */
-  .log-line.reward-epic,
-  .log-line.reward-legendary,
-  .log-line.drop-epic,
-  .log-line.drop-celestial,
-  .log-line.drop-legendary,
-  .log-line.drop-divine,
-  .log-line.drop-mythic {
-    animation: logIn 0.35s ease;
-  }
-  /* 日志文字流光关闭（background-position 持续动画消耗大） */
-  .log-line.drop-epic .log-text,
-  .log-line.drop-celestial .log-text,
-  .log-line.drop-legendary .log-text,
-  .log-line.drop-divine .log-text,
-  .log-line.drop-mythic .log-text {
-    animation: none;
-    -webkit-text-fill-color: initial;
-    background: none;
-  }
-  /* 装备项光晕/脉冲关闭，仅保留 logIn 入场 */
-  .dash-equipment-item.is-epic,
-  .dash-equipment-item.is-legendary,
-  .dash-equipment-item.is-mythic {
-    animation: logIn 0.35s ease;
-  }
-  .dash-equipment-item.is-rare .eq-name,
-  .dash-equipment-item.is-epic .eq-name,
-  .dash-equipment-item.is-legendary .eq-name,
-  .dash-equipment-item.is-mythic .eq-name {
-    animation: none;
-    -webkit-text-fill-color: initial;
-    background: none;
-  }
-  /* 状态脉冲降频：降低每秒 GPU 合成刷新次数 */
-  .boss-phase-banner { animation: bossPulse 3s ease-in-out infinite; }
-  .idle-hp-bar .hp-fill.hp-low { animation: hpPulse 2.5s ease-in-out infinite; }
-  .log-line.combat { animation: combatGlow 4s ease-in-out infinite; }
-  .log-line.fortune { animation: fortuneHue 5s linear infinite; }
+/* ===== 特效档位（用户可在设置页选择 高/中/低）=====
+   通过 <html> 上的 .fx-low / .fx-medium class 控制，移动端默认 medium。
+   low：关闭日志/装备稀有度光晕与流光 + 状态脉冲
+   medium：状态脉冲降频，光晕保留但减慢
+   high：全特效（不加 class，向后兼容） ===== */
+
+/* 低档：关闭所有装饰光晕与流光，仅保留 logIn 入场动画 */
+html.fx-low .log-line.reward-epic,
+html.fx-low .log-line.reward-legendary,
+html.fx-low .log-line.drop-epic,
+html.fx-low .log-line.drop-celestial,
+html.fx-low .log-line.drop-legendary,
+html.fx-low .log-line.drop-divine,
+html.fx-low .log-line.drop-mythic,
+html.fx-low .dash-equipment-item.is-epic,
+html.fx-low .dash-equipment-item.is-legendary,
+html.fx-low .dash-equipment-item.is-mythic {
+  animation: logIn 0.35s ease;
+}
+html.fx-low .log-line.drop-epic .log-text,
+html.fx-low .log-line.drop-celestial .log-text,
+html.fx-low .log-line.drop-legendary .log-text,
+html.fx-low .log-line.drop-divine .log-text,
+html.fx-low .log-line.drop-mythic .log-text,
+html.fx-low .dash-equipment-item.is-rare .eq-name,
+html.fx-low .dash-equipment-item.is-epic .eq-name,
+html.fx-low .dash-equipment-item.is-legendary .eq-name,
+html.fx-low .dash-equipment-item.is-mythic .eq-name {
+  animation: none;
+  -webkit-text-fill-color: initial;
+  background: none;
+}
+html.fx-low .boss-phase-banner,
+html.fx-low .idle-hp-bar .hp-fill.hp-low,
+html.fx-low .log-line.combat,
+html.fx-low .log-line.fortune { animation: none; }
+
+/* 中档：状态脉冲降频（周期延长 2~3 倍），光晕保留但减慢 */
+html.fx-medium .boss-phase-banner { animation: bossPulse 3s ease-in-out infinite; }
+html.fx-medium .idle-hp-bar .hp-fill.hp-low { animation: hpPulse 2.5s ease-in-out infinite; }
+html.fx-medium .log-line.combat { animation: combatGlow 4s ease-in-out infinite; }
+html.fx-medium .log-line.fortune { animation: fortuneHue 5s linear infinite; }
+html.fx-medium .log-line.reward-epic,
+html.fx-medium .log-line.reward-legendary,
+html.fx-medium .log-line.drop-epic,
+html.fx-medium .log-line.drop-celestial,
+html.fx-medium .log-line.drop-legendary,
+html.fx-medium .log-line.drop-divine,
+html.fx-medium .log-line.drop-mythic,
+html.fx-medium .dash-equipment-item.is-epic,
+html.fx-medium .dash-equipment-item.is-legendary,
+html.fx-medium .dash-equipment-item.is-mythic {
+  animation-duration: 4s;
 }
 
-/* 用户系统开启「降低动态效果」时：禁用仪表盘装饰性动画 */
+/* 用户系统开启「降低动态效果」时：与低档等效 */
 @media (prefers-reduced-motion: reduce) {
   .log-line.reward-epic,
   .log-line.reward-legendary,

@@ -169,6 +169,13 @@ export const usePlayerStore = defineStore('player', {
     disablePullToRefresh: localStorage.getItem('disablePullToRefresh') !== 'false',
     // 击杀BOSS立绘突入动画开关，默认开启
     bossKillAnimation: localStorage.getItem('bossKillAnimation') !== 'false',
+    // 特效档位：'high'(全特效) | 'medium'(降频平衡) | 'low'(关闭装饰动画)
+    // 未设置时按屏幕宽度智能默认：移动端(<=768px)默认 medium，桌面默认 high
+    fxQuality: (() => {
+      const saved = localStorage.getItem('fxQuality')
+      if (saved === 'high' || saved === 'medium' || saved === 'low') return saved
+      return (typeof window !== 'undefined' && window.innerWidth <= 768) ? 'medium' : 'high'
+    })(),
     // 每个角色的击杀立绘设置：{ [memberId]: skinIndex }
     // skinIndex: 0=原立绘 1=skin1 2=skin2 3=skin3 ...
     // 击杀BOSS时按实际斩杀者(memberId)取其对应立绘索引；该角色未设置则用原立绘(0)；
@@ -548,6 +555,15 @@ export const usePlayerStore = defineStore('player', {
         htmlEl.classList.remove('disable-pull-refresh')
       }
     },
+    // 同步特效档位到 <html> 标签：CSS 通过 html.fx-low / html.fx-medium 控制动画降级
+    // high 不加 class（全特效，向后兼容）；medium 加 fx-medium；low 加 fx-low
+    updateHtmlFxQuality(quality) {
+      const htmlEl = document.documentElement
+      htmlEl.classList.remove('fx-low', 'fx-medium', 'fx-high')
+      if (quality === 'low') htmlEl.classList.add('fx-low')
+      else if (quality === 'medium') htmlEl.classList.add('fx-medium')
+      else htmlEl.classList.add('fx-high')
+    },
     // 初始化玩家数据
     async initializePlayer() {
       try {
@@ -773,6 +789,14 @@ export const usePlayerStore = defineStore('player', {
       // 初始化击杀动画设置：默认开启
       const bkaSaved = localStorage.getItem('bossKillAnimation')
       this.bossKillAnimation = bkaSaved === null ? true : bkaSaved === 'true'
+      // 初始化特效档位：未设置时按屏幕宽度智能默认，并同步到 <html>
+      const fxqSaved = localStorage.getItem('fxQuality')
+      if (fxqSaved === 'high' || fxqSaved === 'medium' || fxqSaved === 'low') {
+        this.fxQuality = fxqSaved
+      } else {
+        this.fxQuality = (window.innerWidth <= 768) ? 'medium' : 'high'
+      }
+      this.updateHtmlFxQuality(this.fxQuality)
       // 加载每个角色的击杀立绘设置（per-character）
       const cksSaved = localStorage.getItem('characterKillSkins')
       this.characterKillSkins = cksSaved ? JSON.parse(cksSaved) : {}
@@ -1213,6 +1237,7 @@ export const usePlayerStore = defineStore('player', {
       delete payload.bossKillAnimation
       delete payload.characterKillSkins
       delete payload.petKillSkins
+      delete payload.fxQuality // 设备级特效档位偏好（已存 localStorage）
       // 3. 临时快照/死字段
       delete payload._petNaturalSnapshot
       // 4. idleExploration 中的运行时态：保留 zoneId/difficultyKey/startTime/duration（断线续挂需要），

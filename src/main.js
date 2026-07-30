@@ -24,6 +24,16 @@ try {
   if (disabled) document.documentElement.classList.add('disable-pull-refresh')
 } catch (e) { /* localStorage 不可用时静默兜底 */ }
 
+// 启动时立即同步特效档位到 <html>（CSS 通过 html.fx-low/medium 控制动画降级）
+// 必须在 player store initializePlayer 之前生效，避免首屏闪过全特效再降级的抖动
+try {
+  const fxq = localStorage.getItem('fxQuality')
+  const quality = (fxq === 'high' || fxq === 'medium' || fxq === 'low')
+    ? fxq
+    : (window.innerWidth <= 768 ? 'medium' : 'high')
+  document.documentElement.classList.add('fx-' + quality)
+} catch (e) { /* localStorage 不可用时静默兜底，默认全特效 */ }
+
 // 注册 Service Worker：缓存静态资源（人物头像/怪物头像/图标/UI/背景图）到本地
 // 二次访问直接从 Cache Storage 返回，零网络等待；用户不清浏览器数据即可永久命中
 // 仅在生产环境注册（开发环境 vite HMR 频繁变化，SW 会干扰调试）

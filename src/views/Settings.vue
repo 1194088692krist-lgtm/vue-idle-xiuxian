@@ -116,6 +116,31 @@
           </p>
         </div>
 
+        <!-- 特效档位：高/中/低三档，控制战斗与仪表盘的 CSS 动画强度 -->
+        <div class="setting-row">
+          <label class="setting-label">特效档位</label>
+          <div class="setting-input-group fx-quality-group">
+            <button
+              class="btn"
+              :class="playerStore.fxQuality === 'high' ? 'btn-success' : 'btn-outline'"
+              @click="setFxQuality('high')"
+            >高（全特效）</button>
+            <button
+              class="btn"
+              :class="playerStore.fxQuality === 'medium' ? 'btn-success' : 'btn-outline'"
+              @click="setFxQuality('medium')"
+            >中（平衡）</button>
+            <button
+              class="btn"
+              :class="playerStore.fxQuality === 'low' ? 'btn-success' : 'btn-outline'"
+              @click="setFxQuality('low')"
+            >低（省电）</button>
+          </div>
+          <p class="setting-hint">
+            挂机时大量 CSS 动画持续运行会触发 GPU 合成，是移动端卡顿/发热的主因。高档开启全部粒子与光晕特效；中档降频状态脉冲并保留装饰粒子；低档关闭所有装饰性动画，仅保留状态边框与数值飘字，最大程度省电降温。移动端默认中档，桌面默认高档。
+          </p>
+        </div>
+
         <!-- 危险操作 -->
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
@@ -791,6 +816,14 @@
   const toggleBossKillAnimation = () => {
     playerStore.bossKillAnimation = !playerStore.bossKillAnimation
     localStorage.setItem('bossKillAnimation', playerStore.bossKillAnimation)
+    playerStore.saveData()
+  }
+
+  // 特效档位切换：high(全特效)/medium(降频平衡)/low(关闭装饰动画)
+  const setFxQuality = (quality) => {
+    playerStore.fxQuality = quality
+    localStorage.setItem('fxQuality', quality)
+    playerStore.updateHtmlFxQuality(quality)
     playerStore.saveData()
   }
 
@@ -1471,5 +1504,15 @@
     font-size: 12px;
     color: #C9C4BA;
     margin-bottom: 4px;
+  }
+
+  /* 特效档位三按钮组：移动端紧凑排布 */
+  .fx-quality-group .btn {
+    flex: 1;
+    min-width: 80px;
+  }
+  @media (max-width: 480px) {
+    .fx-quality-group { flex-direction: column; }
+    .fx-quality-group .btn { width: 100%; }
   }
 </style>

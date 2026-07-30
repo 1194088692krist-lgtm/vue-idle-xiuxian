@@ -2307,36 +2307,54 @@ html:not(.dark) .rt-log-item.skit .rt-log-bullet { color: #2563eb; }
   .battle-log-text { white-space: normal; }
 }
 
-/* ===== 移动端性能优化：挂机时大量 infinite 动画持续触发 GPU 合成与重绘，
-   是移动端发热/卡顿的主因。关闭装饰性粒子动画、降低状态主特效频率、
-   禁用纯装饰持续动画，保留状态识别度（靠边框/背景色）同时大幅减少每秒合成次数。 ===== */
-@media (max-width: 768px) {
-  /* 装饰性粒子动画（overlay 的 ::before/::after）直接关闭：状态主特效靠边框/背景已可识别 */
-  .frozen-overlay::before, .frozen-overlay::after,
-  .burn-overlay::before, .burn-overlay::after,
-  .bleed-overlay::before, .bleed-overlay::after,
-  .poison-overlay::before, .poison-overlay::after {
-    animation: none;
-  }
-  /* 纯装饰持续动画关闭：灵宠灵光环绕、护盾虚线旋转、日志稀有度光晕/流光（靠颜色区分即可） */
-  .pet-aura-orb,
-  .shield-overlay::before,
-  .rt-log-item.drop-epic,
-  .rt-log-item.drop-legendary,
-  .rt-log-item.drop-mythic,
-  .rt-log-item.drop-mythic .rt-log-part {
-    animation: none;
-  }
-  /* 状态主特效降频：原 0.45~1.5s 的 infinite 周期延长至 2~3s，减少每秒 GPU 合成刷新次数 */
-  .frozen-overlay { animation: frostPulse 3s ease-in-out infinite; }
-  .burn-overlay { animation: burnFlicker 2s ease-in-out infinite alternate; }
-  .shock-overlay::before { animation: shockBolt 2s ease-in-out infinite; }
-  .shield-overlay::after { animation: shieldIcon 2.5s ease-in-out infinite alternate; }
-  /* 暴击刀光/胜负演出等全屏特效在移动端降低合成负担 */
-  .crit-slash-line, .crit-flash-radial { will-change: transform, opacity; }
-}
+/* ===== 特效档位（用户可在设置页选择 高/中/低）=====
+   high(全特效)：所有粒子/光晕/流光动画正常播放
+   medium(平衡)：状态主特效降频，装饰粒子保留但减慢
+   low(省电)：关闭所有装饰性动画，仅保留状态边框与数值飘字
+   通过 <html> 上的 .fx-low / .fx-medium class 控制，移动端默认 medium。 ===== */
 
-/* 用户系统开启「降低动态效果」时：禁用装饰性动画，仅保留必要的状态/数值反馈 */
+/* 低档：关闭所有装饰性粒子动画 + 持续光晕/流光 + 屏震，仅保留状态识别与数值飘字 */
+html.fx-low .frozen-overlay::before, html.fx-low .frozen-overlay::after,
+html.fx-low .burn-overlay::before, html.fx-low .burn-overlay::after,
+html.fx-low .bleed-overlay::before, html.fx-low .bleed-overlay::after,
+html.fx-low .poison-overlay::before, html.fx-low .poison-overlay::after,
+html.fx-low .pet-aura-orb,
+html.fx-low .shield-overlay::before,
+html.fx-low .rt-log-item.drop-epic,
+html.fx-low .rt-log-item.drop-legendary,
+html.fx-low .rt-log-item.drop-mythic,
+html.fx-low .rt-log-item.drop-mythic .rt-log-part {
+  animation: none;
+}
+html.fx-low .frozen-overlay,
+html.fx-low .burn-overlay,
+html.fx-low .shock-overlay::before,
+html.fx-low .shield-overlay::after,
+html.fx-low .screen-shake { animation: none; }
+
+/* 中档：装饰粒子保留但降频（周期延长 2~3 倍），减少每秒 GPU 合成刷新次数 */
+html.fx-medium .frozen-overlay::before, html.fx-medium .frozen-overlay::after,
+html.fx-medium .burn-overlay::before, html.fx-medium .burn-overlay::after,
+html.fx-medium .bleed-overlay::before, html.fx-medium .bleed-overlay::after,
+html.fx-medium .poison-overlay::before, html.fx-medium .poison-overlay::after {
+  animation-duration: 3s;
+}
+html.fx-medium .pet-aura-orb { animation-duration: 6s; }
+html.fx-medium .shield-overlay::before { animation-duration: 3s; }
+html.fx-medium .rt-log-item.drop-epic,
+html.fx-medium .rt-log-item.drop-legendary,
+html.fx-medium .rt-log-item.drop-mythic,
+html.fx-medium .rt-log-item.drop-mythic .rt-log-part {
+  animation-duration: 4s;
+}
+/* 中档状态主特效降频：原 0.45~1.5s 周期延长至 2~3s */
+html.fx-medium .frozen-overlay { animation: frostPulse 3s ease-in-out infinite; }
+html.fx-medium .burn-overlay { animation: burnFlicker 2s ease-in-out infinite alternate; }
+html.fx-medium .shock-overlay::before { animation: shockBolt 2s ease-in-out infinite; }
+html.fx-medium .shield-overlay::after { animation: shieldIcon 2.5s ease-in-out infinite alternate; }
+html.fx-medium .crit-slash-line, html.fx-medium .crit-flash-radial { will-change: transform, opacity; }
+
+/* 用户系统开启「降低动态效果」时：与低档等效，仅保留必要的状态/数值反馈 */
 @media (prefers-reduced-motion: reduce) {
   .pet-aura-orb,
   .frozen-overlay::before, .frozen-overlay::after,
@@ -2347,11 +2365,11 @@ html:not(.dark) .rt-log-item.skit .rt-log-bullet { color: #2563eb; }
   .rt-log-item.drop-epic,
   .rt-log-item.drop-legendary,
   .rt-log-item.drop-mythic,
-  .rt-log-item.drop-mythic .rt-log-part {
-    animation: none;
-  }
-  .frozen-overlay { animation: frostPulse 4s ease-in-out infinite; }
-  .burn-overlay { animation: burnFlicker 3s ease-in-out infinite alternate; }
+  .rt-log-item.drop-mythic .rt-log-part,
+  .frozen-overlay,
+  .burn-overlay,
+  .shock-overlay::before,
+  .shield-overlay::after,
   .screen-shake { animation: none; }
 }
 </style>
