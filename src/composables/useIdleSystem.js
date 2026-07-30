@@ -2171,6 +2171,21 @@ async function runBossChallenge(zoneId, bossId, count) {
   result.message = `挑战 ${boss.name} ${count} 次：胜 ${result.victories} / 败 ${result.defeats}`
   bossChallengeResult.value = result
 
+  // 挑战失败返还挑战券：挑战N次，胜利A次，失败 (N-A) 次 → 返还 (N-A) 张挑战券
+  // 让玩家不会因中途团灭损失全部挑战券，符合"挑战失败也应返还剩余券"的诉求
+  if (result.defeats > 0 && ticketDef) {
+    const refundCount = result.defeats
+    s.gainMaterial({ kind: 'boss_ticket', id: ticketDef.id, name: ticketDef.name })
+    // gainMaterial 只 push 1 个，需要补齐数量：用循环或直接读已有条目+count
+    // 这里查已存在条目并累加 count（与 consumeBossTicket 对称）
+    const existing = s.materials.find(m => m.kind === 'boss_ticket' && m.id === ticketDef.id)
+    if (existing) {
+      existing.count = (existing.count || 1) + (refundCount - 1)
+    }
+    addLog('header', `🎫 挑战失败 ${refundCount} 场，返还 ${refundCount} 张 ${ticketDef.name}`)
+    window.$message?.success(`挑战失败 ${refundCount} 场，已返还 ${refundCount} 张挑战券`, { duration: 2500 })
+  }
+
   addLog('header', `🎯 ${result.message}`)
   flushAllPendingLogs()
 
@@ -2480,6 +2495,18 @@ async function runCharacterBossChallenge(characterId, count) {
   result.success = true
   result.message = `挑战 ${character.name}（人物形态）${count} 次：胜 ${result.victories} / 败 ${result.defeats}`
   bossChallengeResult.value = result
+
+  // 挑战失败返还挑战券：与 BOSS 挑战对称，失败 N-A 场返还 N-A 张挑战券
+  if (result.defeats > 0 && ticketDef) {
+    const refundCount = result.defeats
+    s.gainMaterial({ kind: 'boss_ticket', id: ticketDef.id, name: ticketDef.name })
+    const existing = s.materials.find(m => m.kind === 'boss_ticket' && m.id === ticketDef.id)
+    if (existing) {
+      existing.count = (existing.count || 1) + (refundCount - 1)
+    }
+    addLog('header', `🎫 挑战失败 ${refundCount} 场，返还 ${refundCount} 张 ${ticketDef.name}`)
+    window.$message?.success(`挑战失败 ${refundCount} 场，已返还 ${refundCount} 张挑战券`, { duration: 2500 })
+  }
 
   addLog('header', `🎯 ${result.message}`)
   flushAllPendingLogs()

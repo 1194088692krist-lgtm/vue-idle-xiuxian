@@ -363,7 +363,19 @@ watch(bossKillEvent, (evt) => {
       }
     }
   }
-  // 回退：killerMemberId 缺失或对应成员已阵亡时，随机抽存活队员
+  // 兜底1：killerMemberId 未命中（member 已被移除/重招募）时，用 killerName 按名匹配
+  // 修复日志中立绘与 killerName 不一致：evt.killerName 来自 pickBossKillKiller 选中的真实击杀者，
+  // member 查找回退到随机会导致立绘与名字错配（如净世光使击杀却显示玄玑仙子立绘）。
+  if (!member && evt.killerName) {
+    const byName = playerStore.sectMembers.find(m => m.name === evt.killerName)
+    if (byName) {
+      const hp = statesMap[byName.id]
+      if (hp === undefined || hp > 0) {
+        member = byName
+      }
+    }
+  }
+  // 兜底2：killerMemberId 和 killerName 都未命中时，才随机抽存活队员
   if (!member && playerStore.teamMembers && playerStore.teamMembers.length > 0) {
     const aliveMembers = playerStore.teamMembers
       .map(id => playerStore.sectMembers.find(m => m.id === id))

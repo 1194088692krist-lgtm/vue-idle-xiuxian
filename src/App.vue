@@ -197,7 +197,19 @@
   import { usePlayerStore } from './stores/player'
   import { useAuthStore } from './stores/auth'
   import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
-  import { NIcon, darkTheme } from 'naive-ui'
+  import { NIcon, darkTheme, createDiscreteApi } from 'naive-ui'
+  // 全局 message 实例：通过 createDiscreteApi 创建，挂到 window.$message，
+  // 让非 setup 上下文（如 stores/player.js 的 consumePill、组件内非 setup 函数）也能调用。
+  // 修复"一键全选/丹药服用后无任何反馈"的根因：原仅用 <n-message-provider> 包裹，
+  // 但从未把 message 实例挂到 window，导致 window.$message?.xxx 永远是 undefined 静默跳过。
+  if (!window.$message) {
+    try {
+      const { message } = createDiscreteApi(['message'])
+      window.$message = message
+    } catch (e) {
+      console.warn('[message] createDiscreteApi 初始化失败，window.$message 不可用', e)
+    }
+  }
   import {
     BookOutlined,
     ExperimentOutlined,
