@@ -627,17 +627,27 @@ async function playLiveRound(roundNum) {
     // 玩家先手、敌人后手，顺序更自然
     events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
 
-    // 正向展示：回合开始时，将显示血量初始化为实体当前血量（本回合起点 = 上回合结束值）
-    // 然后随事件播放逐步推进，实现"满血开始→逐步扣除"的视觉效果
+    // 正向展示：回合开始时不重置显示血量，保持上一回合结束时的值
+    // 第一回合的初始值由 encounter watch 设置（initialEnemyHp = 满血）
+    // 后续回合的起点 = 上一回合最后一个事件推进到的血量，无需重置
+    // 仅确保 maxHp 字段已初始化
     const enemy = props.encounter?.enemy
     if (enemy && enemy.stats) {
-      displayEnemyHp.value = enemy.currentHealth
       displayEnemyMaxHp.value = enemy.stats.maxHealth || enemy.currentHealth
+      // 若 displayHp 未初始化（首轮且 watch 未触发的兜底），用 initialEnemyHp
+      if (displayEnemyHp.value <= 0 && props.encounter.initialEnemyHp) {
+        displayEnemyHp.value = props.encounter.initialEnemyHp
+      }
     }
     for (const p of (props.encounter?.players || [])) {
       if (p && p.stats) {
-        displayMemberHp[p.memberId] = p.currentHealth
         displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
+        // 若玩家显示血量未初始化，用 initialPlayerHp 快照
+        if (displayMemberHp[p.memberId] === undefined && props.encounter.initialPlayerHp) {
+          displayMemberHp[p.memberId] = props.encounter.initialPlayerHp[p.memberId] !== undefined
+            ? props.encounter.initialPlayerHp[p.memberId]
+            : p.currentHealth
+        }
       }
     }
 
@@ -684,9 +694,10 @@ function advanceDisplayHp(e) {
 watch(() => props.encounter, (nc) => {
   clearTransient()
   roundWatched.value = nc ? (nc.round || 0) : 0
-  // 新战斗：重置显示血量为满血（第一回合播放前初始展示满血）
+  // 正向血量播放：新战斗时用 initialEnemyHp 快照初始化显示血量（满血）
+  // 不能用 enemy.currentHealth，因为 executeRound 可能已同步跑完，currentHealth 已是终值
   if (nc && nc.enemy && nc.enemy.stats) {
-    displayEnemyHp.value = nc.enemy.currentHealth
+    displayEnemyHp.value = nc.initialEnemyHp || nc.enemy.stats.maxHealth
     displayEnemyMaxHp.value = nc.enemy.stats.maxHealth || nc.enemy.currentHealth
   } else {
     displayEnemyHp.value = 0
@@ -694,7 +705,10 @@ watch(() => props.encounter, (nc) => {
   }
   for (const p of (nc?.players || [])) {
     if (p && p.stats) {
-      displayMemberHp[p.memberId] = p.currentHealth
+      // 用 initialPlayerHp 快照初始化玩家显示血量（战斗开始时的血量）
+      displayMemberHp[p.memberId] = (nc.initialPlayerHp && nc.initialPlayerHp[p.memberId] !== undefined)
+        ? nc.initialPlayerHp[p.memberId]
+        : p.currentHealth
       displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
     }
   }

@@ -138,13 +138,12 @@
         </div>
         <div v-if="currentCharacterBoss && selectedDifficultyKey === 'mieshi'" class="char-boss-hint">
           <span class="char-boss-tag">👑 灭世人物BOSS</span>
-          <span class="char-boss-name">{{ currentCharacterBoss.characterName }}</span>
-          <span class="char-boss-star">{{ currentCharacterBoss.star }}★</span>
-          <span class="char-boss-note">（灭世难度必刷，击败掉落内丹碎片与挑战券）</span>
+          <span class="char-boss-name">{{ characterBossDisplayText }}</span>
+          <span class="char-boss-note">（灭世难度必刷，每5分钟1~2名，{{ selectedDuration }}分钟预计刷{{ characterBossEstimate }}，击败掉落内丹碎片与挑战券）</span>
         </div>
         <div v-else-if="selectedDifficultyKey === 'mieshi'" class="char-boss-hint muted">
           <span class="char-boss-tag">👑 灭世人物BOSS</span>
-          <span class="char-boss-note">灭世难度必刷人物形态BOSS，挂机结束后刷新候选</span>
+          <span class="char-boss-note">灭世难度必刷人物形态BOSS，开始挂机后分配候选</span>
         </div>
       </div>
 
@@ -1544,12 +1543,26 @@ const currentDifficulty = computed(() =>
 )
 
 // 当前图当前难度刷新的人物形态 BOSS（用于地图简介提示）
-// characterBosses: { [zoneId]: { [difficultyKey]: {characterId,characterName,star}|null } }
+// characterBosses: { [zoneId]: { [difficultyKey]: [{characterId,characterName,star},...] |null } }
+// 灭世难度返回 2 名候选数组，其他难度返回 null
 const currentCharacterBoss = computed(() => {
   if (!selectedZone.value || !selectedDifficultyKey.value) return null
   const zoneMap = characterBosses.value?.[selectedZone.value.id]
   if (!zoneMap) return null
   return zoneMap[selectedDifficultyKey.value] || null
+})
+// 灭世人物 BOSS 候选展示文本（2 名角色名+星级）
+const characterBossDisplayText = computed(() => {
+  const bosses = currentCharacterBoss.value
+  if (!bosses || !Array.isArray(bosses) || bosses.length === 0) return ''
+  return bosses.map(b => `${b.characterName}(${b.star}★)`).join('、')
+})
+// 估算本次挂机时长下人物 BOSS 刷出总次数（每 5 分钟 1~2 名）
+const characterBossEstimate = computed(() => {
+  if (selectedDifficultyKey.value !== 'mieshi') return ''
+  const rounds = Math.floor(selectedDuration.value / 5)
+  if (rounds <= 0) return ''
+  return `${rounds * 1}~${rounds * 2} 名`
 })
 
 // 挂机时长选项

@@ -71,7 +71,7 @@ import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
 import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, getPetTemplateId } from '../plugins/pets'
 
-const { bossKillEvent } = useIdleSystem()
+const { bossKillEvent, teamMemberStates } = useIdleSystem()
 const playerStore = usePlayerStore()
 const route = useRoute()
 
@@ -340,15 +340,25 @@ watch(bossKillEvent, (evt) => {
   }
 
   // ===== 人物立绘来源 =====
-  // 按出战人数均分播放概率：3 人 → 各 1/3，2 人 → 各 1/2，1 人 → 100%
-  // 旧实现优先使用 killerMemberId（实际斩杀者），但实际斩杀者往往是同一角色
-  // （最强DPS每次都补刀），导致 9/10 次都显示同一角色，无法看到其他角色的击杀立绘。
-  // 改为纯随机：Math.floor(Math.random() * N) 在 N 个出战人物中均匀取一个，自然均分概率。
+  // 仅弹出存活角色立绘：阵亡角色（hp <= 0）不参与随机
+  // 按存活人数均分播放概率：3 人 → 各 1/3，2 人 → 各 1/2，1 人 → 100%
   let member = null
   if (playerStore.teamMembers && playerStore.teamMembers.length > 0) {
+    // 从 teamMemberStates 获取实时血量，过滤阵亡角色
+    const statesMap = {}
+    if (teamMemberStates && teamMemberStates.value) {
+      for (const ms of teamMemberStates.value) {
+        statesMap[ms.memberId] = ms.hp
+      }
+    }
     const aliveMembers = playerStore.teamMembers
       .map(id => playerStore.sectMembers.find(m => m.id === id))
       .filter(m => m && m.id)
+      .filter(m => {
+        // 仅保留存活角色：teamMemberStates 中 hp > 0，或无状态记录时默认存活
+        const hp = statesMap[m.id]
+        return hp === undefined || hp > 0
+      })
     if (aliveMembers.length > 0) {
       member = aliveMembers[Math.floor(Math.random() * aliveMembers.length)]
     }

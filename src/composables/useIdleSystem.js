@@ -10,7 +10,7 @@ import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '.
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
-import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, getSkinCount, characterList as _charList, starConfig as _starCfg } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -1251,9 +1251,15 @@ function getCharacterBossStarRange(zoneId, difficultyKey) {
 }
 
 // 从 characterList 中按星级范围随机挑选一个角色
-function pickRandomCharacterByStar(minStar, maxStar) {
-  const candidates = _charList.filter(c => c.star >= minStar && c.star <= maxStar)
-  if (candidates.length === 0) return null
+function pickRandomCharacterByStar(minStar, maxStar, excludeIds) {
+  const excludeSet = excludeIds instanceof Set ? excludeIds : null
+  const candidates = _charList.filter(c => c.star >= minStar && c.star <= maxStar && !(excludeSet && excludeSet.has(c.id)))
+  if (candidates.length === 0) {
+    // 排除后无候选，回退到不排除
+    const fallback = _charList.filter(c => c.star >= minStar && c.star <= maxStar)
+    if (fallback.length === 0) return null
+    return fallback[Math.floor(Math.random() * fallback.length)]
+  }
   return candidates[Math.floor(Math.random() * candidates.length)]
 }
 
@@ -1269,61 +1275,33 @@ function getCharacterBossChance(difficultyKey) {
 // 创建人物形态的 BOSS 实体（基于角色模板 + 地图难度，比原地图 BOSS 难 50%）
 function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   const secretLv = effectiveZone.difficulty
-  const scale = effectiveZone.enemyScale || 1
-  const lateMult = getLateZoneMult(effectiveZone.id)
-  // 人物 BOSS 全面强化：达到同地图难度下怪物 BOSS 全数值的 1.5 倍
-  // 怪物 BOSS 的总倍率链 = BOSS_POWER_MULTIPLIER(1.5) × lateMult × BOSS_STRENGTH_MULT(1.5)
-  // 人物 BOSS 在此基础上再 × CHARACTER_BOSS_DIFFICULTY_MULT(1.5)，即达到怪物BOSS的2.25倍
-  // 但用户反馈"显然没有达到1.5倍"，问题在于原实现为避免重复乘1.5而除掉了，且缺少 BOSS_STRENGTH_MULT
-  // 修正：直接用 怪物BOSS总倍率 × 1.5，确保数值真正达到1.5倍
-  const CHARACTER_BOSS_DIFFICULTY_MULT = 1.5
-  const BOSS_STRENGTH_MULT = 1.5  // 与 createBossEnemy 一致的二次强化
-  const totalBossMult = BOSS_POWER_MULTIPLIER * lateMult * BOSS_STRENGTH_MULT * CHARACTER_BOSS_DIFFICULTY_MULT
-
-  // 基础 HP：基于角色星级和地图推荐血量
-  const starMult = _starCfg[character.star]?.multiplier || 1
-  const recHealth = (effectiveZone.recommendedStats?.health || 8000) * scale
-  // 人物 BOSS HP = 推荐血量 × starMult × 总倍率（不再除掉1.5，确保真正达到1.5倍怪物BOSS）
-  const scaledHealth = Math.floor(recHealth * starMult * totalBossMult)
-  const scaledDefense = Math.floor((effectiveZone.recommendedStats?.defense || 100) * scale * lateMult * BOSS_STRENGTH_MULT * CHARACTER_BOSS_DIFFICULTY_MULT * 1.2)
-  const scaledSpeed = Math.floor(((character.baseStats?.speed || 10) * 1.5 + 10) * BOSS_POWER_MULTIPLIER * Math.sqrt(lateMult) * CHARACTER_BOSS_DIFFICULTY_MULT)
-
-  // 攻击力：比普通 BOSS 高 50%
-  const bossAtkLateFactor = 1 + (lateMult - 1) * 0.3
-  const bossAtkRatio = 0.22 * CHARACTER_BOSS_DIFFICULTY_MULT * BOSS_STRENGTH_MULT
-  const scaledAttack = Math.floor(recHealth * bossAtkRatio * bossAtkLateFactor)
-
-  // 战斗属性：全面强化，达到怪物BOSS的1.5倍
-  const bossCombatBoost = Math.min(0.6, (Math.max(0, (scale - 1) * 0.18) + (lateMult - 1) * 0.1) * CHARACTER_BOSS_DIFFICULTY_MULT)
-  const bossFinalDamageBoost = Math.min(0.45, (0.05 + Math.max(0, (scale - 1) * 0.1) + (lateMult - 1) * 0.05) * CHARACTER_BOSS_DIFFICULTY_MULT)
-  const bossFinalDamageReduce = Math.min(0.6, (Math.max(0, (scale - 1) * 0.15) + (lateMult - 1) * 0.1) * CHARACTER_BOSS_DIFFICULTY_MULT)
-
-  const baseStats = {
-    health: scaledHealth,
-    maxHealth: scaledHealth,
-    damage: scaledAttack,
-    defense: scaledDefense,
-    speed: scaledSpeed,
-    critRate: Math.min(0.5, 0.08 + secretLv * 0.025),
-    comboRate: Math.min(0.3, 0.03 + secretLv * 0.012),
-    counterRate: Math.min(0.3, 0.03 + secretLv * 0.012),
-    stunRate: Math.min(0.25, 0.03 + secretLv * 0.008),
-    dodgeRate: Math.min(0.3, 0.04 + secretLv * 0.018),
-    vampireRate: Math.min(0.25, 0.03 + secretLv * 0.008),
-    critResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    comboResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    counterResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    stunResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    dodgeResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    vampireResist: Math.min(0.4, 0.06 + secretLv * 0.025),
-    healBoost: 0,
-    critDamageBoost: 0.8,
-    critDamageReduce: 0,
-    finalDamageBoost: bossFinalDamageBoost,
-    finalDamageReduce: bossFinalDamageReduce,
-    combatBoost: bossCombatBoost,
-    resistanceBoost: 0
+  // 人物 BOSS 强度 = 怪物 BOSS × 1.5
+  // 实现方式：先用 createBossEnemy 生成同地图怪物 BOSS，取其最终面板 × 1.5
+  // 这样人物 BOSS 数值与怪物 BOSS 完全对齐（同基准），仅多 1.5 倍系数
+  const CHARACTER_BOSS_MULT = 1.5
+  // 取该秘境第一个 BOSS 数据作为参照基准（与怪物 BOSS 同源）
+  const refBossData = (effectiveZone.bosses && effectiveZone.bosses.length > 0)
+    ? effectiveZone.bosses[0]
+    : { stats: { health: (effectiveZone.recommendedStats?.health || 8000) * 2, defense: effectiveZone.recommendedStats?.defense || 100, speed: 10 } }
+  const refBoss = createBossEnemy(refBossData, effectiveZone)
+  // 在怪物 BOSS 最终面板上 × 1.5，得到人物 BOSS 面板
+  const baseStats = {}
+  for (const key of Object.keys(refBoss.stats)) {
+    const val = refBoss.stats[key]
+    if (typeof val !== 'number') { baseStats[key] = val; continue }
+    let boosted = val * CHARACTER_BOSS_MULT
+    // 百分比类字段钳制，避免超过 0.95
+    if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
+      boosted = Math.min(0.95, boosted)
+    }
+    baseStats[key] = boosted
   }
+  // 确保关键字段存在
+  baseStats.health = baseStats.health || refBoss.stats.maxHealth
+  baseStats.maxHealth = baseStats.health
+  baseStats.damage = baseStats.damage || refBoss.stats.damage
+  baseStats.defense = baseStats.defense || refBoss.stats.defense
+  baseStats.speed = baseStats.speed || refBoss.stats.speed
 
   const enemy = new CombatEntity(character.name, effectiveZone.minLevel, baseStats, 'BOSS')
   enemy.tier = 'boss'
@@ -1333,7 +1311,7 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
     name: character.name,
     description: character.description || '人物形态 BOSS',
     traits: ['人物形态', `${character.star}星`],
-    stats: { attack: scaledAttack, health: scaledHealth, defense: scaledDefense, speed: scaledSpeed },
+    stats: { attack: baseStats.damage, health: baseStats.health, defense: baseStats.defense, speed: baseStats.speed },
     drops: [],  // 人物 BOSS 掉落由专用函数处理
     dropRateBonus: 1.0
   }
@@ -1343,8 +1321,16 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.characterBossStar = character.star
   // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
   enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-  // 登场立绘优先用 skin1（人物形态 BOSS 的标志外观），不存在时回退原立绘
-  enemy.portrait = getCharacterSkinUrl({ id: character.id }, 1) || getCharacterAvatar({ id: character.id }, 'full')
+  // 登场立绘：随机弹出原立绘或任意一张皮肤（每次随机）
+  const skinCount = getSkinCount({ id: character.id })
+  if (skinCount > 0 && Math.random() < 0.6) {
+    // 60% 概率使用随机皮肤
+    const randomSkin = 1 + Math.floor(Math.random() * skinCount)
+    enemy.portrait = getCharacterSkinUrl({ id: character.id }, randomSkin) || getCharacterAvatar({ id: character.id }, 'full')
+  } else {
+    // 40% 概率使用原立绘
+    enemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
+  }
   return enemy
 }
 
@@ -1369,8 +1355,9 @@ function triggerCharacterBossIntro(enemy) {
   }, 2400)
 }
 
-// 刷新所有图的人物 BOSS 候选（每次挂机结束后调用一次）
-// 仅灭世(mieshi)难度会刷人物BOSS，故只为各图的灭世难度分配候选
+// 刷新所有图的人物 BOSS 候选（挂机开始时调用一次，整个挂机期间不变更种类）
+// 仅灭世(mieshi)难度会刷人物BOSS，故只为各图的灭世难度分配 2 名候选（固定种类）
+// 这样多次 BOSS 窗口都刷同 2 名人物，种类与外部提示一致
 function refreshCharacterBosses() {
   const result = {}
   for (const zone of zones) {
@@ -1382,25 +1369,31 @@ function refreshCharacterBosses() {
         result[zone.id][diff.key] = null
         continue
       }
+      // 灭世难度：分配 2 名人物 BOSS（种类固定，整个挂机期间不变）
       const [minStar, maxStar] = getCharacterBossStarRange(zone.id, diff.key)
-      const character = pickRandomCharacterByStar(minStar, maxStar)
-      if (character) {
-        result[zone.id][diff.key] = {
-          characterId: character.id,
-          characterName: character.name,
-          star: character.star
+      const candidates = []
+      const usedIds = new Set()
+      for (let i = 0; i < 2; i++) {
+        const character = pickRandomCharacterByStar(minStar, maxStar, usedIds)
+        if (character) {
+          usedIds.add(character.id)
+          candidates.push({
+            characterId: character.id,
+            characterName: character.name,
+            star: character.star
+          })
         }
-      } else {
-        result[zone.id][diff.key] = null
       }
+      result[zone.id][diff.key] = candidates.length > 0 ? candidates : null
     }
   }
   characterBosses.value = result
   return result
 }
 
-// 查询某图某难度的人物 BOSS（用于 runIdleEncounter 决策）
+// 查询某图某难度的人物 BOSS 候选数组（用于 runIdleEncounter 决策）
 // 返回 null 表示该图该难度本轮走原怪物 BOSS
+// 返回数组（1~2 名）表示灭世难度固定的人物 BOSS 候选
 function getCharacterBossForZoneDifficulty(zoneId, difficultyKey) {
   const zoneMap = characterBosses.value?.[zoneId]
   if (!zoneMap) return null
@@ -1409,11 +1402,18 @@ function getCharacterBossForZoneDifficulty(zoneId, difficultyKey) {
 
 // 尝试生成人物形态 BOSS：仅灭世(mieshi)难度必刷，其他难度不刷人物形态。
 // 灭世难度下 100% 概率刷出人物 BOSS（不受 getCharacterBossChance 概率限制）。
+// candidateIndex 指定从固定候选数组中取第几个（0 或 1），不传则随机取。
 // 成功返回人物 BOSS 实体，失败返回 null（调用方退化为原秘境怪物 BOSS）。
-function tryCreateCharacterBossEnemy(effectiveZone, difficultyKey) {
+function tryCreateCharacterBossEnemy(effectiveZone, difficultyKey, candidateIndex) {
   // 仅灭世难度刷人物 BOSS，其他难度直接返回 null 走原怪物 BOSS
   if (difficultyKey !== 'mieshi') return null
-  const charBoss = getCharacterBossForZoneDifficulty(effectiveZone.id, difficultyKey)
+  const charBosses = getCharacterBossForZoneDifficulty(effectiveZone.id, difficultyKey)
+  if (!charBosses || !Array.isArray(charBosses) || charBosses.length === 0) return null
+  // 从固定候选中取指定索引，或随机取
+  const idx = (typeof candidateIndex === 'number' && candidateIndex >= 0 && candidateIndex < charBosses.length)
+    ? candidateIndex
+    : Math.floor(Math.random() * charBosses.length)
+  const charBoss = charBosses[idx]
   if (!charBoss) return null
   // 灭世难度必刷，不做概率判定
   const charTemplate = _charList.find(c => c.id === charBoss.characterId)
@@ -1871,7 +1871,10 @@ async function runBossChallenge(zoneId, bossId, count) {
       combatLog: [],
       combatStats: {},
       manager: null,
-      enemyData: { mainEnemy: bossEnemy, allBosses: [bossEnemy], hasBoss: true, isElite: false }
+      enemyData: { mainEnemy: bossEnemy, allBosses: [bossEnemy], hasBoss: true, isElite: false },
+      // 正向血量播放：初始血量快照
+      initialEnemyHp: bossEnemy.stats.maxHealth,
+      initialPlayerHp: Object.fromEntries(playerEntities.map(p => [p.memberId, p.currentHealth]))
     }
     // 设置挂机仪表盘怪物快照，让仪表盘怪物面板实时显示 BOSS 状态
     currentIdleEnemy.value = buildIdleEnemySnapshot(bossEnemy, bossEnemy.currentHealth)
@@ -2153,11 +2156,8 @@ async function runCharacterBossChallenge(characterId, count) {
       break
     }
 
-    // 创建人物 BOSS 实体
+    // 创建人物 BOSS 实体（立绘已在 createCharacterBossEnemy 中随机选取）
     const bossEnemy = createCharacterBossEnemy(character, effectiveZone, 'xiongxian')
-    bossEnemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-    // 登场立绘优先用 skin1（人物形态 BOSS 的标志外观），不存在时回退原立绘
-    bossEnemy.portrait = getCharacterSkinUrl({ id: character.id }, 1) || getCharacterAvatar({ id: character.id }, 'full')
     bossEnemy.name = `${character.name}（人物形态）`
     bossEnemy.characterBossId = character.id
 
@@ -2184,7 +2184,10 @@ async function runCharacterBossChallenge(characterId, count) {
       combatLog: [],
       combatStats: {},
       manager: null,
-      enemyData: { mainEnemy: bossEnemy, allBosses: [bossEnemy], hasBoss: true, isElite: false }
+      enemyData: { mainEnemy: bossEnemy, allBosses: [bossEnemy], hasBoss: true, isElite: false },
+      // 正向血量播放：初始血量快照
+      initialEnemyHp: bossEnemy.stats.maxHealth,
+      initialPlayerHp: Object.fromEntries(playerEntities.map(p => [p.memberId, p.currentHealth]))
     }
     currentIdleEnemy.value = buildIdleEnemySnapshot(bossEnemy, bossEnemy.currentHealth)
 
@@ -2554,7 +2557,10 @@ async function runManualBattle(effectiveZone) {
     combatLog: [],
     combatStats: {},
     manager: null,
-    enemyData
+    enemyData,
+    // 正向血量播放：初始血量快照
+    initialEnemyHp: enemy.stats.maxHealth,
+    initialPlayerHp: Object.fromEntries(playerEntities.map(p => [p.memberId, p.currentHealth]))
   }
   combatState.value = { inCombat: true, combatManager: null }
 
@@ -3795,12 +3801,12 @@ async function runIdleEncounter() {
         // 灭世难度：必刷1~2个人物BOSS；其他难度：尝试人物BOSS，未命中走原怪物BOSS
         const allBosses = []
         if (selectedDifficultyKey.value === 'mieshi') {
-          // 灭世难度必刷1~2个人物BOSS
+          // 灭世难度必刷1~2个人物BOSS（种类固定，从挂机开始时分配的候选中取）
+          // 不再每轮 refreshCharacterBosses，确保种类与外部提示一致
           const bossCount = Math.random() < 0.5 ? 1 : 2
           for (let i = 0; i < bossCount; i++) {
-            // 每次重新刷新候选，确保1~2个不同的人物BOSS
-            refreshCharacterBosses()
-            const charEnemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value)
+            // 从固定候选中按索引取人物BOSS（i=0 取第一个，i=1 取第二个）
+            const charEnemy = tryCreateCharacterBossEnemy(effectiveZone, selectedDifficultyKey.value, i)
             if (charEnemy) {
               allBosses.push(charEnemy)
             } else {
@@ -3898,7 +3904,11 @@ async function runIdleEncounter() {
         combatLog: [],
         combatStats: {},
         manager: null,
-        enemyData
+        enemyData,
+        // 正向血量播放：记录战斗开始时的初始血量快照
+        // BattleStage 用此初始化 displayHp，避免 executeRound 同步跑完后 currentHealth 已变
+        initialEnemyHp: enemy.stats.maxHealth,
+        initialPlayerHp: Object.fromEntries(playerEntities.map(p => [p.memberId, p.currentHealth]))
       }
 
       // 战斗开始即设置挂机仪表盘怪物快照，修复"挂机中怪物信息仪表盘消失"
@@ -4493,6 +4503,9 @@ function startIdle(durationMinutes) {
   encounterAborted = false
   isRunning = false // 重置重入锁，确保新挂机的遭遇能正常触发（上一场残留的 runIdleEncounter 会通过 sessionId 校验自行退出）
   idleEncounterCount.value = 0
+  // 挂机开始时刷新人物 BOSS 候选（灭世难度分配 2 名固定候选）
+  // 整个挂机期间种类不变，多次 BOSS 窗口都刷同 2 名人物，与外部提示一致
+  refreshCharacterBosses()
   runStats.value = { victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 }
   foundEquipment.value = []
   logs.value = []
