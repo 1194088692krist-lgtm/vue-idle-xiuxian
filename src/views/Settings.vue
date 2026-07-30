@@ -120,7 +120,6 @@
         <div class="setting-row">
           <label class="setting-label">其他操作</label>
           <div class="setting-input-group">
-            <button class="btn btn-warning" @click="handleReincarnation">转世重修</button>
             <button class="btn btn-info" @click="handleExportSave">导出存档</button>
             <label class="btn btn-outline">
               导入存档

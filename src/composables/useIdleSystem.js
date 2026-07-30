@@ -528,11 +528,11 @@ function cleanExpiredPillBuffs() {
 }
 
 // 丹药 buff 加成：读取 playerStore 生效效果，同类型 value 累加并封顶，返回 1 + total
-// P0-B：原实现纯加法无封顶，玩家可囤药击穿经济。现对每类增益封顶 +100%（即最大 2 倍）。
+// 战斗buff类丹药可叠加（不同丹药共存），寻宝类叠加封顶 +50%（避免掉落概率过高）
 const PILL_BUFF_CAPS = {
   spiritStoneRate: 1.0,
   cultivationRate: 1.0,
-  dropRate: 1.0,
+  dropRate: 0.5,
   expGain: 1.0
 }
 function getPillBuffMultiplier(type) {
@@ -1198,7 +1198,8 @@ function createBossEnemy(bossData, effectiveZone) {
     if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
       baseStats[key] = Math.min(0.95, boosted)
     } else {
-      baseStats[key] = boosted
+      // 修复血量出现 X.5 小数 bug：×1.5 后奇数会变成 X.5，统一 Math.floor 取整
+      baseStats[key] = Math.floor(boosted)
     }
   })
 
@@ -1294,6 +1295,9 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
     // 百分比类字段钳制，避免超过 0.95
     if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
       boosted = Math.min(0.95, boosted)
+    } else {
+      // 修复血量出现 X.5 小数 bug：×1.5 后统一取整
+      boosted = Math.floor(boosted)
     }
     baseStats[key] = boosted
   }

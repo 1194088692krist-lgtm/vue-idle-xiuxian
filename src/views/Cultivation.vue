@@ -43,12 +43,12 @@
             type="number" 
             v-model.number="allocateAmount" 
             min="1" 
-            :max="Math.min(playerStore.getCultivationPool(), 999999)"
+            :max="Math.min(playerStore.getCultivationPool(), 9999999999)"
             placeholder="输入修为数量"
             class="allocate-input"
           />
-          <button class="btn btn-small btn-primary" @click="allocateQuick(100)">+100</button>
-          <button class="btn btn-small btn-primary" @click="allocateQuick(1000)">+1000</button>
+          <button class="btn btn-small btn-primary" @click="allocateQuick(100000)">+10万</button>
+          <button class="btn btn-small btn-primary" @click="allocateQuick(1000000)">+100万</button>
           <button class="btn btn-small btn-success" @click="doAllocate">分配</button>
         </div>
         <div class="allocate-quick">

@@ -857,6 +857,25 @@ export const usePlayerStore = defineStore('player', {
       this.updateHtmlDarkMode(this.isDarkMode)
       this.queueSave()
     },
+    // 存档体积修剪：清理过期/冗余数据，避免存档膨胀超限
+    // 仅清理安全可重建的数据（过期 buff、空数组项、过长日志），不触碰核心库存
+    trimSaveState() {
+      const now = Date.now()
+      // 1. 清理已过期的临时增益（避免过期数据持续占体积）
+      if (Array.isArray(this.activeBuffs)) {
+        this.activeBuffs = this.activeBuffs.filter(b => !b.expireAt || b.expireAt > now)
+      }
+      if (Array.isArray(this.pillEffects)) {
+        this.pillEffects = this.pillEffects.filter(e => !e.endTime || e.endTime > now)
+      }
+      if (Array.isArray(this.activePillBuffs)) {
+        this.activePillBuffs = this.activePillBuffs.filter(b => !b.expiresAt || b.expiresAt > now)
+      }
+      // 2. 限制挂机日志长度：战斗日志在长挂机中会无限增长，仅保留最近 30 条
+      if (this.idleExploration && Array.isArray(this.idleExploration.logs) && this.idleExploration.logs.length > 30) {
+        this.idleExploration.logs = this.idleExploration.logs.slice(-30)
+      }
+    },
     // 保存数据到IndexedDB
     async saveData() {
       // 清除待保存计时器，避免重复保存
@@ -869,6 +888,8 @@ export const usePlayerStore = defineStore('player', {
       // 之前未写 _saveTime 导致 migrate 把本地当成时间戳 0，无差别用云端覆盖本地，造成 cultivationPool 异常回滚
       this._saveTime = Date.now()
       this._teamPower = this._snapshotTeamPower()
+      // 修剪存档体积：清理过期 buff 与过长日志，防止存档膨胀超限
+      this.trimSaveState()
       const encryptedData = encryptData(this.$state)
       if (encryptedData) {
         try {
@@ -957,12 +978,12 @@ export const usePlayerStore = defineStore('player', {
       if (typeof encryptedBlob !== 'string' || !encryptedBlob) {
         throw new Error('存档数据为空，无法上传')
       }
-      // 体积预检：Cloudflare Pages Functions 默认 body 上限约 100MB，D1 单行建议不超 5MB
-      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，此处用 5MB 作为安全阈值
-      const SIZE_LIMIT = 5 * 1024 * 1024
+      // 体积预检：与后端 functions/api/save.js 的 3MB 限制对齐
+      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，前端 saveData 已做数据修剪
+      const SIZE_LIMIT = 3 * 1024 * 1024
       const payloadSize = new Blob([encryptedBlob]).size
       if (payloadSize > SIZE_LIMIT) {
-        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 5MB），请清理部分宗门成员或装备后重试`)
+        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 3MB），请清理部分宗门成员或装备后重试`)
       }
       let lastErr = null
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -3263,9 +3284,10 @@ export const usePlayerStore = defineStore('player', {
       const memberTypes = ['permanentStat', 'permanentStatMulti', 'effortGain', 'healBattle', 'cleanse', 'breakthroughRate', 'enhanceRate', 'reforgeSafe']
 
       if (globalTypes.includes(baseEffect.type)) {
-        // P0-B：同类丹药改为"刷新而非叠加"——服用新 buff 前清除同类型旧 buff
-        // （否则玩家可囤药击穿封顶，与 getPillBuffMultiplier 的 Math.min 配合实现"以最新为准"）
-        this.activePillBuffs = (this.activePillBuffs || []).filter(b => b.type !== baseEffect.type)
+        // 战斗buff类丹药可叠加：不同丹药（聚灵丹+凝元丹）可共存，
+        // 但同一种丹药（聚灵丹+聚灵丹）不可叠加——服用前仅清除同 pillId 的旧 buff。
+        // 各丹药按 effect.type 累加，由 getPillBuffMultiplier 的 cap 封顶。
+        this.activePillBuffs = (this.activePillBuffs || []).filter(b => b.pillId !== pillId)
         this.activePillBuffs.push({
           pillId,
           type: baseEffect.type,
@@ -3273,10 +3295,11 @@ export const usePlayerStore = defineStore('player', {
           expiresAt,
           scope: 'global'
         })
-        // 兼容旧 getter：expGain / dropRate 同步刷新 pillEffects（先清后写，避免双写累积）
+        // 兼容旧 getter：expGain / dropRate 同步刷新 pillEffects（按 pillId 去重，避免双写累积）
         if (baseEffect.type === 'expGain' || baseEffect.type === 'dropRate') {
-          this.pillEffects = (this.pillEffects || []).filter(e => e.type !== baseEffect.type)
+          this.pillEffects = (this.pillEffects || []).filter(e => e.pillId !== pillId)
           this.pillEffects.push({
+            pillId,
             type: baseEffect.type,
             value: effect.value,
             startTime: now,

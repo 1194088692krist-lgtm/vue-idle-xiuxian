@@ -276,7 +276,7 @@
               <span class="dash-value" :style="{ color: idleDashboard.buildRatio >= 1 ? '#4caf50' : '#ff5252' }">{{ Math.round(idleDashboard.buildRatio * 100) }}%</span>
             </div>
             <div class="dash-item">
-              <span class="dash-label">灵石</span>
+              <span class="dash-label">灵石<span v-if="spiritMult" class="pill-mult-badge">{{ spiritMult }}</span></span>
               <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
             </div>
             <div class="dash-item">
@@ -284,11 +284,11 @@
               <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
             </div>
             <div class="dash-item">
-              <span class="dash-label">修为</span>
+              <span class="dash-label">修为<span v-if="expMult" class="pill-mult-badge">{{ expMult }}</span></span>
               <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
             </div>
             <div class="dash-item">
-              <span class="dash-label">装备</span>
+              <span class="dash-label">装备<span v-if="dropMult" class="pill-mult-badge">{{ dropMult }}</span></span>
               <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
             </div>
             <!-- BOSS 挑战券获得统计（击杀 BOSS 时按 30% 掉落 1~2 张） -->
@@ -702,7 +702,7 @@
                     <span class="dash-value" :style="{ color: idleDashboard.buildRatio >= 1 ? '#4caf50' : '#ff5252' }">{{ Math.round(idleDashboard.buildRatio * 100) }}%</span>
                   </div>
                   <div class="dash-item">
-                    <span class="dash-label">灵石</span>
+                    <span class="dash-label">灵石<span v-if="spiritMult" class="pill-mult-badge">{{ spiritMult }}</span></span>
                     <span class="dash-value gold-text">+{{ idleDashboard.totalSpiritStones }}</span>
                   </div>
                   <div class="dash-item">
@@ -710,11 +710,11 @@
                     <span class="dash-value" style="color:#9370db">+{{ idleDashboard.totalPhantomCrystals }}</span>
                   </div>
                   <div class="dash-item">
-                    <span class="dash-label">修为</span>
+                    <span class="dash-label">修为<span v-if="expMult" class="pill-mult-badge">{{ expMult }}</span></span>
                     <span class="dash-value">+{{ idleDashboard.totalCultivation }}</span>
                   </div>
                   <div class="dash-item">
-                    <span class="dash-label">装备</span>
+                    <span class="dash-label">装备<span v-if="dropMult" class="pill-mult-badge">{{ dropMult }}</span></span>
                     <span class="dash-value">+{{ idleDashboard.totalEquipment }}</span>
                   </div>
                   <div class="dash-item" v-if="idleDashboard.totalBossTickets > 0">
@@ -1164,6 +1164,7 @@ const {
   idlePlayerDefeated,
   idleDashboard,
   activePillBuffList,
+  getPillBuffMultiplier,
   setSelectedZone,
   setDifficulty,
   startIdle,
@@ -1215,6 +1216,16 @@ watch(() => showSummaryLog.value, (v) => {
     })
   }
 })
+
+// 丹药增益倍率显示：仅当倍率 > 1 时返回如 "x1.2"，否则空串
+const pillMultText = (type) => {
+  const mult = getPillBuffMultiplier(type)
+  return mult > 1 ? `x${mult.toFixed(2).replace(/0$/, '').replace(/\.$/, '')}` : ''
+}
+const spiritMult = computed(() => pillMultText('spiritStoneRate'))
+const cultMult = computed(() => pillMultText('cultivationRate'))
+const dropMult = computed(() => pillMultText('dropRate'))
+const expMult = computed(() => pillMultText('expGain'))
 
 // 匹配度配色
 const matchColor = computed(() => {
@@ -3673,6 +3684,20 @@ onUnmounted(() => {
 .dash-label {
   font-size: 11px;
   color: #C9C4BA;
+}
+/* 丹药增益倍率徽标：显示在灵石/修为/装备等标签后，如 x1.2 */
+.pill-mult-badge {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  font-size: 10px;
+  font-weight: bold;
+  color: #7CFC00;
+  background: rgba(124, 252, 0, 0.12);
+  border: 1px solid rgba(124, 252, 0, 0.35);
+  border-radius: 8px;
+  line-height: 1.4;
+  vertical-align: middle;
 }
 .dash-value {
   font-size: 16px;

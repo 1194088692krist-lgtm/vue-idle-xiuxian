@@ -301,7 +301,7 @@ export const pillRecipes = [
       { kind: 'ore', id: 'prospect_sand', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
-    baseEffect: { type: 'dropRate', value: 0.2, duration: 1800 }
+    baseEffect: { type: 'dropRate', value: 0.05, duration: 1800 }
   },
   {
     id: 'quench_spirit_pill',
