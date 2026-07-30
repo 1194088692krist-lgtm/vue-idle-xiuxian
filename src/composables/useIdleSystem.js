@@ -16,6 +16,7 @@ import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
 import { triggerRandomEvent } from '../plugins/events'
+import { logUserAction } from './useDebugLog'
 
 // Buff 百分比格式化：最多保留两位小数，去除多余小数位
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
@@ -1732,6 +1733,7 @@ function grantBossChallengeDrops(zoneId, bossId) {
 // 异步函数：每场战斗逐回合推进，结果实时反映到 currentEncounter / idleDashboard / currentEncounterSummary
 // 全部结束后写入 bossChallengeResult（汇总）+ bossChallengeSummary（结算栏数据源）
 async function runBossChallenge(zoneId, bossId, count) {
+  logUserAction('[BOSS挑战] 启动', `zone=${zoneId} boss=${bossId} count=${count}`)
   const s = store()
   const result = {
     zoneId,
@@ -2064,6 +2066,7 @@ function pickChallengeZoneForCharacter(character) {
 // 实装：人物 BOSS 挑战券主动挑战
 // 与 runBossChallenge 对称，但敌人用 createCharacterBossEnemy 生成，掉落走 grantCharacterBossDrops
 async function runCharacterBossChallenge(characterId, count) {
+  logUserAction('[人物BOSS挑战] 启动', `char=${characterId} count=${count}`)
   const s = store()
   const result = {
     characterId,
@@ -4005,6 +4008,7 @@ async function runIdleEncounter() {
         // 让十杀文案演出完整播完再进下一场（额外延后 BOSS_KILL_EXTRA_DELAY=2s）
         lastBossKillTs = Date.now()
         // 诊断日志：确认击杀事件已发出（排查挂机立绘不弹出的关键证据）
+        logUserAction('[BOSS击杀]', `${killEvt.killerName} 击败 ${killEvt.bossName} @${killEvt.zoneId}`)
         console.log('[useIdleSystem] BOSS击杀事件已发出', killEvt)
       }
 
@@ -4015,7 +4019,7 @@ async function runIdleEncounter() {
         const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
         s.spiritStones += recovered
         runStats.value.spiritStones += recovered
-        const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + ratio * 0.5) * getPillBuffMultiplier('cultivationRate'))
+        const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + recoverRatio * 0.5) * getPillBuffMultiplier('cultivationRate'))
         s.cultivate(cultBonus)
         runStats.value.cultivation += cultBonus
         // 奇遇系统：每 10 次探索有较高概率触发一次事件（events.js）
@@ -4479,6 +4483,7 @@ function ensureTeamMemberStates() {
 }
 
 function startIdle(durationMinutes) {
+  logUserAction('[挂机] 启动', `zone=${selectedZone.value} diff=${selectedDifficultyKey.value} dur=${durationMinutes}min`)
   const s = store()
   if (!selectedZone.value) return
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
@@ -4532,7 +4537,10 @@ function startIdle(durationMinutes) {
   s.saveToCurrentSlot().catch(err => console.error('挂机开始自动存档失败:', err))
 }
 
-function stopIdle() { finishIdle() }
+function stopIdle() {
+  logUserAction('[挂机] 停止', `encounters=${idleEncounterCount.value}`)
+  finishIdle()
+}
 
 function finishIdle() {
   if (!isIdling.value) return

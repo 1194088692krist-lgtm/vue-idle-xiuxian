@@ -614,52 +614,78 @@ const ACTION_DELAY = 1000
 let isPlayingRound = false
 
 // 播放某一回合的所有事件（实时反馈）
+// 修复 BOSS 不掉血 bug：原实现在 isPlayingRound=true 时直接 return，导致后续回合事件被丢弃，
+// 表现为血量只在第一回合可见衰减，后续回合血量"卡住"不动，直到 BOSS 突然暴死。
+// 改为：当前回合播完后，自动播放期间累积的所有未播回合，确保所有回合的血量快照都被应用到显示血量。
+const pendingRoundQueue = []  // 待播放回合队列（播放期间累积的请求）
 async function playLiveRound(roundNum) {
-  if (isPlayingRound) return // 上一回合仍在播放，跳过本次（避免动画堆叠抖动）
+  if (isPlayingRound) {
+    // 入队等待当前播放完成后处理（去重，避免同一回合被多次入队）
+    if (!pendingRoundQueue.includes(roundNum)) pendingRoundQueue.push(roundNum)
+    return
+  }
   isPlayingRound = true
   try {
-    const cs = props.encounter?.combatStats || {}
-    const events = []
-    for (const pid of Object.keys(cs)) {
-      const details = cs[pid]?.roundDetails || []
-      for (const d of details) if (d.round === roundNum) events.push(d)
-    }
-    // 玩家先手、敌人后手，顺序更自然
-    events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
-
-    // 正向展示：回合开始时不重置显示血量，保持上一回合结束时的值
-    // 第一回合的初始值由 encounter watch 设置（initialEnemyHp = 满血）
-    // 后续回合的起点 = 上一回合最后一个事件推进到的血量，无需重置
-    // 仅确保 maxHp 字段已初始化
-    const enemy = props.encounter?.enemy
-    if (enemy && enemy.stats) {
-      displayEnemyMaxHp.value = enemy.stats.maxHealth || enemy.currentHealth
-      // 若 displayHp 未初始化（首轮且 watch 未触发的兜底），用 initialEnemyHp
-      if (displayEnemyHp.value <= 0 && props.encounter.initialEnemyHp) {
-        displayEnemyHp.value = props.encounter.initialEnemyHp
+    await playOneRoundEvents(roundNum)
+    // 处理播放期间累积的所有待播回合（按回合号升序播放，保证血量快照按顺序应用）
+    while (pendingRoundQueue.length > 0) {
+      // 战斗可能已结束（enemy.currentHealth <= 0），剩余待播回合无意义，直接清空
+      if (props.encounter && props.encounter.enemy && props.encounter.enemy.currentHealth <= 0) {
+        pendingRoundQueue.length = 0
+        break
       }
-    }
-    for (const p of (props.encounter?.players || [])) {
-      if (p && p.stats) {
-        displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
-        // 若玩家显示血量未初始化，用 initialPlayerHp 快照
-        if (displayMemberHp[p.memberId] === undefined && props.encounter.initialPlayerHp) {
-          displayMemberHp[p.memberId] = props.encounter.initialPlayerHp[p.memberId] !== undefined
-            ? props.encounter.initialPlayerHp[p.memberId]
-            : p.currentHealth
-        }
-      }
-    }
-
-    for (const e of events) {
-      showEvent(e)
-      // 正向展示：每播放一个事件后，根据事件快照推进显示血量
-      // defenderHP/attackerHP 是事件发生后的血量快照，逐步推进实现血条渐变
-      advanceDisplayHp(e)
-      await delay(ACTION_DELAY)
+      const next = pendingRoundQueue.shift()
+      await playOneRoundEvents(next)
     }
   } finally {
     isPlayingRound = false
+  }
+}
+
+// 实际播放某一回合所有事件的核心逻辑
+async function playOneRoundEvents(roundNum) {
+  const cs = props.encounter?.combatStats || {}
+  const events = []
+  for (const pid of Object.keys(cs)) {
+    const details = cs[pid]?.roundDetails || []
+    for (const d of details) if (d.round === roundNum) events.push(d)
+  }
+  // 玩家先手、敌人后手，顺序更自然
+  events.sort((a, b) => (a.isPlayerAttack === b.isPlayerAttack ? 0 : a.isPlayerAttack ? -1 : 1))
+
+  // 正向展示：回合开始时不重置显示血量，保持上一回合结束时的值
+  // 第一回合的初始值由 encounter watch 设置（initialEnemyHp = 满血）
+  // 后续回合的起点 = 上一回合最后一个事件推进到的血量，无需重置
+  // 仅确保 maxHp 字段已初始化
+  const enemy = props.encounter?.enemy
+  if (enemy && enemy.stats) {
+    displayEnemyMaxHp.value = enemy.stats.maxHealth || enemy.currentHealth
+    // 若 displayHp 未初始化（首轮且 watch 未触发的兜底），用 initialEnemyHp
+    if (displayEnemyHp.value <= 0 && props.encounter.initialEnemyHp) {
+      displayEnemyHp.value = props.encounter.initialEnemyHp
+    }
+  }
+  for (const p of (props.encounter?.players || [])) {
+    if (p && p.stats) {
+      displayMemberMaxHp[p.memberId] = p.stats.maxHealth || p.currentHealth
+      // 若玩家显示血量未初始化，用 initialPlayerHp 快照
+      if (displayMemberHp[p.memberId] === undefined && props.encounter.initialPlayerHp) {
+        displayMemberHp[p.memberId] = props.encounter.initialPlayerHp[p.memberId] !== undefined
+          ? props.encounter.initialPlayerHp[p.memberId]
+          : p.currentHealth
+      }
+    }
+  }
+
+  // 兜底：若该回合没有事件（如纯防御回合），不做任何显示更新
+  if (events.length === 0) return
+
+  for (const e of events) {
+    showEvent(e)
+    // 正向展示：每播放一个事件后，根据事件快照推进显示血量
+    // defenderHP/attackerHP 是事件发生后的血量快照，逐步推进实现血条渐变
+    advanceDisplayHp(e)
+    await delay(ACTION_DELAY)
   }
 }
 

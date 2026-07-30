@@ -1350,6 +1350,70 @@ const bossChallengeDropSummary = computed(() => {
   return Object.values(map)
 })
 
+// ============ 人物 BOSS 挑战系统 ============
+// 修复：模板中引用了 bossChallengeMode/characterBossGroups/selectedCharBossTarget 等变量，
+// 但 script 中从未定义，导致「怪物 BOSS / 人物 BOSS」切换按钮点击无效（赋值 undefined ref 不触发响应），
+// 且人物 BOSS 选择网格因 characterBossGroups 为 undefined 永远渲染空。
+// 切换模式：'monster' = 怪物 BOSS（默认），'character' = 人物 BOSS
+const bossChallengeMode = ref('monster')
+// 当前选中的人物 BOSS 目标（{ characterId, name, ticketName, ticketId, star }）
+const selectedCharBossTarget = ref(null)
+// 人物 BOSS 挑战次数（独立于怪物 BOSS 的 bossChallengeCount）
+const charBossChallengeCount = ref(1)
+// 星级配色（3星灰、4星蓝、5星金）
+const starColor = (star) => {
+  if (star === 5) return '#FFD700'
+  if (star === 4) return '#4169E1'
+  return '#999999'
+}
+// 人物 BOSS 选择网格：按星级分组（3/4/5星），列出所有 50 个角色及其挑战券持有量
+// 显式访问 playerStore.materials 让 Vue 追踪依赖，确保挑战券变化时本 computed 重算
+const characterBossGroups = computed(() => {
+  const materials = playerStore.materials || []
+  const groups = {}
+  for (const c of characterList) {
+    const ticketDef = CHARACTER_BOSS_TICKETS[c.id]
+    if (!ticketDef) continue
+    const ticketCount = materials.filter(m => m && m.kind === 'boss_ticket' && m.id === ticketDef.id).length
+    if (!groups[c.star]) groups[c.star] = { star: c.star, characters: [] }
+    groups[c.star].characters.push({
+      characterId: c.id,
+      name: c.name,
+      star: c.star,
+      school: c.school,
+      avatar: getCharacterAvatar({ id: c.id }, 'thumbnail'),
+      ticketId: ticketDef.id,
+      ticketName: ticketDef.name,
+      ticketCount
+    })
+  }
+  // 按星级降序排列（5星在前）
+  return Object.values(groups).sort((a, b) => b.star - a.star)
+})
+// 当前选中人物 BOSS 的挑战券持有数量
+const selectedCharBossTicketCount = computed(() => {
+  if (!selectedCharBossTarget.value) return 0
+  const ticketDef = CHARACTER_BOSS_TICKETS[selectedCharBossTarget.value.characterId]
+  if (!ticketDef) return 0
+  const materials = playerStore.materials || []
+  return materials.filter(m => m && m.kind === 'boss_ticket' && m.id === ticketDef.id).length
+})
+// 选择人物 BOSS 挑战目标
+const selectCharBossTarget = (cb) => {
+  selectedCharBossTarget.value = cb
+  charBossChallengeCount.value = 1
+}
+// 执行人物 BOSS 挑战（异步：进入实时战斗，UI 切换到战斗模式）
+const executeCharBossChallenge = async () => {
+  if (!selectedCharBossTarget.value) return
+  if (isBossChallengeInProgress.value) return
+  const count = Math.max(1, Math.floor(charBossChallengeCount.value) || 1)
+  const target = { ...selectedCharBossTarget.value }
+  // 清除选中让 UI 切换到 boss-challenge-live 视图（基于 isBossChallengeInProgress）
+  selectedCharBossTarget.value = null
+  await runCharacterBossChallenge(target.characterId, count)
+}
+
 // 血条百分比
 const idleHpPercent = computed(() => {
   if (!idlePlayerMaxHP.value) return 0
