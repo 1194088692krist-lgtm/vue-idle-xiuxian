@@ -56,7 +56,7 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
     baseEffect: {
-      type: 'cultivationRate',
+      type: 'expGain',
       value: 0.15,
       duration: 1800
     }
@@ -73,7 +73,7 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
     baseEffect: {
-      type: 'cultivationRate',
+      type: 'expGain',
       value: 0.25,
       duration: 1800
     }
@@ -118,7 +118,7 @@ export const pillRecipes = [
     ],
     fragmentsNeeded: getFragmentsNeeded('grade6'),
     baseEffect: {
-      type: 'cultivationRate',
+      type: 'expGain',
       value: 0.35,
       duration: 1800
     }

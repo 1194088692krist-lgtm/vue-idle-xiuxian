@@ -1686,21 +1686,25 @@ function grantBossMaterialDrops(enemy, zoneId) {
   return drops
 }
 
-function grantCombatDrops(enemy, zoneId = null) {
+function grantCombatDrops(enemy, zoneId = null, isIdleMode = false) {
   const s = store()
   const drops = []
   const tier = enemy?.tier || 'normal'
   // 取当前秘境对象，用于「天玄碎片仅仙墟/混沌界掉落」等 zone 门控
   const zone = zoneId ? getZoneById(zoneId) : null
+  // 挂机模式下素材掉率整体下调（与 grantReward 的 IDLE_MATERIAL_NERF 配合），
+  // 避免每场战斗都通过本通道额外发放大量素材。
+  const matChanceScale = isIdleMode ? 0.3 : 1
   if (tier === 'boss') {
     if (Math.random() < 0.6) { const c = getRandomCore('boss'); s.gainMaterial(c); drops.push(c) }
     // 天玄碎片仅从仙墟/混沌界获得；其余秘境 boss 仍可掉定灵珠
     if (Math.random() < 0.08) { const sp = getRandomSpecial(zone); s.gainMaterial(sp); drops.push(sp) }
-    if (Math.random() < 0.25) { const h = getRandomHerb({ difficulty: 9 }); s.gainMaterial(h); drops.push(h) }
+    if (Math.random() < 0.25 * matChanceScale) { const h = getRandomHerb({ difficulty: 9 }); s.gainMaterial(h); drops.push(h) }
     // 定向素材：BOSS 必掉 1~2 个该秘境丹药所需素材（解决"洗髓花等关键主料从未获取"）
     // 配合 zoneMaterialPool：每个秘境 BOSS 都掉对应丹方所需素材
+    // 挂机模式下数量减半（原 1~2 → 1~1），降低素材膨胀
     if (zoneId) {
-      const zoneMatCount = 1 + (Math.random() < 0.4 ? 1 : 0)
+      const zoneMatCount = isIdleMode ? 1 : (1 + (Math.random() < 0.4 ? 1 : 0))
       for (let i = 0; i < zoneMatCount; i++) {
         const zm = getRandomZoneMaterial(zoneId)
         if (zm) { s.gainMaterial(zm); drops.push(zm) }
@@ -1732,15 +1736,15 @@ function grantCombatDrops(enemy, zoneId = null) {
   } else if (tier === 'elite') {
     if (Math.random() < 0.5) { const c = getRandomCore('elite'); s.gainMaterial(c); drops.push(c) }
     const beast = getRandomCore('normal'); s.gainMaterial(beast); drops.push(beast)
-    // 精英怪 40% 概率掉 1 个该秘境定向素材（让低难玩家也有途径）
-    if (zoneId && Math.random() < 0.40) {
+    // 精英怪 40% 概率掉 1 个该秘境定向素材（挂机模式降至 12%）
+    if (zoneId && Math.random() < 0.40 * matChanceScale) {
       const zm = getRandomZoneMaterial(zoneId)
       if (zm) { s.gainMaterial(zm); drops.push(zm) }
     }
   } else {
     if (Math.random() < 0.4) { const c = getRandomCore('normal'); s.gainMaterial(c); drops.push(c) }
-    // 普通怪 18% 概率掉 1 个该秘境定向素材（让前期玩家也能稳定获取丹药主料）
-    if (zoneId && Math.random() < 0.18) {
+    // 普通怪 18% 概率掉 1 个该秘境定向素材（挂机模式降至 5.4%）
+    if (zoneId && Math.random() < 0.18 * matChanceScale) {
       const zm = getRandomZoneMaterial(zoneId)
       if (zm) { s.gainMaterial(zm); drops.push(zm) }
     }
@@ -2043,7 +2047,8 @@ async function runBossChallenge(zoneId, bossId, count) {
           : '0%'
         currentIdleEnemy.value.dead = liveHP <= 0
       }
-      await new Promise(resolve => setTimeout(resolve, 750))
+      // 后台时跳过动画延迟，避免 setTimeout 被节流导致战斗耗时数分钟卡死挂机
+      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, 750))
     }
 
     // 处理本场战斗结果
@@ -2129,7 +2134,8 @@ async function runBossChallenge(zoneId, bossId, count) {
 
     // 场次间隔：让斩杀特效（立绘+灵宠+逐字文案+停留）完整播完再进下一场
     // BOSS 击杀后额外 +2s（共 7s）让十杀文案逐字砸入+停留完整播完，避免被截断
-    if (i < count - 1 && !teamMemberStates.value.every(ms => ms.hp <= 0)) {
+    // 后台时跳过间隔等待（setInterval 节流会让 7s 变成数分钟，卡死挂机推进）
+    if (i < count - 1 && !teamMemberStates.value.every(ms => ms.hp <= 0) && !document.hidden) {
       const gap = lastBossKillTs > 0 && (Date.now() - lastBossKillTs) < ENCOUNTER_INTERVAL
         ? ENCOUNTER_INTERVAL + BOSS_KILL_EXTRA_DELAY
         : ENCOUNTER_INTERVAL
@@ -2371,7 +2377,8 @@ async function runCharacterBossChallenge(characterId, count) {
           : '0%'
         currentIdleEnemy.value.dead = liveHP <= 0
       }
-      await new Promise(resolve => setTimeout(resolve, 750))
+      // 后台时跳过动画延迟，避免 setTimeout 被节流导致战斗耗时数分钟卡死挂机
+      if (!document.hidden) await new Promise(resolve => setTimeout(resolve, 750))
     }
 
     const victory = roundResult.victory
@@ -2537,6 +2544,10 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   // 挂机产出系数调整：用户反馈修为/灵石产出过多，下调至原值的 20%；幻灵结晶下调至 50%。
   const IDLE_RESOURCE_NERF = 0.2  // 修为/灵石产出系数
   const IDLE_CRYSTAL_NERF = 0.5   // 幻灵结晶产出系数
+  // 挂机素材（灵草/矿料/灵液）产出系数：原无 nerf，被 rewardMultiplier(最高100) +
+  // BOSS_REWARD_MULT(10) 叠加放大，单场掉几十~上百个，远超炼丹/锻造消耗。
+  // 下调至 10%（比修为/灵石更狠，因素材累积更快且用途有限）。
+  const IDLE_MATERIAL_NERF = 0.1
   for (const rw of effectiveZone.rewards) {
     const chance = ['spirit_stone', 'cultivation'].includes(rw.type)
       ? rw.chance
@@ -2545,23 +2556,30 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
       const amount = Array.isArray(rw.amount)
         ? Math.floor(Math.random() * (rw.amount[1] - rw.amount[0] + 1)) + rw.amount[0]
         : rw.amount || 1
-      // Boss：数量型奖励 ×10（仅放大产出数量，不触碰爆率 chance）
+      // Boss：数量型奖励 ×BOSS_REWARD_MULT（仅放大产出数量，不触碰爆率 chance）。
+      // 但素材类（herb/ore/liquid）单独用更低的倍率，避免 BOSS 击杀后单场掉几十个素材。
+      const isMaterialType = ['herb', 'ore', 'liquid'].includes(rw.type)
+      const bossMatMult = isBoss && isMaterialType ? 3 : 1   // BOSS 素材倍率 3（原 10，过大）
       const bossAmountMult = (isBoss && BOSS_STACKABLE.includes(rw.type)) ? BOSS_REWARD_MULT : 1
-      const multiplied = Math.floor(amount * bossAmountMult * effectiveZone.rewardMultiplier)
+      const multiplied = Math.floor(amount * bossAmountMult * bossMatMult * effectiveZone.rewardMultiplier)
       if (rw.type === 'spirit_stone') {
         const final = Math.floor(multiplied * IDLE_RESOURCE_NERF * getPillBuffMultiplier('spiritStoneRate'))
         s.spiritStones += final
         runStats.value.spiritStones += final
         rewards.push({ type: 'spirit_stone', amount: final, name: '灵石' })
       } else if (rw.type === 'herb') {
-        for (let i = 0; i < multiplied; i++) { const h = getRandomHerb(effectiveZone); if (h) s.gainMaterial(h) }
-        rewards.push({ type: 'herb', amount: multiplied, name: '灵草' })
+        // 挂机素材大幅削减：应用 IDLE_MATERIAL_NERF（10%），避免被 rewardMultiplier 放大后单场掉落过多
+        const matAmount = Math.max(1, Math.floor(multiplied * IDLE_MATERIAL_NERF))
+        for (let i = 0; i < matAmount; i++) { const h = getRandomHerb(effectiveZone); if (h) s.gainMaterial(h) }
+        rewards.push({ type: 'herb', amount: matAmount, name: '灵草' })
       } else if (rw.type === 'ore') {
-        for (let i = 0; i < multiplied; i++) { const o = getRandomOre(effectiveZone); if (o) s.gainMaterial(o) }
-        rewards.push({ type: 'ore', amount: multiplied, name: '矿料' })
+        const matAmount = Math.max(1, Math.floor(multiplied * IDLE_MATERIAL_NERF))
+        for (let i = 0; i < matAmount; i++) { const o = getRandomOre(effectiveZone); if (o) s.gainMaterial(o) }
+        rewards.push({ type: 'ore', amount: matAmount, name: '矿料' })
       } else if (rw.type === 'liquid') {
-        for (let i = 0; i < multiplied; i++) { const l = getRandomLiquid(effectiveZone); if (l) s.gainMaterial(l) }
-        rewards.push({ type: 'liquid', amount: multiplied, name: '灵液' })
+        const matAmount = Math.max(1, Math.floor(multiplied * IDLE_MATERIAL_NERF))
+        for (let i = 0; i < matAmount; i++) { const l = getRandomLiquid(effectiveZone); if (l) s.gainMaterial(l) }
+        rewards.push({ type: 'liquid', amount: matAmount, name: '灵液' })
       } else if (rw.type === 'fortune') {
         // 奇遇奖励：从高难素材池中随机抽一个（定灵珠/天玄碎片/灵草/矿料/灵液）
         // 累计到 buildMaterialSummary 时按 pickItem.kind 分类，让结算栏能展示真实素材
@@ -2752,7 +2770,7 @@ async function runManualBattle(effectiveZone) {
   combatState.value = { inCombat: false, combatManager: null }
   // 怪物掉落（仅胜利时）
   let drops = []
-  if (victory && enemy) drops = grantCombatDrops(enemy, effectiveZone.id)
+  if (victory && enemy) drops = grantCombatDrops(enemy, effectiveZone.id, isIdleMode)
   // 保留最终画面短暂时间，让 BattleStage 展示胜负结果与最终血量，再收尾重置
   currentEncounter.value = { ...currentEncounter.value, inProgress: false }
   await sleep(1600)
@@ -4041,9 +4059,10 @@ async function runIdleEncounter() {
         const bossNames = allBosses.map(b => b.name).join('、')
         idleDiag.value.lastEnemyName = 'BOSS ' + bossNames + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
         // 人物 BOSS 入场演出：立绘从上而下在屏幕中间展示后，从下方滑出
-        for (const b of allBosses) {
-          if (b.isCharacterBoss) triggerCharacterBossIntro(b)
-        }
+        // 修复"登场的是 A 展示的是 B"：原循环对 allBosses 中每个 BOSS 都调一次
+        // triggerCharacterBossIntro，第二次同步覆盖第一次，UI 只渲染最后一个 B。
+        // 现在仅对主敌（allBosses[0]）触发，确保战斗主目标与立绘展示一致。
+        if (enemy.isCharacterBoss) triggerCharacterBossIntro(enemy)
         addLog('header', `👑【${zone.name}·${diff.label}】第 ${roundIndex + 1} 轮 BOSS 决战：${bossNames}！限时 1 分钟内击杀，失败则进入下一轮！`)
         // 在完整战斗日志中插入本轮 BOSS 分隔符，便于「查看完整日志」按场次区分
         idleCombatLog.value.push(`—— 第 ${roundIndex + 1} 轮 BOSS · ${bossNames} ——`)
@@ -4242,7 +4261,9 @@ async function runIdleEncounter() {
         const recovered = Math.max(1, Math.round(diff.spiritCost * recoverRatio))
         s.spiritStones += recovered
         runStats.value.spiritStones += recovered
-        const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + recoverRatio * 0.5) * getPillBuffMultiplier('cultivationRate'))
+        // dungeon 胜利恢复修为：直接走 s.cultivate()，修为获取（expGain）由 cultivate 内部统一加成。
+        // 原 cultivationRate（修炼速度）已废弃改用 expGain，避免双重相乘导致膨胀。
+        const cultBonus = Math.round(5 * effectiveZone.difficulty * (1 + recoverRatio * 0.5))
         s.cultivate(cultBonus)
         runStats.value.cultivation += cultBonus
         // 奇遇系统：每 10 次探索有较高概率触发一次事件（events.js）
@@ -4274,8 +4295,8 @@ async function runIdleEncounter() {
         })
         accumulateMaterials(rewards)
 
-        // 战斗掉落
-        const drops = grantCombatDrops(enemy, effectiveZone.id)
+        // 战斗掉落（挂机模式：isIdleMode=true，触发素材掉率下调）
+        const drops = grantCombatDrops(enemy, effectiveZone.id, true)
         for (const d of drops) {
           // 修复：普通战斗掉落素材（herb/ore/liquid/core 等）只有 kind 字段无 type 字段，
           // 导致日志生成时按 r.type 过滤被排除，整条"获得素材"日志缺失、icon 不显示。

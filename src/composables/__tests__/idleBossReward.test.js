@@ -38,7 +38,7 @@ function makeZone(rewards) {
 }
 
 describe('Boss 奖励区分：数量 ×10 与高稀有度加权（不破爆率）', () => {
-  it('数量型奖励 Boss 是普怪的 10 倍（爆率 chance 不变）', () => {
+  it('数量型奖励 Boss 是普怪的 10 倍（爆率 chance 不变）；素材类（herb/ore/liquid）Boss 倍率单独下调至 3', () => {
     // 固定 Math.random = 0.4：chance=1 必然命中；数字 amount 不受随机影响
     const spy = vi.spyOn(Math, 'random').mockReturnValue(0.4)
     const zone = makeZone([
@@ -51,8 +51,13 @@ describe('Boss 奖励区分：数量 ×10 与高稀有度加权（不破爆率�
     const bStone = boss.find(r => r.type === 'spirit_stone').amount
     const nHerb = normal.find(r => r.type === 'herb').amount
     const bHerb = boss.find(r => r.type === 'herb').amount
+    // 灵石：BOSS_REWARD_MULT=10 倍（非素材类，不受 bossMatMult 和 IDLE_MATERIAL_NERF 影响）
     expect(bStone).toBe(nStone * 10)
-    expect(bHerb).toBe(nHerb * 10)
+    // 素材（herb/ore/liquid）：BOSS 素材倍率从 10 降至 3，且 IDLE_MATERIAL_NERF=0.1 对普怪和 BOSS 同效。
+    // 普怪 nHerb = max(1, floor(2 * 1 * 1 * 0.1)) = max(1, 0) = 1
+    // BOSS bHerb = max(1, floor(2 * 10 * 3 * 0.1)) = max(1, 6) = 6
+    expect(nHerb).toBe(1)
+    expect(bHerb).toBe(6)
     spy.mockRestore()
   })
 

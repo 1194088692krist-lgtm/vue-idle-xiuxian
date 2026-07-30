@@ -1264,14 +1264,8 @@ const pillMultText = (type) => {
   const mult = getPillBuffMultiplier(type)
   return mult > 1 ? `x${mult.toFixed(2).replace(/0$/, '').replace(/\.$/, '')}` : ''
 }
-// 修为增益双轨制：expGain（悟道丹，作用于 zone rewards 修为）+ cultivationRate（修炼速度类，作用于每场胜利恢复修为）
-// 仪表盘"修为" badge 需合并显示两类，否则服用修炼速度丹后增益不显示
-const expMult = computed(() => {
-  const a = pillMultText('expGain')
-  const b = pillMultText('cultivationRate')
-  if (a && b) return `${a}/${b}`
-  return a || b || ''
-})
+// 修为增益统一走 expGain（原 cultivationRate 修炼速度已废弃，合并到 expGain 修为获取）
+const expMult = computed(() => pillMultText('expGain'))
 const spiritMult = computed(() => pillMultText('spiritStoneRate'))
 const dropMult = computed(() => pillMultText('dropRate'))
 
@@ -1280,10 +1274,9 @@ const showPillSelectModal = ref(false)
 // 可选丹药列表：从 ownedPills 筛选全局 buff 类丹药
 const availableIdlePills = computed(() => {
   const owned = playerStore.ownedPills || {}
-  const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain']
+  const globalTypes = ['spiritStoneRate', 'dropRate', 'expGain']
   const typeNames = {
     spiritStoneRate: '灵石获取',
-    cultivationRate: '修炼速度',
     dropRate: '掉落加成',
     expGain: '修为获取'
   }
