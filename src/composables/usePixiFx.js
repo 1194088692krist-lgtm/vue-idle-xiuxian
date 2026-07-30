@@ -245,7 +245,13 @@ function loadImageElement(dataUrl) {
  * @returns {Promise<Texture>}
  */
 async function loadTexture(url) {
-  if (textureCache.has(url)) return textureCache.get(url)
+  if (textureCache.has(url)) {
+    // 修复：缓存中的 texture 可能因首次构造时 source 未传播而无效，校验后必要时重载
+    const cached = textureCache.get(url)
+    if (cached && cached.source && cached.source.width > 0) return cached
+    // source 无效：清除缓存重新加载
+    textureCache.delete(url)
+  }
 
   let tex
   if (isDataUrl(url)) {
@@ -255,8 +261,35 @@ async function loadTexture(url) {
     if (typeof img.decode === 'function') {
       try { await img.decode() } catch (_) { /* decode 失败也继续，onload 已保证加载完成 */ }
     }
-    const { Texture } = pixiModule
-    tex = Texture.from(img)
+    const { Texture, ImageSource } = pixiModule
+    // 修复 hasSource:false：原直接 Texture.from(img) 在 PixiJS 8 部分场景下
+    // 返回 source 为 null 的 texture（ImageSource 未正确从 img 构造）。
+    // 改为显式构造 ImageSource → Texture，并等待 source.valid 传播。
+    if (ImageSource) {
+      const source = new ImageSource({ resource: img })
+      // ImageSource 构造后 source.valid 可能异步传播，轮询等待最多 200ms
+      const valid = await waitForSourceValid(source, 200)
+      // 仅当 source 已就绪时才用它构造 Texture，否则回退 Texture.from
+      // （避免 source.valid=false 时构造出无效 texture，导致 play 阶段再次失败）
+      if (valid && source) {
+        tex = new Texture({ source })
+      } else {
+        tex = Texture.from(img)
+      }
+    } else {
+      tex = Texture.from(img)
+    }
+    // 兜底校验：若显式构造仍无效，回退 Texture.from
+    if (!tex || !tex.source) {
+      tex = Texture.from(img)
+    }
+    // 二次校验：source.width<=0 说明资源仍未就绪，强制重试 Texture.from 一次
+    if (tex && tex.source && tex.source.width <= 0) {
+      try {
+        const fallback = Texture.from(img)
+        if (fallback && fallback.source && fallback.source.width > 0) tex = fallback
+      } catch (_) { /* 保留原 tex，由 play 阶段校验拦截 */ }
+    }
   } else {
     // 普通 URL 路径：走 PixiJS 完整异步加载
     const { Assets } = pixiModule
@@ -265,6 +298,27 @@ async function loadTexture(url) {
 
   textureCache.set(url, tex)
   return tex
+}
+
+/**
+ * 等待 TextureSource 的 valid 状态传播（PixiJS 8 ImageSource 构造后可能异步标记 valid）
+ * @param {Object} source - PixiJS TextureSource
+ * @param {number} timeout - 超时 ms
+ */
+function waitForSourceValid(source, timeout = 200) {
+  return new Promise(resolve => {
+    if (!source) return resolve(false)
+    if (source.valid) return resolve(true)
+    const start = Date.now()
+    const check = () => {
+      if (source.valid || Date.now() - start > timeout) {
+        resolve(!!source.valid)
+      } else {
+        requestAnimationFrame(check)
+      }
+    }
+    requestAnimationFrame(check)
+  })
 }
 
 /**
@@ -291,13 +345,12 @@ async function play({ frames, fps = 24, tint, scale = 1, onDone, loop = false, s
     const textures = await Promise.all(frames.map(loadTexture))
     // 加载过程中如果已被 stop，放弃
     if (!pixiApp) return false
-    // 校验纹理有效性：PixiJS 8 的 TextureSource 没有 valid 属性（那是 v7 BaseTexture 的 API），
-    // 改用 source 存在判断。dataURL 经主线程 Image+decode 加载后 Texture.from(img) 同步构造，
-    // source.width/height 可能在 Texture 刚构造时还未传播到 source（异步赋值），
-    // 但纹理本身已可用。仅当 t 或 t.source 完全缺失时才判定为失败。
+    // 校验纹理有效性：与 loadTexture 缓存校验保持一致，要求 source 存在且 width>0。
+    // 仅检查 source 存在会漏掉 source 已构造但 valid=false 的边缘情况（width=0），
+    // 那种纹理传给 AnimatedSprite 仍会渲染异常，应一并判为失败回退 CSS。
     const badIndices = []
     textures.forEach((t, i) => {
-      if (!t || !t.source) badIndices.push(i)
+      if (!t || !t.source || t.source.width <= 0) badIndices.push(i)
     })
     if (badIndices.length > 0) {
       console.warn('[usePixiFx] 部分纹理未就绪，回退 CSS。失败帧索引:', badIndices,

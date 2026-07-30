@@ -885,6 +885,25 @@ export const usePlayerStore = defineStore('player', {
       if (this.idleExploration && Array.isArray(this.idleExploration.logs) && this.idleExploration.logs.length > 30) {
         this.idleExploration.logs = this.idleExploration.logs.slice(-30)
       }
+      // 2.1 挂机运行态瘦身：runStats/roundDetails/encounter 是战斗运行时态，存档保留纯属冗余
+      //     重载后由 startIdle 重新构建，不保留任何挂机中状态（防止"继续挂机"逻辑误用旧快照）
+      if (this.idleExploration && typeof this.idleExploration === 'object') {
+        delete this.idleExploration.runStats
+        delete this.idleExploration.roundDetails
+        delete this.idleExploration.encounter
+        delete this.idleExploration.lastRoundResult
+      }
+      // 2.2 限制各类历史/日志数组长度，防止无限增长
+      const MAX_ARRAY_LEN = 100
+      const arrayFieldsToTrim = ['killLog', 'bossKillLog', 'dropLog', 'eventLog', 'battleLog', 'cultivationLog', 'refineLog']
+      arrayFieldsToTrim.forEach(field => {
+        if (Array.isArray(this[field]) && this[field].length > MAX_ARRAY_LEN) {
+          this[field] = this[field].slice(-MAX_ARRAY_LEN)
+        }
+        if (this.idleExploration && Array.isArray(this.idleExploration[field]) && this.idleExploration[field].length > MAX_ARRAY_LEN) {
+          this.idleExploration[field] = this.idleExploration[field].slice(-MAX_ARRAY_LEN)
+        }
+      })
       // 3. sectMembers 临时战斗态瘦身：currentHealth/currentSp/tempBuffs 是战斗运行时态，
       //    重载后由 buildTeamMemberState 重置为满血满气，存档保留纯属浪费体积
       if (Array.isArray(this.sectMembers)) {
@@ -893,6 +912,18 @@ export const usePlayerStore = defineStore('player', {
             delete m.currentHealth
             delete m.currentSp
             delete m.tempBuffs
+          }
+        })
+      }
+      // 3.1 装备词缀临时态瘦身：craftedAffixes 可能缓存大量中间态，只保留最终词缀
+      if (Array.isArray(this.sectMembers)) {
+        this.sectMembers.forEach(m => {
+          if (m && m.equippedArtifacts && typeof m.equippedArtifacts === 'object') {
+            Object.values(m.equippedArtifacts).forEach(eq => {
+              if (eq && Array.isArray(eq.craftedAffixes) && eq.affixes) {
+                delete eq.craftedAffixes  // affixes 已是最终态，craftedAffixes 冗余
+              }
+            })
           }
         })
       }
@@ -907,6 +938,23 @@ export const usePlayerStore = defineStore('player', {
       if (this.bossTicketShopState && Array.isArray(this.bossTicketShopState.items)) {
         delete this.bossTicketShopState.items
       }
+      // 5. 存档体积诊断：定位体积超限的根因字段（仅在原始体积 > 1MB 时输出）
+      //    帮助发现持续增长但未清理的冗余字段
+      try {
+        const rawSize = new Blob([JSON.stringify(this.$state)]).size
+        if (rawSize > 1024 * 1024) {
+          const fieldSizes = {}
+          for (const key of Object.keys(this.$state)) {
+            try {
+              fieldSizes[key] = new Blob([JSON.stringify(this.$state[key])]).size
+            } catch (_) { /* 忽略序列化失败的字段 */ }
+          }
+          // 按体积降序输出 top 5 字段
+          const top5 = Object.entries(fieldSizes).sort((a, b) => b[1] - a[1]).slice(0, 5)
+          console.log('[trimSaveState] 存档体积分布 top5:',
+            top5.map(([k, v]) => `${k}:${(v / 1024).toFixed(0)}KB`).join(' '))
+        }
+      } catch (_) { /* 诊断失败不影响保存 */ }
     },
     // 保存数据到IndexedDB
     async saveData() {
@@ -2703,7 +2751,16 @@ export const usePlayerStore = defineStore('player', {
     // 获取当前黑市商品列表（自动检测是否需要刷新）
     getBlackMarketItems() {
       const now = Date.now()
-      const state = this.shopState || { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      // 修复 TypeError: Cannot read properties of undefined (reading 'length')：
+      // shopState 存在但缺 blackMarketItems 字段时，原代码 state = this.shopState（真实对象）
+      // 后直接读 state.blackMarketItems.length 报错。现确保 fallback 对象数组字段完整。
+      const state = (this.shopState && typeof this.shopState === 'object')
+        ? this.shopState
+        : { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      if (!Array.isArray(state.blackMarketItems)) state.blackMarketItems = []
+      if (typeof state.blackMarketRefreshAt !== 'number') state.blackMarketRefreshAt = 0
+      if (typeof state.manualRefreshCount !== 'number') state.manualRefreshCount = 0
+      if (typeof state.manualRefreshResetDay !== 'number') state.manualRefreshResetDay = 0
       // 每日重置手动刷新计数
       const today = Math.floor(now / (24 * 3600 * 1000))
       if (state.manualRefreshResetDay !== today) {
@@ -2721,7 +2778,12 @@ export const usePlayerStore = defineStore('player', {
     // 手动刷新黑市（消耗灵石，价格递增）
     refreshBlackMarket() {
       const now = Date.now()
-      const state = this.shopState || { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      const state = (this.shopState && typeof this.shopState === 'object')
+        ? this.shopState
+        : { blackMarketItems: [], blackMarketRefreshAt: 0, manualRefreshCount: 0, manualRefreshResetDay: 0 }
+      if (!Array.isArray(state.blackMarketItems)) state.blackMarketItems = []
+      if (typeof state.manualRefreshCount !== 'number') state.manualRefreshCount = 0
+      if (typeof state.manualRefreshResetDay !== 'number') state.manualRefreshResetDay = 0
       const today = Math.floor(now / (24 * 3600 * 1000))
       if (state.manualRefreshResetDay !== today) {
         state.manualRefreshCount = 0
