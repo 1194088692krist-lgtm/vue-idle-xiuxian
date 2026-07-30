@@ -172,25 +172,41 @@ export const BOSS_MATERIALS = {
 }
 
 export const getBossMaterialForLevel = (level) => {
-  const zoneMap = {
-    9: 'forest_edge',
-    18: 'misty_valley',
-    27: 'phoenix_cave',
-    36: 'dragon_abyss',
-    45: 'ghost_wasteland',
-    54: 'ice_palace',
-    63: 'immortal_ruins',
-    72: 'chaos_realm',
-    90: 'chaos_realm',
-    108: 'chaos_realm',
-    126: 'chaos_realm'
+  // 修复：原用 zoneId + level%2 取索引，导致 immortal_fragment/void_essence 因奇偶性永远取不到
+  // 改为直接指定具体素材 id，确保所有 BOSS 素材都有突破消耗用途
+  const levelMaterialMap = {
+    9:   'forest_edge',        // wolf_fang / bandit_leader_emblem
+    18:  'misty_valley',       // tiger_king_claw / skeleton_general_bone
+    27:  'phoenix_cave',       // phoenix_feather / flame_core
+    36:  'dragon_abyss',       // dragon_scale / dragon_core
+    45:  'ghost_wasteland',    // ghost_essence / bone_artifact
+    54:  'ice_palace',         // ice_crystal / frozen_core
+    63:  'immortal_ruins',     // divine_essence
+    72:  'chaos_realm',        // chaos_crystal
+    81:  'immortal_ruins',     // immortal_fragment（修复：原奇偶逻辑漏掉，新增 81 级突破消耗）
+    90:  'chaos_realm',        // void_essence（修复：原奇偶逻辑漏掉，新增 90 级突破消耗）
+    99:  'immortal_ruins',     // ancient_immortal_marrow
+    108: 'chaos_realm',        // primordial_chaos_essence
+    117: 'immortal_ruins',     // divine_essence
+    126: 'chaos_realm'         // primordial_chaos_essence
   }
-  
-  const zoneId = zoneMap[level]
+
+  const zoneId = levelMaterialMap[level]
   if (!zoneId) return null
-  
+
   const materials = BOSS_MATERIALS[zoneId]
-  return materials ? materials[level % 2 === 0 ? 0 : 1] : null
+  if (!materials) return null
+
+  // 按等级指定具体索引，确保每个素材都被用到
+  const indexByLevel = {
+    9: 0, 18: 0, 27: 0, 36: 0, 45: 0, 54: 0,
+    63: 1, 72: 0,
+    81: 0,  // immortal_fragment
+    90: 1,  // void_essence
+    99: 2, 108: 2, 117: 1, 126: 2
+  }
+  const idx = indexByLevel[level] ?? (level % 2 === 0 ? 0 : 1)
+  return materials[idx] || materials[0]
 }
 
 export const ZONE_BOSSES = {
@@ -580,13 +596,17 @@ export const getEnhanceBossMaterial = (level) => {
 
 // 6 档品级洗练对应难度 BOSS 素材映射
 // 凡品(common) -> forest_edge[0]（对应「狼王」），按品级递增取更高难度秘境
+// 修复：原仅到 ice_palace[0]，immortal_ruins/chaos_realm 的素材无洗练消耗用途
+// 新增 immortal 档（仙墟素材）和 chaos 档（混沌界素材），覆盖更高品级装备洗练
 export const REFORGE_BOSS_MATERIAL_MAP = {
   common:    { zoneId: 'forest_edge',     index: 0 },
   uncommon:  { zoneId: 'misty_valley',    index: 0 },
   rare:      { zoneId: 'phoenix_cave',    index: 0 },
   epic:      { zoneId: 'dragon_abyss',    index: 0 },
   legendary: { zoneId: 'ghost_wasteland', index: 0 },
-  mythic:    { zoneId: 'ice_palace',      index: 0 }
+  mythic:    { zoneId: 'ice_palace',      index: 0 },
+  immortal:  { zoneId: 'immortal_ruins',  index: 0 },
+  chaos:     { zoneId: 'chaos_realm',      index: 1 }
 }
 
 // 取某品级洗练所需的 BOSS 素材
