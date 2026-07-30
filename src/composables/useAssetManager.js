@@ -346,8 +346,10 @@ export async function downloadAllAssets() {
   startSpeedMonitor()
 
   try {
-    // 预检查：拉取远程清单签名，与本地签名比对。
+    // 预检查阶段：先刷新本地缓存统计，确保 cachedFileCount 准确，
+    // 再拉取远程清单签名与本地签名比对。
     // 若签名一致且本地已有缓存文件 → 资源已是最新，跳过整个下载流程。
+    await refreshCacheStats()
     let remoteSignature = ''
     try {
       remoteSignature = await computeRemoteAssetSignature()
@@ -366,6 +368,8 @@ export async function downloadAllAssets() {
         elapsedSec: 0,
         upToDate: true
       }
+      isDownloading.value = false
+      stopSpeedMonitor()
       return lastDownloadResult.value
     }
 

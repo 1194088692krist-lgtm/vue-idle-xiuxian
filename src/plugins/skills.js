@@ -132,8 +132,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 1,
-        description: '凝聚剑气为盾，生成吸收150%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 1.5, duration: 2 }
+        description: '凝聚剑气为盾，生成吸收250%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 2.5, duration: 3 }
       },
       {
         id: 'sword_shield_2',
@@ -150,8 +150,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 2,
-        description: '布下剑阵护体，生成吸收200%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 2.0, duration: 2 }
+        description: '布下剑阵护体，生成吸收350%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 3.5, duration: 3 }
       },
       {
         id: 'sword_shield_4',
@@ -168,8 +168,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 3,
-        description: '万剑结壁，为全队生成吸收250%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 2.5, duration: 3, target: 'team' }
+        description: '万剑结壁，为全队生成吸收500%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 5.0, duration: 4, target: 'team' }
       },
       {
         id: 'sword_shield_6',
@@ -204,8 +204,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 5,
-        description: '万古剑阵护佑全队，为全队生成吸收400%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 4.0, duration: 3, target: 'team' }
+        description: '万古剑阵护佑全队，为全队生成吸收800%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 8.0, duration: 4, target: 'team' }
       },
       {
         id: 'sword_shield_10',
@@ -227,8 +227,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.BUFF,
         level: 1,
-        description: '布下符阵，提升全队攻击20%，持续3回合',
-        effect: { stat: 'attack', value: 0.2, duration: 3, target: 'team' }
+        description: '布下符阵，提升全队攻击30%，持续4回合',
+        effect: { stat: 'attack', value: 0.3, duration: 4, target: 'team' }
       },
       {
         id: 'dao_tactician_2',
@@ -245,8 +245,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.BUFF,
         level: 2,
-        description: '布下八卦阵法，提升全队攻击和防御10%，持续3回合',
-        effect: { stat: 'attack', value: 0.1, stat2: 'defense', value2: 0.1, duration: 3, target: 'team' }
+        description: '布下八卦阵法，提升全队攻击和防御20%，持续4回合',
+        effect: { stat: 'attack', value: 0.2, stat2: 'defense', value2: 0.2, duration: 4, target: 'team' }
       },
       {
         id: 'dao_tactician_4',
@@ -263,8 +263,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.DEBUFF,
         level: 3,
-        description: '运转五行阵法，降低全体敌人攻击15%，持续3回合',
-        effect: { statDebuff: 'attack', debuffValue: -0.15, duration: 3, target: 'aoe' }
+        description: '运转五行阵法，降低全体敌人攻击25%，持续4回合',
+        effect: { statDebuff: 'attack', debuffValue: -0.25, duration: 4, target: 'aoe' }
       },
       {
         id: 'dao_tactician_6',
@@ -603,8 +603,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 1,
-        description: '凝起冰墙护体，生成吸收150%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 1.5, duration: 2 }
+        description: '凝起冰墙护体，生成吸收250%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 2.5, duration: 3 }
       },
       {
         id: 'ice_shield_2',
@@ -621,8 +621,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 2,
-        description: '寒冰凝盾护体，生成吸收200%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 2.0, duration: 2 }
+        description: '寒冰凝盾护体，生成吸收350%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 3.5, duration: 3 }
       },
       {
         id: 'ice_shield_4',
@@ -639,8 +639,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 3,
-        description: '玄冰凝甲护全队，为全队生成吸收250%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 2.5, duration: 3, target: 'team' }
+        description: '玄冰凝甲护全队，为全队生成吸收500%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 5.0, duration: 4, target: 'team' }
       },
       {
         id: 'ice_shield_6',
@@ -675,8 +675,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 5,
-        description: '万古冰封护佑全队，为全队生成吸收400%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 4.0, duration: 3, target: 'team' }
+        description: '万古冰封护佑全队，为全队生成吸收800%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 8.0, duration: 4, target: 'team' }
       },
       {
         id: 'ice_shield_10',
@@ -887,7 +887,7 @@ export const skills = {
         category: SKILL_CATEGORIES.DEBUFF,
         level: 1,
         description: '释放毒雾弥漫全场，降低全体敌人攻击15%，持续3回合',
-        effect: { statDebuff: 'attack', debuffValue: -0.15, duration: 3, target: 'aoe' }
+        effect: { statDebuff: 'attack', debuffValue: -0.25, duration: 4, target: 'aoe' }
       },
       {
         id: 'poison_tactician_2',
@@ -905,7 +905,7 @@ export const skills = {
         category: SKILL_CATEGORIES.BUFF,
         level: 2,
         description: '布下蛊毒之阵，提升全队攻击15%，持续3回合',
-        effect: { stat: 'attack', value: 0.15, duration: 3, target: 'team' }
+        effect: { stat: 'attack', value: 0.25, duration: 4, target: 'team' }
       },
       {
         id: 'poison_tactician_4',
@@ -923,7 +923,7 @@ export const skills = {
         category: SKILL_CATEGORIES.DEBUFF,
         level: 3,
         description: '释放腐蚀云蚀骨，降低全体敌人速度25%，持续3回合',
-        effect: { statDebuff: 'speed', debuffValue: -0.25, duration: 3, target: 'aoe' }
+        effect: { statDebuff: 'speed', debuffValue: -0.35, duration: 4, target: 'aoe' }
       },
       {
         id: 'poison_tactician_6',
@@ -981,8 +981,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 1,
-        description: '蛮兽之力凝盾，生成吸收150%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 1.5, duration: 2 }
+        description: '蛮兽之力凝盾，生成吸收250%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 2.5, duration: 3 }
       },
       {
         id: 'beast_shield_2',
@@ -999,8 +999,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 2,
-        description: '蛮力凝甲护体，生成吸收200%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 2.0, duration: 2 }
+        description: '蛮力凝甲护体，生成吸收350%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 3.5, duration: 3 }
       },
       {
         id: 'beast_shield_4',
@@ -1017,8 +1017,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 3,
-        description: '蛮兽之力护全队，为全队生成吸收250%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 2.5, duration: 3, target: 'team' }
+        description: '蛮兽之力护全队，为全队生成吸收500%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 5.0, duration: 4, target: 'team' }
       },
       {
         id: 'beast_shield_6',
@@ -1053,8 +1053,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 5,
-        description: '洪荒之力护佑全队，为全队生成吸收400%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 4.0, duration: 3, target: 'team' }
+        description: '洪荒之力护佑全队，为全队生成吸收800%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 8.0, duration: 4, target: 'team' }
       },
       {
         id: 'beast_shield_10',
@@ -1262,8 +1262,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 1,
-        description: '幽冥之力凝盾，生成吸收150%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 1.5, duration: 2 }
+        description: '幽冥之力凝盾，生成吸收250%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 2.5, duration: 3 }
       },
       {
         id: 'ghost_shield_2',
@@ -1280,8 +1280,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 2,
-        description: '冥府之力凝甲护体，生成吸收200%防御力伤害的护盾，持续2回合',
-        effect: { shieldPercent: 2.0, duration: 2 }
+        description: '冥府之力凝甲护体，生成吸收350%防御力伤害的护盾，持续3回合',
+        effect: { shieldPercent: 3.5, duration: 3 }
       },
       {
         id: 'ghost_shield_4',
@@ -1298,8 +1298,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 3,
-        description: '幽魂结壁护全队，为全队生成吸收250%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 2.5, duration: 3, target: 'team' }
+        description: '幽魂结壁护全队，为全队生成吸收500%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 5.0, duration: 4, target: 'team' }
       },
       {
         id: 'ghost_shield_6',
@@ -1334,8 +1334,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.SHIELD,
         level: 5,
-        description: '冥府护佑全队，为全队生成吸收400%防御力伤害的护盾，持续3回合',
-        effect: { shieldPercent: 4.0, duration: 3, target: 'team' }
+        description: '冥府护佑全队，为全队生成吸收800%防御力伤害的护盾，持续4回合',
+        effect: { shieldPercent: 8.0, duration: 4, target: 'team' }
       },
       {
         id: 'ghost_shield_10',
@@ -1450,8 +1450,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 1,
-        description: '释放圣光治疗单个队友，恢复目标100%攻击力的生命值',
-        effect: { healPercent: 1.0, target: 'single' }
+        description: '释放圣光治疗单个队友，恢复目标150%攻击力的生命值',
+        effect: { healPercent: 1.5, target: 'single' }
       },
       {
         id: 'light_herb_2',
@@ -1468,8 +1468,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 2,
-        description: '圣光普照全场，恢复全队60%攻击力的生命值',
-        effect: { healPercent: 0.6, target: 'team' }
+        description: '圣光普照全场，恢复全队100%攻击力的生命值',
+        effect: { healPercent: 1.0, target: 'team' }
       },
       {
         id: 'light_herb_4',
@@ -1486,8 +1486,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 3,
-        description: '净世圣光治疗单个队友，恢复200%攻击力生命值并清除负面状态',
-        effect: { healPercent: 2.0, target: 'single', removeDebuff: true }
+        description: '净世圣光治疗单个队友，恢复300%攻击力生命值并清除负面状态',
+        effect: { healPercent: 3.0, target: 'single', removeDebuff: true }
       },
       {
         id: 'light_herb_6',
@@ -1504,8 +1504,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 4,
-        description: '圣光涌动全场，恢复全队150%攻击力的生命值',
-        effect: { healPercent: 1.5, target: 'team' }
+        description: '圣光涌动全场，恢复全队250%攻击力的生命值',
+        effect: { healPercent: 2.5, target: 'team' }
       },
       {
         id: 'light_herb_8',
@@ -1731,8 +1731,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 1,
-        description: '汲取暗影之力治疗单个队友，恢复目标100%攻击力的生命值',
-        effect: { healPercent: 1.0, target: 'single' }
+        description: '汲取暗影之力治疗单个队友，恢复目标150%攻击力的生命值',
+        effect: { healPercent: 1.5, target: 'single' }
       },
       {
         id: 'dark_herb_2',
@@ -1749,8 +1749,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 2,
-        description: '暗影涌动治疗全队，恢复60%攻击力的生命值',
-        effect: { healPercent: 0.6, target: 'team' }
+        description: '暗影涌动治疗全队，恢复100%攻击力的生命值',
+        effect: { healPercent: 1.0, target: 'team' }
       },
       {
         id: 'dark_herb_4',
@@ -1767,8 +1767,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 3,
-        description: '暗影净化治疗单个队友，恢复200%攻击力生命值并清除负面状态',
-        effect: { healPercent: 2.0, target: 'single', removeDebuff: true }
+        description: '暗影净化治疗单个队友，恢复300%攻击力生命值并清除负面状态',
+        effect: { healPercent: 3.0, target: 'single', removeDebuff: true }
       },
       {
         id: 'dark_herb_6',
@@ -1785,8 +1785,8 @@ export const skills = {
         type: SKILL_TYPES.ACTIVE,
         category: SKILL_CATEGORIES.HEAL,
         level: 4,
-        description: '暗影涌动全场，恢复全队150%攻击力的生命值',
-        effect: { healPercent: 1.5, target: 'team' }
+        description: '暗影涌动全场，恢复全队250%攻击力的生命值',
+        effect: { healPercent: 2.5, target: 'team' }
       },
       {
         id: 'dark_herb_8',

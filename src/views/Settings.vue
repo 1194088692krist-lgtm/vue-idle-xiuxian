@@ -421,11 +421,14 @@
           </div>
           <div v-if="lastDownloadResult && !isDownloading" class="progress-result">
             <template v-if="lastDownloadResult.success">
-              ✓ 下载完成：共 {{ lastDownloadResult.total }} 个，
-              跳过 {{ lastDownloadResult.skipped }} 个已缓存，
-              <span v-if="lastDownloadResult.failed > 0" class="warn-text">失败 {{ lastDownloadResult.failed }} 个</span>
-              <span v-else>全部成功</span>，
-              用时 {{ lastDownloadResult.elapsedSec }}s
+              <span v-if="lastDownloadResult.upToDate">✓ 本地资源已是最新，无需更新（已缓存 {{ lastDownloadResult.skipped }} 个文件）</span>
+              <template v-else>
+                ✓ 下载完成：共 {{ lastDownloadResult.total }} 个，
+                跳过 {{ lastDownloadResult.skipped }} 个已缓存，
+                <span v-if="lastDownloadResult.failed > 0" class="warn-text">失败 {{ lastDownloadResult.failed }} 个</span>
+                <span v-else>全部成功</span>，
+                用时 {{ lastDownloadResult.elapsedSec }}s
+              </template>
             </template>
             <template v-else>
               ✗ 下载失败：{{ lastDownloadResult.error }}

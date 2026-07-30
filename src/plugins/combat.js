@@ -140,6 +140,18 @@ class CombatEntity {
       }
     }
   }
+  // 获取受 buff 影响后的有效属性值
+  // 支持 attack_up/defense_up/speed_up 等百分比增益 buff
+  getEffectiveStat(statName) {
+    const base = this.stats[statName] || 0
+    let mult = 1
+    for (const buff of (this.buffs || [])) {
+      if (buff.duration > 0 && buff.type === statName + '_up') {
+        mult += (buff.value || 0)
+      }
+    }
+    return base * mult
+  }
   // 结算负面效果并减少duration
   tickDebuffs() {
     let totalDamage = 0
@@ -206,10 +218,12 @@ class CombatEntity {
       isCounter: isCounter
     }
   }
-  // 恢复生命值
+  // 恢复生命值（应用 healBoost 强化治疗加成）
   heal(amount) {
     const oldHealth = this.currentHealth
-    this.currentHealth = Math.min(this.stats.maxHealth, Math.floor(this.currentHealth + amount))
+    // healBoost 为正数时增疗，为负时减疗；乘法叠加
+    const boosted = Math.floor(amount * (1 + (this.stats.healBoost || 0)))
+    this.currentHealth = Math.min(this.stats.maxHealth, Math.floor(this.currentHealth + boosted))
     return Math.floor(this.currentHealth - oldHealth)
   }
   // 添加效果
@@ -297,8 +311,21 @@ class CombatManager {
       }
 
       // 攻击
+      // 应用 buff 增益：attack_up/defense_up 等 buff 在攻击/防御时生效
+      // 临时替换 stats 字段，攻击结束后恢复原值
+      const _origDamage = attacker.stats.damage
+      const _origDefense = defender.stats.defense
+      if (typeof attacker.getEffectiveStat === 'function') {
+        attacker.stats.damage = attacker.getEffectiveStat('damage')
+      }
+      if (typeof defender.getEffectiveStat === 'function') {
+        defender.stats.defense = defender.getEffectiveStat('defense')
+      }
       const attack = attacker.stats.calculateDamage(defender)
       const result = defender.takeDamage(attack.damage, attacker)
+      // 恢复原始 stats（buff 增益仅在本次攻击计算时生效，不持久修改）
+      attacker.stats.damage = _origDamage
+      defender.stats.defense = _origDefense
 
       // 吸血
       if (attack.isVampire && !result.dodged) {
