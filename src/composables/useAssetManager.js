@@ -455,8 +455,19 @@ export async function refreshCacheStats() {
       const res = await cache.match(req)
       if (res) {
         count++
-        // 用 Content-Length header 估算（避免消费 body）
-        const len = parseInt(res.headers.get('content-length') || '0', 10)
+        // 优先用 Content-Length header 估算（不消费 body，性能好）
+        let len = parseInt(res.headers.get('content-length') || '0', 10)
+        // 修复：很多缓存响应（SW 写入 / 压缩传输 / 缺少 header）没有 Content-Length，
+        // 导致 cachedBytes 严重偏小、显示失真。fallback 读取 blob 测量真实字节大小。
+        // 用 clone() 避免消费原 response（cache.match 返回的副本读 blob 不影响缓存条目）
+        if (!(len > 0)) {
+          try {
+            const blob = await res.clone().blob()
+            len = blob.size
+          } catch (e) {
+            // 读取失败时跳过，不计入（保持计数但不增加体积）
+          }
+        }
         if (len > 0) bytes += len
       }
     }

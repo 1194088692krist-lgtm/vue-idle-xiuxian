@@ -1323,21 +1323,34 @@ const allIdlePillsSelected = computed(() =>
 const selectAllIdlePills = () => {
   const target = !allIdlePillsSelected.value
   availableIdlePills.value.forEach(p => { p.consumed = target })
+  // 一键全选/取消后给即时反馈，让玩家明确操作已生效（数量变化在确认服用后才扣减）
+  window.$message?.info(target ? `已选中 ${availableIdlePills.value.length} 种丹药` : '已取消全选', { duration: 1500 })
 }
 const confirmPillsAndStart = () => {
   // 服用已选丹药（全局 buff 类不需要 memberId）
   // 用 try/catch 包裹，防止单颗丹药服用异常导致后续 startIdle 不触发卡死
   const selected = availableIdlePills.value.filter(p => p.consumed)
+  if (selected.length === 0) {
+    window.$message?.warning('未选择任何丹药，直接开始挂机', { duration: 1500 })
+  }
+  let consumedCount = 0
   try {
     for (const p of selected) {
       const r = playerStore.consumePill(p.pillId)
+      // consumePill 成功时可能返回 undefined 或 {success:true}；仅当明确返回 !success 才算失败
       if (r && !r.success) {
         // 丹药不足或未知：跳过该颗，继续下一颗，不让单颗失败阻塞挂机
         console.warn('[丹药] 服用失败，跳过：', p.name, r.message)
+      } else {
+        consumedCount++
       }
     }
   } catch (e) {
     console.error('[丹药] 服用异常，继续启动挂机：', e)
+  }
+  if (consumedCount > 0) {
+    // 服用成功提示：明确告知扣减数量，对应"丹药要有-1的数量下降"的反馈诉求
+    window.$message?.success(`已服用 ${consumedCount} 种丹药，背包数量已扣减`, { duration: 2000 })
   }
   // 先关闭弹窗，再启动挂机；避免弹窗未关闭时 startIdle 内部同步触发 runIdleEncounter
   // 导致 UI 渲染阻塞，出现"点击后卡死无响应"现象
@@ -3870,6 +3883,18 @@ onUnmounted(() => {
 .pill-select-check { font-size: 18px; color: #7CFC00; }
 .pill-select-empty { text-align: center; color: #888; padding: 20px; }
 .pill-select-footer { display: flex; gap: 10px; justify-content: flex-end; margin-top: 15px; }
+/* 移动端：丹药选择弹窗贴屏幕下方显示（单手可达，避免居中遮挡视野） */
+@media (max-width: 600px) {
+  .pill-select-modal {
+    max-width: 100%;
+    width: 100%;
+    max-height: 78vh;
+    align-self: flex-end;
+    margin-bottom: 0;
+    border-radius: 16px 16px 0 0;
+    border-bottom: none;
+  }
+}
 .dash-value {
   font-size: 16px;
   font-weight: bold;
