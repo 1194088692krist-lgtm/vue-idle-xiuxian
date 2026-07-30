@@ -336,21 +336,24 @@ export function rollBlackMarketItems(count = BLACK_MARKET_CONFIG.itemsPerRefresh
 //   - excludedSkins: 已知图片内容错误的皮肤（立绘资源性别错配等），从候选池排除
 //   - excludedCharacters: 整体排除的角色 ID（这些角色不出现在皮肤商店）。
 //     skin6/skin7 的立绘资源本质为女性化皮肤，男性角色出现会导致点开显示其他女性角色立绘的错乱。
-//     用户要求：屏蔽所有男性角色。以下为男性角色（基于角色命名与描述确认）。
+//     用户要求：屏蔽所有男性角色 + 指定角色。以下为男性角色与用户指定屏蔽角色（基于角色命名与描述确认）。
 export const SKIN_SHOP_CONFIG = {
   skinPrice: 1000000,
   refreshCost: 100000,
   itemsPerRefresh: 5,
   purchasableSkins: [6, 7],
   minSkinCount: 6,  // 至少拥有 6 个皮肤的角色才可能出售 skin6/skin7
-  // 男性角色整体排除：skin6/skin7 立绘本质为通用女性化皮肤，男性角色点开会显示女性立绘错乱。
-  // 用户要求：彻底屏蔽所有男性角色。以下清单为用户确认的男性角色。
-  // 注意：char_007 熊娇娇/char_008 夜鸢/char_013 血罗刹/char_015 连珠/char_035 千手修罗 等经用户确认为女性，不得屏蔽。
+  // 男性角色整体排除 + 用户指定屏蔽角色：
+  // skin6/skin7 立绘本质为通用女性化皮肤，男性角色点开会显示女性立绘错乱。
+  // 用户额外要求屏蔽：慈航道人(char_040)、逆鳞(char_014)、血罗刹(char_013)。
+  // 注意：char_007 熊娇娇/char_008 夜鸢/char_015 连珠/char_035 千手修罗 等经用户确认为女性，不得屏蔽。
   excludedCharacters: [
-    // 以下角色皮肤数 >=6，会进入候选池，必须排除（用户确认男性）
-    'char_014', // 逆鳞
+    // 以下角色皮肤数 >=6，会进入候选池，必须排除（用户确认男性或用户指定屏蔽）
+    'char_013', // 血罗刹（用户指定屏蔽）
+    'char_014', // 逆鳞（用户指定屏蔽）
     'char_018', // 磐石
     'char_019', // 焚天
+    'char_040', // 慈航道人（用户指定屏蔽）
     // 以下角色皮肤数 <6，已被 minSkinCount 过滤；保留以防 skins.json 数据变更后漏网
     'char_017', // 裂魂（描述用"他"）
     'char_039', // 杀生佛

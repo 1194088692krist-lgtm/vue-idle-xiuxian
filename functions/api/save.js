@@ -2,7 +2,9 @@ import { res, requireUser } from '../_utils.js'
 
 // 5 槽云同步：GET 拉全部 / POST 存单槽（upsert，最后写入获胜）
 // D1 TEXT 列可承载更大体积；前端已有数据修剪逻辑控制体积，后端再校验一次作为兜底
-const DATA_MAX_BYTES = 3 * 1024 * 1024
+// 体积上限提升至 20MB：游戏存档包含装备/丹药/灵宠/挂机日志等大量数据，
+// 原 3MB/8MB 上限过低易触发"存档失败→回档"恶性循环。
+const DATA_MAX_BYTES = 20 * 1024 * 1024
 
 export async function onRequest({ request, env }) {
   const u = await requireUser(request, env)
@@ -36,7 +38,7 @@ export async function onRequest({ request, env }) {
     // 兜底体积校验：防止超大 body 写入 D1 失败
     const dataSize = new TextEncoder().encode(data).length
     if (dataSize > DATA_MAX_BYTES) {
-      return res({ ok: false, error: `存档体积过大（${(dataSize / 1024 / 1024).toFixed(2)}MB > 3MB），请清理部分数据后重试` }, 413)
+      return res({ ok: false, error: `存档体积过大（${(dataSize / 1024 / 1024).toFixed(2)}MB > 20MB），请清理部分数据后重试` }, 413)
     }
     // ⚠️ 时间戳兜底修复：原 `Number(updated_at) || Date.now()` 在前端传入 0/缺失时
     // 用当前时间写入 updated_at，导致云端拿到"新时间戳 + 旧数据"，下次 migrate 必然走

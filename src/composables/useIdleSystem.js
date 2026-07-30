@@ -465,18 +465,60 @@ const currentRecommendedBuild = computed(() => {
   const diff = getZoneDifficulty(selectedZone.value, selectedDifficultyKey.value)
   return diff ? (diff.recommendedBuild || 0) : 0
 })
-// 队伍平均有效生命（含基础+突破+努力+装备天赋加成），用于生存维度判定
-// 修复：原匹配度仅看 build 分（attack 权重 8 远高于 health 0.8），玩家堆攻击即可让匹配度达标，
-// 但实际血量不足，进入后期图会被 BOSS 一击秒杀。新增生存维度，取战力比与生存比的较小值。
+// 队伍平均有效生命（含基础+突破+努力+装备天赋+灵宠加成），用于生存维度判定
+// 修复：原实现优先使用 teamMemberStates.maxHP，但 teamMemberStates 仅在 startIdle 时构建，
+// 挂机期间换装备/换灵宠后不会更新，导致匹配度被陈旧血量拉低（build 高但匹配度低）。
+// 现改为始终从 store 实时计算完整血量，确保匹配度反映当前装备状态。
 const teamAvgEffectiveHP = computed(() => {
   const s = store()
   const team = s.getTeamMembersDetail()
-  if (!team.length) return 0
+  if (!team.length) {
+    // 无队伍时回退到 teamMemberStates（挂机中可能尚未构建 store 队伍）
+    const states = teamMemberStates.value
+    if (states && states.length > 0) {
+      let sum = 0
+      for (const ms of states) {
+        sum += ms.maxHP || ms.maxHealth || 0
+      }
+      return Math.round(sum / states.length)
+    }
+    return 0
+  }
   let sum = 0
   for (const m of team) {
+    // 基础+天赋血量
     const eff = getEffectiveBaseStats(m)
     const ts = m.talentStats || {}
-    sum += (eff.health || 0) + (ts.health || 0)
+    let hp = (eff.health || 0)
+    if (ts.health) hp = Math.floor(hp * (1 + ts.health))
+    // 装备血量加成（固定值 + 百分比），与 buildTeamMemberState 口径一致
+    const artifacts = m.equippedArtifacts || {}
+    let flatBonus = 0
+    let pctBonus = 0
+    Object.values(artifacts).forEach(eq => {
+      if (!eq) return
+      // 专属装备加成：对应角色穿戴时数值 ×1.3（与 buildTeamMemberState 一致）
+      const exclMult = getExclusiveMultiplier(eq, m.templateId || m.id)
+      if (eq.stats && eq.stats.health) flatBonus += Math.round(eq.stats.health * exclMult)
+      if (Array.isArray(eq.affixes)) {
+        eq.affixes.forEach(a => {
+          if (a.stat === 'health') {
+            const adjValue = a.value * exclMult
+            if (a.valueType === 'percent') pctBonus += Math.round(adjValue * 1000) / 1000
+            else flatBonus += Math.round(adjValue)
+          }
+        })
+      }
+    })
+    hp = Math.floor((hp + flatBonus) * (1 + pctBonus))
+    // 灵宠血量加成（固定值 + 灵宠倍率，与 buildTeamMemberState 一致）
+    const pet = m.equippedPet
+    if (pet && pet.combatAttributes) {
+      hp += pet.combatAttributes.health || 0
+      const petMult = computePetMultiplier(pet)
+      hp = Math.floor(hp * petMult)
+    }
+    sum += hp
   }
   return Math.round(sum / team.length)
 })
@@ -515,22 +557,37 @@ const activePillBuffList = computed(() => {
     combatBoost: '战斗加成',
     allAttributes: '全属性'
   }
-  return effects.map(buff => {
+  // 按 type 分组合并：同类型丹药 buff 的加成值相加后统一显示，
+  // 避免用户看到"x1.2 / x1.4"两个独立条目而误解为未叠加（实际应用层已相加为 x1.6）
+  const grouped = {}
+  for (const buff of effects) {
+    const key = buff.type
+    if (!grouped[key]) {
+      grouped[key] = { type: buff.type, value: 0, count: 0, names: [], isIdleOnly: true, minExpiresAt: Infinity }
+    }
+    grouped[key].value += (buff.value || 0)
+    grouped[key].count++
     const recipe = pillRecipes.find(r => r.id === buff.pillId)
-    // idleOnly buff（仅本次挂机生效）：expiresAt=Infinity，显示"本次挂机"而非剩余时间
-    const isIdleOnly = buff.idleOnly === true
-    const remainingMs = isIdleOnly ? Infinity : Math.max(0, buff.expiresAt - now)
+    grouped[key].names.push(recipe?.name || buff.pillId || '未知丹药')
+    if (!buff.idleOnly) {
+      grouped[key].isIdleOnly = false
+      grouped[key].minExpiresAt = Math.min(grouped[key].minExpiresAt, buff.expiresAt || Infinity)
+    }
+  }
+  return Object.values(grouped).map(g => {
+    const isIdleOnly = g.isIdleOnly
+    const remainingMs = isIdleOnly ? Infinity : Math.max(0, g.minExpiresAt - now)
     const remainingSec = isIdleOnly ? 0 : Math.ceil(remainingMs / 1000)
     const minutes = Math.floor(remainingSec / 60)
     const seconds = remainingSec % 60
     return {
-      ...buff,
-      name: recipe?.name || buff.pillId || '未知丹药',
-      description: recipe?.description || '',
-      typeName: typeNames[buff.type] || buff.type,
-      valueText: (buff.value > 0 ? '+' : '') + formatBuffPercent(buff.value || 0),
+      type: g.type,
+      name: g.count > 1 ? `${g.names[0]}等${g.count}种` : g.names[0],
+      typeName: typeNames[g.type] || g.type,
+      valueText: (g.value > 0 ? '+' : '') + formatBuffPercent(g.value),
       remainingText: isIdleOnly ? '本次挂机' : (minutes > 0 ? `${minutes}分${seconds}秒` : `${seconds}秒`),
-      remainingMs
+      remainingMs,
+      count: g.count
     }
   })
 })
@@ -1967,12 +2024,13 @@ async function runBossChallenge(zoneId, bossId, count) {
       // 修复：原用 typeof players !== 'undefined' 检查，但 players 在本作用域未定义，
       // 永远走 null 分支。改为直接读 currentEncounter.value.players（与挂机路径一致）
       // 击杀立绘展示对象：按存活出战角色概率随机选择，避免固定单个角色立绘刷屏。
+      // 概率策略：50% 真实最后一击者，50% 从存活出战角色随机挑选。
       const _alivePlayers = (currentEncounter.value.players || []).filter(p => p && p.currentHealth > 0)
       const _lastAttacker = roundResult.lastPlayerAttacker
       let killer
       if (_alivePlayers.length === 0) {
         killer = _lastAttacker || currentEncounter.value.players[0] || null
-      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.7) {
+      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.5) {
         killer = _lastAttacker
       } else {
         killer = _alivePlayers[Math.floor(Math.random() * _alivePlayers.length)]
@@ -2286,12 +2344,13 @@ async function runCharacterBossChallenge(characterId, count) {
       result.victories++
       // 击杀事件（人物 BOSS 击杀立绘演出）
       // 按存活出战角色概率随机选择展示对象，避免固定单个角色立绘刷屏。
+      // 概率策略：50% 真实最后一击者，50% 从存活出战角色随机挑选。
       const _alivePlayers = (currentEncounter.value.players || []).filter(p => p && p.currentHealth > 0)
       const _lastAttacker = roundResult.lastPlayerAttacker
       let killer
       if (_alivePlayers.length === 0) {
         killer = _lastAttacker || currentEncounter.value.players[0] || null
-      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.7) {
+      } else if (_lastAttacker && _alivePlayers.some(p => p.memberId === _lastAttacker.memberId) && Math.random() < 0.5) {
         killer = _lastAttacker
       } else {
         killer = _alivePlayers[Math.floor(Math.random() * _alivePlayers.length)]
@@ -3309,6 +3368,11 @@ function buildActionFromSkill(skill, memberState, teamStates, enemy, getSkillEff
       const selfHPpct = memberState.hp / (memberState.maxHP || memberState.maxHealth || 1)
       const aliveAllies = teamStates.filter(t => t.hp > 0)
       const noShield = aliveAllies.filter(t => !t.hasShield)
+      // 团队护盾（target: 'team'）：一次性给所有存活队友加盾，不再只挑一个目标
+      const isTeamShield = getSkillEffectValue(skill, 'target', null) === 'team'
+      if (isTeamShield) {
+        return { type: 'shield_team', targets: aliveAllies, value: shieldValue, duration, skillName: skill.name }
+      }
       let target = null
 
       // 优先级 1：上一回合受到伤害 → 给自己加盾（自保反应）
@@ -3544,6 +3608,22 @@ async function executeRound(effectiveZone) {
       const shieldValue = Math.max(1, Math.floor(action.value || 0))
       targetEntity.addBuff({ type: 'shield', value: shieldValue, duration: action.duration, source: p.name })
       roundLog.push(`🛡️ ${p.name}施展${action.skillName || '护盾'}，为${targetEntity.name}添加${shieldValue}点护盾（持续${action.duration}回合）`)
+      const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
+      if (isBossFight && action.skillName) {
+        roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'shield', casterSide: 'player', ts: Date.now() })
+      }
+    } else if (action.type === 'shield_team') {
+      // 团队护盾技能：给所有存活队友添加护盾 buff（target: 'team' 的高阶盾系技能）
+      // 修复 BUG：原 shield 分支只给单个目标加盾，团队盾形同虚设，盾系角色伤害吸收统计为 0
+      const teamShieldValue = Math.max(1, Math.floor(action.value || 0))
+      const targets = (action.targets || []).map(t => players.find(pl => pl.name === t.name)).filter(Boolean)
+      // 兜底：若 targets 为空（极端情况），至少给施法者自己加盾
+      if (targets.length === 0) targets.push(p)
+      for (const tgt of targets) {
+        tgt.addBuff({ type: 'shield', value: teamShieldValue, duration: action.duration, source: p.name })
+      }
+      const names = targets.map(t => t.name).join('、')
+      roundLog.push(`🛡️ ${p.name}施展${action.skillName || '团队护盾'}，为${names}各添加${teamShieldValue}点护盾（持续${action.duration}回合）`)
       const isBossFight = isBossChallengeInProgress.value || bossSpawned.value || !!encounter.enemyData?.hasBoss
       if (isBossFight && action.skillName) {
         roundSkillEvents.push({ skillName: action.skillName, casterName: p.name, isBoss: true, skillType: 'shield', casterSide: 'player', ts: Date.now() })
@@ -4067,18 +4147,18 @@ async function runIdleEncounter() {
         // 且连带跳过后续 bossSpawned 复位与奖励发放。改为使用 roundResult.lastPlayerAttacker
         // 与 encounter.players（与手动 BOSS 挑战路径 line 1594 写法一致）
         // 击杀立绘展示对象：按存活出战角色概率随机选择，避免固定单个角色立绘刷屏。
-        // 优先尊重真实最后一击者（70% 概率），否则从存活出战角色中随机挑选，
+        // 概率策略：50% 真实最后一击者（若其仍存活），50% 从存活出战角色中随机挑选，
         // 让所有参与战斗的存活角色都有机会展示立绘。
         const alivePlayers = (encounter.players || []).filter(p => p && p.currentHealth > 0)
         const lastAttacker = roundResult.lastPlayerAttacker
         let killer
         if (alivePlayers.length === 0) {
           killer = lastAttacker || encounter.players[0]
-        } else if (lastAttacker && alivePlayers.some(p => p.memberId === lastAttacker.memberId) && Math.random() < 0.7) {
-          // 70% 概率使用真实最后一击者（若其仍存活）
+        } else if (lastAttacker && alivePlayers.some(p => p.memberId === lastAttacker.memberId) && Math.random() < 0.5) {
+          // 50% 概率使用真实最后一击者（若其仍存活）
           killer = lastAttacker
         } else {
-          // 30% 概率（或最后一击者已阵亡）从存活角色中随机挑选
+          // 50% 概率（或最后一击者已阵亡）从存活角色中随机挑选
           killer = alivePlayers[Math.floor(Math.random() * alivePlayers.length)]
         }
         const killEvt = {

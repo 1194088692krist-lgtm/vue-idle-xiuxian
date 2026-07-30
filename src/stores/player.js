@@ -868,7 +868,7 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
     },
     // 存档体积修剪：清理过期/冗余数据，避免存档膨胀超限
-    // 仅清理安全可重建的数据（过期 buff、空数组项、过长日志），不触碰核心库存
+    // 仅清理安全可重建的数据（过期 buff、临时战斗态、过长日志），不触碰核心库存
     trimSaveState() {
       const now = Date.now()
       // 1. 清理已过期的临时增益（避免过期数据持续占体积）
@@ -885,31 +885,80 @@ export const usePlayerStore = defineStore('player', {
       if (this.idleExploration && Array.isArray(this.idleExploration.logs) && this.idleExploration.logs.length > 30) {
         this.idleExploration.logs = this.idleExploration.logs.slice(-30)
       }
+      // 3. sectMembers 临时战斗态瘦身：currentHealth/currentSp/tempBuffs 是战斗运行时态，
+      //    重载后由 buildTeamMemberState 重置为满血满气，存档保留纯属浪费体积
+      if (Array.isArray(this.sectMembers)) {
+        this.sectMembers.forEach(m => {
+          if (m && typeof m === 'object') {
+            delete m.currentHealth
+            delete m.currentSp
+            delete m.tempBuffs
+          }
+        })
+      }
+      // 4. 商店商品列表瘦身：黑市/皮肤/BOSS券商店的商品列表由 rollXxx 生成，
+      //    访问商店时自动刷新，存档保留纯属冗余
+      if (this.shopState && Array.isArray(this.shopState.blackMarketItems)) {
+        delete this.shopState.blackMarketItems
+      }
+      if (this.skinShopState && Array.isArray(this.skinShopState.items)) {
+        delete this.skinShopState.items
+      }
+      if (this.bossTicketShopState && Array.isArray(this.bossTicketShopState.items)) {
+        delete this.bossTicketShopState.items
+      }
     },
     // 保存数据到IndexedDB
     async saveData() {
+      // 互斥锁：防止并发写入导致旧快照覆盖新快照（回档根因）
+      // saveData 是 async，encryptData 捕获的是调用瞬间的 $state 快照；
+      // 若 A、B 两个 saveData 并发，A 先加密旧状态、后完成写入，会把 B 已写入的新状态覆盖掉。
+      // 加锁后串行执行，且保存期间若有新变更会标记重存，确保最新状态最终落盘。
+      if (this._saving) {
+        this._needsResave = true
+        return
+      }
+      this._saving = true
       // 清除待保存计时器，避免重复保存
       if (this.saveTimer) {
         clearTimeout(this.saveTimer)
         this.saveTimer = null
       }
       this.pendingSave = false
-      // 写入时间戳与战力快照：migrate() 依赖 _saveTime 判断新旧，存档列表依赖 _teamPower 显示战力
-      // 之前未写 _saveTime 导致 migrate 把本地当成时间戳 0，无差别用云端覆盖本地，造成 cultivationPool 异常回滚
-      this._saveTime = Date.now()
-      this._teamPower = this._snapshotTeamPower()
-      // 修剪存档体积：清理过期 buff 与过长日志，防止存档膨胀超限
-      this.trimSaveState()
-      const encryptedData = encryptData(this.$state)
-      if (encryptedData) {
-        try {
-          await GameDB.setData('playerData', encryptedData)
-          this.lastSaveTime = Date.now()
-        } catch (error) {
-          console.error('数据保存失败:', error)
+      try {
+        // 写入时间戳与战力快照：migrate() 依赖 _saveTime 判断新旧，存档列表依赖 _teamPower 显示战力
+        this._saveTime = Date.now()
+        this._teamPower = this._snapshotTeamPower()
+        // 修剪存档体积：清理过期 buff 与过长日志，防止存档膨胀超限
+        this.trimSaveState()
+        const encryptedData = encryptData(this.$state)
+        if (encryptedData) {
+          // 存档体积诊断：帮助定位"存档容易超限"的根因（哪些字段占体积）
+          // 仅在 dev 模式或体积接近上限时输出，避免污染生产日志
+          try {
+            const rawSize = new Blob([JSON.stringify(this.$state)]).size
+            const encSize = encryptedData.length
+            const KB = 1024
+            if (rawSize > 1024 * KB || import.meta.env?.DEV) {
+              console.log(`[saveData] 存档体积：原始 ${(rawSize / KB).toFixed(1)}KB → 密文 ${(encSize / KB).toFixed(1)}KB`)
+            }
+          } catch { /* 诊断日志失败不影响保存 */ }
+          try {
+            await GameDB.setData('playerData', encryptedData)
+            this.lastSaveTime = Date.now()
+          } catch (error) {
+            console.error('数据保存失败:', error)
+          }
+        } else {
+          console.error('数据加密失败')
         }
-      } else {
-        console.error('数据加密失败')
+      } finally {
+        this._saving = false
+        // 保存期间有新数据变更：重新保存一次，确保最新状态落盘
+        if (this._needsResave) {
+          this._needsResave = false
+          this.queueSave()
+        }
       }
       // 登录后：本地落盘即自动云同步（节流）
       this._scheduleCloudSync()
@@ -988,12 +1037,12 @@ export const usePlayerStore = defineStore('player', {
       if (typeof encryptedBlob !== 'string' || !encryptedBlob) {
         throw new Error('存档数据为空，无法上传')
       }
-      // 体积预检：与后端 functions/api/save.js 的 3MB 限制对齐
+      // 体积预检：与后端 functions/api/save.js 的 20MB 限制对齐
       // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，前端 saveData 已做数据修剪
-      const SIZE_LIMIT = 3 * 1024 * 1024
+      const SIZE_LIMIT = 20 * 1024 * 1024
       const payloadSize = new Blob([encryptedBlob]).size
       if (payloadSize > SIZE_LIMIT) {
-        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 3MB），请清理部分宗门成员或装备后重试`)
+        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 20MB），请清理部分宗门成员或装备后重试`)
       }
       let lastErr = null
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -1315,10 +1364,30 @@ export const usePlayerStore = defineStore('player', {
     async resolveConflict(slot, useCloud) {
       const key = slot === 0 ? 'playerData' : `saveSlot_${slot}`
       if (useCloud) {
+        // 用户显式选择"用云端"覆盖本地：先落盘当前内存状态到备份槽（防误操作丢档），
+        // 再下载云端数据覆盖本地。下载后必须 $reset + initializePlayer 才能加载云端数据。
+        // 备份写入 currentSlot===0 时使用 saveSlot_5（保留槽），避免污染自动存档槽。
+        try {
+          await this.saveData()  // 先把内存最新进度落盘，避免 pendingSave 未 flush
+          const localBlob = await GameDB.getData(key)
+          if (localBlob) {
+            const backupKey = 'saveSlot_5'
+            await GameDB.setData(backupKey, localBlob)
+            console.warn(`[resolveConflict] 已将本地槽位 ${slot} 备份到 ${backupKey}（用云端覆盖前）`)
+          }
+        } catch (e) {
+          console.error('[resolveConflict] 备份本地存档失败，继续覆盖:', e)
+        }
         const cloud = await this.fetchCloudSaves()
         const blob = cloud?.[slot]?.data
         if (blob) await GameDB.setData(key, blob)
       } else {
+        // 用户显式选择"用本地"：内存中的状态就是用户期望保留的最新状态，
+        // 直接上传到云端即可。不需要 $reset + initializePlayer（那会丢弃内存进度导致回档）。
+        // 仅当内存状态与磁盘可能不一致时（pendingSave），先 saveData 落盘再上传。
+        if (this.pendingSave || this.saveTimer) {
+          await this.saveData()
+        }
         const localBlob = await GameDB.getData(key)
         if (localBlob) {
           const d = decryptData(localBlob)
@@ -1329,7 +1398,9 @@ export const usePlayerStore = defineStore('player', {
         }
       }
       this.cloudConflicts = this.cloudConflicts.filter(c => c.slot !== slot)
-      if (!this.cloudConflicts.length) {
+      // 仅在"用云端"时才需要 $reset + initializePlayer（要加载新下载的云端数据）；
+      // "用本地"时内存状态已是最新，$reset 会丢弃进度导致回档，必须跳过。
+      if (useCloud && !this.cloudConflicts.length) {
         this.$reset()
         await this.initializePlayer()
       }
@@ -2718,7 +2789,10 @@ export const usePlayerStore = defineStore('player', {
       if (this.skinShopState.items.length === 0 || now - this.skinShopState.refreshedAt >= 24 * 3600 * 1000) {
         await this.refreshSkinShop({ autoRefresh: true })
       }
-      return this.skinShopState.items
+      // 运行时过滤：即使缓存中仍含被屏蔽角色（excludedCharacters 配置变更后未刷新），
+      // 也立即从返回结果中剔除，确保屏蔽落实到位
+      const excluded = new Set(SKIN_SHOP_CONFIG.excludedCharacters || [])
+      return (this.skinShopState.items || []).filter(i => !excluded.has(i.characterId))
     },
     // 手动刷新皮肤商店（消耗灵石）。autoRefresh=true 时为系统自动刷新，不扣费
     async refreshSkinShop({ autoRefresh = false } = {}) {
