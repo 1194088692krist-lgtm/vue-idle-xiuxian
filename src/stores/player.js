@@ -3851,15 +3851,37 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
     },
     // 升级灵宠（主要增强途径：每级加成 = 升星每星加成的 2 倍）
+    // 内部：按 id/uid 在 items / activePet / sectMembers.equippedPet 中查找灵宠实际引用
+    // 装备中的灵宠会被移出 items，因此升级/升星需要从装备位置直接定位
+    // 返回 { pet, location } location: 'items' | 'activePet' | 'sectMember'
+    _findPetRef(petId) {
+      const pKey = (p) => p && (p.uid || p.id)
+      const targetKey = petId
+      // 1) 背包
+      const idx = this.items.findIndex(i => i.type === 'pet' && (i.uid || i.id) === targetKey)
+      if (idx > -1) return { pet: this.items[idx], location: 'items' }
+      // 2) 玩家出战
+      if (this.activePet && pKey(this.activePet) === targetKey) {
+        return { pet: this.activePet, location: 'activePet' }
+      }
+      // 3) 宗门成员装备中
+      for (const m of this.sectMembers) {
+        if (m.equippedPet && pKey(m.equippedPet) === targetKey) {
+          return { pet: m.equippedPet, location: 'sectMember' }
+        }
+      }
+      return { pet: null, location: null }
+    },
     upgradePet(pet, essenceCount) {
       if (this.petEssence < essenceCount) {
         return { success: false, message: '灵宠精华不足' }
       }
       // 消耗精华并提升等级
       this.petEssence -= essenceCount
-      const petIndex = this.items.findIndex(item => item.id === pet.id)
-      if (petIndex > -1) {
-        const currentPet = this.items[petIndex]
+      // 统一查找灵宠实际引用：背包 / 玩家出战 / 宗门成员装备中
+      const ref = this._findPetRef(pet.uid || pet.id)
+      const currentPet = ref.pet
+      if (currentPet) {
         currentPet.level = (currentPet.level || 1) + 1
         // 品质倍率：升级系数 = 0.02 * qualityMultiplier（是升星 0.01 的 2 倍）
         // 神品每级 +4%，仙品 +3.6%，玄品 +3.2%，灵品 +2.8%，凡品 +2.4%
@@ -3917,8 +3939,9 @@ export const usePlayerStore = defineStore('player', {
     },
     // 升星灵宠（次要增强途径：每星加成 = 升级每级加成的一半；升星后属性真实生效）
     evolvePet(pet) {
-      const petIndex = this.items.findIndex(item => item.id === pet.id)
-      if (petIndex === -1) {
+      // 统一查找灵宠实际引用：背包 / 玩家出战 / 宗门成员装备中
+      const ref = this._findPetRef(pet.uid || pet.id)
+      if (!ref.pet) {
         return { success: false, message: '灵宠不存在' }
       }
       const cost = this.getEvolveCost(pet)
@@ -3926,11 +3949,11 @@ export const usePlayerStore = defineStore('player', {
         return { success: false, message: `升星碎片不足，需要 ${cost} 个` }
       }
       this.petFragments -= cost
-      this.items[petIndex].star = (this.items[petIndex].star || 0) + 1
+      ref.pet.star = (ref.pet.star || 0) + 1
       // 升星后真实提升 combatAttributes（修复：原版只改 star 字段不触发属性变化）
       // 系数 = 0.01 * qualityMultiplier（升级 0.02 的一半）
       // 神品每星 +2%，10 星累计 ≈ +22%（远低于原 UI 显示的"10星翻10倍"）
-      const currentPet = this.items[petIndex]
+      const currentPet = ref.pet
       const qualityMultiplier =
         {
           divine: 2.0,
@@ -3984,7 +4007,7 @@ export const usePlayerStore = defineStore('player', {
       // 5 星解锁 skin1，之后每星 +1，满星全解锁；同名灵宠（同 templateId）已解锁过的进度共享
       this._updatePetSkinUnlockRecord(currentPet)
       this.queueSave()
-      return { success: true, message: `升星成功！${pet.name} 升至 ${this.items[petIndex].star} 星` }
+      return { success: true, message: `升星成功！${pet.name} 升至 ${currentPet.star} 星` }
     },
     // 内部：更新灵宠皮肤解锁记录（按 templateId 共享进度，同名灵宠无需再次解锁）
     _updatePetSkinUnlockRecord(pet) {

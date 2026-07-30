@@ -89,28 +89,68 @@
                   <div class="recipe-status">
                     {{ selectedRecipe?.id === recipe.id ? '已选择' : '点击选择' }}
                   </div>
-                  <!-- 内联炼制行：点击该丹药后直接在其下方弹出数量选择与确认，无需到列表底部寻找 -->
+                  <!-- 选中后内联展开：材料需求 + 效果预览 + 炼制数量 + 炼制按钮，全部直接显示在该丹药下方 -->
                   <div
                     v-if="selectedRecipe?.id === recipe.id"
-                    class="craft-inline-row"
+                    class="craft-inline-detail"
                     @click.stop
                   >
-                    <span class="craft-count-label">数量</span>
-                    <n-input-number
-                      v-model:value="craftCount"
-                      :min="1"
-                      :max="maxCraftCountFor(recipe)"
-                      :disabled="maxCraftCountFor(recipe) <= 1"
-                      size="small"
-                      style="width: 110px;"
-                    />
-                    <button
-                      class="btn-small btn-primary"
-                      :disabled="!checkMaterials(recipe, craftCount)"
-                      @click="craftPillInline(recipe)"
-                    >
-                      {{ !checkMaterials(recipe, craftCount) ? '材料不足' : (craftCount > 1 ? `炼制 ×${craftCount}` : '炼制') }}
-                    </button>
+                    <!-- 材料需求 -->
+                    <div class="inline-section">
+                      <h5 class="inline-section-title">材料需求</h5>
+                      <div class="materials-list">
+                        <div class="material-item" v-for="material in recipe.materials" :key="material.id || material.herb">
+                          <div class="material-info">
+                            <span class="material-name">{{ getMaterialName(material) }}</span>
+                            <span class="material-source">{{ getMaterialSource(material) }}</span>
+                            <span class="material-need">需要: {{ material.count }}</span>
+                          </div>
+                          <div
+                            class="material-status"
+                            :class="getMaterialStatusFor(recipe, material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
+                          >
+                            {{ getMaterialStatusFor(recipe, material) }}
+                          </div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- 效果预览 -->
+                    <div class="inline-section">
+                      <h5 class="inline-section-title">效果预览</h5>
+                      <div class="effect-grid">
+                        <div class="effect-item">
+                          <div class="effect-label">{{ getEffectDescription(recipe).label }}</div>
+                          <div class="effect-value highlight">{{ getEffectDescription(recipe).value }}</div>
+                        </div>
+                        <div class="effect-item">
+                          <div class="effect-label">持续时间</div>
+                          <div class="effect-value">{{ getDurationText(recipe) }}</div>
+                        </div>
+                        <div class="effect-item">
+                          <div class="effect-label">成功率</div>
+                          <div class="effect-value">{{ (pillGrades[recipe.grade].successRate * 100).toFixed(1) }}%</div>
+                        </div>
+                      </div>
+                    </div>
+                    <!-- 炼制数量与按钮 -->
+                    <div class="craft-inline-row">
+                      <span class="craft-count-label">数量</span>
+                      <n-input-number
+                        v-model:value="craftCount"
+                        :min="1"
+                        :max="maxCraftCountFor(recipe)"
+                        :disabled="maxCraftCountFor(recipe) <= 1"
+                        size="small"
+                        style="width: 110px;"
+                      />
+                      <button
+                        class="btn-small btn-primary"
+                        :disabled="!checkMaterials(recipe, craftCount)"
+                        @click="craftPillInline(recipe)"
+                      >
+                        {{ !checkMaterials(recipe, craftCount) ? '材料不足' : (craftCount > 1 ? `炼制 ×${craftCount}` : '炼制') }}
+                      </button>
+                    </div>
                   </div>
                 </div>
               </div>
@@ -120,47 +160,6 @@
             <n-empty description="暂未掌握任何丹方" />
             <p class="empty-hint">探索秘境可获得丹方残页</p>
           </div>
-          <template v-if="selectedRecipe">
-            <div class="section">
-              <h3 class="section-title">材料需求</h3>
-              <div class="materials-list">
-                <div class="material-item" v-for="material in selectedRecipe.materials" :key="material.id || material.herb">
-                  <div class="material-info">
-                    <span class="material-name">{{ getMaterialName(material) }}</span>
-                    <span class="material-source">{{ getMaterialSource(material) }}</span>
-                    <span class="material-need">需要: {{ material.count }}</span>
-                  </div>
-                  <div
-                    class="material-status"
-                    :class="getMaterialStatus(material) === `${material.count}/${material.count}` ? 'success' : 'warning'"
-                  >
-                    {{ getMaterialStatus(material) }}
-                  </div>
-                </div>
-              </div>
-            </div>
-            <div class="section">
-              <h3 class="section-title">效果预览</h3>
-              <div class="effect-grid">
-                <div class="effect-item">
-                  <div class="effect-label">丹药介绍</div>
-                  <div class="effect-value">{{ selectedRecipe.description }}</div>
-                </div>
-                <div class="effect-item">
-                  <div class="effect-label">{{ effectDescription.label }}</div>
-                  <div class="effect-value highlight">{{ effectDescription.value }}</div>
-                </div>
-                <div class="effect-item">
-                  <div class="effect-label">持续时间</div>
-                  <div class="effect-value">{{ durationText }}</div>
-                </div>
-                <div class="effect-item">
-                  <div class="effect-label">成功率</div>
-                  <div class="effect-value">{{ (currentEffect?.successRate * 100).toFixed(1) }}%</div>
-                </div>
-              </div>
-            </div>
-          </template>
         </template>
 
         <!-- ==================== 装备锻打 ==================== -->
@@ -1660,25 +1659,30 @@
     return ''
   }
 
-  const currentEffect = computed(() => {
-    if (!selectedRecipe.value) return null
-    return calculatePillEffect(selectedRecipe.value, playerStore.level)
-  })
+  // 内联展开用的辅助函数：直接接收 recipe 参数，避免依赖全局 selectedRecipe
+  // 这样同一页面同时展示多个丹药详情时也能各自正确取值
+  const getMaterialStatusFor = (recipe, material) => {
+    // recipe 仅作为存在性校验，实际数量与具体丹药无关，只取决于素材 id/kind
+    if (!recipe || !material) return '0/0'
+    const count = playerStore.materials.filter(m => m.kind === (material.kind || 'herb') && m.id === material.id).length
+    return `${count}/${material.count}`
+  }
 
-  // 持续时间文案：buff 类丹药（灵石/修炼/掉落/修为获取）仅持续本次挂机，其余按原有分钟或永久/即时
-  const durationText = computed(() => {
-    const e = currentEffect.value
+  const getDurationText = (recipe) => {
+    if (!recipe) return '-'
+    const e = calculatePillEffect(recipe, playerStore.level)
     if (!e) return '-'
     const globalTypes = ['spiritStoneRate', 'cultivationRate', 'dropRate', 'expGain']
     if (globalTypes.includes(e.type)) return '本次挂机'
     const dur = e.duration || 0
     if (dur <= 0) return '永久/即时'
     return `${Math.floor(dur / 60)}分钟`
-  })
+  }
 
   // 按丹药效果类型给出可读描述（支持新增值/突破/强化/洗练/战斗/探索类）
-  const effectDescription = computed(() => {
-    const e = currentEffect.value
+  const getEffectDescription = (recipe) => {
+    if (!recipe) return { label: '效果', value: '-' }
+    const e = calculatePillEffect(recipe, playerStore.level)
     if (!e) return { label: '效果', value: '-' }
     const statNames = { attack: '攻击', defense: '防御', health: '生命', speed: '速度' }
     switch (e.type) {
@@ -1725,7 +1729,15 @@
       default:
         return { label: '效果数值', value: `+${e.value}` }
     }
+  }
+
+  // 旧版 computed 委托给新函数，保持向后兼容（底部日志区等其他地方仍可能引用）
+  const currentEffect = computed(() => {
+    if (!selectedRecipe.value) return null
+    return calculatePillEffect(selectedRecipe.value, playerStore.level)
   })
+  const durationText = computed(() => getDurationText(selectedRecipe.value))
+  const effectDescription = computed(() => getEffectDescription(selectedRecipe.value))
 
   const craftPill = () => {
     if (!selectedRecipe.value) return
@@ -2543,12 +2555,12 @@
 
   .effect-grid {
     display: grid;
-    grid-template-columns: 1fr;
+    grid-template-columns: repeat(auto-fit, minmax(120px, 1fr));
     gap: 10px;
   }
 
   .effect-item {
-    padding: 12px;
+    padding: 10px 12px;
     background: rgba(0, 0, 0, 0.2);
     border-radius: 8px;
   }
@@ -2575,6 +2587,37 @@
     border-top: 1px solid rgba(139, 69, 19, 0.2);
   }
 
+  /* 内联展开详情容器：点击丹药后在该丹药卡片下方直接展开材料/效果/炼制控件 */
+  .craft-inline-detail {
+    margin-top: 12px;
+    padding: 12px;
+    background: rgba(0, 0, 0, 0.28);
+    border: 1px solid rgba(218, 165, 32, 0.3);
+    border-radius: 10px;
+    display: flex;
+    flex-direction: column;
+    gap: 12px;
+    animation: craftInlineIn 0.22s ease;
+  }
+  .inline-section {
+    display: flex;
+    flex-direction: column;
+    gap: 8px;
+  }
+  .inline-section-title {
+    margin: 0;
+    font-size: 13px;
+    color: var(--color-accent-gold, #daa520);
+    font-weight: 600;
+    letter-spacing: 0.5px;
+    border-left: 3px solid var(--color-accent-gold, #daa520);
+    padding-left: 8px;
+  }
+  .material-source {
+    font-size: 11px;
+    color: #9a958a;
+    margin-left: 6px;
+  }
   /* 内联炼制行：点击丹药后在该丹药卡片下方直接弹出数量选择与确认 */
   .craft-inline-row {
     display: flex;

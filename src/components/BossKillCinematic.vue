@@ -319,12 +319,23 @@ function scheduleAutoHide() {
   }, 16000)
 }
 
+// 记录已演出过的批次：同批次连挑仅第 0 场演出立绘，避免 N 次全屏动画叠加卡顿
+let lastShownBatchId = null
+
 // 监听击杀事件，触发立绘突入动画
 watch(bossKillEvent, (evt) => {
   // 诊断日志：确认 watch 是否被触发（排查挂机立绘不弹出的关键证据）
   console.log('[BossKillCinematic] watch 触发', evt)
   if (!evt || !evt.ts) {
     console.warn('[BossKillCinematic] 事件无效，跳过', evt)
+    return
+  }
+  // 同批次去重：手动连挑 N 场时，仅第 0 场演出立绘动画（batchIndex === 0）
+  // 后续场次仍会触发连击计数（bumpCombo），但不再弹出全屏立绘，避免 N 次动画叠加导致卡顿
+  if (evt.batchId && evt.batchId === lastShownBatchId) {
+    console.log('[BossKillCinematic] 同批次已演出，跳过立绘（batchIndex=' + evt.batchIndex + '）')
+    // 仅累计连击，不演出立绘
+    bumpCombo()
     return
   }
   // 仅在探索挂机页显示斩杀演出：切换到背包/炼丹等其他页面时不弹特效
@@ -338,6 +349,8 @@ watch(bossKillEvent, (evt) => {
     console.log('[BossKillCinematic] bossKillAnimation 设置已关闭，跳过')
     return
   }
+  // 记录本批次 ID，后续同批次事件跳过立绘演出
+  if (evt.batchId) lastShownBatchId = evt.batchId
 
   // ===== 人物立绘来源 =====
   // 修复立绘错配 bug：原实现随机抽存活队员显示立绘，忽略 evt.killerMemberId，

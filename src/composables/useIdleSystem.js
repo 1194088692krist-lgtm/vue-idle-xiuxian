@@ -35,12 +35,15 @@ const selectedDifficultyKey = ref('xiongxian')
 // 挂机结束 finishIdle 时清空。
 const lockedZone = ref(null)
 const lockedDiffKey = ref(null)
-// 击杀BOSS事件总线：击杀时写入 { killerMemberId, killerName, bossName, zoneId, ts }
-// BattleStage/挂机界面 watch 此 ref 触发立绘突入动画
+// 击杀BOSS事件总线：击杀时写入 { killerMemberId, killerName, bossName, zoneId, ts, batchId, batchIndex }
+// batchId/batchIndex 用于同批次连挑去重：BossKillCinematic 仅对同 batchId 的第 0 场演出立绘，避免 N 连挑 N 次全屏动画叠加卡顿
 const bossKillEvent = ref(null)
 // 上次 BOSS 击杀立绘展示角色 memberId：用于去重，避免连续多次展示同一角色立绘刷屏
 // （用户反馈日志中风无形连续 4 次刷屏：存活角色少时 50/50 随机仍易重复命中同一角色）
 let lastBossKillMemberId = null
+// 当前挑战批次 ID：runBossChallenge / runCharacterBossChallenge 启动时生成，同批次内共用
+// BossKillCinematic 仅对 batchIndex === 0 的事件演出立绘，后续场次仅累计连击不重发动画
+let currentBossBatchId = 0
 // 选择本次 BOSS 击杀立绘展示对象
 // 概率策略：50% 真实最后一击者（若仍存活），50% 从存活出战角色随机挑选（二选一各 25% 期望）。
 // 去重：存活角色 > 1 时，避免与上次展示角色相同，保证角色展示多样性。
@@ -1976,6 +1979,9 @@ async function runBossChallenge(zoneId, bossId, count) {
 
   addLog('header', `👑 开始挑战【${zone.name}】${boss.name}，共 ${count} 场`)
 
+  // 生成本次挑战批次 ID：同批次内 BossKillCinematic 仅对第 0 场演出立绘，避免 N 连挑 N 次全屏动画叠加卡顿
+  currentBossBatchId = Date.now()
+
   // 逐场实时战斗
   for (let i = 0; i < count; i++) {
     bossChallengeRound.value = i + 1
@@ -2070,7 +2076,9 @@ async function runBossChallenge(zoneId, bossId, count) {
         killerName: killer?.name || '',
         bossName: boss?.name || '',
         zoneId: zoneId || '',
-        ts: Date.now()
+        ts: Date.now(),
+        batchId: currentBossBatchId,
+        batchIndex: i
       }
       bossKillEvent.value = killEvt
       // 标记本场为 BOSS 击杀，下方场次间隔延时额外 +2s 让十杀文案完整播完
@@ -2308,6 +2316,9 @@ async function runCharacterBossChallenge(characterId, count) {
 
   addLog('header', `👑 开始挑战【人物形态】${character.name}，共 ${count} 场`)
 
+  // 生成本次挑战批次 ID：同批次内 BossKillCinematic 仅对第 0 场演出立绘
+  currentBossBatchId = Date.now()
+
   // 逐场战斗
   for (let i = 0; i < count; i++) {
     bossChallengeRound.value = i + 1
@@ -2397,7 +2408,9 @@ async function runCharacterBossChallenge(characterId, count) {
         killerName: killer?.name || '',
         bossName: character.name || '',
         zoneId: zone.id || '',
-        ts: Date.now()
+        ts: Date.now(),
+        batchId: currentBossBatchId,
+        batchIndex: i
       }
       bossKillEvent.value = killEvt
       lastBossKillTs = Date.now()
@@ -2634,7 +2647,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
         }
         const pet = generatePet(rarity, effectiveZone)
         s.items.push(pet); s.itemsFound++
-        runStats.value.equipment++
+        // 宠物不计入装备统计：仪表盘"获得装备数"应仅统计装备，与 foundEquipment 列表口径一致
         const info = rarityInfo[rarity] || rarityInfo.mortal
         rewards.push({ type: 'pet', name: pet.name, rarity, info, item: pet })
       }

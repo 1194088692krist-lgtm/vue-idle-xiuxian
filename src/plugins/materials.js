@@ -1,6 +1,7 @@
-// 素材系统：灵草(herb) / 矿料(ore) / 灵液(liquid) / 妖丹(core) / 至宝(special)
+// 素材系统：灵草(herb) / 矿料(ore) / 灵液(liquid) / 妖丹(core) / 至宝(special) / BOSS素材(boss_material)
 // 灵草数据迁自 herbs.js，其余四类为本模块新增。
 import { herbs, herbQualities, getRandomHerb as getRandomHerbBase, getHerbValue } from './herbs'
+import { BOSS_MATERIALS } from './cultivationSystem'
 
 export const MATERIAL_KINDS = {
   herb: { name: '灵草', color: '#44aa44' },
@@ -101,12 +102,23 @@ const specials = [
   ...characterInnerPills
 ]
 
+// 将 BOSS_MATERIALS 扁平化并纳入 allMaterials，使炼丹界面能正确查询到中文名
+const bossMaterialList = Object.values(BOSS_MATERIALS).flat().map(m => ({
+  id: m.id,
+  name: m.name,
+  description: m.description,
+  kind: 'boss_material',
+  quality: 'rare',
+  baseValue: 100
+}))
+
 const allMaterials = [
   ...herbs.map(h => ({ ...h, kind: 'herb', quality: h.quality || 'common' })),
   ...ores.map(o => ({ ...o, kind: 'ore' })),
   ...liquids.map(l => ({ ...l, kind: 'liquid' })),
   ...cores.map(c => ({ ...c, kind: 'core' })),
-  ...specials.map(s => ({ ...s, kind: 'special' }))
+  ...specials.map(s => ({ ...s, kind: 'special' })),
+  ...bossMaterialList
 ]
 
 export const oreList = ores

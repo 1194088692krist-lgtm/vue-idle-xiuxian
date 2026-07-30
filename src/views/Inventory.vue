@@ -256,7 +256,20 @@
             <button class="btn-small" :disabled="currentPage * pageSize >= filteredPets.length" @click="currentPage++">下一页</button>
           </div>
           <div v-if="displayPets.length" class="simple-grid" :class="{ mobile: isMobile }">
-            <div v-for="pet in displayPets" :key="pet.id" class="simple-card pet-card" @click="showPetDetails(pet)">
+            <div
+              v-for="pet in displayPets"
+              :key="pet.id"
+              class="simple-card pet-card"
+              :class="{ 'pet-equipped': equippedPetOwners.has(pet.uid || pet.id) }"
+              @click="showPetDetails(pet)"
+            >
+              <!-- 已装备角标：顶置显示的装备中灵宠标注归属，方便玩家识别并直接强化 -->
+              <div
+                v-if="equippedPetOwners.has(pet.uid || pet.id)"
+                class="equipped-badge"
+              >
+                已装备 · {{ equippedPetOwners.get(pet.uid || pet.id) }}
+              </div>
               <div class="card-header">
                 <span class="pet-card-title">
                   <img
@@ -829,14 +842,42 @@
   const petsSortedByScore = ref(false)
   const equipmentSortedByScore = ref(false)
 
-  // 过滤后的灵宠列表
+  // 已装备灵宠 -> 装备者名称映射（用于卡片"已装备"角标显示归属）
+  // 含玩家出战 + 各宗门成员装备中的灵宠
+  const equippedPetOwners = computed(() => {
+    const map = new Map()
+    if (playerStore.activePet) {
+      map.set(playerStore.activePet.uid || playerStore.activePet.id, '玩家出战')
+    }
+    playerStore.sectMembers.forEach(m => {
+      if (m.equippedPet) {
+        map.set(m.equippedPet.uid || m.equippedPet.id, m.name)
+      }
+    })
+    return map
+  })
+
+  // 过滤后的灵宠列表：已装备灵宠顶置显示，便于玩家直接强化
   const filteredPets = computed(() => {
+    // 1) 已装备灵宠（从 activePet + sectMembers.equippedPet 收集实际引用，保持响应式）
+    const equipped = []
+    if (playerStore.activePet) equipped.push(playerStore.activePet)
+    playerStore.sectMembers.forEach(m => {
+      if (m.equippedPet) equipped.push(m.equippedPet)
+    })
+    const equippedFiltered = selectedRarityToRelease.value === 'all'
+      ? equipped
+      : equipped.filter(pet => pet.rarity === selectedRarityToRelease.value)
+    // 2) 背包内未装备灵宠
     const pets = playerStore.items.filter(item => item.type === 'pet')
     let result = selectedRarityToRelease.value === 'all' ? pets : pets.filter(pet => pet.rarity === selectedRarityToRelease.value)
     if (petsSortedByScore.value) {
+      // 排序时已装备的仍顶置，仅在各自分组内排序
+      equippedFiltered.sort((a, b) => calculatePetScore(b) - calculatePetScore(a))
       result = [...result].sort((a, b) => calculatePetScore(b) - calculatePetScore(a))
     }
-    return result
+    // 3) 已装备在前，未装备在后
+    return [...equippedFiltered, ...result]
   })
 
   // 当前页显示的灵宠
@@ -1485,7 +1526,11 @@
     if (result.success) {
       message.success(result.message)
       // 重新从 store 拉取最新灵宠对象，确保 selectedPet 引用同步（响应式属性刷新）
-      const freshPet = playerStore.items.find(item => item.id === pet.id)
+      // 已装备灵宠不在 items 中，需统一查找：items / activePet / sectMembers.equippedPet
+      const petKey = pet.uid || pet.id
+      const freshPet = playerStore.items.find(item => (item.uid || item.id) === petKey && item.type === 'pet')
+        || (playerStore.activePet && (playerStore.activePet.uid || playerStore.activePet.id) === petKey ? playerStore.activePet : null)
+        || playerStore.sectMembers.reduce((acc, m) => acc || (m.equippedPet && (m.equippedPet.uid || m.equippedPet.id) === petKey ? m.equippedPet : null), null)
       if (freshPet) selectedPet.value = freshPet
     } else {
       message.error(result.message)
@@ -2198,6 +2243,32 @@
 
   .simple-card:hover {
     border-color: rgba(218, 165, 32, 0.5);
+  }
+
+  /* 已装备灵宠卡片：金色边框高亮，区别于普通灵宠 */
+  .simple-card.pet-equipped {
+    border-color: rgba(218, 165, 32, 0.65);
+    background: linear-gradient(135deg, rgba(218, 165, 32, 0.1), rgba(0, 0, 0, 0.25));
+    box-shadow: 0 0 0 1px rgba(218, 165, 32, 0.35), 0 0 10px rgba(218, 165, 32, 0.18);
+  }
+  /* 已装备角标：卡片右上角金色标签，标注装备归属 */
+  .equipped-badge {
+    position: absolute;
+    top: 6px;
+    right: 6px;
+    padding: 2px 8px;
+    background: linear-gradient(135deg, #daa520, #f0c040);
+    color: #1a1a2e;
+    font-size: 11px;
+    font-weight: bold;
+    border-radius: 10px;
+    z-index: 3;
+    letter-spacing: 0.3px;
+    box-shadow: 0 1px 4px rgba(0, 0, 0, 0.4);
+    max-width: 60%;
+    white-space: nowrap;
+    overflow: hidden;
+    text-overflow: ellipsis;
   }
 
   /* 装备多选模式：选中态 + checkbox 定位 */

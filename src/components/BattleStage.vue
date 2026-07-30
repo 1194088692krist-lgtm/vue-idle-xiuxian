@@ -1581,10 +1581,10 @@ onUnmounted(() => {
   top: -8px;
   left: 50%;
   transform: translateX(-50%);
-  font-size: 14px;
+  font-size: 16px;
   font-weight: 700;
-  text-shadow: 0 0 4px rgba(0,0,0,0.8), 0 1px 2px rgba(0,0,0,0.8);
-  animation: floatUp 1s ease-out forwards;
+  text-shadow: 0 0 4px rgba(0,0,0,0.9), 0 1px 2px rgba(0,0,0,0.9), 0 0 2px rgba(0,0,0,0.9);
+  animation: floatUp 1.6s ease-out forwards;
   z-index: 3;
   pointer-events: none;
   white-space: nowrap;
@@ -1592,41 +1592,41 @@ onUnmounted(() => {
 }
 .float-damage.crit {
   color: #fca5a5;
-  font-size: 20px;
-  text-shadow: 0 0 6px rgba(239, 68, 68, 0.8), 0 1px 2px rgba(0,0,0,0.8);
+  font-size: 22px;
+  text-shadow: 0 0 6px rgba(239, 68, 68, 0.8), 0 1px 2px rgba(0,0,0,0.9);
 }
 .float-damage.normal { color: #fff; }
 .float-damage.counter { color: #93c5fd; }
 .float-damage.dodge {
   color: #d1d5db;
-  font-size: 12px;
+  font-size: 13px;
   animation: dodgeFloat 0.8s ease-out forwards;
 }
 .float-damage.vampire { color: #86efac; }
 .float-damage.shield-absorb {
   color: #38bdf8;
-  font-size: 12px;
-  text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 1px 2px rgba(0,0,0,0.8);
-  animation: floatUp 1.2s ease-out forwards;
+  font-size: 13px;
+  text-shadow: 0 0 6px rgba(56, 189, 248, 0.7), 0 1px 2px rgba(0,0,0,0.9);
+  animation: floatUp 1.4s ease-out forwards;
 }
 /* 数值量级分档：<1万白色基础字号；1万~1亿橙黄色放大；>=1亿红色最大字号+强爽感动效 */
-.float-damage.low { color: #fff; font-size: 14px; }
+.float-damage.low { color: #fff; font-size: 16px; }
 .float-damage.mid {
   color: #f97316;
-  font-size: 20px;
-  text-shadow: 0 0 8px rgba(249, 115, 22, 0.7), 0 1px 3px rgba(0,0,0,0.85);
-  animation: floatUp 1.1s ease-out forwards;
+  font-size: 24px;
+  text-shadow: 0 0 8px rgba(249, 115, 22, 0.8), 0 0 4px rgba(249, 115, 22, 0.4), 0 1px 3px rgba(0,0,0,0.9);
+  animation: floatUp 1.8s ease-out forwards;
 }
 .float-damage.high {
   color: #ef4444;
-  font-size: 28px;
+  font-size: 34px;
   font-weight: 800;
-  text-shadow: 0 0 10px rgba(239, 68, 68, 0.9), 0 0 18px rgba(239, 68, 68, 0.5), 0 1px 3px rgba(0,0,0,0.85);
-  animation: floatUpBig 1.2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
+  text-shadow: 0 0 12px rgba(239, 68, 68, 0.95), 0 0 20px rgba(239, 68, 68, 0.6), 0 0 4px rgba(239, 68, 68, 0.8), 0 1px 3px rgba(0,0,0,0.9);
+  animation: floatUpBig 2s cubic-bezier(0.18, 0.89, 0.32, 1.28) forwards;
 }
 /* 暴击与量级叠加：暴击仍以红色描边为主，但字号跟随量级档（高量级暴击 = 极致爽感） */
-.float-damage.crit.mid { font-size: 24px; }
-.float-damage.crit.high { font-size: 32px; }
+.float-damage.crit.mid { font-size: 28px; }
+.float-damage.crit.high { font-size: 40px; }
 /* 护盾吸收飘字定位偏移：避免与主伤害飘字重叠 */
 .float-damage.shield-floater {
   top: -22px;
@@ -1635,15 +1635,17 @@ onUnmounted(() => {
 }
 
 @keyframes floatUp {
-  0% { opacity: 1; transform: translateX(-50%) translateY(0); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-30px); }
+  0% { opacity: 1; transform: translateX(-50%) translateY(0) scale(1); }
+  20% { transform: translateX(-50%) translateY(-8px) scale(1.05); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-40px) scale(1); }
 }
 /* 高量级（>=1亿）飘字：弹性放大→上浮淡出，强化"大数字砸下"的爽感 */
 @keyframes floatUpBig {
-  0% { opacity: 0; transform: translateX(-50%) translateY(8px) scale(0.4); }
-  18% { opacity: 1; transform: translateX(-50%) translateY(-6px) scale(1.25); }
-  35% { transform: translateX(-50%) translateY(-10px) scale(1); }
-  100% { opacity: 0; transform: translateX(-50%) translateY(-42px) scale(0.95); }
+  0% { opacity: 0; transform: translateX(-50%) translateY(10px) scale(0.3); }
+  12% { opacity: 1; transform: translateX(-50%) translateY(-8px) scale(1.4); }
+  25% { transform: translateX(-50%) translateY(-12px) scale(1); }
+  70% { opacity: 1; transform: translateX(-50%) translateY(-30px) scale(1); }
+  100% { opacity: 0; transform: translateX(-50%) translateY(-55px) scale(0.9); }
 }
 @keyframes dodgeFloat {
   0% { opacity: 1; transform: translateX(-50%) translateY(0); }
