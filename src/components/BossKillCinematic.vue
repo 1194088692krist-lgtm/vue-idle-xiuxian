@@ -71,7 +71,7 @@ import { usePlayerStore } from '../stores/player'
 import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
 import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, getPetTemplateId } from '../plugins/pets'
 
-const { bossKillEvent, teamMemberStates } = useIdleSystem()
+const { bossKillEvent, teamMemberStates, characterBossIntro } = useIdleSystem()
 const playerStore = usePlayerStore()
 const route = useRoute()
 
@@ -334,6 +334,14 @@ watch(bossKillEvent, (evt) => {
   // BossKillCinematic 跳过全屏演出（黑色背景会遮挡击败立绘），仅累计连击
   if (evt.defeatedIntroShown) {
     console.log('[BossKillCinematic] 击败立绘已由 CharacterBossIntro 展示，跳过全屏演出')
+    bumpCombo()
+    return
+  }
+  // 跨事件遮挡保护：挂机5秒一次tick，可能出现"上一轮人物BOSS击败立绘还在展示（2.4s未结束），
+  // 新一轮遭遇击败了普通怪物BOSS"，此时 BossKillCinematic 全屏黑色背景会遮挡还未消失的击败立绘
+  // 检查 CharacterBossIntro 是否正在展示击败立绘，若是则跳过本次全屏演出
+  if (characterBossIntro.value && characterBossIntro.value.show && characterBossIntro.value.isDefeated) {
+    console.log('[BossKillCinematic] 击败立绘正在展示中，跳过全屏演出避免遮挡')
     bumpCombo()
     return
   }
