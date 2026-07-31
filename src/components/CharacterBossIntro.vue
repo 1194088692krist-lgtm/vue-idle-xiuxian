@@ -1,14 +1,19 @@
 <template>
-  <!-- 人物 BOSS 入场演出：立绘从屏幕上方滑入、居中展示后从下方滑出 -->
+  <!-- 人物 BOSS 入场/击败演出：立绘从屏幕上方滑入、居中展示后从下方滑出 -->
   <teleport to="body">
-    <div v-if="intro.show" class="char-boss-intro-overlay" :class="{ 'theme-wraith': intro.theme === 'wraith' }" @click="dismiss">
-      <div class="char-boss-intro-stage" :key="intro.characterId + '-' + intro.name">
+    <div v-if="intro.show" class="char-boss-intro-overlay" :class="{ 'theme-wraith': intro.theme === 'wraith', 'theme-defeated': intro.theme === 'defeated' }" @click="dismiss">
+      <div class="char-boss-intro-stage" :key="intro.characterId + '-' + intro.name + '-' + (intro.isDefeated ? 'defeated' : 'intro')">
         <!-- 邪修降临：深紫色特效大字，人物 BOSS 登场时降下 -->
         <div v-if="intro.theme === 'wraith'" class="char-boss-intro-title">
           <span class="title-char">邪</span>
           <span class="title-char">修</span>
           <span class="title-char">降</span>
           <span class="title-char">临</span>
+        </div>
+        <!-- 陨落：暗红色特效大字，人物 BOSS 被击败时降下 -->
+        <div v-else-if="intro.theme === 'defeated'" class="char-boss-intro-title">
+          <span class="title-char">陨</span>
+          <span class="title-char">落</span>
         </div>
         <div class="char-boss-intro-portrait-wrap">
           <img
@@ -23,7 +28,7 @@
         <div class="char-boss-intro-banner">
           <div class="char-boss-intro-stars">{{ '★'.repeat(intro.star || 1) }}</div>
           <div class="char-boss-intro-name">{{ intro.name }}</div>
-          <div class="char-boss-intro-sub">人物形态 · BOSS</div>
+          <div class="char-boss-intro-sub">{{ intro.isDefeated ? '人物形态 · 陨落' : '人物形态 · BOSS' }}</div>
         </div>
       </div>
     </div>
@@ -46,7 +51,7 @@ function onImgError(e) {
   e.target.style.opacity = '0.2'
 }
 function dismiss() {
-  intro.value = { show: false, characterId: null, name: '', portrait: '', star: 0 }
+  intro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
 }
 
 // 兜底：若 2.4s 定时器未触发（如组件挂载时机问题），4s 后强制关闭
@@ -56,7 +61,7 @@ watch(
     if (show) {
       setTimeout(() => {
         if (intro.value && intro.value.show) {
-          intro.value = { show: false, characterId: null, name: '', portrait: '', star: 0 }
+          intro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
         }
       }, 4000)
     }
@@ -204,6 +209,19 @@ watch(
   border-color: rgba(157, 78, 221, 0.7);
 }
 
+/* 陨落主题：暗红色背景强化，与登场主题区分 */
+.char-boss-intro-overlay.theme-defeated {
+  background: radial-gradient(ellipse at center, rgba(60, 5, 5, 0.92) 0%, rgba(20, 0, 0, 0.97) 70%);
+}
+.theme-defeated .char-boss-intro-portrait-wrap {
+  box-shadow: 0 0 60px rgba(220, 38, 38, 0.6), 0 0 20px rgba(180, 30, 30, 0.5);
+  border-color: rgba(220, 38, 38, 0.7);
+}
+.theme-defeated .char-boss-intro-name {
+  color: #DC2626;
+  text-shadow: 0 0 12px rgba(220, 38, 38, 0.7), 0 2px 4px rgba(0, 0, 0, 0.8);
+}
+
 /* 怨灵降临：四个深紫色特效大字 */
 .char-boss-intro-title {
   display: flex;
@@ -219,6 +237,16 @@ watch(
     0 0 60px rgba(123, 44, 191, 0.4),
     0 2px 4px rgba(0, 0, 0, 0.8);
   animation: charBossTitleSlam 0.8s cubic-bezier(0.16, 1, 0.3, 1) 0.1s both;
+}
+
+/* 陨落：两个暗红色特效大字 */
+.theme-defeated .char-boss-intro-title {
+  color: #DC2626;
+  text-shadow:
+    0 0 20px rgba(220, 38, 38, 0.9),
+    0 0 40px rgba(220, 38, 38, 0.6),
+    0 0 60px rgba(180, 30, 30, 0.4),
+    0 2px 4px rgba(0, 0, 0, 0.8);
 }
 
 .char-boss-intro-title .title-char {

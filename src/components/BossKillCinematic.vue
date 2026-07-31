@@ -26,15 +26,6 @@
         :alt="petName"
         @animationend="onPetAnimEnd"
       />
-      <!-- 被击败 BOSS 立绘：人物 BOSS 被击败时从右下倒下，与击杀者立绘分两侧 -->
-      <img
-        v-if="defeatedPortraitUrl"
-        :key="`defeated-${animKey}`"
-        :src="defeatedPortraitUrl"
-        class="kill-defeated-portrait"
-        :alt="defeatedBossName"
-        @error="onDefeatedImgError"
-      />
       <!-- 几片飘动粒子（灵光） -->
       <div :key="`p1-${animKey}`" class="kill-particle p1"></div>
       <div :key="`p2-${animKey}`" class="kill-particle p2"></div>
@@ -77,7 +68,7 @@ import { ref, watch, computed, nextTick, onUnmounted } from 'vue'
 import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
 import { usePlayerStore } from '../stores/player'
-import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount, getCharacterDefeatedUrl } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
 import { getPetAvatar, getPetSkinUrl, getPetSkinCount, getUnlockedSkinCount, getPetTemplateId } from '../plugins/pets'
 
 const { bossKillEvent, teamMemberStates } = useIdleSystem()
@@ -97,11 +88,6 @@ const petPortraitUrl = ref(null)
 const petName = ref('')
 const petAnimKey = ref(0)
 let petDelayTimer = null
-
-// 被击败 BOSS 立绘：人物 BOSS 被击败时显示对应 defeated 立绘
-// 与击杀者立绘分两侧显示：击杀者在左下突入，被击败 BOSS 在右下倒下
-const defeatedPortraitUrl = ref(null)
-const defeatedBossName = ref('')
 
 // 连击文案：count（如"一杀"）与 text（如"势如破竹"）分两行显示
 // 分离后 text 行字数固定为四字/五字/七字等，字号自适应只针对 text 行
@@ -328,15 +314,9 @@ function scheduleAutoHide() {
       portraitUrl.value = null
       petShow.value = false
       petPortraitUrl.value = null
-      defeatedPortraitUrl.value = null
     }
     hideTimerId = null
   }, 16000)
-}
-
-// 击败立绘加载失败时清空（目前仅前19个角色有 defeated 立绘，其余角色文件不存在）
-function onDefeatedImgError() {
-  defeatedPortraitUrl.value = null
 }
 
 // 记录已演出过的批次：同批次连挑仅第 0 场演出立绘，避免 N 次全屏动画叠加卡顿
@@ -350,34 +330,13 @@ watch(bossKillEvent, (evt) => {
     console.warn('[BossKillCinematic] 事件无效，跳过', evt)
     return
   }
-  // 同批次去重：手动连挑 N 场时，仅第 0 场演出击杀者立绘动画（batchIndex === 0）
-  // 但最后一场（isLastInBatch）需单独显示被击败 BOSS 的击败立绘
-  // 挂机路径无 batchId，每次击杀都完整演出（含击败立绘）
+  // 同批次去重：手动连挑 N 场时，仅第 0 场演出立绘动画（batchIndex === 0）
+  // 后续场次仍会触发连击计数（bumpCombo），但不再弹出全屏立绘，避免 N 次动画叠加导致卡顿
+  // 注意：人物 BOSS 击败立绘由 triggerCharacterBossDefeated 经 CharacterBossIntro 展示，
+  //       不在 BossKillCinematic 中处理，因此同批次后续场次仅需累计连击
   if (evt.batchId && evt.batchId === lastShownBatchId) {
-    // 末场：仅显示击败立绘，不重复演出击杀者立绘/连击
-    if (evt.isLastInBatch && evt.defeatedBossId) {
-      if (route.path !== '/exploration') return
-      if (!playerStore.bossKillAnimation) return
-      bumpCombo()
-      // 清空击杀者立绘与连击，仅保留击败立绘
-      portraitUrl.value = null
-      killerName.value = ''
-      comboCount.value = ''
-      comboText.value = ''
-      comboClass.value = ''
-      if (petDelayTimer) { clearTimeout(petDelayTimer); petDelayTimer = null }
-      petShow.value = false
-      petPortraitUrl.value = null
-      bossName.value = evt.bossName || ''
-      defeatedPortraitUrl.value = getCharacterDefeatedUrl({ id: evt.defeatedBossId })
-      defeatedBossName.value = evt.bossName || ''
-      animKey.value++
-      show.value = true
-      scheduleAutoHide()
-      console.log('[BossKillCinematic] 末场击败立绘演出', evt.bossName)
-      return
-    }
-    // 非末场：仅累计连击，不演出立绘
+    console.log('[BossKillCinematic] 同批次已演出，跳过立绘（batchIndex=' + evt.batchIndex + '）')
+    // 仅累计连击，不演出立绘
     bumpCombo()
     return
   }
@@ -481,24 +440,6 @@ watch(bossKillEvent, (evt) => {
   portraitUrl.value = url
   killerName.value = member.name || ''
   bossName.value = evt.bossName || ''
-  // 被击败 BOSS 立绘显示规则：
-  // - 挂机探索（无 batchId）：每次击败都显示对应 defeated 立绘
-  // - 人物boss挑战（有 batchId）：仅最后一场（isLastInBatch）显示 defeated 立绘，
-  //   首场若非末场（count>1）则不显示，避免连挑中间场次反复弹出击败立绘
-  const defeatedId = evt.defeatedBossId
-  if (defeatedId) {
-    const shouldShowDefeated = !evt.batchId || evt.isLastInBatch
-    if (shouldShowDefeated) {
-      defeatedPortraitUrl.value = getCharacterDefeatedUrl({ id: defeatedId })
-      defeatedBossName.value = evt.bossName || ''
-    } else {
-      defeatedPortraitUrl.value = null
-      defeatedBossName.value = ''
-    }
-  } else {
-    defeatedPortraitUrl.value = null
-    defeatedBossName.value = ''
-  }
   animKey.value++
   show.value = true
   scheduleAutoHide()

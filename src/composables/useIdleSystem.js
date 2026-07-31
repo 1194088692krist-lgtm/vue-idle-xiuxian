@@ -10,7 +10,7 @@ import { craftCurrencies, pickCraftCurrency, CRAFT_DROP_CHANCE_BY_ZONE } from '.
 import { getSocketsByRarity, getRandomRune } from '../plugins/runes'
 import { equipmentNameParts } from '../plugins/gacha'
 import { BOSS_MATERIALS, getBossEncounterChance, ZONE_BOSSES, getBossMaterialByBossId, BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
-import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, getSkinCount, characterList as _charList, starConfig as _starCfg, getEffectiveBaseStats } from '../plugins/characters'
+import { getCharacterAvatar, getCharacterThumbnail, getCharacterSkinUrl, getSkinCount, characterList as _charList, starConfig as _starCfg, getEffectiveBaseStats, getCharacterDefeatedUrl } from '../plugins/characters'
 import { getInitialSkills, deduplicateSkills, getSkillSchoolByCharacter, getSkillsForBreakthrough } from '../plugins/skills'
 import { getMonsterAvatarSync } from '../plugins/monsters'
 import { getIconUrl } from '../plugins/icons'
@@ -112,7 +112,11 @@ const combatState = ref({ inCombat: false, combatManager: null })
 const animState = ref({ playerAttack: false, playerHurt: false, enemyAttack: false, enemyHurt: false })
 const treasureFlash = ref({ show: false, tier: '', title: '', desc: '', icon: '' })
 // 人物 BOSS 入场演出：从屏幕上方滑入、居中展示后向下滑出
-const characterBossIntro = ref({ show: false, characterId: null, name: '', portrait: '', star: 0 })
+// 字段说明：
+//   show / characterId / name / portrait / star：基础展示
+//   theme：'wraith' 登场主题（深紫）、'defeated' 击败主题（暗红）
+//   isDefeated：是否为击败立绘模式（CharacterBossIntro 据此切换标题文案与立绘来源）
+const characterBossIntro = ref({ show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false })
 const runStats = ref({ victories: 0, defeats: 0, spiritStones: 0, cultivation: 0, equipment: 0, exp: 0, healAmount: 0, buffCount: 0, shieldAmount: 0, damageBoost: 0, phantomCrystals: 0, totalDamageDealt: 0, totalDamageTaken: 0, totalShieldAbsorbed: 0, bossTickets: 0, bossMaterials: 0, characterInnerPills: 0 })
 const foundEquipment = ref([])       // 本次挂机获得的装备列表
 const currentEncounterSummary = ref(null) // 实时显示当前最新结算画面
@@ -1490,11 +1494,41 @@ function triggerCharacterBossIntro(enemy) {
     portrait,
     star: enemy.characterBossStar || 0,
     // 人物 BOSS 登场主题：怨灵降临（深紫色特效大字）
-    theme: 'wraith'
+    theme: 'wraith',
+    isDefeated: false
   }
   // 2.4s 后关闭（与 CSS 动画时长对齐：0.6s 入场 + 1.2s 停留 + 0.6s 离场）
   setTimeout(() => {
-    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null }
+    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
+  }, 2400)
+}
+
+// 人物 BOSS 被击败演出：复用 characterBossIntro 的全屏滑入展示方式
+// 与登场演出唯一的区别：portrait 用 defeated 立绘、theme 用 'defeated' 暗红主题
+// 规则：
+//   - 挂机探索：每次击败都触发（人物 BOSS 登场频率低）
+//   - 人物boss挑战：仅在最后一场（isLastInBatch）触发，避免连挑中间场次反复弹出
+let defeatedIntroTimer = null
+function triggerCharacterBossDefeated(enemy, bossName) {
+  if (!enemy || !enemy.isCharacterBoss) return
+  const defeatedUrl = getCharacterDefeatedUrl({ id: enemy.characterBossId })
+  if (!defeatedUrl) return
+  // 清掉上一次未结束的击败演出定时器，避免快速连斩时定时器叠加
+  if (defeatedIntroTimer) { clearTimeout(defeatedIntroTimer); defeatedIntroTimer = null }
+  characterBossIntro.value = {
+    show: true,
+    characterId: enemy.characterBossId,
+    name: bossName || enemy.name,
+    portrait: defeatedUrl,
+    star: enemy.characterBossStar || 0,
+    // 击败主题：陨落（暗红色特效大字）
+    theme: 'defeated',
+    isDefeated: true
+  }
+  // 2.4s 后关闭
+  defeatedIntroTimer = setTimeout(() => {
+    characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
+    defeatedIntroTimer = null
   }, 2400)
 }
 
@@ -2422,6 +2456,11 @@ async function runCharacterBossChallenge(characterId, count) {
       }
       bossKillEvent.value = killEvt
       lastBossKillTs = Date.now()
+      // 人物 BOSS 被击败：仅在最后一场触发 defeated 立绘演出
+      // 连挑 N 场时中间场次不弹击败立绘，避免反复打断；末场才显示该角色陨落立绘
+      if (bossEnemy.isCharacterBoss && i === count - 1) {
+        triggerCharacterBossDefeated(bossEnemy, killEvt.bossName)
+      }
       console.log('[useIdleSystem] 人物BOSS挑战击杀事件已发出', killEvt)
 
       // 标准奖励（按 BOSS 计算）
@@ -4279,6 +4318,11 @@ async function runIdleEncounter() {
         // 记录 BOSS 击杀时间戳，runIdleEncounter 入口据此延时保护，
         // 让十杀文案演出完整播完再进下一场（额外延后 BOSS_KILL_EXTRA_DELAY=2s）
         lastBossKillTs = Date.now()
+        // 人物 BOSS 被击败：触发 defeated 立绘全屏滑入演出（与登场展示方式一致）
+        // 挂机路径无 batchId，每次击败都触发
+        if (enemy?.isCharacterBoss) {
+          triggerCharacterBossDefeated(enemy, killEvt.bossName)
+        }
         // 诊断日志：确认击杀事件已发出（排查挂机立绘不弹出的关键证据）
         logUserAction('[BOSS击杀]', `${killEvt.killerName} 击败 ${killEvt.bossName} @${killEvt.zoneId}`)
         console.log('[useIdleSystem] BOSS击杀事件已发出', killEvt)

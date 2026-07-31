@@ -153,6 +153,7 @@ async function collectResourceUrls() {
     './portraits/manifest.json',
     './monsters/manifest.json',
     './portraits/skins.json?v=8',
+    './portraits/defeated.json',
     './pets/manifest.json',
     './pets/skins.json?v=8'
   ]
@@ -177,7 +178,7 @@ async function collectResourceUrls() {
     const fetchUrls = manifestUrls.map(u =>
       u.includes('skins.json') ? `${u}&_t=${bustTs}` : u
     )
-    const [portraitsRes, monstersRes, skinsRes, petManifestRes, petSkinsRes, fxManifestRes] = await Promise.all(
+    const [portraitsRes, monstersRes, skinsRes, defeatedRes, petManifestRes, petSkinsRes, fxManifestRes] = await Promise.all(
       fetchUrls.map(u => fetch(urlFromPath(u))).concat([fetch(urlFromPath('./fx-manifest.json'))])
     )
     const portraitsData = await portraitsRes.json()
@@ -203,6 +204,16 @@ async function collectResourceUrls() {
         const count = skinsData[charId] || 0
         for (let i = 1; i <= count; i++) {
           urls.push(`./portraits/${charId}_skin${i}.jpg`)
+        }
+      }
+    }
+    // 击败立绘：defeated.json 为角色 id 数组 ["char_001", ...]
+    // 仅包含已有击败立绘的角色，缺失的角色不会加入下载列表（避免 404）
+    if (defeatedRes.ok) {
+      const defeatedIds = await defeatedRes.json()
+      if (Array.isArray(defeatedIds)) {
+        for (const charId of defeatedIds) {
+          urls.push(`./portraits/${charId}_defeated.jpg`)
         }
       }
     }
@@ -484,6 +495,8 @@ function isAssetFile(url) {
   // 立绘清单 manifest.json（在 portraits/ 或 monsters/ 或 pets/ 目录下）
   if (/\/(portraits|monsters|pets)\/manifest\.json(\?|$)/i.test(url)) return true
   if (/\/(portraits|monsters|pets)\/skins\.json(\?|$)/i.test(url)) return true
+  // 击败立绘清单 portraits/defeated.json
+  if (/\/portraits\/defeated\.json(\?|$)/i.test(url)) return true
   // 图片/视频扩展名
   if (/\.(jpg|jpeg|png|webp|gif|svg|ico|avif|mp4|webm)$/i.test(url)) return true
   // 素材目录下的文件（保险起见，凡是路径含 /portraits/ /monsters/ /pets/ /assets/bg/ /assets/icons/ /assets/zones/ 都算素材）
