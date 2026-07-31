@@ -2368,8 +2368,9 @@ async function runCharacterBossChallenge(characterId, count) {
     addLog('header', `⚔️ 第 ${i + 1}/${count} 场人物形态 BOSS 挑战：${character.name}！`)
     idleCombatLog.value.push(`—— 第 ${i + 1} 场人物 BOSS 挑战 · ${character.name} ——`)
 
-    // 触发人物 BOSS 入场演出（与挂机路径对称，让手动挑战也有立绘登场效果）
-    triggerCharacterBossIntro(bossEnemy)
+    // 人物 BOSS 入场演出：手动连挑时人物 BOSS 频繁登场，仅首场显示 skin5 立绘
+    // 挂机路径人物 BOSS 登场频率低（每轮5分钟才1~2次），每次登场都触发
+    if (i === 0) triggerCharacterBossIntro(bossEnemy)
 
     // 推进战斗
     let roundResult = { finished: false }
@@ -2414,6 +2415,8 @@ async function runCharacterBossChallenge(characterId, count) {
         ts: Date.now(),
         batchId: currentBossBatchId,
         batchIndex: i,
+        // 标记是否为本次连挑的最后一场：BossKillCinematic 仅在最后一场显示击败立绘
+        isLastInBatch: i === count - 1,
         // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
         defeatedBossId: bossEnemy.isCharacterBoss ? bossEnemy.characterBossId : null
       }
