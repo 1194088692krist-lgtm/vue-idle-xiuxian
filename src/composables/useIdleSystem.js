@@ -2435,6 +2435,8 @@ async function runCharacterBossChallenge(characterId, count) {
     const victory = roundResult.victory
     let rewards = []
     let loss = 0
+    // 标记末场是否触发了击败立绘：需在结算页出现前等待立绘展示完成
+    let needWaitDefeatedIntro = false
 
     if (victory) {
       result.victories++
@@ -2460,6 +2462,8 @@ async function runCharacterBossChallenge(characterId, count) {
       // 连挑 N 场时中间场次不弹击败立绘，避免反复打断；末场才显示该角色陨落立绘
       if (bossEnemy.isCharacterBoss && i === count - 1) {
         triggerCharacterBossDefeated(bossEnemy, killEvt.bossName)
+        // 标记需等待击败立绘展示完成后再显示结算页
+        needWaitDefeatedIntro = true
       }
       console.log('[useIdleSystem] 人物BOSS挑战击杀事件已发出', killEvt)
 
@@ -2509,6 +2513,13 @@ async function runCharacterBossChallenge(characterId, count) {
       runStats.value.totalDamageDealt += Math.max(0, Math.round(cs.playerDamage || 0))
       runStats.value.totalDamageTaken += Math.max(0, Math.round(cs.enemyDamage || 0))
       runStats.value.totalShieldAbsorbed += Math.max(0, Math.round(cs.shieldAbsorbed || 0))
+    }
+
+    // 末场击败立绘展示完成后，再显示结算页
+    // triggerCharacterBossDefeated 内部 setTimeout 2400ms 关闭立绘，等待 2600ms 留余量
+    // 确保玩家先看完角色陨落立绘，再出现结算页
+    if (needWaitDefeatedIntro && !document.hidden) {
+      await new Promise(resolve => setTimeout(resolve, 2600))
     }
 
     currentEncounterSummary.value = {
