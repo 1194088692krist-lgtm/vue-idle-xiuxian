@@ -2,8 +2,10 @@ import { res, requireUser } from '../_utils.js'
 
 // 5 槽云同步：GET 拉全部 / POST 存单槽（upsert，最后写入获胜）
 // D1 TEXT 列可承载更大体积；前端已有数据修剪逻辑控制体积，后端再校验一次作为兜底
-// 体积上限提升至 20MB：游戏存档包含装备/丹药/灵宠/挂机日志等大量数据，
+// 体积上限 20MB：游戏存档包含装备/丹药/灵宠/挂机日志等大量数据，
 // 原 3MB/8MB 上限过低易触发"存档失败→回档"恶性循环。
+// 注意：前端现已对存档做 gzip 压缩（data 带 "GZ1:" 标记，密文裸串通常 <1MB），
+// 这里校验的是“压缩后的字符串”体积，正常存档远不会触顶，仅为兜底。
 const DATA_MAX_BYTES = 20 * 1024 * 1024
 
 export async function onRequest({ request, env }) {

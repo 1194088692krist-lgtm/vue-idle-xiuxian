@@ -2,7 +2,7 @@ import { defineStore } from 'pinia'
 import { GameDB } from './db'
 import { useAuthStore } from './auth'
 import { pillRecipes, tryCreatePill, calculatePillEffect, pillGrades } from '../plugins/pills'
-import { encryptData, decryptData, validateData } from '../plugins/crypto'
+import { encryptData, decryptData, validateData, recompressBlob, toLocalBlob } from '../plugins/crypto'
 import { getRealmName, getRealmLength } from '../plugins/realm'
 import { getAffixesForSlot, getActiveSetBonuses, applySetBonusStats, calculateEquipmentScore, calculateBuildStrength, calculateTotalBuild, migrateEquipmentFields } from '../plugins/buildSystem'
 import { craftCurrencies, applyCraftCurrency, disassembleCurrencyRewards, getCraftCost } from '../plugins/craftCurrency'
@@ -1087,7 +1087,12 @@ export const usePlayerStore = defineStore('player', {
           try { data = await r.json() } catch { /* 响应体非 JSON（如网关错误页）*/ }
           if (r.ok && data.ok) {
             const map = {}
-            for (const s of data.saves || []) map[s.slot] = { data: s.data, updated_at: s.updated_at }
+            // 云端数据可能是 gzip 压缩格式（GZ1: 标记）；统一转回本地“普通加密 blob”，
+            // 这样写入 GameDB、initializePlayer / decryptData / _slotInfo 等全部无需改动，旧存档天然兼容。
+            for (const s of data.saves || []) {
+              const blob = s.data == null ? s.data : await toLocalBlob(s.data)
+              map[s.slot] = { data: blob, updated_at: s.updated_at }
+            }
             return map
           }
           const reason = data.error || ('HTTP ' + r.status)
@@ -1117,12 +1122,18 @@ export const usePlayerStore = defineStore('player', {
       if (typeof encryptedBlob !== 'string' || !encryptedBlob) {
         throw new Error('存档数据为空，无法上传')
       }
-      // 体积预检：与后端 functions/api/save.js 的 20MB 限制对齐
-      // 密文(base64)体积约为原始 JSON 的 1.3-2 倍，前端 saveData 已做数据修剪
-      const SIZE_LIMIT = 20 * 1024 * 1024
-      const payloadSize = new Blob([encryptedBlob]).size
+      // 云存档压缩：上传前把“已加密 blob”转成 gzip 压缩格式。
+      // 注意 encryptData 产物是 AES 密文（高熵，gzip 压不动），所以 recompressBlob 会先解密出
+      // 明文 JSON、压缩、再加密——真正大幅瘦身在“明文 JSON”这一步（materials 等重复数据 8-12 倍压缩）。
+      // 7-8MB 明文经 gzip 可降到 <1MB，既解决“境外服务器上传卡顿”，也满足“上传容量只有 3MB”的硬性限制。
+      const payloadData = await recompressBlob(encryptedBlob)
+      // 体积预检：以“压缩后真实上行体积”为准，对齐“上传容量只有 3MB”的平台/后端限制。
+      // 正常存档压缩后远低于 3MB，此处仅作兜底；若压缩失败（环境不支持）导致仍超 3MB 则明确报错，
+      // 而不是把超大 body 发到境外服务器后神秘失败。
+      const SIZE_LIMIT = 3 * 1024 * 1024
+      const payloadSize = new Blob([payloadData]).size
       if (payloadSize > SIZE_LIMIT) {
-        throw new Error(`存档体积过大（${(payloadSize / 1024 / 1024).toFixed(2)}MB > 20MB），请清理部分宗门成员或装备后重试`)
+        throw new Error(`存档体积过大（压缩后仍 ${(payloadSize / 1024 / 1024).toFixed(2)}MB > 3MB），请清理部分宗门成员或装备后重试`)
       }
       let lastErr = null
       for (let attempt = 0; attempt < 2; attempt++) {
@@ -1134,7 +1145,7 @@ export const usePlayerStore = defineStore('player', {
           const r = await fetch('/api/save', {
             method: 'POST',
             headers: { 'content-type': 'application/json', ...auth.authHeaders() },
-            body: JSON.stringify({ slot, data: encryptedBlob, updated_at: updatedAt }),
+            body: JSON.stringify({ slot, data: payloadData, updated_at: updatedAt }),
             signal: controller.signal
           })
           clearTimeout(timeoutId)
