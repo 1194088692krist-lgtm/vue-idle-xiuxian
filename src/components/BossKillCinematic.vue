@@ -330,6 +330,13 @@ watch(bossKillEvent, (evt) => {
     console.warn('[BossKillCinematic] 事件无效，跳过', evt)
     return
   }
+  // 人物 BOSS 被击败时，CharacterBossIntro 会展示击败立绘
+  // BossKillCinematic 跳过全屏演出（黑色背景会遮挡击败立绘），仅累计连击
+  if (evt.defeatedIntroShown) {
+    console.log('[BossKillCinematic] 击败立绘已由 CharacterBossIntro 展示，跳过全屏演出')
+    bumpCombo()
+    return
+  }
   // 同批次去重：手动连挑 N 场时，仅第 0 场演出立绘动画（batchIndex === 0）
   // 后续场次仍会触发连击计数（bumpCombo），但不再弹出全屏立绘，避免 N 次动画叠加导致卡顿
   // 注意：人物 BOSS 击败立绘由 triggerCharacterBossDefeated 经 CharacterBossIntro 展示，

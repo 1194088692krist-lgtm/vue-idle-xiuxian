@@ -2443,6 +2443,9 @@ async function runCharacterBossChallenge(characterId, count) {
       // 击杀事件（人物 BOSS 击杀立绘演出）
       // 50% 真实最后一击者 + 50% 存活随机，并去重避免连续同一角色刷屏
       const killer = pickBossKillKiller(currentEncounter.value.players, roundResult.lastPlayerAttacker)
+      // 人物 BOSS 被击败时仅在最后一场触发 CharacterBossIntro 显示击败立绘
+      // 此时 BossKillCinematic 应跳过全屏演出，避免黑色背景遮挡击败立绘
+      const willShowDefeatedIntro = bossEnemy.isCharacterBoss && i === count - 1
       const killEvt = {
         killerMemberId: killer?.memberId || null,
         killerName: killer?.name || '',
@@ -2451,16 +2454,18 @@ async function runCharacterBossChallenge(characterId, count) {
         ts: Date.now(),
         batchId: currentBossBatchId,
         batchIndex: i,
-        // 标记是否为本次连挑的最后一场：BossKillCinematic 仅在最后一场显示击败立绘
+        // 标记是否为本次连挑的最后一场
         isLastInBatch: i === count - 1,
-        // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
-        defeatedBossId: bossEnemy.isCharacterBoss ? bossEnemy.characterBossId : null
+        // 人物 BOSS 被击败时携带 characterBossId
+        defeatedBossId: bossEnemy.isCharacterBoss ? bossEnemy.characterBossId : null,
+        // 标记已由 CharacterBossIntro 展示击败立绘，BossKillCinematic 据此跳过全屏演出
+        defeatedIntroShown: willShowDefeatedIntro
       }
       bossKillEvent.value = killEvt
       lastBossKillTs = Date.now()
       // 人物 BOSS 被击败：仅在最后一场触发 defeated 立绘演出
       // 连挑 N 场时中间场次不弹击败立绘，避免反复打断；末场才显示该角色陨落立绘
-      if (bossEnemy.isCharacterBoss && i === count - 1) {
+      if (willShowDefeatedIntro) {
         triggerCharacterBossDefeated(bossEnemy, killEvt.bossName)
         // 标记需等待击败立绘展示完成后再显示结算页
         needWaitDefeatedIntro = true
@@ -4316,14 +4321,19 @@ async function runIdleEncounter() {
         // 与 encounter.players（与手动 BOSS 挑战路径 line 1594 写法一致）
         // 击杀立绘展示对象：50% 真实最后一击者 + 50% 存活随机，并去重避免连续同一角色刷屏
         const killer = pickBossKillKiller(encounter.players, roundResult.lastPlayerAttacker)
+        // 人物 BOSS 被击败时会触发 CharacterBossIntro 显示击败立绘
+        // 此时 BossKillCinematic 应跳过全屏演出，避免黑色背景遮挡击败立绘
+        const willShowDefeatedIntro = !!enemy?.isCharacterBoss
         const killEvt = {
           killerMemberId: killer?.memberId || null,
           killerName: killer?.name || '',
           bossName: enemy?.name || '',
           zoneId: effectiveZone?.id || '',
           ts: Date.now(),
-          // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
-          defeatedBossId: enemy?.isCharacterBoss ? enemy.characterBossId : null
+          // 人物 BOSS 被击败时携带 characterBossId
+          defeatedBossId: willShowDefeatedIntro ? enemy.characterBossId : null,
+          // 标记已由 CharacterBossIntro 展示击败立绘，BossKillCinematic 据此跳过全屏演出
+          defeatedIntroShown: willShowDefeatedIntro
         }
         bossKillEvent.value = killEvt
         // 记录 BOSS 击杀时间戳，runIdleEncounter 入口据此延时保护，
@@ -4331,7 +4341,7 @@ async function runIdleEncounter() {
         lastBossKillTs = Date.now()
         // 人物 BOSS 被击败：触发 defeated 立绘全屏滑入演出（与登场展示方式一致）
         // 挂机路径无 batchId，每次击败都触发
-        if (enemy?.isCharacterBoss) {
+        if (willShowDefeatedIntro) {
           triggerCharacterBossDefeated(enemy, killEvt.bossName)
         }
         // 诊断日志：确认击杀事件已发出（排查挂机立绘不弹出的关键证据）
