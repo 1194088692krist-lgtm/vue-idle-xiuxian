@@ -340,6 +340,16 @@ export function getCharacterSkinUrl(member, skin) {
   return `${base}portraits/${id}_skin${skin}.jpg`
 }
 
+// 角色 BOSS 被击败时的立绘：${id}_defeated.jpg
+// 文件不存在时由调用方 onError 回退处理（目前仅前19个角色有击败立绘）
+export function getCharacterDefeatedUrl(member) {
+  if (!member) return null
+  const id = member.templateId || member.id
+  if (!id) return null
+  const base = import.meta.env.BASE_URL || './'
+  return `${base}portraits/${id}_defeated.jpg`
+}
+
 /**
  * 获取角色的动态立绘视频 URL（用于点击立绘后的视频播放）
  * 优先从 sharedPortraitMap（站点共享包）读取，其次回退到 characterDefMap

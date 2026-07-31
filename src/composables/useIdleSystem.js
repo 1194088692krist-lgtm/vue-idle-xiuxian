@@ -1471,16 +1471,9 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.characterBossStar = character.star
   // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
   enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-  // 登场立绘：随机弹出原立绘或任意一张皮肤（每次随机）
-  const skinCount = getSkinCount({ id: character.id })
-  if (skinCount > 0 && Math.random() < 0.6) {
-    // 60% 概率使用随机皮肤
-    const randomSkin = 1 + Math.floor(Math.random() * skinCount)
-    enemy.portrait = getCharacterSkinUrl({ id: character.id }, randomSkin) || getCharacterAvatar({ id: character.id }, 'full')
-  } else {
-    // 40% 概率使用原立绘
-    enemy.portrait = getCharacterAvatar({ id: character.id }, 'full')
-  }
+  // 登场立绘：统一仅限该角色的 skin5
+  const skin5Url = getCharacterSkinUrl({ id: character.id }, 5)
+  enemy.portrait = skin5Url || getCharacterAvatar({ id: character.id }, 'full')
   return enemy
 }
 
@@ -2089,7 +2082,9 @@ async function runBossChallenge(zoneId, bossId, count) {
         zoneId: zoneId || '',
         ts: Date.now(),
         batchId: currentBossBatchId,
-        batchIndex: i
+        batchIndex: i,
+        // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
+        defeatedBossId: bossEnemy.isCharacterBoss ? bossEnemy.characterBossId : null
       }
       bossKillEvent.value = killEvt
       // 标记本场为 BOSS 击杀，下方场次间隔延时额外 +2s 让十杀文案完整播完
@@ -2418,7 +2413,9 @@ async function runCharacterBossChallenge(characterId, count) {
         zoneId: zone.id || '',
         ts: Date.now(),
         batchId: currentBossBatchId,
-        batchIndex: i
+        batchIndex: i,
+        // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
+        defeatedBossId: bossEnemy.isCharacterBoss ? bossEnemy.characterBossId : null
       }
       bossKillEvent.value = killEvt
       lastBossKillTs = Date.now()
@@ -4271,7 +4268,9 @@ async function runIdleEncounter() {
           killerName: killer?.name || '',
           bossName: enemy?.name || '',
           zoneId: effectiveZone?.id || '',
-          ts: Date.now()
+          ts: Date.now(),
+          // 人物 BOSS 被击败时携带 characterBossId，供 BossKillCinematic 显示击败立绘
+          defeatedBossId: enemy?.isCharacterBoss ? enemy.characterBossId : null
         }
         bossKillEvent.value = killEvt
         // 记录 BOSS 击杀时间戳，runIdleEncounter 入口据此延时保护，
