@@ -354,4 +354,19 @@ const confirmReleasePet = pet => {
 
 .simple-divider::before { left: 0; }
 .simple-divider::after { right: 0; }
+
+/* 移动端：弹窗靠下端显示（底部弹出式菜单） */
+@media (max-width: 768px) {
+  .simple-modal {
+    padding: 0;
+    align-items: flex-end;
+  }
+  .simple-modal-content {
+    width: 100%;
+    max-width: 100%;
+    max-height: 85vh;
+    border-radius: 14px 14px 0 0;
+    margin-bottom: 0;
+  }
+}
 </style>

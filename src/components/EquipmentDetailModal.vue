@@ -505,19 +505,19 @@
     box-shadow: 0 8px 40px rgba(0, 0, 0, 0.5);
   }
 
-  /* 装备详情弹窗：移动端铺满屏幕，桌面端居中缩小 */
+  /* 装备详情弹窗：移动端靠下端显示，桌面端居中 */
   .simple-modal.equipment-detail-modal {
     padding: 0;
-    align-items: flex-start;
+    align-items: flex-end;
   }
 
   .equipment-detail-modal .equipment-detail-content {
     width: 100%;
     max-width: 100%;
-    height: calc(100vh - 80px);
-    max-height: calc(100vh - 80px);
-    border-radius: 0;
+    max-height: 85vh;
+    border-radius: 14px 14px 0 0;
     padding: 16px 16px 24px;
+    margin-bottom: 0;
   }
 
   @media (min-width: 769px) {

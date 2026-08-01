@@ -179,6 +179,12 @@
           >
             {{ selectedMember.equippedArtifacts[slot].name }}
           </div>
+          <div
+            v-if="selectedMember.equippedArtifacts?.[slot]"
+            class="equip-slot-score"
+          >
+            评分 {{ formatScore(selectedMember.equippedArtifacts[slot]) }}
+          </div>
           <div v-else class="equip-slot-empty">空</div>
         </div>
       </div>
@@ -447,9 +453,9 @@
           </div>
         </div>
 
-        <!-- 装备区域（长按查看详情，可直接强化，无需脱下） -->
+        <!-- 装备区域（点击查看详情，详情页内可直接强化） -->
         <div class="attr-block" v-if="detailMember?.equippedArtifacts">
-          <h4 class="sub-title">装备（长按查看详情 · 点击强化）</h4>
+          <h4 class="sub-title">装备（点击查看详情）</h4>
           <div class="detail-equip-grid">
             <div
               v-for="slot in slots"
@@ -459,12 +465,7 @@
                 empty: !detailMember.equippedArtifacts?.[slot],
                 [`equip-border-${detailMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: detailMember.equippedArtifacts?.[slot]
               }"
-              @touchstart="onEquipLongPressStart(slot)"
-              @touchend="onEquipLongPressCancel"
-              @touchmove="onEquipLongPressCancel"
-              @mousedown="onEquipLongPressStart(slot)"
-              @mouseup="onEquipLongPressCancel"
-              @mouseleave="onEquipLongPressCancel"
+              @click="openEquipDetail(slot)"
             >
               <div class="detail-equip-label">{{ slotNames[slot] }}</div>
               <div v-if="detailMember.equippedArtifacts?.[slot]" class="detail-equip-content">
@@ -477,9 +478,9 @@
                 </div>
                 <button
                   class="btn btn-small btn-primary detail-enhance-btn"
-                  @click.stop="handleDetailEnhance(slot)"
+                  @click.stop="openEquipDetail(slot)"
                 >
-                  强化
+                  详情
                 </button>
               </div>
               <div v-else class="detail-equip-empty">空</div>
@@ -760,6 +761,12 @@ const rarityColorMap = {
 const getItemColor = (item) => item?.color || rarityColorMap[item?.rarity] || rarityColorMap[item?.quality] || '#DAA520'
 const getPetColor = (pet) => pet?.color || rarityColorMap[pet?.rarity] || '#9fe0ff'
 
+// 装备评分格式化：复用 formatNumber 的万/亿单位转换（>1万显示 x万，>1亿显示 x亿）
+const formatScore = (equip) => {
+  const score = calculateEquipmentScore(equip) || 0
+  return formatNumber(score)
+}
+
 const availableItemsForSlot = computed(() => {
   if (!selectSlot.value) return []
   return (playerStore.items || [])
@@ -1027,31 +1034,17 @@ const handleDetailEnhance = (slot) => {
   }
 }
 
-// ===== 装备详情弹窗（长按触发） =====
-// 长按装备槽 500ms 后弹出与背包一致的装备详情页（sect 模式：强化按钮替代出售/分解）
+// ===== 装备详情弹窗（点击触发） =====
+// 点击装备槽或"详情"按钮即弹出与背包一致的装备详情页（sect 模式：强化按钮替代出售/分解）
 const showEquipDetail = ref(false)
 const equipDetailItem = ref(null)
 const equipDetailSlot = ref(null)
-let equipLongPressTimer = null
-const EQUIP_LONG_PRESS_MS = 500
 
-const onEquipLongPressStart = (slot) => {
-  // 仅当该槽位有装备时才启动长按计时
+const openEquipDetail = (slot) => {
   if (!detailMember.value?.equippedArtifacts?.[slot]) return
-  onEquipLongPressCancel()
-  equipLongPressTimer = setTimeout(() => {
-    equipLongPressTimer = null
-    // 长按触发：打开装备详情弹窗
-    equipDetailItem.value = detailMember.value.equippedArtifacts[slot]
-    equipDetailSlot.value = slot
-    showEquipDetail.value = true
-  }, EQUIP_LONG_PRESS_MS)
-}
-const onEquipLongPressCancel = () => {
-  if (equipLongPressTimer) {
-    clearTimeout(equipLongPressTimer)
-    equipLongPressTimer = null
-  }
+  equipDetailItem.value = detailMember.value.equippedArtifacts[slot]
+  equipDetailSlot.value = slot
+  showEquipDetail.value = true
 }
 const closeEquipDetail = () => {
   showEquipDetail.value = false
@@ -2109,6 +2102,12 @@ watch([allMembers, teamMembers], () => {
   font-weight: bold;
   text-align: center;
   line-height: 1.2;
+}
+.equip-slot-score {
+  font-size: 11px;
+  color: #d4a017;
+  margin-top: 2px;
+  text-align: center;
 }
 .equip-slot-empty {
   font-size: 13px;
