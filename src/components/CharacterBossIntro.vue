@@ -37,6 +37,7 @@
 
 <script setup>
 import { watch } from 'vue'
+import { useRoute } from 'vue-router'
 import { useIdleSystem } from '../composables/useIdleSystem'
 
 const props = defineProps({
@@ -46,6 +47,7 @@ const props = defineProps({
 
 const idleSystem = useIdleSystem()
 const intro = props.intro || idleSystem.characterBossIntro
+const route = useRoute()
 
 function onImgError(e) {
   e.target.style.opacity = '0.2'
@@ -53,6 +55,14 @@ function onImgError(e) {
 function dismiss() {
   intro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
 }
+
+// 切路由时立即关闭：防止 defeated 立绘浮层（z-index 10000）遮挡其他页面弹窗
+// 如仙缘祈福抽卡时 CharacterPortraitModal（z-index 9999）被 defeated 立绘盖住
+watch(() => route.path, () => {
+  if (intro.value && intro.value.show) {
+    dismiss()
+  }
+})
 
 // 兜底：若 2.4s 定时器未触发（如组件挂载时机问题），4s 后强制关闭
 watch(

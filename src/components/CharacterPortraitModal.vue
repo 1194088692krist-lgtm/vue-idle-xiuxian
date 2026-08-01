@@ -90,6 +90,7 @@
 import { computed, ref, watch, onMounted, onBeforeUnmount, nextTick } from 'vue'
 import { getCharacterAvatar, getCharacterVideo, getCharacterSkinUrl, getSkinCount } from '../plugins/characters'
 import { usePlayerStore } from '../stores/player'
+import { useIdleSystem } from '../composables/useIdleSystem'
 
 const props = defineProps({
   character: { type: Object, default: null },
@@ -219,6 +220,14 @@ onMounted(() => {
   if (videoVisible.value) {
     nextTick(() => requestAnimationFrame(tryPlay))
   }
+  // 关闭人物 BOSS 演出浮层（含击败立绘），防止 z-index 10000 遮挡本弹窗（z-index 9999）
+  // 场景：挂机击败人物BOSS后 defeated 立绘仍在展示，此时打开立绘弹窗会被盖住
+  try {
+    const { characterBossIntro } = useIdleSystem()
+    if (characterBossIntro.value && characterBossIntro.value.show) {
+      characterBossIntro.value = { show: false, characterId: null, name: '', portrait: '', star: 0, theme: null, isDefeated: false }
+    }
+  } catch (e) { /* ignore */ }
 })
 
 // 切换角色 / 皮肤 / 开关变化时重置，并尝试直接播放（已被缓存时更快）
