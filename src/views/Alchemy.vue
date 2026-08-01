@@ -819,7 +819,7 @@
           <template v-if="rebirthTab === 'transmute'">
             <div class="tips-box">
               <InfoCircleOutlined />
-              <span>选取 +12 及以上的仙品/神品装备，将其 1/3 基础数值永久融入人物。化器成灵 <b>100% 必成功</b>，仅消耗灵石与装备；强化难度与失败保底已下放到装备强化系统（+1~+12）。</span>
+              <span>选取 <b>+8 及以上</b>的仙品/神品装备，将其 1/3 基础数值永久融入人物。化器成灵 <b>100% 必成功</b>，仅消耗灵石与装备；强化难度与失败保底已下放到装备强化系统（+1~+12）。</span>
             </div>
 
             <div class="section">
@@ -851,9 +851,9 @@
 
             <template v-if="selectedTransmuteMember">
               <div class="section">
-                <h3 class="section-title">选择 +12 仙品/神品装备</h3>
+                <h3 class="section-title">选择 +8 及以上 仙品/神品装备</h3>
                 <div v-if="transmuteEquipments.length === 0" class="empty-state">
-                  暂无 +12 及以上的仙品/神品装备（背包中未装备的）
+                  暂无 +8 及以上的仙品/神品装备（背包中未装备的）
                 </div>
                 <div v-else class="transmute-equip-list">
                   <div
@@ -1353,6 +1353,82 @@
   const craftCount = ref(1)
   const selectedRebirthMember = ref(null)
   const showRebirthConfirm = ref(false)
+  // ===== 回炉转生：二级子菜单（人物重生 / 化器成灵）=====
+  const rebirthTab = ref('rebirth')
+
+  // ===== 化器成灵相关状态 =====
+  const selectedTransmuteMember = ref(null)
+  const selectedTransmuteEquip = ref(null)
+  const showTransmuteConfirm = ref(false)
+
+  // 品质配置兜底：rarityConfig 已从 equipment.js 导入；此处提供兼容函数
+  const getRarityColor = (item) => {
+    const q = item?.rarity || item?.quality
+    return rarityConfig[q]?.color || '#999'
+  }
+  const getRarityName = (item) => {
+    const q = item?.rarity || item?.quality
+    return rarityConfig[q]?.name || '未知'
+  }
+
+  // 化器成灵：可选人物（宗门中已获得的全部人物）
+  const transmuteCandidates = computed(() => {
+    return playerStore.sectMembers || []
+  })
+
+  // 注：transmuteEquipments computed 依赖 equippedItemIds / isForgeEquipItem，
+  // 定义在下方 equippedItemIds 之后，避免 TDZ（暂时性死区）引用错误
+
+  // 化器成灵：预览某装备融入后给人物的 1/3 基础数值加成
+  const getTransmuteBonus = (equip) => {
+    const s = equip?.stats || {}
+    return {
+      attack: Math.floor((s.attack || 0) / 3),
+      health: Math.floor((s.health || 0) / 3),
+      defense: Math.floor((s.defense || 0) / 3),
+      speed: Math.floor((s.speed || 0) / 3)
+    }
+  }
+
+  // 化器成灵：灵石消耗（仙品 50 万 / 神品 100 万，每超出 +12 一级 ×1.5；+8~+11 不加成）
+  const getTransmuteStoneCost = (equip) => {
+    if (!equip) return 0
+    const rarity = equip.rarity || equip.quality
+    const base = rarity === 'legendary' ? 500000 : 1000000
+    const overLevel = Math.max(0, (equip.enhanceLevel || 0) - 12)
+    return Math.floor(base * Math.pow(1.5, overLevel))
+  }
+
+  // 化器成灵：是否可执行（人物 + 装备均已选择且灵石足够）
+  const canTransmute = computed(() => {
+    if (!selectedTransmuteMember.value || !selectedTransmuteEquip.value) return false
+    const cost = getTransmuteStoneCost(selectedTransmuteEquip.value)
+    return (playerStore.spiritStones || 0) >= cost
+  })
+
+  const selectTransmuteEquip = (equip) => {
+    selectedTransmuteEquip.value = equip
+  }
+
+  const requestTransmute = () => {
+    if (!selectedTransmuteMember.value || !selectedTransmuteEquip.value) return
+    showTransmuteConfirm.value = true
+  }
+
+  const confirmTransmute = () => {
+    if (!selectedTransmuteMember.value || !selectedTransmuteEquip.value) return
+    const result = playerStore.transmuteEquipmentToSpirit(
+      selectedTransmuteMember.value.id,
+      selectedTransmuteEquip.value.id || selectedTransmuteEquip.value._id
+    )
+    showTransmuteConfirm.value = false
+    if (result.success) {
+      message.success(result.message)
+      selectedTransmuteEquip.value = null
+    } else {
+      message.error(result.message)
+    }
+  }
 
   // ===== 灵石阁（商店）相关 =====
   const blackMarketItems = ref([])
@@ -2001,6 +2077,20 @@
 
   const inventoryEquipments = computed(() => {
     return playerStore.items.filter(i => isForgeEquipItem(i) && !equippedItemIds.value.has(i.id))
+  })
+
+  // 化器成灵：可选装备（背包中未装备、强化 +8 及以上的仙品/神品装备）
+  // 条件 2.2.1 调整：由 +12 放宽至 +8~+12（含专属装备 +8~+15）
+  const transmuteEquipments = computed(() => {
+    const ids = equippedItemIds.value
+    return playerStore.items.filter(i => {
+      if (!isForgeEquipItem(i)) return false
+      if (ids.has(i.id)) return false
+      const rarity = i.rarity || i.quality
+      if (rarity !== 'legendary' && rarity !== 'mythic') return false
+      const lv = i.enhanceLevel || 0
+      return lv >= 8
+    })
   })
 
   // 筛选+排序后的装备列表

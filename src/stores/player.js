@@ -4566,9 +4566,10 @@ export const usePlayerStore = defineStore('player', {
         inheritedBonus: result.inheritedBonus
       }
     },
-    // ===== 化器成灵：将 +12 及以上仙品/神品装备的 1/3 基础数值永久加成到人物 =====
-    // 2.2.1 调整：100% 必成功（不再有失败/保底概率）；强化难度差异已下放到装备强化系统本身
-    // 失败/保底机制仅存在于「装备强化 +1~+12」流程，化器成灵只校验条件与消耗灵石
+    // ===== 化器成灵：将 +8 及以上仙品/神品装备的 1/3 基础数值永久加成到人物 =====
+    // 2.2.1 调整：
+    //   1) 100% 必成功（不再有失败/保底概率）；强化难度差异已下放到装备强化系统本身
+    //   2) 装备门槛由 +12 放宽至 +8（含专属装备 +8~+15），让中后期玩家更易参与
     transmuteEquipmentToSpirit(memberId, equipmentId) {
       const member = this.sectMembers.find(m => m.id === memberId)
       if (!member) return { success: false, message: '成员不存在' }
@@ -4578,11 +4579,10 @@ export const usePlayerStore = defineStore('player', {
       if (idx < 0) return { success: false, message: '装备不存在或已被装备' }
       const equip = this.items[idx]
 
-      // 校验：强化等级 >= 12
+      // 校验：强化等级 >= 8（普通装备 +8~+12，专属装备 +8~+15）
       const enhanceLevel = equip.enhanceLevel || 0
-      const maxLevel = equip.isExclusive ? 15 : 12
-      if (enhanceLevel < 12) {
-        return { success: false, message: '仅可选择强化 +12 及以上的装备' }
+      if (enhanceLevel < 8) {
+        return { success: false, message: '仅可选择强化 +8 及以上的装备' }
       }
       // 校验：仙品(legendary) 或 神品(mythic)
       const rarity = equip.rarity || equip.quality
