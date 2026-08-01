@@ -5,7 +5,21 @@ import { getEnhanceBossMaterial, getReforgeBossMaterial } from './cultivationSys
 // 调整：降低成功率、提高灵石/强化石/BOSS 素材消耗，让强化系统更稀有
 const enhanceConfig = {
   maxLevel: 12,
-  baseSuccessRate: 0.7,          // 基础成功率 90% → 70%
+  baseSuccessRate: 0.7,          // 基础成功率 90% → 70%（保留作为兜底，实际使用 rarityBaseSuccessRate）
+  // 按装备品质分档的强化基础成功率（+0→+1 起点）
+  // 设计：低品级 > 高品级（凡品最容易强化，神品最难）；越高等级每级 −3% 衰减不变
+  // 整体较旧版（不分品质 70%）抬高约 +20%~30%，+12 档抬高约 +20%
+  rarityBaseSuccessRate: {
+    common:    1.00,  // 凡品 +0→+1 = 95%(cap)，+11→+12 = 67%
+    uncommon:  0.98,  // 良品 +0→+1 = 95%(cap)，+11→+12 = 65%
+    rare:      0.96,  // 上品 +0→+1 = 95%(cap)，+11→+12 = 63%
+    epic:      0.94,  // 极品 +0→+1 = 94%，    +11→+12 = 61%
+    legendary: 0.92,  // 仙品 +0→+1 = 92%，    +11→+12 = 59%
+    mythic:    0.90   // 神品 +0→+1 = 90%，    +11→+12 = 57%
+  },
+  perLevelDecay: 0.03,            // 每级衰减 3%（越往上越难，主曲线斜率）
+  minSuccessRate: 0.05,           // 成功率下限 5%
+  maxSuccessRate: 0.95,           // 成功率上限 95%
   lockLevels: [4, 8],
   spiritStoneBaseCost: 300,      // 灵石基础消耗 100 → 300
   spiritStoneGrowth: 1.8,        // 灵石成长率 1.5 → 1.8
@@ -183,11 +197,17 @@ function enhanceEquipment(equipment, playerGold, playerMaterials, enhanceBonus =
       return { success: false, message: `BOSS素材【${bossCost.name}】不足` }
     }
   }
-  // 专属装备 +13~15 成功率冻结在 +12 的水平（currentLevel=11 → 37%）
+  // 专属装备 +13~15 成功率冻结在 +12 的水平（currentLevel=11）
   const effectiveLevel = (equipment.isExclusive && currentLevel >= enhanceConfig.exclusiveSuccessRateFreezeLevel)
     ? enhanceConfig.exclusiveSuccessRateFreezeLevel
     : currentLevel
-  const successRate = Math.min(1, enhanceConfig.baseSuccessRate - effectiveLevel * 0.03 + (enhanceBonus || 0))
+  // 按品质分档的基础成功率：低品级 > 高品级，每级 −3% 衰减，clamp 5%~95%
+  const rarity = equipment.rarity || equipment.quality || 'common'
+  const rarityBase = (enhanceConfig.rarityBaseSuccessRate && enhanceConfig.rarityBaseSuccessRate[rarity]) || enhanceConfig.baseSuccessRate
+  const successRate = Math.min(
+    enhanceConfig.maxSuccessRate,
+    Math.max(enhanceConfig.minSuccessRate, rarityBase - effectiveLevel * enhanceConfig.perLevelDecay + (enhanceBonus || 0))
+  )
   const isSuccess = Math.random() < successRate
   if (!isSuccess) {
     const lockLevel = getLockLevel(currentLevel)

@@ -819,7 +819,7 @@
           <template v-if="rebirthTab === 'transmute'">
             <div class="tips-box">
               <InfoCircleOutlined />
-              <span>选取 +12 及以上的仙品/神品装备，将其 1/3 基础数值永久融入人物。成功后装备消失，失败保留装备但消耗灵石。累计失败 3 次后下次必成。</span>
+              <span>选取 +12 及以上的仙品/神品装备，将其 1/3 基础数值永久融入人物。化器成灵 <b>100% 必成功</b>，仅消耗灵石与装备；强化难度与失败保底已下放到装备强化系统（+1~+12）。</span>
             </div>
 
             <div class="section">
@@ -843,9 +843,6 @@
                     <div class="member-detail">Lv.{{ member.level }} · {{ member.schoolName }}</div>
                     <div class="member-detail" v-if="member.permanentBonuses">
                       永久加成: 攻{{ member.permanentBonuses.attack || 0 }} 防{{ member.permanentBonuses.defense || 0 }} 血{{ member.permanentBonuses.health || 0 }} 速{{ member.permanentBonuses.speed || 0 }}
-                    </div>
-                    <div class="member-detail" v-if="(playerStore.transmutePity?.[member.id] || 0) > 0">
-                      保底进度: {{ playerStore.transmutePity[member.id] }}/3
                     </div>
                   </div>
                 </div>
@@ -909,10 +906,9 @@
                       </div>
                     </div>
                     <div class="preview-note">
-                      <p>📌 成功率: <b>{{ getTransmuteSuccessRate(selectedTransmuteEquip) }}%</b>（仙品+12=55%，神品+12=40%，每级-5%）</p>
+                      <p>📌 成功率: <b class="success-text">100%</b>（化器成灵必成功，失败概率仅存在于装备强化阶段）</p>
                       <p>📌 灵石消耗: <b class="gold-text">{{ getTransmuteStoneCost(selectedTransmuteEquip).toLocaleString() }}</b></p>
-                      <p>📌 保底: 累计失败 3 次后下次必成（当前 {{ playerStore.transmutePity?.[selectedTransmuteMember.id] || 0 }}/3）</p>
-                      <p>📌 成功后装备消失，1/3 基础数值永久加成到人物；失败保留装备，仅消耗灵石</p>
+                      <p>📌 成功后装备消失，1/3 基础数值永久加成到人物</p>
                     </div>
                   </div>
                 </div>
@@ -932,8 +928,8 @@
             <n-modal v-model:show="showTransmuteConfirm" preset="dialog" title="确认化器成灵"
               positive-text="确认融入" negative-text="取消" @positive-click="confirmTransmute">
               <p>确定要将 <strong :style="{ color: getRarityColor(selectedTransmuteEquip) }">{{ selectedTransmuteEquip?.name }}</strong> 融入 <strong>{{ selectedTransmuteMember?.name }}</strong> 吗？</p>
-              <p style="color: #d4a017;">成功率: {{ getTransmuteSuccessRate(selectedTransmuteEquip) }}%，消耗灵石 {{ getTransmuteStoneCost(selectedTransmuteEquip).toLocaleString() }}</p>
-              <p style="color: #ff6b6b;">成功后装备将永久消失，1/3 基础数值永久加成到人物。</p>
+              <p style="color: #d4a017;">消耗灵石 {{ getTransmuteStoneCost(selectedTransmuteEquip).toLocaleString() }}，成功率 100%</p>
+              <p style="color: #ff6b6b;">装备将永久消失，1/3 基础数值永久加成到人物。</p>
             </n-modal>
           </template>
         </template>
