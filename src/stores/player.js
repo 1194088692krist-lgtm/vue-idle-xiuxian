@@ -329,6 +329,8 @@ export const usePlayerStore = defineStore('player', {
       items: [],
       refreshedAt: 0,
     },
+    // 化器成灵保底计数：{ [memberId]: failCount }，累计失败 3 次后下次必成
+    transmutePity: {},
     materials: [], // 统一素材库存（herb/ore/liquid/core/special）
     craftCurrencies: {}, // 工艺货币库存（M0-B，{ currencyId: count }）
     runes: [], // 灵纹库存（M1，镶嵌用的灵纹实例数组）
@@ -4564,6 +4566,107 @@ export const usePlayerStore = defineStore('player', {
         oldTalent: result.oldTalent,
         newTalent: result.newTalent,
         inheritedBonus: result.inheritedBonus
+      }
+    },
+    // ===== 化器成灵：将 +12 及以上仙品/神品装备的 1/3 基础数值永久加成到人物 =====
+    // 成功率：仙品(legendary)+12=55%、神品(mythic)+12=40%；每提升1级 -5%
+    // 保底：累计失败 3 次后下次必成（成功率提升至 100%）
+    // 失败：装备保留，强化等级不变，消耗灵石；成功：装备消失，1/3 基础属性永久加成
+    transmuteEquipmentToSpirit(memberId, equipmentId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+
+      // 在背包 items 中查找装备
+      const idx = this.items.findIndex(i => (i.id === equipmentId || i._id === equipmentId) && isEquipmentItem(i))
+      if (idx < 0) return { success: false, message: '装备不存在或已被装备' }
+      const equip = this.items[idx]
+
+      // 校验：强化等级 >= 12
+      const enhanceLevel = equip.enhanceLevel || 0
+      const maxLevel = equip.isExclusive ? 15 : 12
+      if (enhanceLevel < 12) {
+        return { success: false, message: '仅可选择强化 +12 及以上的装备' }
+      }
+      // 校验：仙品(legendary) 或 神品(mythic)
+      const rarity = equip.rarity || equip.quality
+      if (rarity !== 'legendary' && rarity !== 'mythic') {
+        return { success: false, message: '仅可选择仙品或神品装备' }
+      }
+
+      // 计算成功率
+      // 仙品基础 55%，神品基础 40%；每级（超出 +12 的部分）递减 5%
+      const baseRate = rarity === 'legendary' ? 0.55 : 0.40
+      const overLevel = Math.max(0, enhanceLevel - 12)
+      let successRate = Math.max(0.1, baseRate - overLevel * 0.05)
+
+      // 保底机制：累计失败次数
+      if (!this.transmutePity) this.transmutePity = {}
+      const pityKey = `${memberId}`
+      const failCount = this.transmutePity[pityKey] || 0
+      // 累计失败 3 次后下次必成
+      if (failCount >= 3) {
+        successRate = 1
+      }
+
+      // 计算灵石消耗：仙品+12=50万，神品+12=100万，每级 ×1.5
+      const baseCost = rarity === 'legendary' ? 500000 : 1000000
+      const stoneCost = Math.floor(baseCost * Math.pow(1.5, overLevel))
+      if ((this.spiritStones || 0) < stoneCost) {
+        return { success: false, message: `灵石不足，需要 ${stoneCost.toLocaleString()} 灵石` }
+      }
+
+      // 扣除灵石
+      this.spiritStones -= stoneCost
+
+      // 判定成功/失败
+      const isSuccess = Math.random() < successRate
+
+      if (!isSuccess) {
+        // 失败：装备保留，累计失败次数
+        this.transmutePity[pityKey] = failCount + 1
+        this.queueSave()
+        const remainPity = Math.max(0, 3 - (failCount + 1))
+        return {
+          success: false,
+          message: `化器成灵失败！装备保留，灵石已消耗。保底剩余 ${remainPity} 次`,
+          consumed: false,
+          failCount: failCount + 1,
+          successRate: Math.round(successRate * 100)
+        }
+      }
+
+      // 成功：计算 1/3 基础数值加成
+      const stats = equip.stats || {}
+      const bonus = { attack: 0, health: 0, defense: 0, speed: 0 }
+      if (typeof stats.attack === 'number') bonus.attack = Math.floor(stats.attack / 3)
+      if (typeof stats.health === 'number') bonus.health = Math.floor(stats.health / 3)
+      if (typeof stats.defense === 'number') bonus.defense = Math.floor(stats.defense / 3)
+      if (typeof stats.speed === 'number') bonus.speed = Math.floor(stats.speed / 3)
+
+      // 累加到人物永久加成和基础属性（复用丹药的 permanentBonuses 机制）
+      if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
+      if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
+      const bonusLines = []
+      Object.entries(bonus).forEach(([stat, val]) => {
+        if (val > 0) {
+          member.permanentBonuses[stat] = (member.permanentBonuses[stat] || 0) + val
+          member.baseStats[stat] = (member.baseStats[stat] || 0) + val
+          bonusLines.push(`${stat}+${val}`)
+        }
+      })
+
+      // 消耗装备：从 items 中移除
+      this.items.splice(idx, 1)
+      // 重置保底
+      this.transmutePity[pityKey] = 0
+
+      this.queueSave()
+      return {
+        success: true,
+        message: `化器成灵成功！${equip.name} 已融入 ${member.name}，永久加成：${bonusLines.join('、')}`,
+        consumed: true,
+        bonus,
+        bonusLines
       }
     },
     // 更新角色头像

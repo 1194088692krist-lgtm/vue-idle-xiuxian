@@ -367,6 +367,41 @@
               </button>
             </div>
           </div>
+          <!-- 灵宠入口：点击进入该角色正在装备的灵宠详情页（与背包灵宠详情页一致） -->
+          <div class="attr-block detail-pet-section">
+            <h4 class="sub-title">灵宠</h4>
+            <div v-if="detailMember.equippedPet" class="detail-pet-info">
+              <img
+                v-if="getPetThumbnail(detailMember.equippedPet)"
+                :src="getPetThumbnail(detailMember.equippedPet)"
+                class="detail-pet-thumb"
+                :alt="detailMember.equippedPet.name"
+                loading="lazy"
+                decoding="async"
+                @error="$event.target.style.display='none'"
+              />
+              <div class="detail-pet-meta">
+                <div class="detail-pet-name" :style="{ color: getPetColor(detailMember.equippedPet) }">
+                  {{ detailMember.equippedPet.name }}
+                </div>
+                <div class="detail-pet-sub">
+                  {{ getPetRarityName(detailMember.equippedPet) }} · Lv.{{ detailMember.equippedPet.level || 1 }} · ⭐{{ detailMember.equippedPet.star || 0 }}
+                </div>
+              </div>
+              <button
+                class="btn btn-small btn-primary detail-pet-btn"
+                @click="openDetailPetPortrait"
+                title="查看灵宠详情与立绘"
+              >
+                灵宠详情
+              </button>
+            </div>
+            <div v-else class="detail-pet-empty">
+              <span class="detail-pet-empty-icon">🐾</span>
+              <span>未装备灵宠</span>
+            </div>
+          </div>
+
           <div class="breakthrough-section">
             <div v-if="detailMember.breakThrough < 5" class="skill-unlock-hint">
               ⚡ 每突破一次可获得 2 个新技能
@@ -412,9 +447,9 @@
           </div>
         </div>
 
-        <!-- 装备区域（可直接强化，无需脱下） -->
+        <!-- 装备区域（长按查看详情，可直接强化，无需脱下） -->
         <div class="attr-block" v-if="detailMember?.equippedArtifacts">
-          <h4 class="sub-title">装备（点击强化）</h4>
+          <h4 class="sub-title">装备（长按查看详情 · 点击强化）</h4>
           <div class="detail-equip-grid">
             <div
               v-for="slot in slots"
@@ -424,6 +459,12 @@
                 empty: !detailMember.equippedArtifacts?.[slot],
                 [`equip-border-${detailMember.equippedArtifacts?.[slot]?.quality || 'common'}`]: detailMember.equippedArtifacts?.[slot]
               }"
+              @touchstart="onEquipLongPressStart(slot)"
+              @touchend="onEquipLongPressCancel"
+              @touchmove="onEquipLongPressCancel"
+              @mousedown="onEquipLongPressStart(slot)"
+              @mouseup="onEquipLongPressCancel"
+              @mouseleave="onEquipLongPressCancel"
             >
               <div class="detail-equip-label">{{ slotNames[slot] }}</div>
               <div v-if="detailMember.equippedArtifacts?.[slot]" class="detail-equip-content">
@@ -436,7 +477,7 @@
                 </div>
                 <button
                   class="btn btn-small btn-primary detail-enhance-btn"
-                  @click="handleDetailEnhance(slot)"
+                  @click.stop="handleDetailEnhance(slot)"
                 >
                   强化
                 </button>
@@ -475,6 +516,24 @@
     <!-- 立绘查看器：复用抽卡时的角色立绘大图弹窗效果 -->
     <CharacterPortraitModal v-if="showPortrait" :character="portraitCharacter" @close="closePortrait" />
     <PetPortraitModal v-if="showPetPortrait" :pet="portraitPet" @close="closePetPortrait" @update-skin="onPetSkinChange" />
+
+    <!-- 装备详情弹窗（宗门页长按装备触发，sect 模式：强化按钮替代出售/分解） -->
+    <EquipmentDetailModal
+      v-if="showEquipDetail"
+      :equipment="equipDetailItem"
+      mode="sect"
+      :member-id="detailMember?.id"
+      :slot="equipDetailSlot"
+      @close="closeEquipDetail"
+      @enhanced="onEquipDetailEnhanced"
+    />
+
+    <!-- 灵宠详情弹窗（人物详情页灵宠按钮触发，与背包灵宠详情页一致） -->
+    <PetDetailModal
+      v-if="showPetDetail"
+      :pet="petDetailItem"
+      @close="closePetDetail"
+    />
 
     <!-- 装备选择弹窗 -->
     <div v-if="showEquipSelect" class="equip-select-modal" @click.self="closeEquipSelect">
@@ -544,6 +603,8 @@ import { calculateEquipmentScore } from '../plugins/buildSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 import PetPortraitModal from '../components/PetPortraitModal.vue'
+import PetDetailModal from '../components/PetDetailModal.vue'
+import EquipmentDetailModal from '../components/EquipmentDetailModal.vue'
 import { formatNumber } from '../utils/formatNumber.js'
 import { getIconUrl } from '../plugins/icons'
 import { getPetThumbnail } from '../plugins/pets'
@@ -964,6 +1025,58 @@ const handleDetailEnhance = (slot) => {
   } else {
     message.error(`强化失败：${result.message}`)
   }
+}
+
+// ===== 装备详情弹窗（长按触发） =====
+// 长按装备槽 500ms 后弹出与背包一致的装备详情页（sect 模式：强化按钮替代出售/分解）
+const showEquipDetail = ref(false)
+const equipDetailItem = ref(null)
+const equipDetailSlot = ref(null)
+let equipLongPressTimer = null
+const EQUIP_LONG_PRESS_MS = 500
+
+const onEquipLongPressStart = (slot) => {
+  // 仅当该槽位有装备时才启动长按计时
+  if (!detailMember.value?.equippedArtifacts?.[slot]) return
+  onEquipLongPressCancel()
+  equipLongPressTimer = setTimeout(() => {
+    equipLongPressTimer = null
+    // 长按触发：打开装备详情弹窗
+    equipDetailItem.value = detailMember.value.equippedArtifacts[slot]
+    equipDetailSlot.value = slot
+    showEquipDetail.value = true
+  }, EQUIP_LONG_PRESS_MS)
+}
+const onEquipLongPressCancel = () => {
+  if (equipLongPressTimer) {
+    clearTimeout(equipLongPressTimer)
+    equipLongPressTimer = null
+  }
+}
+const closeEquipDetail = () => {
+  showEquipDetail.value = false
+  equipDetailItem.value = null
+  equipDetailSlot.value = null
+}
+const onEquipDetailEnhanced = () => {
+  // 强化成功后刷新详情弹窗中的装备引用（装备对象是响应式的，此处仅提示）
+  if (equipDetailItem.value) {
+    message.success(`强化成功！${equipDetailItem.value.name} +${equipDetailItem.value.enhanceLevel}`)
+  }
+}
+
+// ===== 灵宠详情入口（人物详情页灵宠按钮） =====
+// 点击「灵宠详情」打开与背包一致的灵宠详情弹窗（含升级/升星/放生）
+const showPetDetail = ref(false)
+const petDetailItem = ref(null)
+const openDetailPetPortrait = () => {
+  if (!detailMember.value?.equippedPet) return
+  petDetailItem.value = detailMember.value.equippedPet
+  showPetDetail.value = true
+}
+const closePetDetail = () => {
+  showPetDetail.value = false
+  petDetailItem.value = null
 }
 
 // 立绘查看器：复用抽卡角色立绘大图弹窗

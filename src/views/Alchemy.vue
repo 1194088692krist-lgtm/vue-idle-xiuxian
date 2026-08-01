@@ -705,6 +705,28 @@
 
         <!-- ==================== 回炉转生 ==================== -->
         <template v-if="activeTab === 'rebirth'">
+          <!-- 回炉转生二级子菜单：人物重生 / 化器成灵 -->
+          <div class="forge-sub-tabs rebirth-sub-tabs">
+            <div
+              class="forge-sub-tab"
+              :class="{ active: rebirthTab === 'rebirth' }"
+              @click="rebirthTab = 'rebirth'"
+            >
+              <span class="sub-tab-icon">♻️</span>
+              <span class="sub-tab-label">人物重生</span>
+            </div>
+            <div
+              class="forge-sub-tab"
+              :class="{ active: rebirthTab === 'transmute' }"
+              @click="rebirthTab = 'transmute'"
+            >
+              <span class="sub-tab-icon">✨</span>
+              <span class="sub-tab-label">化器成灵</span>
+            </div>
+          </div>
+
+          <!-- 人物重生 -->
+          <template v-if="rebirthTab === 'rebirth'">
           <div class="tips-box">
             <InfoCircleOutlined />
             <span>角色达到80级后可回炉重造，晋升星级，获得更高天赋。升星后等级重置为1级，但永久继承原努力值的10%。</span>
@@ -791,6 +813,129 @@
             <p>角色将晋升 {{ selectedRebirthMember ? selectedRebirthMember.star + 1 : 0 }} 星，但等级重置为 1 级。</p>
             <p style="color: #d4a017;">当前努力值的 10% 将永久继承为天赋值加成。</p>
           </n-modal>
+          </template>
+
+          <!-- 化器成灵 -->
+          <template v-if="rebirthTab === 'transmute'">
+            <div class="tips-box">
+              <InfoCircleOutlined />
+              <span>选取 +12 及以上的仙品/神品装备，将其 1/3 基础数值永久融入人物。成功后装备消失，失败保留装备但消耗灵石。累计失败 3 次后下次必成。</span>
+            </div>
+
+            <div class="section">
+              <h3 class="section-title">选择目标人物</h3>
+              <div class="rebirth-member-list">
+                <div
+                  v-for="member in transmuteCandidates"
+                  :key="member.id"
+                  class="rebirth-member-card glass-card"
+                  :class="{ selected: selectedTransmuteMember?.id === member.id }"
+                  @click="selectTransmuteMember(member)"
+                >
+                  <div class="member-avatar">{{ member.name.charAt(0) }}</div>
+                  <div class="member-info">
+                    <div class="member-name">
+                      {{ member.name }}
+                      <span class="member-star" :style="{ color: starConfig[member.star]?.color }">
+                        {{ '★'.repeat(member.star) }}
+                      </span>
+                    </div>
+                    <div class="member-detail">Lv.{{ member.level }} · {{ member.schoolName }}</div>
+                    <div class="member-detail" v-if="member.permanentBonuses">
+                      永久加成: 攻{{ member.permanentBonuses.attack || 0 }} 防{{ member.permanentBonuses.defense || 0 }} 血{{ member.permanentBonuses.health || 0 }} 速{{ member.permanentBonuses.speed || 0 }}
+                    </div>
+                    <div class="member-detail" v-if="(playerStore.transmutePity?.[member.id] || 0) > 0">
+                      保底进度: {{ playerStore.transmutePity[member.id] }}/3
+                    </div>
+                  </div>
+                </div>
+              </div>
+            </div>
+
+            <template v-if="selectedTransmuteMember">
+              <div class="section">
+                <h3 class="section-title">选择 +12 仙品/神品装备</h3>
+                <div v-if="transmuteEquipments.length === 0" class="empty-state">
+                  暂无 +12 及以上的仙品/神品装备（背包中未装备的）
+                </div>
+                <div v-else class="transmute-equip-list">
+                  <div
+                    v-for="equip in transmuteEquipments"
+                    :key="equip.id || equip.name"
+                    class="transmute-equip-card glass-card"
+                    :class="{ selected: selectedTransmuteEquip?.id === equip.id }"
+                    @click="selectTransmuteEquip(equip)"
+                  >
+                    <div class="transmute-equip-name" :style="{ color: getRarityColor(equip) }">
+                      {{ equip.name }}
+                      <span class="enhance-lv">+{{ equip.enhanceLevel }}</span>
+                    </div>
+                    <div class="transmute-equip-meta">
+                      <span class="simple-tag" :style="{ color: getRarityColor(equip) }">{{ getRarityName(equip) }}</span>
+                      <span>{{ equip.slot || equip.type }}</span>
+                    </div>
+                    <div class="transmute-equip-stats">
+                      <span v-if="equip.stats?.attack">攻{{ equip.stats.attack }}</span>
+                      <span v-if="equip.stats?.health">血{{ equip.stats.health }}</span>
+                      <span v-if="equip.stats?.defense">防{{ equip.stats.defense }}</span>
+                      <span v-if="equip.stats?.speed">速{{ equip.stats.speed }}</span>
+                    </div>
+                    <div class="transmute-bonus-preview">
+                      融入 +{{ getTransmuteBonus(equip).attack }}/+{{ getTransmuteBonus(equip).health }}/+{{ getTransmuteBonus(equip).defense }}/+{{ getTransmuteBonus(equip).speed }}
+                    </div>
+                  </div>
+                </div>
+              </div>
+
+              <template v-if="selectedTransmuteEquip">
+                <div class="section">
+                  <h3 class="section-title">化器成灵预览</h3>
+                  <div class="rebirth-preview glass-card">
+                    <div class="preview-row">
+                      <div class="preview-col">
+                        <div class="preview-label">装备</div>
+                        <div class="preview-value" :style="{ color: getRarityColor(selectedTransmuteEquip) }">
+                          {{ selectedTransmuteEquip.name }} +{{ selectedTransmuteEquip.enhanceLevel }}
+                        </div>
+                        <div class="preview-value">品质: {{ getRarityName(selectedTransmuteEquip) }}</div>
+                      </div>
+                      <div class="preview-arrow">→</div>
+                      <div class="preview-col">
+                        <div class="preview-label">融入 {{ selectedTransmuteMember.name }}</div>
+                        <div class="preview-value highlight">攻 +{{ getTransmuteBonus(selectedTransmuteEquip).attack }}</div>
+                        <div class="preview-value highlight">血 +{{ getTransmuteBonus(selectedTransmuteEquip).health }}</div>
+                        <div class="preview-value highlight">防 +{{ getTransmuteBonus(selectedTransmuteEquip).defense }}</div>
+                        <div class="preview-value highlight">速 +{{ getTransmuteBonus(selectedTransmuteEquip).speed }}</div>
+                      </div>
+                    </div>
+                    <div class="preview-note">
+                      <p>📌 成功率: <b>{{ getTransmuteSuccessRate(selectedTransmuteEquip) }}%</b>（仙品+12=55%，神品+12=40%，每级-5%）</p>
+                      <p>📌 灵石消耗: <b class="gold-text">{{ getTransmuteStoneCost(selectedTransmuteEquip).toLocaleString() }}</b></p>
+                      <p>📌 保底: 累计失败 3 次后下次必成（当前 {{ playerStore.transmutePity?.[selectedTransmuteMember.id] || 0 }}/3）</p>
+                      <p>📌 成功后装备消失，1/3 基础数值永久加成到人物；失败保留装备，仅消耗灵石</p>
+                    </div>
+                  </div>
+                </div>
+
+                <div class="action-section">
+                  <button
+                    class="btn-primary rebirth-button"
+                    :disabled="!canTransmute"
+                    @click="requestTransmute"
+                  >
+                    ✨ 化器成灵
+                  </button>
+                </div>
+              </template>
+            </template>
+
+            <n-modal v-model:show="showTransmuteConfirm" preset="dialog" title="确认化器成灵"
+              positive-text="确认融入" negative-text="取消" @positive-click="confirmTransmute">
+              <p>确定要将 <strong :style="{ color: getRarityColor(selectedTransmuteEquip) }">{{ selectedTransmuteEquip?.name }}</strong> 融入 <strong>{{ selectedTransmuteMember?.name }}</strong> 吗？</p>
+              <p style="color: #d4a017;">成功率: {{ getTransmuteSuccessRate(selectedTransmuteEquip) }}%，消耗灵石 {{ getTransmuteStoneCost(selectedTransmuteEquip).toLocaleString() }}</p>
+              <p style="color: #ff6b6b;">成功后装备将永久消失，1/3 基础数值永久加成到人物。</p>
+            </n-modal>
+          </template>
         </template>
 
         <!-- ==================== 灵石阁（商店） ==================== -->
