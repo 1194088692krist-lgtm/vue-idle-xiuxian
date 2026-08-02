@@ -57,7 +57,7 @@ describe('灵宠卸下后回到背包（修复：卸下直接消失）', () => {
     expect(count).toBe(1)
   })
 
-  it('一键卸下（autoUnequipCharacter）也会把灵宠归还背包', () => {
+  it('一键卸下（autoUnequipCharacter）只卸装备，不动灵宠', () => {
     const pet = store.items[0]
     store.equipCharacterPet('m1', pet)
     expect(store.sectMembers[0].equippedPet).toBe(pet)
@@ -65,8 +65,8 @@ describe('灵宠卸下后回到背包（修复：卸下直接消失）', () => {
 
     const r = store.autoUnequipCharacter('m1')
     expect(r.success).toBe(true)
-    expect(store.sectMembers[0].equippedPet).toBeNull()
-    // 关键：一键卸下后灵宠必须回到背包
-    expect(store.items.find(p => p.id === 'pet_1')).toBeDefined()
+    // 关键：一键卸下装备不应卸下灵宠，灵宠仍装备中
+    expect(store.sectMembers[0].equippedPet).toBe(pet)
+    expect(store.items.find(p => p.id === 'pet_1')).toBeUndefined()
   })
 })

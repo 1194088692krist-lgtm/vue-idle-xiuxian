@@ -484,3 +484,26 @@ html.disable-pull-refresh body {
     font-size: 12px;
   }
 }
+
+/* ===== 移动端竖屏锁定遮罩 ===== */
+/* 仅在窄屏（移动端）且横屏时显示提示，桌面端宽屏横屏不受影响 */
+@media (max-width: 900px) and (orientation: landscape) and (max-height: 500px) {
+  /* 遮罩盖住整个视口，强制玩家旋转为竖屏 */
+  body::before {
+    content: '📵 请旋转设备至竖屏使用';
+    position: fixed;
+    inset: 0;
+    z-index: 2147483647;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: #0D0D12;
+    color: #FFD700;
+    font-size: 20px;
+    font-weight: 600;
+    font-family: '楷体', 'KaiTi', serif;
+    text-align: center;
+    padding: 24px;
+    line-height: 1.6;
+  }
+}

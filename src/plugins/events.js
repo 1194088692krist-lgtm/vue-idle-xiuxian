@@ -160,8 +160,10 @@ export const events = [
     effect: (s, ctx) => {
       const mult = ctx.zone?.difficulty || 1
       const damage = Math.floor(40 * mult * (s.level / 3 + 1))
-      s.cultivationPool = Math.max(0, s.cultivationPool - damage)
-      ctx.showMessage('error', `[走火入魔]走火入魔，损失 ${damage} 点修为池`)
+      const pool = Number(s.cultivationPool) || 0
+      const realLoss = Math.min(damage, pool)
+      s.cultivationPool = Math.max(0, pool - realLoss)
+      ctx.showMessage('error', `[走火入魔]走火入魔，损失 ${realLoss} 点修为池`)
     }
   },
   {
@@ -173,9 +175,11 @@ export const events = [
     effect: (s, ctx) => {
       const mult = ctx.zone?.difficulty || 1
       const damage = Math.floor(50 * mult * (s.level / 3 + 1))
-      s.spirit = Math.max(0, s.spirit - damage)
-      s.cultivationPool = Math.max(0, s.cultivationPool - Math.floor(damage / 2))
-      ctx.showMessage('error', `[心魔侵扰]损失 ${damage} 灵力 + ${Math.floor(damage / 2)} 修为池`)
+      s.spirit = Math.max(0, (Number(s.spirit) || 0) - damage)
+      const pool = Number(s.cultivationPool) || 0
+      const cultLoss = Math.min(Math.floor(damage / 2), pool)
+      s.cultivationPool = Math.max(0, pool - cultLoss)
+      ctx.showMessage('error', `[心魔侵扰]损失 ${damage} 灵力 + ${cultLoss} 修为池`)
     }
   }
 ]

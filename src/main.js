@@ -34,6 +34,25 @@ try {
   document.documentElement.classList.add('fx-' + quality)
 } catch (e) { /* localStorage 不可用时静默兜底，默认全特效 */ }
 
+// 移动端锁定竖屏：PWA standalone / Android Chrome 下调用 Screen Orientation API
+// 浏览器无法强制锁定时（如 iOS Safari、非 standalone），由 CSS 横屏遮罩提示用户旋转
+try {
+  const lockPortrait = () => {
+    const orient = window.screen?.orientation
+    if (orient && typeof orient.lock === 'function') {
+      orient.lock('portrait').catch(() => {
+        // lock 失败属预期（iOS 不支持/非 standalone），CSS 遮罩兜底
+      })
+    }
+  }
+  // 仅在移动尺寸尝试锁定（桌面端不需要）
+  if (window.innerWidth <= 768 || 'ontouchstart' in window) lockPortrait()
+  // 页面可见性变化后重新尝试（部分浏览器从后台切回会丢失锁定）
+  document.addEventListener('visibilitychange', () => {
+    if (!document.hidden) lockPortrait()
+  })
+} catch (e) { /* Screen Orientation API 不可用时静默，CSS 兜底 */ }
+
 // 注册 Service Worker：缓存静态资源（人物头像/怪物头像/图标/UI/背景图）到本地
 // 二次访问直接从 Cache Storage 返回，零网络等待；用户不清浏览器数据即可永久命中
 // 仅在生产环境注册（开发环境 vite HMR 频繁变化，SW 会干扰调试）

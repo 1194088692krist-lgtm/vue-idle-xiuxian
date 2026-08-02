@@ -576,8 +576,15 @@ export const usePlayerStore = defineStore('player', {
             // 早期版本 cultivate() 中 gained = amount * bonus（悟道丹 expGain 加成是小数），
             // 导致 cultivationPool 与 member.experience 累积成 14171.26400000113 之类的浮点数。
             // 这里在加载时统一取整，修复已有玩家存档。
-            if (typeof this.cultivationPool === 'number' && !Number.isInteger(this.cultivationPool)) {
-              this.cultivationPool = Math.floor(this.cultivationPool)
+            // 修为池类型自愈：兼容旧存档里 cultivationPool 可能为 null/undefined/NaN/字符串，
+            // 这类值在 Math.floor(pool * 0.05) 时会产出 NaN 污染整个池子（用户反馈"几万变几百"）。
+            {
+              const cp = this.cultivationPool
+              if (typeof cp === 'number' && Number.isFinite(cp)) {
+                if (!Number.isInteger(cp)) this.cultivationPool = Math.floor(cp)
+              } else {
+                this.cultivationPool = 0
+              }
             }
             if (typeof this.cultivation === 'number' && !Number.isInteger(this.cultivation)) {
               this.cultivation = Math.floor(this.cultivation)
@@ -4729,7 +4736,7 @@ export const usePlayerStore = defineStore('player', {
       this.queueSave()
       return { success: true, message: `已为 ${member.name} 自动装备 ${equippedCount} 件装备` }
     },
-    // 一键卸下角色所有装备
+    // 一键卸下角色所有装备（仅装备，不含灵宠——灵宠需单独卸下）
     autoUnequipCharacter(memberId) {
       const member = this.sectMembers.find(m => m.id === memberId)
       if (!member) return { success: false, message: '成员不存在' }
@@ -4743,19 +4750,10 @@ export const usePlayerStore = defineStore('player', {
           unequippedCount++
         }
       }
-      // 一并卸下灵宠并归还背包，避免“一键卸下”后灵宠仍被占用而看似丢失
-      if (member.equippedPet) {
-        const pet = member.equippedPet
-        // 修复：同 unequipCharacterPet，用 petKey 比较避免 undefined===undefined
-        const pKey = (p) => p && (p.uid || p.id)
-        const targetKey = pKey(pet)
-        const alreadyInBag = this.items.some(p => p.type === 'pet' && pKey(p) === targetKey)
-        if (!alreadyInBag) this.items.push(pet)
-        member.equippedPet = null
-        unequippedCount++
-      }
+      // 注意：灵宠不在此处理，需通过 unequipCharacterPet 单独卸下，
+      // 避免一键卸下装备时把灵宠也一起卸掉。
       this.queueSave()
-      return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件物品` }
+      return { success: true, message: `已卸下 ${member.name} 的 ${unequippedCount} 件装备` }
     },
     // 灵兽放生（报恩返还培养素养 + 素材 + 升星碎片）
     releasePet(petUid) {

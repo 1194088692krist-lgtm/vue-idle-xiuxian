@@ -1026,6 +1026,21 @@ const PET_RARITY_WEIGHTS = {
 
 // Boss 奖励倍率：数量型奖励 Boss 是普怪的 10 倍（仅放大产出数量，不触碰爆率 chance）
 const BOSS_REWARD_MULT = 10
+
+// 修为公共池失败扣减：原按总池 5% 复利扣，长会话复利把几万磨成几百（50000×0.95¹⁰⁰≈295）。
+// 改为：按比例扣，但单次上限 MAX_LOSS，且总是 || 0 防 NaN 污染；返回实际扣除量。
+// 上限取总池 5% 与 2000 的较小者——低池时仍按 5% 衰减，高池时单次最多扣 2000，
+// 避免高难度长挂机把整池复利磨光。
+const MAX_CULTIVATION_LOSS = 2000
+function applyCultivationLoss(s, ratio = 0.05) {
+  const pool = Number(s.cultivationPool) || 0
+  if (pool <= 0) return 0
+  let loss = Math.floor(pool * ratio)
+  if (loss > MAX_CULTIVATION_LOSS) loss = MAX_CULTIVATION_LOSS
+  if (loss < 0) loss = 0
+  s.cultivationPool = Math.max(0, pool - loss)
+  return loss
+}
 // Boss 品质权重：列表中最高稀有度档权重 ×10（其余档不变），使高稀有度/高评分物品
 // 获取期望 ≈ 普怪 10 倍；爆率 chance 全程不变，仅命中后的品质分布向高档倾斜。
 function bossRarityWeights(rarityList, baseWeights) {
@@ -2146,8 +2161,7 @@ async function runBossChallenge(zoneId, bossId, count) {
       addLog('victory', `✅ 第 ${i + 1} 场挑战胜利！击杀 ${boss.name}`)
     } else {
       result.defeats++
-      loss = Math.floor((s.cultivationPool || 0) * 0.05)
-      s.cultivationPool = Math.max(0, (s.cultivationPool || 0) - loss)
+      loss = applyCultivationLoss(s)
       runStats.value.defeats++
       addLog('defeat', `❌ 第 ${i + 1} 场挑战失败，损失修为 ${loss}`)
     }
@@ -2500,8 +2514,7 @@ async function runCharacterBossChallenge(characterId, count) {
       addLog('victory', `✅ 第 ${i + 1} 场挑战胜利！击杀 ${character.name}（人物形态）`)
     } else {
       result.defeats++
-      loss = Math.floor((s.cultivationPool || 0) * 0.05)
-      s.cultivationPool = Math.max(0, (s.cultivationPool || 0) - loss)
+      loss = applyCultivationLoss(s)
       runStats.value.defeats++
       addLog('defeat', `❌ 第 ${i + 1} 场挑战失败，损失修为 ${loss}`)
     }
@@ -4421,8 +4434,7 @@ async function runIdleEncounter() {
           }
         }
       } else {
-        loss = Math.floor(s.cultivationPool * 0.05)
-        s.cultivationPool = Math.max(0, s.cultivationPool - loss)
+        loss = applyCultivationLoss(s)
         s.dungeonDeathCount++
         runStats.value.defeats++
       }
@@ -4599,8 +4611,7 @@ function runOfflineEncounter(zone, diff, count) {
     logEncounter(zone, diff, count, { name: zone.monsters[0], tier: 'normal' }, true, rewards, 0)
     runStats.value.victories++
   } else {
-    const loss = Math.floor(s.cultivationPool * 0.05)
-    s.cultivationPool = Math.max(0, s.cultivationPool - loss)
+    const loss = applyCultivationLoss(s)
     s.dungeonDeathCount++
     logEncounter(zone, diff, count, { name: zone.monsters[0], tier: 'normal' }, false, [], loss)
     runStats.value.defeats++
