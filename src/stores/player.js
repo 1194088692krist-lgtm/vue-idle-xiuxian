@@ -1690,7 +1690,11 @@ export const usePlayerStore = defineStore('player', {
       this.spirit = Math.min(this.spirit, this.maxSpirit)
       this.queueSave()
     },
-    // 恢复灵力（2小时回满上限），同时被动获取修为
+    // 恢复灵力（2小时回满上限）
+    // 注意：旧版本会在此处根据离线时长被动白送修为到公共池（passiveCultRate），
+    // 该"离线挂机收益"与当前主动挂机探索（useIdleSystem）流程脱节，且会干扰修为池数值，
+    // 已移除。修为只应来自主动挂机探索/挑战/分配等显式行为。灵力回复保留，
+    // 因灵力计入战斗属性（spiritDamage = spirit × 0.1），删除会削弱登录后战斗力。
     regenerateSpirit() {
       const now = Date.now()
       const elapsedMs = now - (this.lastSpiritUpdate || now)
@@ -1700,13 +1704,6 @@ export const usePlayerStore = defineStore('player', {
       if (recovered > 0) {
         this.spirit = Math.min(this.maxSpirit, this.spirit + recovered)
         this.lastSpiritUpdate = now
-        // 被动修为增长：每10秒根据等级和Build强度自动获得修为
-        // 约每真实1小时可获得相当于手动修炼3-5次的修为量
-        const passiveCultRate = Math.max(1, Math.floor(this.level * 0.8 + this.buildStrength * 0.00001))
-        const passiveGain = Math.floor(elapsedMs / 10000) * passiveCultRate
-        if (passiveGain > 0) {
-          this.cultivate(passiveGain)
-        }
         this.queueSave()
       }
       return recovered
