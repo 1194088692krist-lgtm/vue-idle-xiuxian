@@ -522,18 +522,18 @@
 
   @media (min-width: 769px) {
     .simple-modal.equipment-detail-modal {
-      padding: 20px;
-      align-items: center;
-      justify-content: center;
+      padding: 0;
+      align-items: flex-end;
+      justify-content: flex-end;
     }
 
     .equipment-detail-modal .equipment-detail-content {
       width: 45vw;
       max-width: 480px;
-      height: 75vh;
       max-height: 75vh;
-      border-radius: 14px;
+      border-radius: 14px 14px 0 0;
       padding: 18px 20px 24px;
+      margin-bottom: 0;
     }
   }
 

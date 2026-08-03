@@ -293,14 +293,20 @@ export async function estimateTotalSize() {
 }
 
 // 并发下载单个资源到 Cache Storage
+// 关键修复：先检查 ALL cache（含 SW 预缓存的 core/assets cache），而非仅 USER_CACHE。
+// 此前仅查 user-assets，导致 SW cacheFirst 已缓存的资源被重复下载。
 async function downloadOne(cache, url) {
   const fullUrl = urlFromPath(url)
-  // 先检查是否已缓存，已缓存则跳过
-  const existing = await cache.match(fullUrl)
-  if (existing) {
-    // 已缓存：计入 doneCount 但不增加 downloadedBytes（避免速度虚高）
-    const size = await getResponseSize(existing)
-    return { ok: true, size, skipped: true }
+  // 先检查是否已缓存：遍历所有 cache（SW 可能已在 core-/assets- cache 中预缓存该资源）
+  const allCacheNames = await caches.keys()
+  for (const name of allCacheNames) {
+    const c = await caches.open(name)
+    const existing = await c.match(fullUrl)
+    if (existing) {
+      // 已缓存：计入 doneCount 但不增加 downloadedBytes（避免速度虚高）
+      const size = await getResponseSize(existing)
+      return { ok: true, size, skipped: true }
+    }
   }
   // 走网络下载
   const res = await fetch(fullUrl)

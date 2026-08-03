@@ -1397,8 +1397,9 @@ const BOSS_VARIANTS = {
   }
 }
 
-// 变种出现概率：轮劫 30%、天道 30%（高难变种稀有但可遇）
-const VARIANT_SPAWN_CHANCE = 0.30
+// 变种出现概率：轮回/天劫 50%，天道 70%
+const VARIANT_SPAWN_CHANCE_XIAN = 0.50
+const VARIANT_SPAWN_CHANCE_HUNDUN = 0.70
 
 // 尝试创建变种 BOSS：满足条件返回变种 enemy，否则返回 null（调用方回退到普通 BOSS）
 // 条件：ice_palace/immortal_ruins/chaos_realm 秘境 + lunhui/tianjie/tiandao 难度 + 该 BOSS 有对应变种立绘
@@ -1412,13 +1413,13 @@ function tryCreateVariantBossEnemy(bossData, effectiveZone, difficultyKey) {
   let variantMult = 1
 
   if (difficultyKey === 'tiandao' && variants.hundun) {
-    if (Math.random() < VARIANT_SPAWN_CHANCE) {
+    if (Math.random() < VARIANT_SPAWN_CHANCE_HUNDUN) {
       variantType = 'hundun'
       variantName = variants.hundun
       variantMult = 1.5
     }
   } else if ((difficultyKey === 'lunhui' || difficultyKey === 'tianjie') && variants.xian) {
-    if (Math.random() < VARIANT_SPAWN_CHANCE) {
+    if (Math.random() < VARIANT_SPAWN_CHANCE_XIAN) {
       variantType = 'xian'
       variantName = variants.xian
       variantMult = 1.3
@@ -2747,6 +2748,7 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   // 挂机产出系数调整：用户反馈修为/灵石产出过多，下调至原值的 20%；幻灵结晶下调至 50%。
   const IDLE_RESOURCE_NERF = 0.2  // 修为/灵石产出系数
   const IDLE_CRYSTAL_NERF = 0.5   // 幻灵结晶产出系数
+  const MAX_PHANTOM_CRYSTALS_PER_RUN = 1000  // 单局幻灵结晶上限（5min最高难度不超1000）
   // 挂机素材（灵草/矿料/灵液）产出系数：原无 nerf，被 rewardMultiplier(最高100) +
   // BOSS_REWARD_MULT(10) 叠加放大，单场掉几十~上百个，远超炼丹/锻造消耗。
   // 用户反馈 10% 仍偏多，再次下调至 3%。
@@ -2844,14 +2846,26 @@ function grantReward(effectiveZone, isIdleMode = false, isBoss = false) {
   // 幻灵结晶：每场遭遇独立产出（青萝林·游历5min≈15，混沌界·灭世30min<1000）。
   // 此前比例偏高（2+diff*1.5+scale*3），现下调约 60%，让灵石/结晶产出更平衡。
   // 挂机产出系数调整：幻灵结晶再下调至原值的 50%（IDLE_CRYSTAL_NERF）。
+  // 上限：单局（5min）不超过 MAX_PHANTOM_CRYSTALS_PER_RUN 个，防止刷结晶。
   const diff = effectiveZone.difficulty || 1
   const scale = effectiveZone.enemyScale || 1
   const crystalBase = Math.floor(1 + diff * 0.6 + scale * 1.2)
   const crystalMult = isBoss ? BOSS_REWARD_MULT : 1
-  const crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4) * crystalMult * IDLE_CRYSTAL_NERF))
-  s.phantomCrystals += crystalAmount
-  runStats.value.phantomCrystals += crystalAmount
-  rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
+  let crystalAmount = Math.max(1, Math.floor(crystalBase * (0.8 + Math.random() * 0.4) * crystalMult * IDLE_CRYSTAL_NERF))
+  // 单局幻灵结晶上限：MAX_PHANTOM_CRYSTALS_PER_RUN（最高难度5min不超1000）
+  const remainingCrystalCap = MAX_PHANTOM_CRYSTALS_PER_RUN - runStats.value.phantomCrystals
+  if (remainingCrystalCap <= 0) {
+    crystalAmount = 0
+  } else if (crystalAmount > remainingCrystalCap) {
+    crystalAmount = remainingCrystalCap
+  }
+  // 单场遭遇上限：不超过 200（即使 BOSS 也不能爆太多）
+  crystalAmount = Math.min(crystalAmount, 200)
+  if (crystalAmount > 0) {
+    s.phantomCrystals += crystalAmount
+    runStats.value.phantomCrystals += crystalAmount
+    rewards.push({ type: 'phantom_crystal', amount: crystalAmount, name: '幻灵结晶' })
+  }
   
   // 升星碎片：难度3以上有概率掉落，难度越高概率越大
   if (diff >= 3 && Math.random() < Math.min(1, (diff - 2) * 0.15)) {

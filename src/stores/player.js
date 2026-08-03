@@ -2497,9 +2497,9 @@ export const usePlayerStore = defineStore('player', {
       this.recallPet()
       return this.deployPet(pet)
     },
-    // 幻灵结晶兑换（200灵石 = 1幻灵结晶）
+    // 幻灵结晶兑换（1000灵石 = 1幻灵结晶，比升星碎片更贵，保持稀缺）
     exchangeCrystals(amount) {
-      const cost = amount * 200
+      const cost = amount * 1000
       if (this.spiritStones < cost) {
         return { success: false, message: `灵石不足，需要 ${cost} 灵石` }
       }
