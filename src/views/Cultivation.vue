@@ -61,11 +61,28 @@
     <!-- 2. 角色选择区 -->
     <div class="member-select glass-card">
       <label>选择角色</label>
-      <select v-model="selectedMemberId" @change="selectMember(selectedMemberId)">
-        <option v-for="m in sortedMembers" :key="m.id" :value="m.id">
-          {{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }}
-        </option>
-      </select>
+      <div class="member-select-row">
+        <select v-model="selectedMemberId" @change="selectMember(selectedMemberId)">
+          <optgroup v-if="teamMemberOptions.length > 0" label="出战成员">
+            <option v-for="m in teamMemberOptions" :key="m.id" :value="m.id">
+              {{ m.name }}
+            </option>
+          </optgroup>
+          <optgroup v-if="nonTeamMemberOptions.length > 0" :label="'未出战成员（' + nonTeamMemberOptions.length + '）'">
+            <option v-if="showNonTeamMembers" v-for="m in nonTeamMemberOptions" :key="'non-' + m.id" :value="m.id">
+              {{ m.name }}
+            </option>
+          </optgroup>
+        </select>
+        <button
+          v-if="nonTeamMemberOptions.length > 0"
+          class="btn btn-small"
+          @click="showNonTeamMembers = !showNonTeamMembers"
+        >
+          {{ showNonTeamMembers ? '收起未出战' : '展开未出战' }}
+        </button>
+        <button class="btn btn-small btn-outline" @click="showCollectionModal = true">图鉴</button>
+      </div>
     </div>
 
     <!-- 3. 选中角色详情面板 -->
@@ -92,10 +109,12 @@
             <span class="build-label">战力</span>
             <span class="build-value">{{ formatNumber(playerStore.getCharacterBuildStrength(selectedMember)) }}</span>
           </div>
+          <span v-if="!isTeamMemberSelected" class="non-team-hint">未出战成员 · 详细面板请加入队伍后查看</span>
         </div>
       </div>
 
-      <div class="attr-block">
+      <!-- 属性面板（仅出战成员渲染，节省计算资源） -->
+      <div v-if="isTeamMemberSelected" class="attr-block">
         <h4 class="sub-title">属性面板 <span class="scroll-hint">（下滑查看更多）</span></h4>
         <div class="attr-table-wrap">
           <div class="attr-table scrollable-table">
@@ -150,8 +169,8 @@
       </div>
     </div>
 
-    <!-- 4. 装备区域 -->
-    <div v-if="selectedMember" class="stats-card glass-card">
+    <!-- 4. 装备区域（仅出战成员渲染） -->
+    <div v-if="isTeamMemberSelected" class="stats-card glass-card">
       <h3 class="section-title">装备</h3>
       <div class="equip-actions">
         <button class="btn btn-primary" @click="autoEquip">一键装备</button>
@@ -190,8 +209,8 @@
       </div>
     </div>
 
-    <!-- 5. 灵宠区域 -->
-    <div v-if="selectedMember" class="pet-card glass-card">
+    <!-- 5. 灵宠区域（仅出战成员渲染） -->
+    <div v-if="isTeamMemberSelected" class="pet-card glass-card">
       <h3 class="section-title">灵宠</h3>
       <div v-if="selectedMember.equippedPet" class="pet-equipped">
         <img
@@ -269,8 +288,10 @@
     </div>
 
     <!-- 人物详情弹窗（独立弹窗，不再切换顶部面板） -->
-    <div v-if="showMemberDetailModal && detailMember" class="equip-select-modal character-detail-modal" @click.self="closeMemberDetail">
-      <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
+    <!-- 使用 Teleport 移到 body，避免父级 overflow-y:auto 容器导致 fixed 定位在移动端失效 -->
+    <Teleport to="body">
+      <div v-if="showMemberDetailModal && detailMember" class="equip-select-modal character-detail-modal" @click.self="closeMemberDetail">
+        <div class="modal-content glass-card character-detail-content sect-member-modal-content" @click.stop :style="modalPositionStyle">
         <div class="char-detail-header">
           <div class="char-avatar large" :class="detailMember?.star >= 5 ? 'star-5' : (detailMember?.star >= 4 ? 'star-4' : '')" @click="openDetailPortrait" title="点击查看立绘">
             <img v-if="getCharacterAvatar(detailMember)" :src="getCharacterThumbnail(detailMember)" loading="lazy" decoding="async" />
@@ -516,6 +537,7 @@
         </div>
       </div>
     </div>
+    </Teleport>
 
     <!-- 立绘查看器：复用抽卡时的角色立绘大图弹窗效果 -->
     <CharacterPortraitModal v-if="showPortrait" :character="portraitCharacter" @close="closePortrait" />
@@ -590,6 +612,42 @@
         <button class="btn btn-warning" @click="showPetSelect = false">取消</button>
       </div>
     </div>
+
+    <!-- 图鉴弹窗：显示所有已获得的宗门人物 -->
+    <Teleport to="body">
+      <div v-if="showCollectionModal" class="collection-overlay" @click.self="showCollectionModal = false">
+        <div class="collection-modal">
+          <div class="collection-header">
+            <h3>宗门图鉴 · 已获得 {{ allMembers.length }} 位人物</h3>
+            <button class="btn btn-small" @click="showCollectionModal = false">关闭</button>
+          </div>
+          <div class="collection-list">
+            <div v-for="m in allMembers" :key="'col-' + m.id" class="collection-card">
+              <div class="collection-avatar" @click="openMemberPortrait(m)" title="点击查看立绘">
+                <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" loading="lazy" decoding="async" />
+                <span v-else>{{ m.name?.[0] || '仙' }}</span>
+              </div>
+              <div class="collection-info">
+                <div class="collection-name">{{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }} <span class="collection-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
+                <div class="collection-meta">Lv.{{ m.level }} · {{ characterSchools[m.school]?.name || m.school }}</div>
+                <div class="collection-strength">战力 {{ formatNumber(playerStore.getCharacterBuildStrength(m)) }}</div>
+              </div>
+              <div class="collection-actions">
+                <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id)">详情</button>
+                <button
+                  class="btn btn-small"
+                  :class="isInTeam(m.id) ? 'btn-warning' : 'btn-success'"
+                  @click="toggleTeam(m.id)"
+                >
+                  {{ isInTeam(m.id) ? '退出' : '加入' }}
+                </button>
+              </div>
+            </div>
+          </div>
+          <div v-if="allMembers.length === 0" class="collection-empty">暂无已获得的人物</div>
+        </div>
+      </div>
+    </Teleport>
   </div>
 </template>
 
@@ -671,6 +729,11 @@ const showPetSelect = ref(false)
 const benchPage = ref(1)
 const benchPageSize = 10
 
+// 未出战成员折叠控制
+const showNonTeamMembers = ref(false)
+// 图鉴弹窗控制
+const showCollectionModal = ref(false)
+
 const getPetRarityName = (pet) => {
   return petRarities[pet.rarity]?.name || '未知品质'
 }
@@ -701,6 +764,14 @@ const sortedMembers = computed(() => {
     return 0
   })
 })
+
+// 出战成员（始终显示）
+const teamMemberOptions = computed(() => sortedMembers.value.filter(m => isInTeam(m.id)))
+// 未出战成员（折叠显示）
+const nonTeamMemberOptions = computed(() => sortedMembers.value.filter(m => !isInTeam(m.id)))
+
+// 是否选中了出战成员（用于控制重计算面板渲染，未出战成员不渲染以节省资源）
+const isTeamMemberSelected = computed(() => selectedMember.value && isInTeam(selectedMember.value.id))
 const totalBenchPages = computed(() => Math.max(1, Math.ceil(sortedMembers.value.length / benchPageSize)))
 const pagedSortedMembers = computed(() => {
   const start = (benchPage.value - 1) * benchPageSize
@@ -2414,22 +2485,35 @@ html.fx-medium .progress-glow { animation: none; }
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: flex-start;
-  padding: 16px;
+  align-items: flex-end;
+  padding: 0;
   z-index: 1000;
   overflow: hidden;
 }
 
 .sect-member-modal-content {
-  width: 95%;
-  max-width: 400px;
-  max-height: calc(100vh - 32px);
+  width: 100%;
+  max-width: 480px;
+  max-height: 90vh;
   padding: 16px;
   overflow-y: auto;
-  border-radius: 12px;
+  border-radius: 16px 16px 0 0;
   background: rgba(15, 20, 25, 0.98);
   border: 1px solid rgba(218, 165, 32, 0.3);
-  margin: auto;
+  border-bottom: none;
+}
+
+/* 桌面端居中显示 */
+@media (min-width: 769px) {
+  .character-detail-modal {
+    align-items: center;
+    padding: 16px;
+  }
+  .sect-member-modal-content {
+    width: 95%;
+    border-radius: 12px;
+    border: 1px solid rgba(218, 165, 32, 0.3);
+  }
 }
 
 .char-detail-header {
@@ -2791,4 +2875,165 @@ html.fx-medium .progress-glow { animation: none; }
   text-shadow: 0 0 10px rgba(255, 215, 0, 0.5);
   padding: 6px 0;
 }
-</style>
+
+/* 成员选择行布局 */
+.member-select-row {
+  display: flex;
+  gap: 8px;
+  align-items: center;
+  flex-wrap: wrap;
+}
+.member-select-row select {
+  flex: 1;
+  min-width: 120px;
+}
+
+/* 未出战提示 */
+.non-team-hint {
+  display: inline-block;
+  margin-top: 8px;
+  padding: 4px 8px;
+  font-size: 12px;
+  color: #ffa726;
+  background: rgba(255, 167, 38, 0.1);
+  border: 1px solid rgba(255, 167, 38, 0.3);
+  border-radius: 4px;
+}
+
+/* 图鉴弹窗 */
+.collection-overlay {
+  position: fixed;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.7);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 2000;
+  padding: 16px;
+}
+
+.collection-modal {
+  width: 100%;
+  max-width: 600px;
+  max-height: 85vh;
+  background: rgba(15, 20, 25, 0.98);
+  border: 1px solid rgba(218, 165, 32, 0.3);
+  border-radius: 12px;
+  padding: 16px;
+  overflow-y: auto;
+}
+
+.collection-header {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  margin-bottom: 16px;
+  padding-bottom: 12px;
+  border-bottom: 1px solid rgba(218, 165, 32, 0.2);
+}
+
+.collection-header h3 {
+  margin: 0;
+  color: #FFD700;
+}
+
+.collection-list {
+  display: flex;
+  flex-direction: column;
+  gap: 8px;
+}
+
+.collection-card {
+  display: flex;
+  align-items: center;
+  gap: 12px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.3);
+  border-radius: 8px;
+  border: 1px solid rgba(255, 255, 255, 0.05);
+}
+
+.collection-avatar {
+  width: 48px;
+  height: 48px;
+  border-radius: 50%;
+  background: linear-gradient(135deg, #8B4513, #DAA520);
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  overflow: hidden;
+  flex-shrink: 0;
+}
+
+.collection-avatar img {
+  width: 100%;
+  height: 100%;
+  object-fit: cover;
+}
+
+.collection-avatar span {
+  font-size: 20px;
+  color: #fff;
+}
+
+.collection-info {
+  flex: 1;
+  min-width: 0;
+}
+
+.collection-name {
+  font-weight: bold;
+  font-size: 14px;
+  color: #fff;
+  margin-bottom: 4px;
+}
+
+.collection-stars {
+  color: #FFD700;
+  font-size: 12px;
+}
+
+.collection-meta {
+  font-size: 12px;
+  color: #aaa;
+  margin-bottom: 2px;
+}
+
+.collection-strength {
+  font-size: 12px;
+  color: #DAA520;
+}
+
+.collection-actions {
+  display: flex;
+  gap: 6px;
+  flex-shrink: 0;
+}
+
+.collection-empty {
+  text-align: center;
+  color: #aaa;
+  padding: 40px 0;
+}
+
+/* 移动端图鉴弹窗适配 */
+@media (max-width: 768px) {
+  .collection-overlay {
+    padding: 8px;
+    align-items: flex-end;
+  }
+  .collection-modal {
+    max-height: 92vh;
+    border-radius: 12px 12px 0 0;
+  }
+  .collection-card {
+    flex-wrap: wrap;
+  }
+  .collection-actions {
+    width: 100%;
+    justify-content: flex-end;
+  }
+}</style>
