@@ -20,11 +20,11 @@
   "噬魂鬼": { "thumbnail": "zone_ghost_soul_eater_portrait_thumb.webp", "full": "zone_ghost_soul_eater_portrait.jpg" },
   "噬魂鬼王": { "thumbnail": "zone_ghost_soul_king_portrait_thumb.webp", "full": "zone_ghost_soul_king_portrait.jpg" },
   "白骨魔尊": { "thumbnail": "zone_ghost_bone_lord_portrait_thumb.webp", "full": "zone_ghost_bone_lord_portrait.jpg" },
-  "冰凰": { "thumbnail": "zone_ice_ice_phoenix_portrait_thumb.webp", "full": "zone_ice_ice_phoenix_portrait.jpg" },
-  "冰封古魔": { "thumbnail": "zone_ice_ancient_ice_demon_portrait_thumb.webp", "full": "zone_ice_ancient_ice_demon_portrait.jpg" },
-  "远古妖龙": { "thumbnail": "ancient_dragon_portrait_thumb.webp", "full": "ancient_dragon_portrait.jpg" },
-  "仙墟守护者": { "thumbnail": "zone_ruin_celestial_guard_portrait_thumb.webp", "full": "zone_ruin_celestial_guard_portrait.jpg" },
-  "堕落仙君": { "thumbnail": "zone_ruin_fallen_immortal_portrait_thumb.webp", "full": "zone_ruin_fallen_immortal_portrait.jpg" },
-  "混沌主宰": { "thumbnail": "zone_chaos_overlord_portrait_thumb.webp", "full": "zone_chaos_overlord_portrait.jpg" },
-  "天道化身": { "thumbnail": "zone_chaos_dao_avatar_portrait_thumb.webp", "full": "zone_chaos_dao_avatar_portrait.jpg" }
+  "冰凰": { "thumbnail": "m01_xuanbing_zulong_beast_thumb.webp", "full": "m01_xuanbing_zulong_beast.jpg" },
+  "冰封古魔": { "thumbnail": "m02_bingfeng_gumo_beast_thumb.webp", "full": "m02_bingfeng_gumo_beast.jpg" },
+  "远古妖龙": { "thumbnail": "m05_taigu_xianren_beast_thumb.webp", "full": "m05_taigu_xianren_beast.jpg" },
+  "仙墟守护者": { "thumbnail": "m03_xianxu_shouhu_beast_thumb.webp", "full": "m03_xianxu_shouhu_beast.jpg" },
+  "堕落仙君": { "thumbnail": "m04_duoluo_xianjun_beast_thumb.webp", "full": "m04_duoluo_xianjun_beast.jpg" },
+  "混沌主宰": { "thumbnail": "m06_hundun_zhuizai_beast_thumb.webp", "full": "m06_hundun_zhuizai_beast.jpg" },
+  "天道化身": { "thumbnail": "m07_tiandao_huashen_beast_thumb.webp", "full": "m07_tiandao_huashen_beast.jpg" }
 }

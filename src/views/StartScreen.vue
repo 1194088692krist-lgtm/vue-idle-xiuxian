@@ -639,8 +639,10 @@ onMounted(() => {
 }
 
 .title-main {
-  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', serif;
+  /* 与击败 BOSS 特效字体（BossKillCinematic 连击文案）保持一致 */
+  font-family: 'Ma Shan Zheng', 'STKaiti', 'KaiTi', 'STHeiti', 'Microsoft YaHei', serif;
   font-size: 56px;
+  font-weight: 900;
   color: #FFD700;
   text-shadow:
     0 0 12px rgba(255, 215, 0, 0.6),
@@ -649,7 +651,6 @@ onMounted(() => {
     2px 2px 4px rgba(0, 0, 0, 0.8);
   margin-bottom: 10px;
   letter-spacing: 10px;
-  font-weight: normal;
 }
 
 .title-sub {

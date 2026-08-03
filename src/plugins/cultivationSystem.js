@@ -403,15 +403,17 @@ export const getBossEncounterChance = (difficultyKey) => {
   // 修复：原仅 xiongxian/juejing/mieshi 三档出 BOSS，
   // 导致前期玩家挂 youli/shilian 档永远遇不到 BOSS，
   // 也就永远掉不到 zoneMaterialPool 中的定向素材（洗髓花/锻骨木/护厄花等丹药主料）
+  // 调整：整体下调约 50%，避免高难度（灭世等）每场几乎都是 BOSS、挂机变 BOSS 循环。
+  // 高难轮回收/天劫/天道由原必出降为 50%，仍保证有 BOSS 通道但不再是纯 BOSS 循环。
   const chances = {
-    youli: 0.10,     // 游历：10% 概率出 BOSS（让前期玩家也有途径获取丹药素材）
-    shilian: 0.25,   // 试炼：25%
-    xiongxian: 0.50, // 凶险：50%
-    juejing: 0.75,   // 绝境：75%
-    mieshi: 0.90,    // 灭世：90%
-    lunhui: 1.00,    // 轮回：必出 BOSS
-    tianjie: 1.00,   // 天劫：必出 BOSS
-    tiandao: 1.00    // 天道：必出 BOSS
+    youli: 0.05,     // 游历：5%（原 10%）
+    shilian: 0.12,   // 试炼：12%（原 25%）
+    xiongxian: 0.25, // 凶险：25%（原 50%）
+    juejing: 0.38,   // 绝境：38%（原 75%）
+    mieshi: 0.45,    // 灭世：45%（原 90%）
+    lunhui: 0.50,    // 轮回：50%（原 100%）
+    tianjie: 0.50,   // 天劫：50%（原 100%）
+    tiandao: 0.50    // 天道：50%（原 100%）
   }
   return chances[difficultyKey] || 0
 }
