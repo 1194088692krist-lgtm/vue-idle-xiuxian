@@ -1283,17 +1283,17 @@ function createPlayerEntity() {
 // BOSS 整体实力倍率：统一应用于所有 BOSS 战斗数值（血量/攻击/防御/速度）
 // 平衡修复（v3）：1.2 倍偏弱，玩家反馈各地图各难度 BOSS 血量太低、过简单。
 // 上调至 1.5，配合小怪整体强化，让 BOSS 战更具挑战性（HP 和 DEF 用此倍率，ATK 单独基于 recommendedStats.health）
-const BOSS_POWER_MULTIPLIER = 1.5
+const BOSS_POWER_MULTIPLIER = 1.3
 
 // 后期秘境额外强化系数（小怪与 BOSS 共用）
-// 难度提升：最后 3 张图大幅强化，避免玩家轻松毕业
+// 平衡修复（v3）：降低后期秘境倍率，平滑过渡，消除混沌界断崖式跳跃
 const LATE_ZONE_ENEMY_MULT = {
   phoenix_cave: 1.10,
   dragon_abyss: 1.20,
   ghost_wasteland: 1.35,
-  ice_palace: 3.00,
-  immortal_ruins: 4.50,
-  chaos_realm: 8.00
+  ice_palace: 2.20,
+  immortal_ruins: 3.00,
+  chaos_realm: 4.50
 }
 
 // 获取秘境的后期强化倍率（前期秘境返回 1，无影响）
@@ -1353,9 +1353,10 @@ function createBossEnemy(bossData, effectiveZone) {
     resistanceBoost: 0
   }
   // 平衡调整：盾系实装后 BOSS 普遍偏弱，所有能力值统一提升 50%
-  // 应用在最终 baseStats 上，HP/攻防/速度/暴击率/抗性/最终增减伤/战斗提升全部 ×1.5
+  // 应用在最终 baseStats 上，HP/攻防/速度/暴击率/抗性/最终增减伤/战斗提升全部 ×1.2
+  // 平衡修复（v3）：1.5 → 1.2，避免与 BOSS_POWER_MULTIPLIER(1.3) 双重叠加导致 1.5×1.5=2.25 倍
   // 百分比类字段若超过 0.95 用 Math.min 钳制，避免出现 100% 必然暴击/必然闪避等极端数值
-  const BOSS_STRENGTH_MULT = 1.5
+  const BOSS_STRENGTH_MULT = 1.2
   Object.keys(baseStats).forEach(key => {
     if (typeof baseStats[key] !== 'number') return
     const boosted = baseStats[key] * BOSS_STRENGTH_MULT
@@ -1416,13 +1417,13 @@ function tryCreateVariantBossEnemy(bossData, effectiveZone, difficultyKey) {
     if (Math.random() < VARIANT_SPAWN_CHANCE_HUNDUN) {
       variantType = 'hundun'
       variantName = variants.hundun
-      variantMult = 1.5
+      variantMult = 1.3
     }
   } else if ((difficultyKey === 'lunhui' || difficultyKey === 'tianjie') && variants.xian) {
     if (Math.random() < VARIANT_SPAWN_CHANCE_XIAN) {
       variantType = 'xian'
       variantName = variants.xian
-      variantMult = 1.3
+      variantMult = 1.2
     }
   }
 
