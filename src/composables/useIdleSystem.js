@@ -1374,6 +1374,104 @@ function createBossEnemy(bossData, effectiveZone) {
   return enemy
 }
 
+// ==================== BOSS 变种系统（仙/混沌） ====================
+// 用户需求：冰雪宫/仙墟/混沌界的 BOSS 拥有「仙」和「混沌」两种变种形态
+//   - 仙变种（human 立绘）：强度×1.3，仅在轮回/天劫难度出现，80% 追加 +6~+8 神品(40%)/仙品(60%) 装备
+//   - 混沌变种（hybrid 立绘）：强度×1.5，仅在天道难度出现，80% 追加 +8~+9 神品(40%)/仙品(60%) 装备
+// 变种立绘文件命名：m0X_XXX_human.jpg（仙）、m0X_XXX_hybrid.jpg（混沌）
+// 仅 m05_taigu_xianren 无 hybrid 文件，太古仙人无混沌变种
+const BOSS_VARIANTS = {
+  ice_palace: {
+    'ice_boss_2': { xian: '冰封古魔·仙', hundun: '冰封古魔·混沌' },
+    'ice_boss_3': { xian: '玄冰祖龙·仙', hundun: '玄冰祖龙·混沌' }
+  },
+  immortal_ruins: {
+    'immortal_boss_1': { xian: '仙墟守护者·仙', hundun: '仙墟守护者·混沌' },
+    'immortal_boss_2': { xian: '堕落仙君·仙', hundun: '堕落仙君·混沌' },
+    'immortal_boss_3': { xian: '太古仙人·仙', hundun: null }
+  },
+  chaos_realm: {
+    'chaos_boss_1': { xian: '混沌主宰·仙', hundun: '混沌主宰·混沌' },
+    'chaos_boss_2': { xian: '天道化身·仙', hundun: '天道化身·混沌' },
+    'chaos_boss_3': { xian: '原始混沌·仙', hundun: '原始混沌·混沌' }
+  }
+}
+
+// 变种出现概率：轮劫 30%、天道 30%（高难变种稀有但可遇）
+const VARIANT_SPAWN_CHANCE = 0.30
+
+// 尝试创建变种 BOSS：满足条件返回变种 enemy，否则返回 null（调用方回退到普通 BOSS）
+// 条件：ice_palace/immortal_ruins/chaos_realm 秘境 + lunhui/tianjie/tiandao 难度 + 该 BOSS 有对应变种立绘
+function tryCreateVariantBossEnemy(bossData, effectiveZone, difficultyKey) {
+  const zoneId = effectiveZone.id
+  const variants = BOSS_VARIANTS[zoneId]?.[bossData.id]
+  if (!variants) return null
+
+  let variantType = null
+  let variantName = null
+  let variantMult = 1
+
+  if (difficultyKey === 'tiandao' && variants.hundun) {
+    if (Math.random() < VARIANT_SPAWN_CHANCE) {
+      variantType = 'hundun'
+      variantName = variants.hundun
+      variantMult = 1.5
+    }
+  } else if ((difficultyKey === 'lunhui' || difficultyKey === 'tianjie') && variants.xian) {
+    if (Math.random() < VARIANT_SPAWN_CHANCE) {
+      variantType = 'xian'
+      variantName = variants.xian
+      variantMult = 1.3
+    }
+  }
+
+  if (!variantType) return null
+
+  // 基于普通 BOSS 面板再 × 变种倍率
+  const enemy = createBossEnemy(bossData, effectiveZone)
+  enemy.name = variantName
+  enemy.bossData = { ...bossData, name: variantName, variantType, variantMult }
+  enemy.variantType = variantType
+  enemy.variantMult = variantMult
+  enemy.isVariantBoss = true
+
+  // 变种强化：对所有数值字段乘以变种倍率
+  for (const key of Object.keys(enemy.stats)) {
+    if (typeof enemy.stats[key] !== 'number') continue
+    const boosted = enemy.stats[key] * variantMult
+    if (key.includes('Rate') || key.includes('Resist') || key.includes('Boost') || key.includes('Reduce')) {
+      enemy.stats[key] = Math.min(0.95, boosted)
+    } else {
+      enemy.stats[key] = Math.floor(boosted)
+    }
+  }
+  enemy.stats.maxHealth = enemy.stats.health
+  enemy.currentHealth = enemy.stats.health
+  return enemy
+}
+
+// 变种 BOSS 专属掉落：80% 概率追加高强化神品/仙品装备
+// 仙变种：+6~+8 强化；混沌变种：+8~+9 强化；神品(mythic) 40% / 仙品(legendary) 60%
+function grantVariantBossDrops(enemy, effectiveZone) {
+  const s = store()
+  const drops = []
+  if (!enemy?.isVariantBoss || !enemy.variantType) return drops
+  if (!effectiveZone) return drops
+
+  if (Math.random() >= 0.80) return drops
+
+  // 神品(mythic) 40% / 仙品(legendary) 60%
+  const rarity = Math.random() < 0.40 ? 'mythic' : 'legendary'
+  // 仙变种 +6~+8，混沌变种 +8~+9
+  const enhanceRange = enemy.variantType === 'hundun' ? [8, 9] : [6, 8]
+  const equip = generateEquipment(rarity, effectiveZone, { enhanceLevel: enhanceRange })
+  s.items.push(equip)
+  s.itemsFound++
+  const info = rarityInfo[rarity] || rarityInfo.common
+  drops.push({ type: 'equipment', name: equip.name, rarity, info, item: equip, variantDrop: true })
+  return drops
+}
+
 // ==================== 人物 BOSS 系统 ====================
 // 用户需求：八大秘境最终 BOSS 改为人物形态，比原地图 BOSS 难 50%。
 //   - 图 1-4：3星/4星人物作为 BOSS（按难度递进）
@@ -1490,9 +1588,16 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.characterBossStar = character.star
   // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
   enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
-  // 登场立绘：统一仅限该角色的 skin5
-  const skin5Url = getCharacterSkinUrl({ id: character.id }, 5)
-  enemy.portrait = skin5Url || getCharacterAvatar({ id: character.id }, 'full')
+  // 登场立绘：优先 skin5（专属 BOSS 立绘），skin5 不存在时用该角色最高编号皮肤作为 BOSS 形态
+  // 修复：云隐(char_009)等只有 3 个皮肤的角色无 skin5，原逻辑回退到原立绘导致 BOSS 登场无差异化
+  const skinCount = getSkinCount({ id: character.id })
+  let bossPortraitUrl = null
+  if (skinCount >= 5) {
+    bossPortraitUrl = getCharacterSkinUrl({ id: character.id }, 5)
+  } else if (skinCount > 0) {
+    bossPortraitUrl = getCharacterSkinUrl({ id: character.id }, skinCount )
+  }
+  enemy.portrait = bossPortraitUrl || getCharacterAvatar({ id: character.id }, 'full')
   return enemy
 }
 
@@ -1631,7 +1736,8 @@ function generateBossEnemies(effectiveZone, difficultyKey) {
 
   for (let i = 0; i < bossCount; i++) {
     const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-    bosses.push(createBossEnemy(bossData, effectiveZone))
+    // 变种优先：轮劫/天道难度有概率刷出仙/混沌变种 BOSS
+    bosses.push(tryCreateVariantBossEnemy(bossData, effectiveZone, difficultyKey) || createBossEnemy(bossData, effectiveZone))
   }
 
   return bosses
@@ -1742,7 +1848,7 @@ function grantBossMaterialDrops(enemy, zoneId) {
   return drops
 }
 
-function grantCombatDrops(enemy, zoneId = null, isIdleMode = false) {
+function grantCombatDrops(enemy, zoneId = null, isIdleMode = false, effectiveZone = null) {
   const s = store()
   const drops = []
   const tier = enemy?.tier || 'normal'
@@ -1788,6 +1894,14 @@ function grantCombatDrops(enemy, zoneId = null, isIdleMode = false) {
         runStats.value.bossTickets += ticketDrops.reduce((sum, d) => sum + (d.amount || 1), 0)
       }
       drops.push(...ticketDrops)
+    }
+    // 变种 BOSS 专属掉落：仙/混沌变种 80% 追加高强化神品/仙品装备
+    if (enemy?.isVariantBoss && effectiveZone) {
+      const variantDrops = grantVariantBossDrops(enemy, effectiveZone)
+      if (variantDrops.length > 0) {
+        runStats.value.equipment += variantDrops.length
+        drops.push(...variantDrops)
+      }
     }
   } else if (tier === 'elite') {
     if (Math.random() < 0.5) { const c = getRandomCore('elite'); s.gainMaterial(c); drops.push(c) }
@@ -2859,7 +2973,7 @@ async function runManualBattle(effectiveZone) {
   combatState.value = { inCombat: false, combatManager: null }
   // 怪物掉落（仅胜利时）
   let drops = []
-  if (victory && enemy) drops = grantCombatDrops(enemy, effectiveZone.id, isIdleMode)
+  if (victory && enemy) drops = grantCombatDrops(enemy, effectiveZone.id, isIdleMode, effectiveZone)
   // 保留最终画面短暂时间，让 BattleStage 展示胜负结果与最终血量，再收尾重置
   currentEncounter.value = { ...currentEncounter.value, inProgress: false }
   await sleep(1600)
@@ -4135,15 +4249,15 @@ async function runIdleEncounter() {
             } else {
               // 兜底：人物候选缺失时退化为怪物BOSS
               const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-              allBosses.push(createBossEnemy(bossData, effectiveZone))
+              allBosses.push(tryCreateVariantBossEnemy(bossData, effectiveZone, diff.key) || createBossEnemy(bossData, effectiveZone))
             }
           }
         } else {
-          // 非灭世难度走原逻辑：尝试人物BOSS，未命中走怪物BOSS
+          // 非灭世难度走原逻辑：尝试人物BOSS，未命中走怪物BOSS（含变种）
           enemy = tryCreateCharacterBossEnemy(effectiveZone, diff.key)
           if (!enemy) {
             const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-            enemy = createBossEnemy(bossData, effectiveZone)
+            enemy = tryCreateVariantBossEnemy(bossData, effectiveZone, diff.key) || createBossEnemy(bossData, effectiveZone)
           }
           allBosses.push(enemy)
         }
@@ -4170,7 +4284,7 @@ async function runIdleEncounter() {
         enemy = tryCreateCharacterBossEnemy(effectiveZone, diff.key)
         if (!enemy) {
           const bossData = effectiveZone.bosses[Math.floor(Math.random() * effectiveZone.bosses.length)]
-          enemy = createBossEnemy(bossData, effectiveZone)
+          enemy = tryCreateVariantBossEnemy(bossData, effectiveZone, diff.key) || createBossEnemy(bossData, effectiveZone)
         }
         enemyData = { mainEnemy: enemy, allBosses: [enemy], hasBoss: true, isElite: false }
         idleDiag.value.lastEnemyName = 'BOSS ' + enemy.name + '(HP=' + enemy.stats.maxHealth + ',ATK=' + enemy.stats.damage + ')'
@@ -4404,7 +4518,7 @@ async function runIdleEncounter() {
         accumulateMaterials(rewards)
 
         // 战斗掉落（挂机模式：isIdleMode=true，触发素材掉率下调）
-        const drops = grantCombatDrops(enemy, effectiveZone.id, true)
+        const drops = grantCombatDrops(enemy, effectiveZone.id, true, effectiveZone)
         for (const d of drops) {
           // 修复：普通战斗掉落素材（herb/ore/liquid/core 等）只有 kind 字段无 type 字段，
           // 导致日志生成时按 r.type 过滤被排除，整条"获得素材"日志缺失、icon 不显示。

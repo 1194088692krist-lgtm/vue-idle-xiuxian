@@ -83,17 +83,21 @@
     "thumbnail": "zone_ghost_bone_lord_portrait_thumb.webp",
     "full": "zone_ghost_bone_lord_portrait.jpg"
   },
+  "远古妖龙": {
+    "thumbnail": "ancient_dragon_portrait_thumb.webp",
+    "full": "ancient_dragon_portrait.jpg"
+  },
   "冰凰": {
-    "thumbnail": "m01_xuanbing_zulong_beast_thumb.webp",
-    "full": "m01_xuanbing_zulong_beast.jpg"
+    "thumbnail": "zone_ice_ice_phoenix_portrait_thumb.webp",
+    "full": "zone_ice_ice_phoenix_portrait.jpg"
   },
   "冰封古魔": {
     "thumbnail": "m02_bingfeng_gumo_beast_thumb.webp",
     "full": "m02_bingfeng_gumo_beast.jpg"
   },
-  "远古妖龙": {
-    "thumbnail": "m05_taigu_xianren_beast_thumb.webp",
-    "full": "m05_taigu_xianren_beast.jpg"
+  "玄冰祖龙": {
+    "thumbnail": "m01_xuanbing_zulong_beast_thumb.webp",
+    "full": "m01_xuanbing_zulong_beast.jpg"
   },
   "仙墟守护者": {
     "thumbnail": "m03_xianxu_shouhu_beast_thumb.webp",
@@ -103,6 +107,10 @@
     "thumbnail": "m04_duoluo_xianjun_beast_thumb.webp",
     "full": "m04_duoluo_xianjun_beast.jpg"
   },
+  "太古仙人": {
+    "thumbnail": "m05_taigu_xianren_beast_thumb.webp",
+    "full": "m05_taigu_xianren_beast.jpg"
+  },
   "混沌主宰": {
     "thumbnail": "m06_hundun_zhuizai_beast_thumb.webp",
     "full": "m06_hundun_zhuizai_beast.jpg"
@@ -110,5 +118,93 @@
   "天道化身": {
     "thumbnail": "m07_tiandao_huashen_beast_thumb.webp",
     "full": "m07_tiandao_huashen_beast.jpg"
+  },
+  "原始混沌": {
+    "thumbnail": "m08_yuanshi_hundun_beast_thumb.webp",
+    "full": "m08_yuanshi_hundun_beast.jpg"
+  },
+  "寒冰幽魂": {
+    "thumbnail": "m09_hanbing_youhun_thumb.webp",
+    "full": "m09_hanbing_youhun.jpg"
+  },
+  "雪女": {
+    "thumbnail": "m10_xuenv_thumb.webp",
+    "full": "m10_xuenv.jpg"
+  },
+  "仙灵剑修": {
+    "thumbnail": "m11_xianling_jianxiu_thumb.webp",
+    "full": "m11_xianling_jianxiu.jpg"
+  },
+  "堕仙残魂": {
+    "thumbnail": "m12_duoxian_canhun_thumb.webp",
+    "full": "m12_duoxian_canhun.jpg"
+  },
+  "混沌兽": {
+    "thumbnail": "m13_hundun_shou_thumb.webp",
+    "full": "m13_hundun_shou.jpg"
+  },
+  "虚空魔灵": {
+    "thumbnail": "m14_xukong_moling_thumb.webp",
+    "full": "m14_xukong_moling.jpg"
+  },
+  "玄冰祖龙·仙": {
+    "thumbnail": "m01_xuanbing_zulong_human_thumb.webp",
+    "full": "m01_xuanbing_zulong_human.jpg"
+  },
+  "冰封古魔·仙": {
+    "thumbnail": "m02_bingfeng_gumo_human_thumb.webp",
+    "full": "m02_bingfeng_gumo_human.jpg"
+  },
+  "仙墟守护者·仙": {
+    "thumbnail": "m03_xianxu_shouhu_human_thumb.webp",
+    "full": "m03_xianxu_shouhu_human.jpg"
+  },
+  "堕落仙君·仙": {
+    "thumbnail": "m04_duoluo_xianjun_human_thumb.webp",
+    "full": "m04_duoluo_xianjun_human.jpg"
+  },
+  "太古仙人·仙": {
+    "thumbnail": "m05_taigu_xianren_human_thumb.webp",
+    "full": "m05_taigu_xianren_human.jpg"
+  },
+  "混沌主宰·仙": {
+    "thumbnail": "m06_hundun_zhuizai_human_thumb.webp",
+    "full": "m06_hundun_zhuizai_human.jpg"
+  },
+  "天道化身·仙": {
+    "thumbnail": "m07_tiandao_huashen_human_thumb.webp",
+    "full": "m07_tiandao_huashen_human.jpg"
+  },
+  "原始混沌·仙": {
+    "thumbnail": "m08_yuanshi_hundun_human_thumb.webp",
+    "full": "m08_yuanshi_hundun_human.jpg"
+  },
+  "玄冰祖龙·混沌": {
+    "thumbnail": "m01_xuanbing_zulong_hybrid_thumb.webp",
+    "full": "m01_xuanbing_zulong_hybrid.jpg"
+  },
+  "冰封古魔·混沌": {
+    "thumbnail": "m02_bingfeng_gumo_hybrid_thumb.webp",
+    "full": "m02_bingfeng_gumo_hybrid.jpg"
+  },
+  "仙墟守护者·混沌": {
+    "thumbnail": "m03_xianxu_shouhu_hybrid_thumb.webp",
+    "full": "m03_xianxu_shouhu_hybrid.jpg"
+  },
+  "堕落仙君·混沌": {
+    "thumbnail": "m04_duoluo_xianjun_hybrid_thumb.webp",
+    "full": "m04_duoluo_xianjun_hybrid.jpg"
+  },
+  "混沌主宰·混沌": {
+    "thumbnail": "m06_hundun_zhuizai_hybrid_thumb.webp",
+    "full": "m06_hundun_zhuizai_hybrid.jpg"
+  },
+  "天道化身·混沌": {
+    "thumbnail": "m07_tiandao_huashen_hybrid_thumb.webp",
+    "full": "m07_tiandao_huashen_hybrid.jpg"
+  },
+  "原始混沌·混沌": {
+    "thumbnail": "m08_yuanshi_hundun_hybrid_thumb.webp",
+    "full": "m08_yuanshi_hundun_hybrid.jpg"
   }
 }
