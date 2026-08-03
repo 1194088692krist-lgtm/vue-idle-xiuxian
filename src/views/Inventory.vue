@@ -97,7 +97,7 @@
               />
               <div class="card-header">
                 <span :style="{ color: qualityInfoOf(item).color }" :class="'text-glow-' + (item.quality || 'common')">
-                  {{ item.name }}
+                  {{ item.name }}<span v-if="item.enhanceLevel > 0" class="eq-enhance">+{{ item.enhanceLevel }}</span>
                   <span class="equip-category-tag">{{ getEquipCategoryName(item.slot) }}</span>
                 </span>
               </div>
