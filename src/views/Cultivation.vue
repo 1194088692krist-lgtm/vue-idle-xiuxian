@@ -2414,20 +2414,22 @@ html.fx-medium .progress-glow { animation: none; }
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: center;
+  align-items: flex-start;
   padding: 16px;
   z-index: 1000;
+  overflow: hidden;
 }
 
 .sect-member-modal-content {
   width: 95%;
   max-width: 400px;
-  max-height: 85vh;
+  max-height: calc(100vh - 32px);
   padding: 16px;
   overflow-y: auto;
   border-radius: 12px;
   background: rgba(15, 20, 25, 0.98);
   border: 1px solid rgba(218, 165, 32, 0.3);
+  margin: auto;
 }
 
 .char-detail-header {
