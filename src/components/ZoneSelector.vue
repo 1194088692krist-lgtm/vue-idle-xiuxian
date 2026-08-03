@@ -563,7 +563,7 @@
             @click="openBattleRewardEquipDetail(eq)"
           >
             <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
-              {{ eq.name }}
+              {{ eq.name }}<span v-if="eq.enhanceLevel > 0" class="eq-enhance">+{{ eq.enhanceLevel }}</span>
               <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
               <span class="eq-score">评分 {{ formatEquipmentScore(getEquipScore(eq)) }}</span>
             </div>
@@ -679,10 +679,10 @@
         <div class="modal-content glass-card" @click.stop>
           <button class="btn btn-warning btn-close" @click="closeBattleRewardEquipDetail">关闭</button>
           <div class="modal-header" :style="{ borderColor: battleRewardEqDetail.color }">
-            <span class="modal-title" :style="{ color: battleRewardEqDetail.color }">{{ battleRewardEqDetail.name }}</span>
+            <span class="modal-title" :style="{ color: battleRewardEqDetail.color }">{{ battleRewardEqDetail.name }}<span v-if="battleRewardEqDetail.enhanceLevel > 0" class="eq-enhance">+{{ battleRewardEqDetail.enhanceLevel }}</span></span>
             <span>{{ battleRewardEqDetail.rarityName }}</span>
             <span>·</span>
-            <span>评分 {{ battleRewardEqDetail.score || 0 }}</span>
+            <span>评分 {{ formatEquipmentScore(battleRewardEqDetail.score || 0) }}</span>
           </div>
           <div v-if="battleRewardEqDetail.stats && Object.keys(battleRewardEqDetail.stats).length" class="attr-block">
             <h4 class="sub-title">基础数据</h4>
@@ -1855,7 +1855,8 @@ const openBattleRewardEquipDetail = (eq) => {
     color: eq.qualityInfo?.color || '#9e9e9e',
     score: getEquipScore(eq),
     stats: eq.mainAttributes || eq.stats || {},
-    affixes: eq.affixes || []
+    affixes: eq.affixes || [],
+    enhanceLevel: eq.enhanceLevel || 0
   }
   showBattleRewardEqDetail.value = true
 }
@@ -3680,6 +3681,21 @@ onUnmounted(() => {
   font-size: 14px;
   font-weight: bold;
   margin-bottom: 4px;
+}
+
+/* 强化等级标记（+1 及以上显示，+0 不显示） */
+.equipment-detail-item .eq-enhance,
+.modal-header .eq-enhance {
+  display: inline-block;
+  margin-left: 4px;
+  padding: 0 5px;
+  border-radius: 3px;
+  font-size: 11px;
+  font-weight: 700;
+  color: #FFE082;
+  background: rgba(255, 160, 0, 0.2);
+  border: 1px solid rgba(255, 160, 0, 0.5);
+  vertical-align: middle;
 }
 
 .eq-quality {
