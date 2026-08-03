@@ -486,6 +486,7 @@
                     <button class="btn-small" :disabled="forgePage <= 1" @click="forgeInvPrevPage">上一页</button>
                     <button class="btn-small" :disabled="forgePage >= forgeInventoryTotalPages" @click="forgeInvNextPage">下一页</button>
                     <button class="btn-small" @click="selectAllCurrentPage">全选当前页</button>
+                    <button class="btn-small btn-warning" @click="selectEpicAndBelow">全选极品及以下</button>
                     <button class="btn-small btn-danger" @click="selectedDisassembleIds = []">清空选择</button>
                     <button
                       class="btn-small btn-primary"
@@ -2330,6 +2331,16 @@
       const set = new Set([...selectedDisassembleIds.value, ...pageIds])
       selectedDisassembleIds.value = Array.from(set)
     }
+  }
+
+  // 全选所有极品(epic)及以下（凡/良/上/极）装备，含所有筛选/分页结果
+  const selectEpicAndBelow = () => {
+    const RARITY_ORDER = ['common', 'uncommon', 'rare', 'epic']
+    const targetIds = inventoryEquipments.value
+      .filter(e => RARITY_ORDER.includes((e.rarity || e.quality || 'common')))
+      .map(e => e.id)
+    const set = new Set([...selectedDisassembleIds.value, ...targetIds])
+    selectedDisassembleIds.value = Array.from(set)
   }
 
   // 强化成功率（与 enhanceEquipment 内部计算保持一致）：

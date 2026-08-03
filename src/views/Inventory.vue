@@ -443,7 +443,7 @@
           @click="showEquipmentDetails(equipment)"
         >
           <div class="card-header">
-            <span class="equip-name">{{ equipment.name }}</span>
+            <span class="equip-name">{{ equipment.name }}<span v-if="equipment.enhanceLevel > 0" class="eq-enhance">+{{ equipment.enhanceLevel }}</span></span>
           </div>
           <div class="card-body">
             <div class="equip-meta">
@@ -466,7 +466,7 @@
   <div v-if="showEquipmentDetailModal" class="simple-modal equipment-detail-modal" @click.self="showEquipmentDetailModal = false">
     <div class="simple-modal-content equipment-detail-content">
       <div class="modal-header">
-        <h3>{{ selectedEquipment?.name || '装备详情' }}</h3>
+        <h3>{{ selectedEquipment?.name || '装备详情' }}<span v-if="selectedEquipment && selectedEquipment.enhanceLevel > 0" class="eq-enhance">+{{ selectedEquipment.enhanceLevel }}</span></h3>
         <button class="btn-small" @click="showEquipmentDetailModal = false">关闭</button>
       </div>
       <div v-if="selectedEquipment" class="modal-body">
@@ -2651,6 +2651,20 @@
     text-overflow: ellipsis;
     white-space: nowrap;
     max-width: 70%;
+  }
+
+  /* 强化等级标记（+1 及以上显示，+0 不显示） */
+  .eq-enhance {
+    display: inline-block;
+    margin-left: 4px;
+    padding: 0 5px;
+    border-radius: 3px;
+    font-size: 11px;
+    font-weight: 700;
+    color: #FFE082;
+    background: rgba(255, 160, 0, 0.2);
+    border: 1px solid rgba(255, 160, 0, 0.5);
+    vertical-align: middle;
   }
 
   .equip-meta {
