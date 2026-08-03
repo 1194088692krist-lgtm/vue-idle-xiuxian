@@ -427,31 +427,34 @@
         </div>
 
         <!-- 技能槽位选择弹窗：点击"装备"按钮后弹出，选择要装备到哪个槽位 -->
-        <div v-if="skillSlotPicker.show" class="skill-slot-picker-overlay" @click.self="closeSkillSlotPicker">
-          <div class="skill-slot-picker">
-            <div class="picker-header">
-              <span>选择装备槽位</span>
-              <button class="picker-close" @click="closeSkillSlotPicker">✕</button>
-            </div>
-            <div class="picker-skill-name">
-              {{ getSkillCategoryIcon(skillSlotPicker.skill?.category) }} {{ skillSlotPicker.skill?.name }}
-            </div>
-            <div class="picker-slots">
-              <button
-                v-for="slotIdx in 3"
-                :key="'pick-' + slotIdx"
-                class="picker-slot-btn"
-                @click="confirmEquipToSlot(slotIdx - 1)"
-              >
-                <span class="picker-slot-label">槽位 {{ slotIdx }}</span>
-                <span class="picker-slot-current" v-if="getEquippedSkillAtSlot(detailMember, slotIdx - 1)">
-                  {{ getEquippedSkillAtSlot(detailMember, slotIdx - 1).name }}
-                </span>
-                <span class="picker-slot-current empty" v-else>（空）</span>
-              </button>
+        <!-- 使用 Teleport 移到 body，避免父级 overflow-y:auto 容器导致 fixed 定位在移动端失效 -->
+        <Teleport to="body">
+          <div v-if="skillSlotPicker.show" class="skill-slot-picker-overlay" @click.self="closeSkillSlotPicker">
+            <div class="skill-slot-picker">
+              <div class="picker-header">
+                <span>选择装备槽位</span>
+                <button class="picker-close" @click="closeSkillSlotPicker">✕</button>
+              </div>
+              <div class="picker-skill-name">
+                {{ getSkillCategoryIcon(skillSlotPicker.skill?.category) }} {{ skillSlotPicker.skill?.name }}
+              </div>
+              <div class="picker-slots">
+                <button
+                  v-for="slotIdx in 3"
+                  :key="'pick-' + slotIdx"
+                  class="picker-slot-btn"
+                  @click="confirmEquipToSlot(slotIdx - 1)"
+                >
+                  <span class="picker-slot-label">槽位 {{ slotIdx }}</span>
+                  <span class="picker-slot-current" v-if="getEquippedSkillAtSlot(detailMember, slotIdx - 1)">
+                    {{ getEquippedSkillAtSlot(detailMember, slotIdx - 1).name }}
+                  </span>
+                  <span class="picker-slot-current empty" v-else>（空）</span>
+                </button>
+              </div>
             </div>
           </div>
-        </div>
+        </Teleport>
 
         <!-- 装备区域（点击查看详情，详情页内可直接强化） -->
         <div class="attr-block" v-if="detailMember?.equippedArtifacts">
@@ -1543,6 +1546,9 @@ watch([allMembers, teamMembers], () => {
   background: linear-gradient(90deg, transparent, rgba(255,255,255,0.3), transparent);
   animation: shimmer 2s infinite;
 }
+/* 中低端设备禁用常驻 shimmer 动画 */
+html.fx-low .progress-glow,
+html.fx-medium .progress-glow { animation: none; }
 @keyframes shimmer {
   0% { transform: translateX(-100%); }
   100% { transform: translateX(100%); }
@@ -2408,14 +2414,15 @@ watch([allMembers, teamMembers], () => {
   background: rgba(0, 0, 0, 0.7);
   display: flex;
   justify-content: center;
-  align-items: flex-end;
-  padding-bottom: 20px;
+  align-items: center;
+  padding: 16px;
+  z-index: 1000;
 }
 
 .sect-member-modal-content {
   width: 95%;
   max-width: 400px;
-  max-height: 80vh;
+  max-height: 85vh;
   padding: 16px;
   overflow-y: auto;
   border-radius: 12px;

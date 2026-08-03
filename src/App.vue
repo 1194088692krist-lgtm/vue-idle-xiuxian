@@ -641,6 +641,12 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     }
     const start = Number(ref.value)
     const diff = target - start
+    // 差值过小时直接赋值，避免每秒高频 RAF（spirit 每秒+1 时差值仅 1，RAF 动画肉眼不可见却持续占 CPU）
+    if (Math.abs(diff) < 5) {
+      ref.value = target
+      raf_ref.value = null
+      return
+    }
     const startTime = performance.now()
     const animate = currentTime => {
       const elapsed = currentTime - startTime
@@ -962,6 +968,18 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     0% { transform: translateX(-100%); }
     100% { transform: translateX(100%); }
   }
+
+  /* 中低端设备（fx-low / fx-medium）禁用常驻装饰动画，减少 GPU 合成层持续重绘 */
+  html.fx-low .progress-shimmer,
+  html.fx-medium .progress-shimmer { animation: none; }
+
+  /* 低端设备禁用角色星级光效（每角色 3 组 infinite 动画叠加，多角色时 GPU 负载高） */
+  html.fx-low .char-avatar.star-4,
+  html.fx-low .char-avatar.star-4::before,
+  html.fx-low .char-avatar.star-4::after,
+  html.fx-low .char-avatar.star-5,
+  html.fx-low .char-avatar.star-5::before,
+  html.fx-low .char-avatar.star-5::after { animation: none; }
 
   .cultivation-pool-fill {
     background: linear-gradient(90deg, #9b59b6, #8e44ad, #9b59b6);
