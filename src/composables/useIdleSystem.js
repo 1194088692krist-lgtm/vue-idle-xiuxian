@@ -1588,8 +1588,6 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   enemy.isCharacterBoss = true
   enemy.characterBossId = character.id
   enemy.characterBossStar = character.star
-  // 头像/立绘：使用人物立绘（非怪物 manifest），便于 BattleStage 渲染头像并点击查看立绘
-  enemy.avatar = getCharacterAvatar({ id: character.id }, 'thumbnail')
   // 登场立绘：优先 skin5（专属 BOSS 立绘），skin5 不存在时用该角色最高编号皮肤作为 BOSS 形态
   // 修复：云隐(char_009)等只有 3 个皮肤的角色无 skin5，原逻辑回退到原立绘导致 BOSS 登场无差异化
   const skinCount = getSkinCount({ id: character.id })
@@ -1599,6 +1597,10 @@ function createCharacterBossEnemy(character, effectiveZone, difficultyKey) {
   } else if (skinCount > 0) {
     bossPortraitUrl = getCharacterSkinUrl({ id: character.id }, skinCount )
   }
+  // 头像/立绘：人物 BOSS 头像也使用 BOSS 形态立绘（skin5），与登场/击败立绘保持一致
+  // 修复：原头像用原角色缩略图（thumbnails/char_XXX_thumb.webp），BOSS 战中显示为「原立绘」
+  // 改为优先使用 bossPortraitUrl，让战斗内头像与 BOSS 形态统一
+  enemy.avatar = bossPortraitUrl || getCharacterAvatar({ id: character.id }, 'thumbnail')
   enemy.portrait = bossPortraitUrl || getCharacterAvatar({ id: character.id }, 'full')
   return enemy
 }
@@ -5319,6 +5321,7 @@ const idleDashboard = computed(() => {
       rarityName: (eq.qualityInfo && eq.qualityInfo.name) || eq.rarity || '',
       color: (eq.qualityInfo && eq.qualityInfo.color) || '#9e9e9e',
       score: calculateEquipmentScore(eq),
+      enhanceLevel: eq.enhanceLevel || 0,
       stats: eq.stats,
       affixes: eq.affixes,
       time: eq._pickedAt || Date.now()

@@ -20,7 +20,7 @@
           <span>强化等级</span><span>+{{ equipment.enhanceLevel || 0 }}</span>
         </div>
         <div class="detail-row">
-          <span>装备评分</span><span class="equipment-score">{{ calculateEquipmentScore(equipment) }}</span>
+          <span>装备评分</span><span class="equipment-score">{{ formatEquipmentScore(equipment) }}</span>
         </div>
         <div v-if="equipment.setId" class="detail-row">
           <span>套装</span>
@@ -143,7 +143,7 @@
             <div v-for="p in enhancePreview" :key="p.level" class="enhance-preview-row">
               <span>+{{ p.level }}</span>
               <span>×{{ Math.round(p.multiplier * 100) / 100 }}</span>
-              <span>{{ p.score }}</span>
+              <span>{{ formatEquipmentScore(p.score) }}</span>
             </div>
           </div>
         </div>
@@ -210,7 +210,7 @@
   import { useMessage } from 'naive-ui'
   import { usePlayerStore } from '../stores/player'
   import { getStatName, formatStatValue } from '../plugins/stats'
-  import { calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/buildSystem'
+  import { calculateEquipmentScore, formatEquipmentScore, rarityConfig, setBonuses } from '../plugins/buildSystem'
   import { enhanceConfig } from '../plugins/equipment'
   import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
   import { craftCurrencies } from '../plugins/craftCurrency'

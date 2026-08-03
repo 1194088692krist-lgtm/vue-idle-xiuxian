@@ -418,7 +418,7 @@
             <div class="eq-info">
               <div class="eq-name">{{ eq.name }}</div>
               <div class="eq-type">{{ getEquipmentTypeName(eq.type) }}</div>
-              <div class="eq-score">评分: {{ calculateEquipmentScore(eq) }}</div>
+              <div class="eq-score">评分: {{ formatEquipmentScore(eq) }}</div>
             </div>
             <button class="btn-delete" @click.stop="deleteEquipment(index)">×</button>
           </div>
@@ -499,7 +499,7 @@
               </div>
               <div class="form-item full">
                 <label>装备评分</label>
-                <span class="equipment-score">{{ calculateEquipmentScore(editingEquipment) }}</span>
+                <span class="equipment-score">{{ formatEquipmentScore(editingEquipment) }}</span>
               </div>
             </div>
             <div class="modal-actions">
@@ -1163,7 +1163,7 @@ import { usePlayerStore } from '../stores/player'
 import { GameDB } from '../stores/db'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
 import { equipmentQualities, equipmentTypeNames, petRarities, equipmentNameParts, petNameParts, petDescriptions, equipmentStatPool } from '../plugins/gacha'
-import { rarityConfig, affixPool, setBonuses, calculateEquipmentScore, getAffixesForSlot } from '../plugins/buildSystem'
+import { rarityConfig, affixPool, setBonuses, calculateEquipmentScore, formatEquipmentScore, getAffixesForSlot } from '../plugins/buildSystem'
 import { characterList, characterSchools, characterTalents, generateCharacterById, getCharacterAvatar, initCharacterDefs, characterDefMap, syncCharacterDefs } from '../plugins/characters'
 
 const playerStore = usePlayerStore()

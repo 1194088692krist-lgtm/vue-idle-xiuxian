@@ -548,7 +548,7 @@
             @click="equipItem(item)"
           >
             <span class="item-name" :style="{ color: getItemColor(item) }">{{ item.name }}</span>
-            <span class="item-score">评分 {{ calculateEquipmentScore(item) || 0 }}</span>
+            <span class="item-score">评分 {{ formatEquipmentScore(item) }}</span>
           </div>
         </div>
         <div v-else class="equip-select-empty">没有可用的装备</div>
@@ -600,7 +600,7 @@ import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
-import { calculateEquipmentScore } from '../plugins/buildSystem'
+import { calculateEquipmentScore, formatEquipmentScore } from '../plugins/buildSystem'
 import { getAllResonanceEffects, getResonanceDesc, getResonanceBuildMultiplier } from '../plugins/schoolResonance'
 import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
 import PetPortraitModal from '../components/PetPortraitModal.vue'
@@ -761,11 +761,8 @@ const rarityColorMap = {
 const getItemColor = (item) => item?.color || rarityColorMap[item?.rarity] || rarityColorMap[item?.quality] || '#DAA520'
 const getPetColor = (pet) => pet?.color || rarityColorMap[pet?.rarity] || '#9fe0ff'
 
-// 装备评分格式化：复用 formatNumber 的万/亿单位转换（>1万显示 x万，>1亿显示 x亿）
-const formatScore = (equip) => {
-  const score = calculateEquipmentScore(equip) || 0
-  return formatNumber(score)
-}
+// 装备评分格式化：1~9999 阿拉伯数字，1万~1亿 XXX万，1亿+ X.xxx亿
+const formatScore = (equip) => formatEquipmentScore(equip)
 
 const availableItemsForSlot = computed(() => {
   if (!selectSlot.value) return []

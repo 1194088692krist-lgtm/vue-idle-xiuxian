@@ -330,7 +330,7 @@
                     </div>
                     <div class="equip-info">
                       <span>强化: {{ equip.enhanceLevel || 0 }}/{{ getEquipMaxEnhanceLevel(equip) }}</span>
-                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
+                      <span class="equip-score-badge">评分 {{ formatEquipmentScore(equip) }}</span>
                     </div>
                   </div>
                 </div>
@@ -467,7 +467,7 @@
                     </div>
                     <div class="equip-info">
                       <span>词条数: {{ (equip.affixes ? equip.affixes.length : 0) }}/{{ reforgeConfig.affixMaxCount[equip.rarity || 'common'] }}</span>
-                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
+                      <span class="equip-score-badge">评分 {{ formatEquipmentScore(equip) }}</span>
                     </div>
                   </div>
                 </div>
@@ -519,7 +519,7 @@
                       </div>
                     </div>
                     <div class="equip-info">
-                      <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equip) }}</span>
+                      <span class="equip-score-badge">评分 {{ formatEquipmentScore(equip) }}</span>
                     </div>
                   </div>
                 </div>
@@ -631,7 +631,7 @@
                         </div>
                         <div class="equip-info">
                           <span>强化: {{ eq.enhanceLevel || 0 }}/{{ EXCLUSIVE_EQUIP_CONFIG.maxEnhanceLevel }}</span>
-                          <span class="equip-score-badge">评分 {{ calculateEquipmentScore(eq) }}</span>
+                          <span class="equip-score-badge">评分 {{ formatEquipmentScore(eq) }}</span>
                         </div>
                       </div>
                     </div>
@@ -685,7 +685,7 @@
                   </div>
                   <div class="excl-source-item-meta">
                     <span>部位: {{ EXCLUSIVE_SLOT_NAMES[equip.slot] || equip.slot || '-' }}</span>
-                    <span>评分: {{ calculateEquipmentScore(equip) }}</span>
+                    <span>评分: {{ formatEquipmentScore(equip) }}</span>
                     <span v-if="equip.enhanceLevel">+{{ equip.enhanceLevel }}</span>
                   </div>
                   <div class="excl-source-item-stats">
@@ -1315,7 +1315,7 @@
     InfoCircleOutlined,
     FireOutlined
   } from '@ant-design/icons-vue'
-  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore } from '../plugins/equipment'
+  import { enhanceConfig, reforgeConfig, rarityConfig, getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, calculateEquipmentScore, formatEquipmentScore } from '../plugins/equipment'
   import { formatNumber as formatNumberWithUnit } from '../utils/formatNumber.js'
   import { getReforgeBossMaterial } from '../plugins/cultivationSystem'
   import { BLACK_MARKET_CONFIG, getManualRefreshCost, SKIN_SHOP_CONFIG, getSkinShopRefreshCost } from '../plugins/shopConfig'
@@ -2269,7 +2269,7 @@
       return exclMythicCount.value > 0 ? `点击选择（共 ${exclMythicCount.value} 件）` : '无神品装备'
     }
     const eq = exclSelectedSource.value
-    return `${eq.name}（评分 ${calculateEquipmentScore(eq)}）`
+    return `${eq.name}（评分 ${formatEquipmentScore(eq)}）`
   })
   const openExclSourcePicker = () => {
     exclSourcePickerVisible.value = true

@@ -258,7 +258,7 @@
               <span>强化等级</span><span>+{{ selectedGachaItem.enhanceLevel || 0 }}</span>
             </div>
             <div class="detail-row">
-              <span>装备评分</span><span class="equipment-score">{{ calculateEquipmentScore(selectedGachaItem) }}</span>
+              <span>装备评分</span><span class="equipment-score">{{ formatEquipmentScore(selectedGachaItem) }}</span>
             </div>
             <div v-if="selectedGachaItem.setId" class="detail-row">
               <span>套装</span>
@@ -330,7 +330,7 @@
     petRarities,
     equipmentQualities
   } from '../plugins/gacha'
-  import { setBonuses, calculateEquipmentScore, rarityConfig } from '../plugins/buildSystem'
+  import { setBonuses, calculateEquipmentScore, formatEquipmentScore, rarityConfig } from '../plugins/buildSystem'
   import LogPanel from '../components/LogPanel.vue'
   import CharacterPortraitModal from '../components/CharacterPortraitModal.vue'
   import PetPortraitModal from '../components/PetPortraitModal.vue'

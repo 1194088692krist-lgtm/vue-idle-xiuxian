@@ -330,6 +330,23 @@ function calculateEquipmentScore(equipment) {
   return totalScore
 }
 
+/**
+ * 装备评分显示格式化：
+ * - 1~9999：阿拉伯数字（如 1234）
+ * - 1万~1亿：XXX万（整数万，如 12万、123万、1234万）
+ * - 1亿以上：X.xxx亿（3位小数，如 1.234亿、12.345亿）
+ */
+function formatEquipmentScore(equipment) {
+  const score = typeof equipment === 'number' ? equipment : calculateEquipmentScore(equipment)
+  if (score >= 1e8) {
+    return (score / 1e8).toFixed(3) + '亿'
+  }
+  if (score >= 10000) {
+    return Math.round(score / 10000) + '万'
+  }
+  return String(score)
+}
+
 function getStatScore(stat, value, isPercent = false) {
   const highValueStats = ['health', 'spiritRate', 'cultivationRate']
   const attackStats = ['attack', 'critRate', 'critDamageBoost', 'comboRate', 'vampireRate', 'stunRate', 'finalDamageBoost', 'combatBoost']
@@ -456,6 +473,7 @@ export {
   getAffixesForSlot,
   getAffixValue,
   calculateEquipmentScore,
+  formatEquipmentScore,
   calculateBuildStrength,
   calculateCharacterPower,
   calculateTotalBuild,

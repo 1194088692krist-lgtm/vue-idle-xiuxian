@@ -106,7 +106,7 @@
                   <span class="simple-tag" :style="{ color: qualityInfoOf(item).color }">
                     {{ qualityInfoOf(item).name }}
                   </span>
-                  <span class="equip-score-badge">评分 {{ calculateEquipmentScore(item) }}</span>
+                  <span class="equip-score-badge">评分 {{ formatEquipmentScore(item) }}</span>
                   <span v-if="bestAffixTier(item.affixes)" class="qtier-badge qtier-card" :class="qualityTierClass(bestAffixTier(item.affixes))">{{ qualityTierLabel(bestAffixTier(item.affixes)) }}{{ bestAffixTierTag(bestAffixTier(item.affixes)) ? '·' + bestAffixTierTag(bestAffixTier(item.affixes)) : '' }}</span>
                 </div>
                 <p>{{ equipmentTypes[item.slot] || item.slot }}</p>
@@ -450,7 +450,7 @@
               <span class="simple-tag" :style="{ color: qualityInfoOf(equipment).color }">
                 {{ qualityInfoOf(equipment).name }}
               </span>
-              <span class="equip-score-badge">评分 {{ calculateEquipmentScore(equipment) }}</span>
+              <span class="equip-score-badge">评分 {{ formatEquipmentScore(equipment) }}</span>
               <span v-if="bestAffixTier(equipment.affixes)" class="qtier-badge qtier-card" :class="qualityTierClass(bestAffixTier(equipment.affixes))">{{ qualityTierLabel(bestAffixTier(equipment.affixes)) }}{{ bestAffixTierTag(bestAffixTier(equipment.affixes)) ? '·' + bestAffixTierTag(bestAffixTier(equipment.affixes)) : '' }}</span>
             </div>
             <p class="equip-affix-preview">词条：{{ formatAffixNames(equipment.affixes) }}</p>
@@ -483,7 +483,7 @@
           <span>强化等级</span><span>+{{ selectedEquipment.enhanceLevel || 0 }}</span>
         </div>
         <div class="detail-row">
-          <span>装备评分</span><span class="equipment-score">{{ calculateEquipmentScore(selectedEquipment) }}</span>
+          <span>装备评分</span><span class="equipment-score">{{ formatEquipmentScore(selectedEquipment) }}</span>
         </div>
         <div v-if="selectedEquipment.setId" class="detail-row">
           <span>套装</span>
@@ -606,7 +606,7 @@
             <div v-for="p in enhancePreview" :key="p.level" class="enhance-preview-row">
               <span>+{{ p.level }}</span>
               <span>×{{ Math.round(p.multiplier * 100) / 100 }}</span>
-              <span>{{ p.score }}</span>
+              <span>{{ formatEquipmentScore(p.score) }}</span>
             </div>
           </div>
         </div>
@@ -818,7 +818,7 @@
   import { getRealmName } from '../plugins/realm'
   import { getCharacterAvatar, getCharacterThumbnail } from '../plugins/characters'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
-  import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
+  import { enhanceEquipment, reforgeEquipment, calculateEquipmentScore, formatEquipmentScore, rarityConfig, setBonuses } from '../plugins/equipment'
   import { qualityTierLabel, qualityTierClass, bestAffixTier, bestAffixTierTag } from '../utils/affixQuality'
   import { craftCurrencies } from '../plugins/craftCurrency'
   import { getRuneSynergy, RUNE_ELEMENTS, getRuneStats } from '../plugins/runes'

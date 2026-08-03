@@ -508,11 +508,11 @@ function disassembleEquipment(equipment) {
   }
 }
 
-import { calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
+import { calculateEquipmentScore, formatEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses } from './buildSystem'
 
 export {
   enhanceConfig, reforgeConfig, reforgeableStats, statCaps, statBaseRanges,
   enhanceEquipment, reforgeEquipment, disassembleEquipment,
   getEnhanceSpiritStoneCost, getEnhanceStoneCost, getEnhanceBossMaterialCost, getLockLevel,
-  calculateEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses
+  calculateEquipmentScore, formatEquipmentScore, calculateBuildStrength, getActiveSetBonuses, applySetBonusStats, rarityConfig, setBonuses
 }

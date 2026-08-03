@@ -421,10 +421,10 @@
                 @click="showDashEquipment(eq)"
               >
                 <img :src="getEquipIcon(eq.type || eq.slot)" class="eq-icon" :alt="eq.name" loading="lazy" decoding="async" />
-                <span class="eq-name">{{ eq.name }}</span>
+                <span class="eq-name">{{ eq.name }}<span v-if="eq.enhanceLevel > 0" class="eq-enhance">+{{ eq.enhanceLevel }}</span></span>
                 <span class="eq-slot">{{ eq.slotName }}</span>
                 <span class="eq-rarity">{{ eq.rarityName }}</span>
-                <span class="eq-score" v-if="eq.score">评分 {{ eq.score }}</span>
+                <span class="eq-score" v-if="eq.score">评分 {{ formatEquipmentScore(eq.score) }}</span>
               </div>
             </div>
           </div>
@@ -440,8 +440,10 @@
           <span>{{ dashEqDetail.slotName }}</span>
           <span>·</span>
           <span>{{ dashEqDetail.rarityName }}</span>
+          <span v-if="dashEqDetail.enhanceLevel > 0">·</span>
+          <span v-if="dashEqDetail.enhanceLevel > 0">+{{ dashEqDetail.enhanceLevel }}</span>
           <span>·</span>
-          <span>评分 {{ dashEqDetail.score || 0 }}</span>
+          <span>评分 {{ formatEquipmentScore(dashEqDetail.score || 0) }}</span>
         </div>
         <div v-if="dashEqDetail.stats" class="attr-block">
           <h4 class="sub-title">基础数据</h4>
@@ -563,7 +565,7 @@
             <div class="eq-name" :style="{ color: eq.qualityInfo?.color || '#fff' }">
               {{ eq.name }}
               <span class="eq-quality">{{ eq.qualityInfo?.name || '' }}</span>
-              <span class="eq-score">评分 {{ getEquipScore(eq) }}</span>
+              <span class="eq-score">评分 {{ formatEquipmentScore(getEquipScore(eq)) }}</span>
             </div>
             <div class="eq-type">{{ getEquipSlotName(eq) }}</div>
             <div class="eq-stats">
@@ -1160,7 +1162,7 @@ import { characterSchools, getCharacterAvatar, getCharacterThumbnail } from '../
 import { getStatName, formatStatValue } from '../plugins/stats'
 import { formatNumber } from '../utils/formatNumber.js'
 import CharacterPortraitModal from './CharacterPortraitModal.vue'
-import { calculateEquipmentScore } from '../plugins/buildSystem'
+import { calculateEquipmentScore, formatEquipmentScore } from '../plugins/buildSystem'
 import { qualityTierLabel, qualityTierClass } from '../utils/affixQuality'
 import { getPillsByZone, pillRecipes } from '../plugins/pills'
 import { BOSS_TICKETS, getBossTicketByBossId, CHARACTER_BOSS_TICKETS } from '../plugins/cultivationSystem'
@@ -4041,6 +4043,17 @@ onUnmounted(() => {
 }
 .dash-equipment-item:hover {
   opacity: 0.8;
+}
+/* 强化等级标记（+1 及以上显示，+0 不显示） */
+.dash-equipment-item .eq-enhance {
+  margin-left: 4px;
+  padding: 0 4px;
+  border-radius: 3px;
+  font-size: 10px;
+  font-weight: 700;
+  color: #FFE082;
+  background: rgba(255, 160, 0, 0.18);
+  border: 1px solid rgba(255, 160, 0, 0.5);
 }
 /* 最近获得装备：稀有及以上 发光文本框 + 渐变流光文字（保留宝物高亮特效） */
 .dash-equipment-item.is-rare,
