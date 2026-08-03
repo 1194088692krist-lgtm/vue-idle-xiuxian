@@ -31,7 +31,8 @@ async function computeRemoteAssetSignature() {
     `./portraits/skins.json?v=8&_t=${ts}`,
     `./pets/manifest.json?_t=${ts}`,
     `./pets/skins.json?v=8&_t=${ts}`,
-    `./fx-manifest.json?_t=${ts}`
+    `./fx-manifest.json?_t=${ts}`,
+    `./assets/manifest.json?_t=${ts}`
   ]
   const responses = await Promise.all(
     manifestPaths.map(u => fetch(urlFromPath(u), { cache: 'no-store' }).catch(() => null))
@@ -155,7 +156,8 @@ async function collectResourceUrls() {
     './portraits/skins.json?v=8',
     './portraits/defeated.json',
     './pets/manifest.json',
-    './pets/skins.json?v=8'
+    './pets/skins.json?v=8',
+    './assets/manifest.json'
   ]
   for (const m of manifestUrls) {
     urls.push(m)
@@ -178,7 +180,7 @@ async function collectResourceUrls() {
     const fetchUrls = manifestUrls.map(u =>
       u.includes('skins.json') ? `${u}&_t=${bustTs}` : u
     )
-    const [portraitsRes, monstersRes, skinsRes, defeatedRes, petManifestRes, petSkinsRes, fxManifestRes] = await Promise.all(
+    const [portraitsRes, monstersRes, skinsRes, defeatedRes, petManifestRes, petSkinsRes, assetsManifestRes, fxManifestRes] = await Promise.all(
       fetchUrls.map(u => fetch(urlFromPath(u))).concat([fetch(urlFromPath('./fx-manifest.json'))])
     )
     const portraitsData = await portraitsRes.json()
@@ -228,6 +230,16 @@ async function collectResourceUrls() {
           for (const skinFile of entry.skins) {
             urls.push('./pets/' + skinFile)
           }
+        }
+      }
+    }
+    // 静态素材：assets/manifest.json 含 files 数组（icons/zones/bg 全部图片）
+    // 纳入一键下载，确保离线后所有 UI 图标和秘境图片均可本地命中
+    if (assetsManifestRes && assetsManifestRes.ok) {
+      const assetsData = await assetsManifestRes.json()
+      if (Array.isArray(assetsData.files)) {
+        for (const file of assetsData.files) {
+          urls.push('./assets/' + file)
         }
       }
     }

@@ -4570,6 +4570,69 @@ export const usePlayerStore = defineStore('player', {
         inheritedBonus: result.inheritedBonus
       }
     },
+    // ===== GM 工具：直接修改出战角色数据 =====
+    // 供 GM 工具首页「出战角色编辑」使用，绕过正常升级/突破流程，直接覆写字段。
+    // changes 支持：level, breakThrough, effortValue, baseStats{attack,health,defense,speed}, experience, star
+    gmModifyTeamMember(memberId, changes) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      const before = { level: member.level, breakThrough: member.breakThrough, effortValue: member.effortValue }
+      try {
+        if (typeof changes.level === 'number' && changes.level >= 1 && changes.level <= 9999) {
+          member.level = Math.floor(changes.level)
+          member.maxExperience = calculateLevelExp(member.level)
+        }
+        if (typeof changes.breakThrough === 'number') {
+          member.breakThrough = Math.max(0, Math.min(5, Math.floor(changes.breakThrough)))
+        }
+        if (typeof changes.effortValue === 'number' && changes.effortValue >= 0) {
+          member.effortValue = Math.floor(changes.effortValue)
+        }
+        if (typeof changes.experience === 'number' && changes.experience >= 0) {
+          member.experience = Math.floor(changes.experience)
+        }
+        if (typeof changes.star === 'number' && [3, 4, 5].includes(changes.star)) {
+          member.star = changes.star
+        }
+        if (changes.baseStats && typeof changes.baseStats === 'object') {
+          if (!member.baseStats) member.baseStats = {}
+          for (const k of ['attack', 'health', 'defense', 'speed']) {
+            if (typeof changes.baseStats[k] === 'number' && changes.baseStats[k] >= 0) {
+              member.baseStats[k] = Math.floor(changes.baseStats[k])
+            }
+          }
+        }
+        // 修复异常 baseStats（全 0 或负值）
+        if (isMemberBaseStatsAbnormal(member)) {
+          recalculateMemberBaseStats(member)
+        }
+        this.characterStatsVersion++
+        this.queueSave()
+        return {
+          success: true,
+          message: `${member.name} 数据已修改：等级 ${before.level}→${member.level}，突破 ${before.breakThrough}→${member.breakThrough}，努力值 ${before.effortValue}→${member.effortValue}`,
+          before,
+          after: { level: member.level, breakThrough: member.breakThrough, effortValue: member.effortValue }
+        }
+      } catch (e) {
+        return { success: false, message: '修改失败：' + e.message }
+      }
+    },
+    // GM 工具：重算指定角色的 baseStats（按 templateId + level + breakThrough 重新走成长公式）
+    gmRecalcMemberStats(memberId) {
+      const member = this.sectMembers.find(m => m.id === memberId)
+      if (!member) return { success: false, message: '成员不存在' }
+      const before = { ...member.baseStats }
+      recalculateMemberBaseStats(member)
+      this.characterStatsVersion++
+      this.queueSave()
+      return {
+        success: true,
+        message: `${member.name} 基础属性已重算`,
+        before,
+        after: { ...member.baseStats }
+      }
+    },
     // ===== 化器成灵：将 +8 及以上仙品/神品装备的 1/3 基础数值永久加成到人物 =====
     // 2.2.1 调整：
     //   1) 100% 必成功（不再有失败/保底概率）；强化难度差异已下放到装备强化系统本身

@@ -18,6 +18,63 @@
     <div class="tools-content">
       <!-- 数值调整面板 -->
       <div v-if="activeTab === 'values'" class="panel">
+        <!-- 出战角色编辑（GM 快捷入口） -->
+        <div class="panel-section gm-team-section">
+          <h3>出战角色编辑</h3>
+          <div v-if="gmTeamMembers.length === 0" class="gm-empty-hint">
+            当前没有出战角色，请先在「队伍」页面配置出战队伍。
+          </div>
+          <div v-else class="gm-team-list">
+            <div v-for="m in gmTeamMembers" :key="m.id" class="gm-team-card">
+              <div class="gm-team-card-head">
+                <span class="gm-team-name">{{ m.name }}</span>
+                <span class="gm-team-meta">{{ m.star }}★ · {{ m.schoolName }} · Lv.{{ m.level }} · 突破{{ m.breakThrough }}/5</span>
+              </div>
+              <div class="gm-team-grid">
+                <div class="value-item">
+                  <label>等级</label>
+                  <input type="number" v-model.number="gmEdits[m.id].level" min="1" max="9999" />
+                </div>
+                <div class="value-item">
+                  <label>突破 (0-5)</label>
+                  <input type="number" v-model.number="gmEdits[m.id].breakThrough" min="0" max="5" />
+                </div>
+                <div class="value-item">
+                  <label>努力值</label>
+                  <input type="number" v-model.number="gmEdits[m.id].effortValue" min="0" />
+                </div>
+                <div class="value-item">
+                  <label>经验</label>
+                  <input type="number" v-model.number="gmEdits[m.id].experience" min="0" />
+                </div>
+                <div class="value-item">
+                  <label>攻击</label>
+                  <input type="number" v-model.number="gmEdits[m.id].baseStats.attack" min="0" />
+                </div>
+                <div class="value-item">
+                  <label>生命</label>
+                  <input type="number" v-model.number="gmEdits[m.id].baseStats.health" min="0" />
+                </div>
+                <div class="value-item">
+                  <label>防御</label>
+                  <input type="number" v-model.number="gmEdits[m.id].baseStats.defense" min="0" />
+                </div>
+                <div class="value-item">
+                  <label>速度</label>
+                  <input type="number" v-model.number="gmEdits[m.id].baseStats.speed" min="0" />
+                </div>
+              </div>
+              <div class="panel-actions gm-team-actions">
+                <button class="btn-primary" @click="applyGmMemberEdit(m.id)">保存修改</button>
+                <button class="btn-secondary" @click="recalcGmMember(m.id)">重算属性</button>
+                <button class="btn-secondary" @click="resetGmEdit(m.id)">还原</button>
+                <button class="btn-danger" @click="maxLevelGmMember(m.id)">满级80</button>
+              </div>
+            </div>
+          </div>
+          <div v-if="gmEditMessage" class="gm-edit-msg" :class="{ ok: gmEditOk, err: !gmEditOk }">{{ gmEditMessage }}</div>
+        </div>
+
         <div class="panel-section">
           <h3>修炼数值</h3>
           <div class="value-grid">
@@ -1101,7 +1158,7 @@
 </template>
 
 <script setup>
-import { ref, computed, onMounted } from 'vue'
+import { ref, computed, onMounted, watch } from 'vue'
 import { usePlayerStore } from '../stores/player'
 import { GameDB } from '../stores/db'
 import { importTheme, exportTheme, resetTheme, getCurrentTheme, defaultTheme } from '../plugins/theme'
@@ -1123,6 +1180,83 @@ const tabs = [
   { key: 'assets', label: '素材管理' },
   { key: 'gm-gift', label: '礼包发放' }
 ]
+
+// ===== 出战角色编辑（GM 首页快捷入口）=====
+const gmTeamMembers = computed(() => playerStore.getTeamMembersDetail ? playerStore.getTeamMembersDetail() : [])
+// 每个出战角色的可编辑表单数据：gmEdits[memberId] = { level, breakThrough, effortValue, experience, baseStats }
+const gmEdits = ref({})
+const gmEditMessage = ref('')
+const gmEditOk = ref(false)
+let gmEditTimer = null
+
+// 同步 gmEdits 与当前出战队伍（首次加载 / 队伍变化时填充）
+function syncGmEdits() {
+  const next = {}
+  for (const m of gmTeamMembers.value) {
+    next[m.id] = {
+      level: m.level,
+      breakThrough: m.breakThrough || 0,
+      effortValue: m.effortValue || 0,
+      experience: m.experience || 0,
+      baseStats: { ...(m.baseStats || { attack: 0, health: 0, defense: 0, speed: 0 }) }
+    }
+  }
+  gmEdits.value = next
+}
+
+// 应用修改到 store
+function applyGmMemberEdit(memberId) {
+  const edit = gmEdits.value[memberId]
+  if (!edit) return
+  const res = playerStore.gmModifyTeamMember(memberId, {
+    level: edit.level,
+    breakThrough: edit.breakThrough,
+    effortValue: edit.effortValue,
+    experience: edit.experience,
+    baseStats: edit.baseStats
+  })
+  showGmResult(res)
+  // 同步最新值回表单
+  syncGmEdits()
+}
+
+// 重算角色 baseStats
+function recalcGmMember(memberId) {
+  const res = playerStore.gmRecalcMemberStats(memberId)
+  showGmResult(res)
+  syncGmEdits()
+}
+
+// 还原表单到当前角色数据
+function resetGmEdit(memberId) {
+  const m = gmTeamMembers.value.find(x => x.id === memberId)
+  if (!m) return
+  gmEdits.value[memberId] = {
+    level: m.level,
+    breakThrough: m.breakThrough || 0,
+    effortValue: m.effortValue || 0,
+    experience: m.experience || 0,
+    baseStats: { ...(m.baseStats || { attack: 0, health: 0, defense: 0, speed: 0 }) }
+  }
+  showGmResult({ success: true, message: `${m.name} 表单已还原` })
+}
+
+// 快捷：满级80
+function maxLevelGmMember(memberId) {
+  const edit = gmEdits.value[memberId]
+  if (!edit) return
+  edit.level = 80
+  const res = playerStore.gmModifyTeamMember(memberId, { level: 80 })
+  showGmResult(res)
+  syncGmEdits()
+}
+
+function showGmResult(res) {
+  gmEditMessage.value = res.message || (res.success ? '操作成功' : '操作失败')
+  gmEditOk.value = !!res.success
+  if (gmEditTimer) clearTimeout(gmEditTimer)
+  gmEditTimer = setTimeout(() => { gmEditMessage.value = '' }, 4000)
+}
 
 // 默认游戏数值
 const defaultValues = {
@@ -2194,7 +2328,14 @@ const sendGift = async () => {
 onMounted(async () => {
   await loadFromStorage()
   loadThemeData()
+  // 初始化出战角色编辑表单
+  syncGmEdits()
 })
+
+// 监听出战队伍变化（玩家在队伍页面调整出战角色后自动同步表单）
+watch(gmTeamMembers, () => {
+  syncGmEdits()
+}, { deep: true })
 </script>
 
 <style scoped>
@@ -2250,6 +2391,83 @@ onMounted(async () => {
 
 .panel-section {
   margin-bottom: 25px;
+}
+
+/* ===== 出战角色编辑（GM 首页）===== */
+.gm-team-section {
+  border: 1px solid rgba(218, 165, 32, 0.35);
+  border-radius: 10px;
+  padding: 15px;
+  background: rgba(40, 30, 10, 0.25);
+}
+
+.gm-empty-hint {
+  color: #C9C4BA;
+  font-size: 13px;
+  padding: 12px 0;
+}
+
+.gm-team-list {
+  display: flex;
+  flex-direction: column;
+  gap: 15px;
+}
+
+.gm-team-card {
+  background: rgba(0, 0, 0, 0.35);
+  border: 1px solid rgba(218, 165, 32, 0.2);
+  border-radius: 8px;
+  padding: 12px;
+}
+
+.gm-team-card-head {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  margin-bottom: 12px;
+  flex-wrap: wrap;
+  gap: 6px;
+}
+
+.gm-team-name {
+  font-size: 15px;
+  color: #FFD700;
+  font-weight: bold;
+}
+
+.gm-team-meta {
+  font-size: 12px;
+  color: #C9C4BA;
+}
+
+.gm-team-grid {
+  display: grid;
+  grid-template-columns: repeat(4, 1fr);
+  gap: 10px;
+}
+
+.gm-team-actions {
+  margin-top: 12px;
+  flex-wrap: wrap;
+}
+
+.gm-edit-msg {
+  margin-top: 10px;
+  padding: 8px 12px;
+  border-radius: 6px;
+  font-size: 13px;
+}
+
+.gm-edit-msg.ok {
+  background: rgba(50, 205, 50, 0.15);
+  color: #32CD32;
+  border: 1px solid rgba(50, 205, 50, 0.3);
+}
+
+.gm-edit-msg.err {
+  background: rgba(178, 34, 34, 0.15);
+  color: #FF6347;
+  border: 1px solid rgba(178, 34, 34, 0.3);
 }
 
 .panel-section h3 {
@@ -3153,10 +3371,18 @@ onMounted(async () => {
   .form-grid {
     grid-template-columns: 1fr;
   }
-  
+
   .form-item.full,
   .value-item.full {
     grid-column: span 1;
+  }
+
+  .gm-team-grid {
+    grid-template-columns: repeat(2, 1fr);
+  }
+
+  .gm-team-actions {
+    flex-direction: column;
   }
 }
 

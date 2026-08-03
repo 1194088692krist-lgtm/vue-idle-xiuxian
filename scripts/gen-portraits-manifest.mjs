@@ -39,6 +39,9 @@ async function processFile(file) {
   // 跳过皮肤文件（char_001_skin1.jpg 等）——皮肤清单由 skins.json 单独管理，
   // 不应进入原立绘 manifest，否则会因 includes 匹配覆盖原立绘条目
   if (/_skin\d+$/i.test(basename(file, ext))) return null
+  // 跳过击败立绘（char_001_defeated.jpg 等）——击败立绘清单由 defeated.json 单独管理，
+  // 否则 key.includes(c.id) 会把 char_001_defeated 误匹配到 char_001，覆盖正常立绘条目
+  if (/_defeated$/i.test(basename(file, ext))) return null
   // 动态立绘视频：合并到同名角色的 manifest 条目（video 字段）
   if (VIDEO_EXT.has(ext)) {
     const stem = basename(file, ext)
