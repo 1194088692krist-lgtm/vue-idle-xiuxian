@@ -68,20 +68,14 @@
               {{ m.name }}
             </option>
           </optgroup>
-          <optgroup v-if="nonTeamMemberOptions.length > 0" :label="'未出战成员（' + nonTeamMemberOptions.length + '）'">
-            <option v-if="showNonTeamMembers" v-for="m in nonTeamMemberOptions" :key="'non-' + m.id" :value="m.id">
-              {{ m.name }}
-            </option>
-          </optgroup>
         </select>
         <button
           v-if="nonTeamMemberOptions.length > 0"
           class="btn btn-small"
-          @click="showNonTeamMembers = !showNonTeamMembers"
+          @click="showCollectionModal = true"
         >
-          {{ showNonTeamMembers ? '收起未出战' : '展开未出战' }}
+          未出战（{{ nonTeamMemberOptions.length }}）
         </button>
-        <button class="btn btn-small btn-outline" @click="showCollectionModal = true">图鉴</button>
       </div>
     </div>
 
@@ -236,6 +230,9 @@
       <h3 class="section-title">队伍管理</h3>
       <div class="team-actions">
         <button class="btn btn-success" @click="autoPickBestTeam">一键组建最强队伍</button>
+        <button v-if="nonTeamMemberOptions.length > 0" class="btn btn-outline" @click="showCollectionModal = true">
+          未出战（{{ nonTeamMemberOptions.length }}）
+        </button>
       </div>
       <!-- 宗派共鸣信息 -->
       <div v-if="resonanceInfo && (resonanceInfo.uniform.length || resonanceInfo.combo.length)" class="resonance-panel">
@@ -259,32 +256,22 @@
         <span class="resonance-title">宗派共鸣</span>
         <span class="resonance-hint">当前队伍宗派搭配未触发共鸣效果</span>
       </div>
-      <div v-if="allMembers.length" class="bench-list">
-        <div class="bench-pagination">
-          <button class="btn btn-small" :disabled="benchPage <= 1" @click="benchPage--">上一页</button>
-          <span class="page-info">{{ benchPage }} / {{ totalBenchPages }}</span>
-          <button class="btn btn-small" :disabled="benchPage >= totalBenchPages" @click="benchPage++">下一页</button>
-        </div>
-        <div v-for="m in pagedSortedMembers" :key="m.id" class="bench-card">
+      <!-- 仅渲染出战成员（避免未出战成员触发重计算） -->
+      <div v-if="teamMembers.length" class="bench-list">
+        <div v-for="m in teamMembers" :key="m.id" class="bench-card team-card">
           <div class="bench-avatar" @click="openMemberPortrait(m)" title="点击查看立绘">
             <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" loading="lazy" decoding="async" />
             <span v-else>{{ m.name?.[0] || '仙' }}</span>
           </div>
           <div class="bench-info">
-            <div class="bench-name">{{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
+            <div class="bench-name">{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
             <div class="bench-strength">战力 {{ formatNumber(playerStore.getCharacterBuildStrength(m)) }}</div>
           </div>
           <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id, $event)">详情</button>
-          <button
-            class="btn btn-small"
-            :class="isInTeam(m.id) ? 'btn-warning' : 'btn-success'"
-            @click="toggleTeam(m.id)"
-          >
-            {{ isInTeam(m.id) ? '退出' : '加入' }}
-          </button>
+          <button class="btn btn-small btn-warning" @click="toggleTeam(m.id)">退出</button>
         </div>
       </div>
-      <div v-else class="bench-empty">暂无成员</div>
+      <div v-else class="bench-empty">暂无出战成员</div>
     </div>
 
     <!-- 人物详情弹窗（独立弹窗，不再切换顶部面板） -->
@@ -613,38 +600,35 @@
       </div>
     </div>
 
-    <!-- 图鉴弹窗：显示所有已获得的宗门人物 -->
+    <!-- 未出战弹窗：显示所有未出战宗门人物（点击时才渲染，避免首屏开销） -->
     <Teleport to="body">
       <div v-if="showCollectionModal" class="collection-overlay" @click.self="showCollectionModal = false">
         <div class="collection-modal">
           <div class="collection-header">
-            <h3>宗门图鉴 · 已获得 {{ allMembers.length }} 位人物</h3>
+            <h3>未出战成员 · {{ nonTeamMemberOptions.length }} 位</h3>
             <button class="btn btn-small" @click="showCollectionModal = false">关闭</button>
           </div>
+          <!-- 使用 v-memo 避免重渲染：仅在列表长度变化时重建 -->
           <div class="collection-list">
-            <div v-for="m in allMembers" :key="'col-' + m.id" class="collection-card">
+            <div v-for="m in nonTeamMemberOptions" :key="'col-' + m.id" class="collection-card">
               <div class="collection-avatar" @click="openMemberPortrait(m)" title="点击查看立绘">
                 <img v-if="getCharacterAvatar(m)" :src="getCharacterThumbnail(m)" loading="lazy" decoding="async" />
                 <span v-else>{{ m.name?.[0] || '仙' }}</span>
               </div>
               <div class="collection-info">
-                <div class="collection-name">{{ isInTeam(m.id) ? '[出战] ' : '' }}{{ m.name }} <span class="collection-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
+                <div class="collection-name">{{ m.name }} <span class="collection-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
                 <div class="collection-meta">Lv.{{ m.level }} · {{ characterSchools[m.school]?.name || m.school }}</div>
-                <div class="collection-strength">战力 {{ formatNumber(playerStore.getCharacterBuildStrength(m)) }}</div>
+                <!-- 战力懒计算 + 缓存：点击详情时才计算，避免列表渲染时N次调用 -->
+                <div class="collection-strength" v-if="strengthCache.has(m.id)">战力 {{ formatNumber(strengthCache.get(m.id)) }}</div>
+                <div class="collection-strength lazy" v-else @click="getCachedStrength(m)">点击查看战力</div>
               </div>
               <div class="collection-actions">
                 <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id)">详情</button>
-                <button
-                  class="btn btn-small"
-                  :class="isInTeam(m.id) ? 'btn-warning' : 'btn-success'"
-                  @click="toggleTeam(m.id)"
-                >
-                  {{ isInTeam(m.id) ? '退出' : '加入' }}
-                </button>
+                <button class="btn btn-small btn-success" @click="toggleTeam(m.id)">加入</button>
               </div>
             </div>
           </div>
-          <div v-if="allMembers.length === 0" class="collection-empty">暂无已获得的人物</div>
+          <div v-if="nonTeamMemberOptions.length === 0" class="collection-empty">暂无未出战的人物</div>
         </div>
       </div>
     </Teleport>
@@ -726,13 +710,23 @@ const selectedMemberId = ref('')
 const showEquipSelect = ref(false)
 const selectSlot = ref('')
 const showPetSelect = ref(false)
-const benchPage = ref(1)
-const benchPageSize = 10
-
-// 未出战成员折叠控制
-const showNonTeamMembers = ref(false)
-// 图鉴弹窗控制
+// 未出战成员弹窗控制
 const showCollectionModal = ref(false)
+
+// 战力缓存：避免列表渲染时重复调用 getCharacterBuildStrength（重计算开销大）
+// 仅在弹窗打开时才懒计算，且使用 Map 缓存
+const strengthCache = new Map()
+const getCachedStrength = (member) => {
+  if (!member) return 0
+  if (strengthCache.has(member.id)) return strengthCache.get(member.id)
+  const s = playerStore.getCharacterBuildStrength(member)
+  strengthCache.set(member.id, s)
+  return s
+}
+// 队伍变化时清空缓存
+watch([teamMembers, nonTeamMemberOptions], () => {
+  strengthCache.clear()
+})
 
 const getPetRarityName = (pet) => {
   return petRarities[pet.rarity]?.name || '未知品质'
@@ -772,11 +766,6 @@ const nonTeamMemberOptions = computed(() => sortedMembers.value.filter(m => !isI
 
 // 是否选中了出战成员（用于控制重计算面板渲染，未出战成员不渲染以节省资源）
 const isTeamMemberSelected = computed(() => selectedMember.value && isInTeam(selectedMember.value.id))
-const totalBenchPages = computed(() => Math.max(1, Math.ceil(sortedMembers.value.length / benchPageSize)))
-const pagedSortedMembers = computed(() => {
-  const start = (benchPage.value - 1) * benchPageSize
-  return sortedMembers.value.slice(start, start + benchPageSize)
-})
 
 const sectSize = computed(() => playerStore.sectMembers?.length || 0)
 const sectMax = computed(() => playerStore.maxSectSize || 0)
@@ -1484,15 +1473,15 @@ const autoPickBestTeam = () => {
   else message.error(result.message)
 }
 
-// 初始化
+// 初始化：始终选中第一个出战成员
 if (teamMembers.value.length > 0) selectedMemberId.value = teamMembers.value[0].id
-else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[0].id
 
-// 当成员列表变化或未选中时，自动选中第一个成员，确保属性面板/装备区域/一键装备始终显示
-watch([allMembers, teamMembers], () => {
-  if (!selectedMemberId.value || !allMembers.value.find(m => m.id === selectedMemberId.value)) {
-    if (teamMembers.value.length > 0) selectedMemberId.value = teamMembers.value[0].id
-    else if (allMembers.value.length > 0) selectedMemberId.value = allMembers.value[0].id
+// 当成员列表变化或未选中时，自动选中第一个出战成员
+// 只选择出战成员，避免未出战成员被选中后触发属性面板空渲染
+watch(teamMembers, () => {
+  if (teamMembers.value.length === 0) return
+  if (!selectedMemberId.value || !teamMembers.value.find(m => m.id === selectedMemberId.value)) {
+    selectedMemberId.value = teamMembers.value[0].id
   }
 }, { immediate: true })
 </script>
@@ -2426,21 +2415,6 @@ html.fx-medium .progress-glow { animation: none; }
   font-size: 13px;
 }
 
-.bench-pagination {
-  display: flex;
-  justify-content: center;
-  align-items: center;
-  gap: 12px;
-  margin-top: 10px;
-  padding-top: 10px;
-  border-top: 1px solid rgba(255,255,255,0.1);
-}
-.page-info {
-  color: #F5DEB3;
-  font-size: 13px;
-  min-width: 60px;
-  text-align: center;
-}
 .bench-card {
   display: flex;
   align-items: center;
@@ -2449,6 +2423,12 @@ html.fx-medium .progress-glow { animation: none; }
   background: rgba(255,255,255,0.03);
   border-radius: 8px;
   margin-bottom: 6px;
+}
+
+.team-actions {
+  display: flex;
+  gap: 8px;
+  flex-wrap: wrap;
 }
 .char-avatar-container {
   display: flex;
@@ -3005,6 +2985,12 @@ html.fx-medium .progress-glow { animation: none; }
 .collection-strength {
   font-size: 12px;
   color: #DAA520;
+  cursor: default;
+}
+.collection-strength.lazy {
+  color: #888;
+  cursor: pointer;
+  text-decoration: underline dashed;
 }
 
 .collection-actions {
