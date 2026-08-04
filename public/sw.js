@@ -103,17 +103,30 @@ self.addEventListener('fetch', event => {
 
 // ===== 缓存策略实现 =====
 
+// 需要查找命中的缓存列表：仅限本版本资产缓存 + 用户主动预载的 user-assets。
+// 原实现每次请求都 caches.keys() 遍历并打开「所有」缓存（含 235MB 立绘、29MB 怪物、
+// 及历史遗留缓存）来查找，挂机刷怪高频加载立绘时产生大量无谓的异步 open/match 开销。
+// 改为固定顺序只查这两个缓存：命中率不变，但避免每次请求遍历全部缓存。
+const SEARCH_CACHES = ['user-assets', ASSET_CACHE]
+
+// 在固定缓存列表里查找命中（优先 user-assets，兼容客户端 useAssetManager 预载入的素材）
+async function findInCaches(req) {
+  for (const k of SEARCH_CACHES) {
+    try {
+      const cache = await caches.open(k)
+      const hit = await cache.match(req)
+      if (hit) return hit
+    } catch (e) { /* 该缓存不存在或不可用，跳过继续 */ }
+  }
+  return null
+}
+
 // Cache-First：缓存优先（图片）
 // 命中缓存→立即返回；未命中→网络获取并写入缓存
-// 注意：先遍历所有 cache 查找（兼容客户端 useAssetManager 写入的 user-assets cache）
 async function cacheFirst(req, cacheName) {
-  // 1. 遍历所有 cache 查找命中（兼容客户端预下载的 cache）
-  const keys = await caches.keys()
-  for (const k of keys) {
-    const cache = await caches.open(k)
-    const cached = await cache.match(req)
-    if (cached) return cached
-  }
+  // 1. 在固定缓存列表查找命中（兼容客户端预下载的 user-assets）
+  const cached = await findInCaches(req)
+  if (cached) return cached
   // 2. 未命中：走网络并写入默认 cache
   try {
     const res = await fetch(req)
@@ -131,17 +144,10 @@ async function cacheFirst(req, cacheName) {
 
 // Stale-While-Revalidate：缓存优先 + 后台刷新（JS/CSS/JSON）
 // 命中缓存→立即返回 + 后台异步更新；未命中→网络获取并写入缓存
-// 与 cacheFirst 一致：先遍历所有 cache 查找命中（兼容客户端预下载的 user-assets）
 // 这样用户预载到 user-assets 的 pixi-fx chunk 也能命中，首次技能演出 0 网络等待
 async function staleWhileRevalidate(req, cacheName) {
-  // 1. 遍历所有 cache 查找命中
-  const keys = await caches.keys()
-  let cached = null
-  for (const k of keys) {
-    const cache = await caches.open(k)
-    const hit = await cache.match(req)
-    if (hit) { cached = hit; break }
-  }
+  // 1. 在固定缓存列表查找命中
+  const cached = await findInCaches(req)
   // 2. 后台刷新（命中或未命中都执行，保证下次拿到最新版本）
   const cache = await caches.open(cacheName)
   const fetchPromise = fetch(req)
