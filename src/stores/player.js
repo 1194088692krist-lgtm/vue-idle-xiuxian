@@ -489,7 +489,7 @@ export const usePlayerStore = defineStore('player', {
     },
     // 最终生效属性 = 自然属性 + 装备固定/百分比词条 + 套装激活加成
     getEffectiveStats() {
-      // 务必拷贝！getNaturalStats 是带缓存的 getter，若直接引用并 mutate，会污染“自然属性”缓存，
+      // 务必拷贝！getNaturalStats 是带缓存的 getter，若直接引用并 mutate，会污染"自然属性"缓存，
       // 导致后续 getNaturalStats 读数被装备数值污染（出现 natAtk 异常偏高）。
       const merged = { ...this.getNaturalStats }
       const applyAffix = (stat, value, valueType) => {
@@ -497,19 +497,22 @@ export const usePlayerStore = defineStore('player', {
         if (valueType === 'percent') merged[stat] = merged[stat] * (1 + value)
         else merged[stat] = merged[stat] + value
       }
-      Object.values(this.equippedArtifacts || {}).forEach(eq => {
-        if (!eq) return
-        if (eq.stats) Object.entries(eq.stats).forEach(([st, v]) => applyAffix(st, v, 'flat'))
-      })
-      Object.values(this.equippedArtifacts || {}).forEach(eq => {
-        if (!eq || !eq.affixes) return
-        eq.affixes.forEach(a => applyAffix(a.stat, a.value, a.valueType))
-      })
-      // M1：应用已镶嵌灵纹词缀 + 相邻同元素共鸣加成
-      Object.values(this.equippedArtifacts || {}).forEach(eq => {
-        if (!eq || !Array.isArray(eq.runes)) return
-        getRuneStats(eq).forEach(rs => applyAffix(rs.stat, rs.value, rs.valueType))
-      })
+      // 合并三次 Object.values 遍历为单次，减少迭代开销
+      for (const eq of Object.values(this.equippedArtifacts || {})) {
+        if (!eq) continue
+        // 装备固定属性
+        if (eq.stats) {
+          for (const [st, v] of Object.entries(eq.stats)) applyAffix(st, v, 'flat')
+        }
+        // 装备词缀
+        if (eq.affixes) {
+          for (const a of eq.affixes) applyAffix(a.stat, a.value, a.valueType)
+        }
+        // 已镶嵌灵纹词缀
+        if (Array.isArray(eq.runes)) {
+          for (const rs of getRuneStats(eq)) applyAffix(rs.stat, rs.value, rs.valueType)
+        }
+      }
       // 套装激活加成（仅作用于已存在的属性键），最终属性 = 自然 + 装备 + 套装
       return applySetBonusStats(this.equippedArtifacts || {}, { ...merged })
     },

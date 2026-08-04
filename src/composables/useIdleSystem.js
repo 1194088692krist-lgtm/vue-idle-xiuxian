@@ -18,7 +18,57 @@ import { getPillsByZone, pillRecipes } from '../plugins/pills'
 import { triggerRandomEvent } from '../plugins/events'
 import { logUserAction } from './useDebugLog'
 
-// Buff 百分比格式化：最多保留两位小数，去除多余小数位
+// ============ 静态数据 Map 索引（避免挂机循环中 O(n) find/filter） ============
+// 懒加载：首次访问时构建，兼容测试中 mock 的模块
+let _setBonusMap = null
+let _setBonusBySlotMap = null
+let _charListMap = null
+let _charListByStarMap = null
+let _pillRecipeMap = null
+let _innerPillMap = null
+
+function getSetBonusMap() {
+  if (!_setBonusMap) {
+    _setBonusMap = new Map(setBonuses.map(s => [s.id, s]))
+    _setBonusBySlotMap = new Map()
+    for (const s of setBonuses) {
+      for (const slot of s.pieces) {
+        if (!_setBonusBySlotMap.has(slot)) _setBonusBySlotMap.set(slot, [])
+        _setBonusBySlotMap.get(slot).push(s)
+      }
+    }
+  }
+  return _setBonusMap
+}
+function getSetBonusBySlotMap() {
+  if (!_setBonusBySlotMap) getSetBonusMap()
+  return _setBonusBySlotMap
+}
+function getCharListMap() {
+  if (!_charListMap) {
+    _charListMap = new Map(_charList.map(c => [c.id, c]))
+    _charListByStarMap = new Map()
+    for (const c of _charList) {
+      if (!_charListByStarMap.has(c.star)) _charListByStarMap.set(c.star, [])
+      _charListByStarMap.get(c.star).push(c)
+    }
+  }
+  return _charListMap
+}
+function getCharListByStarMap() {
+  if (!_charListByStarMap) getCharListMap()
+  return _charListByStarMap
+}
+function getPillRecipeMap() {
+  if (!_pillRecipeMap) _pillRecipeMap = new Map(pillRecipes.map(r => [r.id, r]))
+  return _pillRecipeMap
+}
+function getInnerPillMap() {
+  if (!_innerPillMap) _innerPillMap = new Map(characterInnerPillList.map(p => [p.id, p]))
+  return _innerPillMap
+}
+
+// ============ Buff 百分比格式化 ============
 // 例：0.1 -> "10%"，0.123 -> "12.3%"，0.1234 -> "12.34%"
 const formatBuffPercent = (value) => {
   const pct = value * 100
@@ -613,7 +663,7 @@ const activePillBuffList = computed(() => {
     }
     grouped[key].value += (buff.value || 0)
     grouped[key].count++
-    const recipe = pillRecipes.find(r => r.id === buff.pillId)
+    const recipe = getPillRecipeMap().get(buff.pillId)
     grouped[key].names.push(recipe?.name || buff.pillId || '未知丹药')
     if (!buff.idleOnly) {
       grouped[key].isIdleOnly = false
@@ -694,6 +744,7 @@ function getPillBuffMultiplier(type) {
 
 let idleInterval = null
 let idleTimer = null
+let idleTimerInterval = 2000 // 前台 2s 更新进度条（精度足够），后台时动态切回 1s 检测漏算
 let visibilityHandler = null // 页面可见性监听器引用（息屏/切后台返回时补算挂机进度）
 let isRunning = false // 重入锁
 let isRunningSince = 0 // isRunning 加锁时间戳（死锁保护：超 30s 强制释放）
@@ -922,6 +973,7 @@ const showPendingLog = () => {
   const now = Date.now()
   const timeSinceFirstLog = now - firstPendingLogTime
 
+  // 超过 14s：一次性 flush 全部积压日志
   if (timeSinceFirstLog >= 14000) {
     while (pendingLogs.value.length > 0) {
       const next = pendingLogs.value.shift()
@@ -936,11 +988,15 @@ const showPendingLog = () => {
     return
   }
 
-  const next = pendingLogs.value.shift()
-  if (next) {
-    logs.value.push(next)
-    if (logs.value.length > 400) trimLogs()
+  // 自适应批量 flush：积压越多每 tick 展示越多条，减少 logs.value 变更频率
+  // 积压 ≤3 条时逐条展示；积压 4-10 条时每 tick 展示 2 条；>10 条时展示 3 条
+  const pending = pendingLogs.value.length
+  const batchSize = pending <= 3 ? 1 : pending <= 10 ? 2 : 3
+  for (let i = 0; i < batchSize && pendingLogs.value.length > 0; i++) {
+    const next = pendingLogs.value.shift()
+    if (next) logs.value.push(next)
   }
+  if (logs.value.length > 400) trimLogs()
 }
 
 function addLog(type, text, detail = null, avatar = null, parts = null) {
@@ -957,7 +1013,9 @@ function addLog(type, text, detail = null, avatar = null, parts = null) {
 
   if (!logDisplayTimer) {
     showPendingLog()
-    logDisplayTimer = setInterval(showPendingLog, 1000)
+    // 500ms 间隔配合自适应批量 flush：积压多时每 tick 展示多条，
+    // 减少 logs.value 变更频率（每次变更都触发 displayLogs computed 重算 + DOM diff）
+    logDisplayTimer = setInterval(showPendingLog, 500)
   }
 }
 
@@ -983,7 +1041,7 @@ function formatItemDetail(item, type, rarity) {
     const affixes = item.affixes || []
     if (affixes.length) s += ' | ' + affixes.map(a => a.name).join('·')
     if (item.setId) {
-      const setData = setBonuses.find(x => x.id === item.setId)
+      const setData = getSetBonusMap().get(item.setId)
       if (setData) s += ' | 套装·' + setData.name
     }
     return s
@@ -1136,7 +1194,7 @@ function getEquipName(slot, rarity, setId = null) {
   const nameBase = nameParts[Math.floor(Math.random() * nameParts.length)]
   const qualityName = (rarityConfig[rarity] || {}).name || rarity
   if (setId) {
-    const setData = setBonuses.find(s => s.id === setId)
+    const setData = getSetBonusMap().get(setId)
     if (setData) return `${setData.name}·${nameBase}`
   }
   return `${nameBase}·${qualityName}`
@@ -1150,7 +1208,7 @@ function generateEquipment(rarity, effectiveZone, options = {}) {
   const sockets = getSocketsByRarity(rarity)
   let setId = null
   if (['epic', 'legendary', 'mythic'].includes(rarity) && Math.random() < 0.3) {
-    const availableSets = setBonuses.filter(s => s.pieces.includes(slot))
+    const availableSets = getSetBonusBySlotMap().get(slot) || []
     if (availableSets.length > 0) setId = availableSets[Math.floor(Math.random() * availableSets.length)].id
   }
   // 可选：指定初始强化等级（高级难度档 BOSS 掉落用，直接产出 +N 强化装备）
@@ -1517,14 +1575,29 @@ function getCharacterBossStarRange(zoneId, difficultyKey) {
 }
 
 // 从 characterList 中按星级范围随机挑选一个角色
+// 利用 charListByStarMap 索引避免每次全量遍历 _charList
 function pickRandomCharacterByStar(minStar, maxStar, excludeIds) {
   const excludeSet = excludeIds instanceof Set ? excludeIds : null
-  const candidates = _charList.filter(c => c.star >= minStar && c.star <= maxStar && !(excludeSet && excludeSet.has(c.id)))
+  const starMap = getCharListByStarMap()
+  // 从 star 分组索引中收集候选，避免遍历整个 _charList
+  const candidates = []
+  for (let star = minStar; star <= maxStar; star++) {
+    const group = starMap.get(star)
+    if (group) {
+      for (const c of group) {
+        if (!excludeSet || !excludeSet.has(c.id)) candidates.push(c)
+      }
+    }
+  }
   if (candidates.length === 0) {
     // 排除后无候选，回退到不排除
-    const fallback = _charList.filter(c => c.star >= minStar && c.star <= maxStar)
-    if (fallback.length === 0) return null
-    return fallback[Math.floor(Math.random() * fallback.length)]
+    if (excludeSet) {
+      for (let star = minStar; star <= maxStar; star++) {
+        const group = starMap.get(star)
+        if (group) candidates.push(...group)
+      }
+    }
+    if (candidates.length === 0) return null
   }
   return candidates[Math.floor(Math.random() * candidates.length)]
 }
@@ -1717,7 +1790,7 @@ function tryCreateCharacterBossEnemy(effectiveZone, difficultyKey, candidateInde
   const charBoss = charBosses[idx]
   if (!charBoss) return null
   // 灭世难度必刷，不做概率判定
-  const charTemplate = _charList.find(c => c.id === charBoss.characterId)
+  const charTemplate = getCharListMap().get(charBoss.characterId)
   if (!charTemplate) return null
   return createCharacterBossEnemy(charTemplate, effectiveZone, difficultyKey)
 }
@@ -1966,7 +2039,7 @@ function grantCharacterBossDrops(enemy) {
   const numPart = String(charId).replace(/^char_/, '')
   const numStr = numPart.padStart(3, '0')
   const pillId = 'inner_pill_char_' + numStr
-  const pillDef = characterInnerPillList.find(p => p.id === pillId)
+  const pillDef = getInnerPillMap().get(pillId)
   if (pillDef) {
     const pillCount = 1 + (Math.random() < 0.4 ? 1 : 0) // 1~2 个
     const pillItem = {
@@ -2416,7 +2489,7 @@ async function runCharacterBossChallenge(characterId, count) {
   }
 
   // 校验角色
-  const character = _charList.find(c => c.id === characterId)
+  const character = getCharListMap().get(characterId)
   if (!character) {
     result.message = '角色不存在'
     return result
@@ -4760,6 +4833,14 @@ function startIdleTimers() {
   if (!visibilityHandler) {
     visibilityHandler = () => {
       if (document.visibilityState === 'visible') {
+        // 前台时进度条定时器降频到 2s（精度足够，减少 CPU 唤醒）
+        if (idleTimerInterval !== 2000) {
+          idleTimerInterval = 2000
+          if (idleTimer) {
+            clearInterval(idleTimer)
+            idleTimer = setInterval(idleTimerCallback, idleTimerInterval)
+          }
+        }
         // 修复后台挂机停滞：原逻辑在 isRunning=true 时直接 return 跳过补算，但后台时
         // runIdleEncounter 可能卡在 await setTimeout(ROUND_ANIM_DELAY) 节流中，isRunning
         // 长时间为 true，导致切回前台后补算永不触发、挂机彻底停滞。
@@ -4778,11 +4859,26 @@ function startIdleTimers() {
             catchUpMissedEncounters({ forceFinish: false })
           }
         }, 200)
+      } else if (document.visibilityState === 'hidden') {
+        // 后台时定时器切回 1s：浏览器节流后实际执行频率远低于设定值，
+        // 更短的间隔更可能在节流间隙获得执行机会来检测漏算
+        if (idleTimerInterval !== 1000) {
+          idleTimerInterval = 1000
+          if (idleTimer) {
+            clearInterval(idleTimer)
+            idleTimer = setInterval(idleTimerCallback, idleTimerInterval)
+          }
+        }
       }
     }
     document.addEventListener('visibilitychange', visibilityHandler)
   }
-  idleTimer = setInterval(() => {
+  // idleTimer 回调抽取为独立函数，便于 visibilitychange 动态调整频率时复用
+  idleTimer = setInterval(idleTimerCallback, idleTimerInterval)
+}
+
+// idleTimer 回调：更新进度条/倒计时、后台漏算检测、BOSS 阶段控制
+function idleTimerCallback() {
     // 守卫：仅当挂机真正进行中且存档状态一致时才推进/结束，避免状态不一致时误触发 finishIdle
     if (!isIdling.value || !store().idleExploration.isActive) return
     const remaining = store().getIdleRemainingTime()
@@ -4793,7 +4889,7 @@ function startIdleTimers() {
     const sec = Math.floor((remaining % 60000) / 1000)
     idleTimeRemaining.value = `${min}:${String(sec).padStart(2, '0')}`
     // 后台漏算主动检测：页面隐藏时 setInterval(runIdleEncounter, 5s) 被浏览器节流到可能
-    // 60s+ 才触发一次甚至不触发，遭遇数严重落后墙钟。idleTimer(1s) 虽也被节流但比 5s 间隔
+    // 60s+ 才触发一次甚至不触发，遭遇数严重落后墙钟。idleTimer 虽也被节流但比 5s 间隔
     // 更可能触发，在此检测漏掉的遭遇数，若 >= 3 场则主动补算，避免回到前台才一次性补算。
     // 不在实时战斗中才补（inProgress=true 时实时战斗自己会推进，补算会重复发奖）。
     if (document.hidden && !catchUpInProgress && !isFinishingIdle) {
@@ -4836,7 +4932,6 @@ function startIdleTimers() {
       }
       finishIdle()
     }
-  }, 1000)
 }
 
 // 由队伍成员构建单条战斗状态（含天赋/装备/灵宠加成）
@@ -5053,6 +5148,7 @@ function finishIdle() {
   if (idleInterval) clearInterval(idleInterval)
   if (idleTimer) clearInterval(idleTimer)
   idleInterval = null; idleTimer = null
+  idleTimerInterval = 2000 // 重置为前台默认间隔
   // 注销页面可见性监听，避免挂机结束后残留监听触发补算
   if (visibilityHandler) {
     document.removeEventListener('visibilitychange', visibilityHandler)
@@ -5312,6 +5408,7 @@ const idleDashboard = computed(() => {
       hpPercent: ms.maxHP > 0 ? ((ms.hp / ms.maxHP) * 100).toFixed(0) + '%' : '0%'
     })),
     // 最近获得的装备（按时间倒序，最多展示 6 件），即时反映到仪表盘
+    // score 用记忆化缓存避免每次 dashboard 重算都重复调用 calculateEquipmentScore
     recentEquipment: (foundEquipment.value || []).slice(-6).reverse().map(eq => ({
       id: eq.id,
       name: eq.name,
@@ -5320,13 +5417,12 @@ const idleDashboard = computed(() => {
       rarity: eq.rarity,
       rarityName: (eq.qualityInfo && eq.qualityInfo.name) || eq.rarity || '',
       color: (eq.qualityInfo && eq.qualityInfo.color) || '#9e9e9e',
-      score: calculateEquipmentScore(eq),
+      score: eq._cachedScore ?? (eq._cachedScore = calculateEquipmentScore(eq)),
       enhanceLevel: eq.enhanceLevel || 0,
       stats: eq.stats,
       affixes: eq.affixes,
       time: eq._pickedAt || Date.now()
     })),
-    totalPhantomCrystals: runStats.value.phantomCrystals,
     // 当前挂机遭遇的怪物状态（挂机仪表盘怪物状态面板）
     enemy: currentIdleEnemy.value || null
   }

@@ -445,20 +445,35 @@ const BreakthroughEffect = defineAsyncComponent(() => import('./components/Break
     }
   )
 
+  // 数值动画节流：spirit worker 每秒 tick 会导致 watch 高频触发
+  // 用 200ms 节流合并连续更新，避免 RAF 句柄频繁创建/取消
+  // 节流跳过时直接同步目标值，确保显示值不落后
+  const lastAnimateTime = { spirit: 0, stones: 0, cultivation: 0, crystals: 0 }
+  const throttledAnimate = (key, ref, target, duration, raf_ref) => {
+    const now = Date.now()
+    if (now - lastAnimateTime[key] < 200) {
+      // 节流期间不启动新动画，但如果当前没有正在运行的动画，直接同步到目标值
+      if (!raf_ref.value) ref.value = typeof target === 'string' ? Number(target) : target
+      return
+    }
+    lastAnimateTime[key] = now
+    animateValue(ref, target, duration, raf_ref)
+  }
+
   watch(() => playerStore.spirit, val => {
-    animateValue(animatedSpirit, val.toFixed(2), 500, spiritRaf)
+    throttledAnimate('spirit', animatedSpirit, val.toFixed(2), 500, spiritRaf)
   })
 
   watch(() => playerStore.spiritStones, val => {
-    animateValue(animatedStones, val, 500, stonesRaf)
+    throttledAnimate('stones', animatedStones, val, 500, stonesRaf)
   })
 
   watch(() => playerStore.cultivationPool, val => {
-    animateValue(animatedCultivation, val || 0, 300, cultivationRaf)
+    throttledAnimate('cultivation', animatedCultivation, val || 0, 300, cultivationRaf)
   })
 
   watch(() => playerStore.phantomCrystals, val => {
-    animateValue(animatedCrystals, val, 500, crystalsRaf)
+    throttledAnimate('crystals', animatedCrystals, val, 500, crystalsRaf)
   })
 
   // 突破演出：监听 breakthroughCount 变化（玩家境界突破成功 +1）

@@ -57,6 +57,8 @@ self.addEventListener('activate', event => {
     )
     // 立即接管所有页面（不必等刷新）
     await self.clients.claim()
+    // 预打开常用缓存句柄，后续 fetch 阶段直接复用，避免每次请求 caches.open 异步开销
+    await Promise.all(SEARCH_CACHES.map(k => getCache(k)))
     // 通知所有客户端有新版本
     const clients = await self.clients.matchAll({ type: 'window' })
     clients.forEach(c => c.postMessage({ type: 'SW_UPDATED' }))
@@ -92,6 +94,13 @@ self.addEventListener('fetch', event => {
     return
   }
 
+  // /assets/ 路径下的 hash 文件名资源（JS/CSS 带 contenthash）是 immutable 的，
+  // 用纯 Cache-First 避免 SWR 的无意义后台 revalidate 请求（每次都返回 304 也是浪费）
+  if (path.includes('/assets/') && /\.[a-f0-9]{8,}\.(js|css)$/i.test(path)) {
+    event.respondWith(cacheFirst(req, ASSET_CACHE))
+    return
+  }
+
   // JS/CSS/JSON/字体：Stale-While-Revalidate
   if (/\.(js|css|json|woff2?|ttf|eot|mp4)$/i.test(path)) {
     event.respondWith(staleWhileRevalidate(req, ASSET_CACHE))
@@ -109,11 +118,21 @@ self.addEventListener('fetch', event => {
 // 改为固定顺序只查这两个缓存：命中率不变，但避免每次请求遍历全部缓存。
 const SEARCH_CACHES = ['user-assets', ASSET_CACHE]
 
+// 预打开的缓存句柄缓存：避免每次请求都 caches.open() 产生异步开销
+// 在 activate 阶段预初始化，后续 findInCaches 直接复用
+const _cacheHandles = new Map()
+async function getCache(name) {
+  if (!_cacheHandles.has(name)) {
+    _cacheHandles.set(name, caches.open(name))
+  }
+  return _cacheHandles.get(name)
+}
+
 // 在固定缓存列表里查找命中（优先 user-assets，兼容客户端 useAssetManager 预载入的素材）
 async function findInCaches(req) {
   for (const k of SEARCH_CACHES) {
     try {
-      const cache = await caches.open(k)
+      const cache = await getCache(k)
       const hit = await cache.match(req)
       if (hit) return hit
     } catch (e) { /* 该缓存不存在或不可用，跳过继续 */ }
