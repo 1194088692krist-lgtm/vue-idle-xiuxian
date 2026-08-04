@@ -755,6 +755,9 @@ const sortedMembers = computed(() => {
   })
 })
 
+// 是否在队伍中（必须在使用它的 computed 之前定义，否则 watch 立即求值会触发 TDZ）
+const isInTeam = (id) => playerStore.teamMembers.includes(id)
+
 // 出战成员（始终显示）
 const teamMemberOptions = computed(() => sortedMembers.value.filter(m => isInTeam(m.id)))
 // 未出战成员（折叠显示）
@@ -1415,7 +1418,6 @@ const onUnequipSkill = (member, slotIdx) => {
   if (r.success) message.success(r.message)
   else message.error(r.message)
 }
-const isInTeam = (id) => playerStore.teamMembers.includes(id)
 const toggleTeam = (id) => {
   if (isInTeam(id)) {
     playerStore.removeFromTeam(id)
