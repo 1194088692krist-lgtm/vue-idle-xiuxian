@@ -5,6 +5,8 @@
 </template>
 
 <script setup>
+// 显式组件名，供 App.vue 的 keep-alive include 精确匹配
+defineOptions({ name: 'Exploration' })
 import ZoneSelector from '../components/ZoneSelector.vue'
 </script>
 

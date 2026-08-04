@@ -811,6 +811,8 @@
 </template>
 
 <script setup>
+// 显式组件名，供 App.vue 的 keep-alive include 精确匹配
+defineOptions({ name: 'Inventory' })
   import { usePlayerStore, computePetMultiplier } from '../stores/player'
   import { ref, computed, onMounted, onUnmounted, watch } from 'vue'
   import { useMessage, useDialog } from 'naive-ui'

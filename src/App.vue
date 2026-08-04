@@ -101,7 +101,13 @@
 
             <!-- 主内容区 -->
             <main class="content-area">
-              <router-view />
+              <!-- keep-alive 缓存主菜单页（宗门/探索/八卦炉/背包）：避免每次切菜单全量 unmount+mount，
+                   省去巨型 SFC 的 setup 冷启动、computed 重建与整树 DOM 重建，消除切换卡顿 -->
+              <router-view v-slot="{ Component }">
+                <keep-alive include="Cultivation,Exploration,Alchemy,Inventory">
+                  <component :is="Component" />
+                </keep-alive>
+              </router-view>
             </main>
 
             <!-- 底部导航栏 -->

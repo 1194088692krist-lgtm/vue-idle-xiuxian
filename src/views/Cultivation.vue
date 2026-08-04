@@ -101,7 +101,7 @@
           <div class="char-level">Lv.{{ selectedMember.level }}</div>
           <div class="build-strength">
             <span class="build-label">战力</span>
-            <span class="build-value">{{ formatNumber(playerStore.getCharacterBuildStrength(selectedMember)) }}</span>
+            <span class="build-value">{{ formatNumber(getCachedStrength(selectedMember)) }}</span>
           </div>
           <span v-if="!isTeamMemberSelected" class="non-team-hint">未出战成员 · 详细面板请加入队伍后查看</span>
         </div>
@@ -265,7 +265,7 @@
           </div>
           <div class="bench-info">
             <div class="bench-name">{{ m.name }} <span class="bench-stars">{{ '★'.repeat(m.star || 1) }}</span></div>
-            <div class="bench-strength">战力 {{ formatNumber(playerStore.getCharacterBuildStrength(m)) }}</div>
+            <div class="bench-strength">战力 {{ formatNumber(getCachedStrength(m)) }}</div>
           </div>
           <button class="btn btn-info btn-small" @click="viewMemberDetail(m.id, $event)">详情</button>
           <button class="btn btn-small btn-warning" @click="toggleTeam(m.id)">退出</button>
@@ -299,7 +299,7 @@
               </span>
             </div>
             <div class="char-talent-info">天赋: <b>{{ detailMember.talentName }}</b> · {{ detailMember.talentDesc }}</div>
-            <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ formatNumber(playerStore.getCharacterBuildStrength(detailMember)) }}</div>
+            <div class="char-level">Lv.{{ detailMember.level }} · 战力 {{ formatNumber(getCachedStrength(detailMember)) }}</div>
             <div class="char-potential">
               <span>天赋值: {{ detailMember.talentValue || starConfig[detailMember.star]?.talentValue || 100 }}</span>
               <span class="divider">|</span>
@@ -636,6 +636,8 @@
 </template>
 
 <script setup>
+// 显式组件名，供 App.vue 的 keep-alive include 精确匹配
+defineOptions({ name: 'Cultivation' })
 import { usePlayerStore, computePetMultiplier } from '../stores/player'
 import { ref, computed, watch, reactive } from 'vue'
 import { useMessage } from 'naive-ui'
@@ -714,14 +716,22 @@ const showPetSelect = ref(false)
 const showCollectionModal = ref(false)
 
 // 战力缓存：避免列表渲染时重复调用 getCharacterBuildStrength（重计算开销大）
-// 仅在弹窗打开时才懒计算，且使用 Map 缓存
+// 基于成员装备/宠物/等级/技能快照签名缓存，装备变化时自动失效重算
 const strengthCache = new Map()
 const getCachedStrength = (member) => {
   if (!member) return 0
-  if (strengthCache.has(member.id)) return strengthCache.get(member.id)
-  const s = playerStore.getCharacterBuildStrength(member)
-  strengthCache.set(member.id, s)
-  return s
+  const sig = JSON.stringify({
+    a: member.equippedArtifacts,
+    p: member.equippedPet,
+    l: member.level,
+    s: member.skills,
+    t: member.talentStats
+  })
+  const cached = strengthCache.get(member.id)
+  if (cached && cached.sig === sig) return cached.value
+  const value = playerStore.getCharacterBuildStrength(member)
+  strengthCache.set(member.id, { value, sig })
+  return value
 }
 
 const getPetRarityName = (pet) => {
@@ -776,7 +786,7 @@ const sectMax = computed(() => playerStore.maxSectSize || 0)
 const teamSize = computed(() => playerStore.teamMembers?.length || 0)
 const teamMax = computed(() => playerStore.maxTeamSize || 0)
 const totalStrength = computed(() => {
-  const base = teamMembers.value.reduce((sum, m) => sum + (playerStore.getCharacterBuildStrength(m) || 0), 0)
+  const base = teamMembers.value.reduce((sum, m) => sum + (getCachedStrength(m) || 0), 0)
   const mult = getResonanceBuildMultiplier(teamMembers.value)
   return Math.round(base * mult)
 })
@@ -1469,7 +1479,7 @@ const unequipPet = () => {
   else message.error(result.message)
 }
 const autoPickBestTeam = () => {
-  const sorted = [...playerStore.sectMembers].sort((a, b) => playerStore.getCharacterBuildStrength(b) - playerStore.getCharacterBuildStrength(a))
+  const sorted = [...playerStore.sectMembers].map(m => ({ m, s: getCachedStrength(m) })).sort((a, b) => b.s - a.s).map(x => x.m)
   const best = sorted.slice(0, playerStore.maxTeamSize).map(m => m.id)
   const result = playerStore.setTeamMembers(best)
   if (result.success) message.success(result.message)

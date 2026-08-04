@@ -1302,6 +1302,8 @@
 </template>
 
 <script setup>
+// 显式组件名，供 App.vue 的 keep-alive include 精确匹配
+defineOptions({ name: 'Alchemy' })
   import { ref, computed } from 'vue'
   import { usePlayerStore } from '../stores/player'
   import { pillRecipes, pillGrades, pillTypes, calculatePillEffect } from '../plugins/pills'
@@ -2089,9 +2091,7 @@
     return playerStore.items.filter(i => isForgeEquipItem(i) && !equippedItemIds.value.has(i.id))
   })
 
-  const inventoryEquipments = computed(() => {
-    return playerStore.items.filter(i => isForgeEquipItem(i) && !equippedItemIds.value.has(i.id))
-  })
+  const inventoryEquipments = computed(() => allEquipments.value)
 
   // 化器成灵：可选装备（背包中未装备、强化 +8 及以上的仙品/神品装备）
   // 条件 2.2.1 调整：由 +12 放宽至 +8~+12（含专属装备 +8~+15）
@@ -2132,8 +2132,12 @@
     if (forgeFilterRarity.value) {
       list = list.filter(e => (e.rarity || e.quality || 'common') === forgeFilterRarity.value)
     }
+    // Schwartzian transform：先 O(n) 预计算评分，再排序，避免在比较器内重复调用 calculateEquipmentScore
+    // 原写法 [...list].sort((a,b)=>calculateEquipmentScore(b)-calculateEquipmentScore(a)) 为 O(2·n·log n) 次重计算
     if (forgeSortedByScore.value) {
-      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+      list = list.map(e => ({ e, s: calculateEquipmentScore(e) }))
+        .sort((a, b) => b.s - a.s)
+        .map(x => x.e)
     }
     return list
   })
@@ -2155,8 +2159,11 @@
     if (forgeFilterRarity.value) {
       list = list.filter(e => (e.rarity || e.quality || 'common') === forgeFilterRarity.value)
     }
+    // Schwartzian transform：先 O(n) 预计算评分，再排序，避免在比较器内重复调用 calculateEquipmentScore
     if (forgeSortedByScore.value) {
-      list = [...list].sort((a, b) => calculateEquipmentScore(b) - calculateEquipmentScore(a))
+      list = list.map(e => ({ e, s: calculateEquipmentScore(e) }))
+        .sort((a, b) => b.s - a.s)
+        .map(x => x.e)
     }
     return list
   })

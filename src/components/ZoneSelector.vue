@@ -110,7 +110,7 @@
             </div>
             <div class="member-build">
               <span class="build-label">Build</span>
-              <span class="build-value">{{ formatNumber(playerStore.getCharacterBuildStrength(member)) }}</span>
+              <span class="build-value">{{ formatNumber(getZoneMemberStrength(member)) }}</span>
             </div>
           </div>
         </div>
@@ -658,7 +658,7 @@
                       <span v-for="i in member.star" :key="i" class="star">★</span>
                     </div>
                   </div>
-                  <div class="sect-member-build">{{ formatNumber(playerStore.getCharacterBuildStrength(member)) }}</div>
+                  <div class="sect-member-build">{{ formatNumber(getZoneMemberStrength(member)) }}</div>
                   <div class="sect-member-school">{{ characterSchools[member.school]?.name || member.school }}</div>
                   <div v-if="isMemberInTeam(member.id)" class="sect-member-selected">✓</div>
                 </div>
@@ -1623,6 +1623,25 @@ const toggleTeamModal = () => {
     tempTeam.value = [...playerStore.teamMembers]
   }
   showTeamModal.value = !showTeamModal.value
+}
+
+// 战力缓存：避免模板中重复调用 getCharacterBuildStrength（重计算开销大）
+// 基于成员装备/宠物/等级/技能快照签名缓存，装备变化时自动失效重算
+const zoneStrengthCache = new Map()
+const getZoneMemberStrength = (member) => {
+  if (!member) return 0
+  const sig = JSON.stringify({
+    a: member.equippedArtifacts,
+    p: member.equippedPet,
+    l: member.level,
+    s: member.skills,
+    t: member.talentStats
+  })
+  const cached = zoneStrengthCache.get(member.id)
+  if (cached && cached.sig === sig) return cached.value
+  const value = playerStore.getCharacterBuildStrength(member)
+  zoneStrengthCache.set(member.id, { value, sig })
+  return value
 }
 
 const teamMembersDetail = computed(() => {
