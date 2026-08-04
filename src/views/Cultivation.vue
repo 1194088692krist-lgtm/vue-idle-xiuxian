@@ -723,10 +723,6 @@ const getCachedStrength = (member) => {
   strengthCache.set(member.id, s)
   return s
 }
-// 队伍变化时清空缓存
-watch([teamMembers, nonTeamMemberOptions], () => {
-  strengthCache.clear()
-})
 
 const getPetRarityName = (pet) => {
   return petRarities[pet.rarity]?.name || '未知品质'
@@ -763,6 +759,11 @@ const sortedMembers = computed(() => {
 const teamMemberOptions = computed(() => sortedMembers.value.filter(m => isInTeam(m.id)))
 // 未出战成员（折叠显示）
 const nonTeamMemberOptions = computed(() => sortedMembers.value.filter(m => !isInTeam(m.id)))
+
+// 队伍变化时清空战力缓存（必须在 computed 定义之后，避免 TDZ）
+watch([teamMembers, nonTeamMemberOptions], () => {
+  strengthCache.clear()
+})
 
 // 是否选中了出战成员（用于控制重计算面板渲染，未出战成员不渲染以节省资源）
 const isTeamMemberSelected = computed(() => selectedMember.value && isInTeam(selectedMember.value.id))
