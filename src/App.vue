@@ -596,12 +596,35 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     }
   }
 
+  // ===== 后台节流：暂停 spirit worker，避免后台/息屏持续发热 =====
+  // Web Worker 的 setInterval 不受浏览器后台节流（与主线程 setTimeout 不同），
+  // 即使切后台/锁屏，spirit worker 仍每秒唤起 CPU → 触发 gainSpirit → 响应式更新 + saveData。
+  // 这是"未进入挂机战斗时设备仍发热"的首要原因。切后台时暂停 worker，回前台再恢复（并补算灵回复）。
+  const handleVisibilityChange = () => {
+    if (document.hidden) {
+      if (spiritWorker.value) {
+        spiritWorker.value.postMessage({ type: 'stop' })
+      }
+    } else {
+      // 回前台：先补算息屏期间灵力回复（按已流逝时间，最多回满 maxSpirit），再恢复 worker
+      try { playerStore.regenerateSpirit() } catch (e) { /* 静默 */ }
+      if (!isStartScreen.value) {
+        if (spiritWorker.value) {
+          spiritWorker.value.postMessage({ type: 'start' })
+        } else {
+          startAutoGain()
+        }
+      }
+    }
+  }
+
   onMounted(() => {
     startAutoGain()
     window.addEventListener('beforeunload', flushSave)
     // pagehide 在移动端 Safari / bfcache 场景比 beforeunload 更可靠，作为备份保底
     window.addEventListener('pagehide', flushSave)
     window.addEventListener('keydown', handleEscKey)
+    document.addEventListener('visibilitychange', handleVisibilityChange)
     // 注：人物立绘定义已在 loadGame() 中通过 await initCharacterDefs() 加载完成
     // 此处不再重复调用，避免与加载流程竞争造成 race condition（曾导致头像立绘 5 分钟后才显示）
   })
@@ -618,6 +641,7 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     window.removeEventListener('beforeunload', flushSave)
     window.removeEventListener('pagehide', flushSave)
     window.removeEventListener('keydown', handleEscKey)
+    document.removeEventListener('visibilitychange', handleVisibilityChange)
   })
 
   const getCurrentMenuKey = () => {
@@ -973,13 +997,20 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
   html.fx-low .progress-shimmer,
   html.fx-medium .progress-shimmer { animation: none; }
 
-  /* 低端设备禁用角色星级光效（每角色 3 组 infinite 动画叠加，多角色时 GPU 负载高） */
+  /* 中低端设备（fx-low / fx-medium）禁用角色星级光效（每角色 3 组 infinite 动画叠加，多角色时 GPU 负载高） */
+  /* 移动端特效默认 medium，也禁用，避免常用页面（宗门选中角色头像等）持续重绘 */
   html.fx-low .char-avatar.star-4,
   html.fx-low .char-avatar.star-4::before,
   html.fx-low .char-avatar.star-4::after,
   html.fx-low .char-avatar.star-5,
   html.fx-low .char-avatar.star-5::before,
-  html.fx-low .char-avatar.star-5::after { animation: none; }
+  html.fx-low .char-avatar.star-5::after,
+  html.fx-medium .char-avatar.star-4,
+  html.fx-medium .char-avatar.star-4::before,
+  html.fx-medium .char-avatar.star-4::after,
+  html.fx-medium .char-avatar.star-5,
+  html.fx-medium .char-avatar.star-5::before,
+  html.fx-medium .char-avatar.star-5::after { animation: none; }
 
   .cultivation-pool-fill {
     background: linear-gradient(90deg, #9b59b6, #8e44ad, #9b59b6);
