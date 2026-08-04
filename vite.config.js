@@ -43,6 +43,12 @@ export default defineConfig({
     outDir: 'docs',
     minify: 'terser',
     chunkSizeWarningLimit: 800,
+    // pixi-fx 是 836KB 的动态 chunk（仅技能演出时 import('pixi.js') 才加载）。
+    // 默认 vite 会把入口可解析的 chunk 全部 modulepreload，导致首屏白白下载 836KB。
+    // 这里从 preload 依赖中排除 pixi-fx，让它在首次演出时按需加载（usePixiFx 动态 import）。
+    modulePreload: {
+      resolveDependencies: (filename, deps) => deps.filter(d => !d.includes('pixi-fx'))
+    },
     // 素材/装备图标已压缩到 3-7KB（96x96），内联为 base64 避免每次渲染都发网络请求
     // 修复「素材图标加载延迟非常大」的问题：内联后图标随 JS bundle 一次性加载，0 网络请求
     assetsInlineLimit: 8192,

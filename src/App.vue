@@ -196,7 +196,7 @@
   import { useRouter, useRoute } from 'vue-router'
   import { usePlayerStore } from './stores/player'
   import { useAuthStore } from './stores/auth'
-  import { ref, computed, onMounted, onUnmounted, watch, nextTick } from 'vue'
+  import { ref, computed, onMounted, onUnmounted, watch, nextTick, defineAsyncComponent } from 'vue'
   import { NIcon, darkTheme, createDiscreteApi } from 'naive-ui'
   // 全局 message 实例：通过 createDiscreteApi 创建，挂到 window.$message，
   // 让非 setup 上下文（如 stores/player.js 的 consumePill、组件内非 setup 函数）也能调用。
@@ -228,14 +228,15 @@
   } from '@ant-design/icons-vue'
   import { formatNumber } from './utils/formatNumber.js'
   import { getRealmName } from './plugins/realm'
-import { useIdleSystem } from './composables/useIdleSystem'
 import { useDebugLog, exportLogs, clearLogs } from './composables/useDebugLog'
 import { initCharacterDefs } from './plugins/characters'
 import { loadSharedPetPortraits, loadPetSkinsManifest } from './plugins/pets'
 import SaveButton from './components/SaveButton.vue'
-import BossKillCinematic from './components/BossKillCinematic.vue'
-import CharacterBossIntro from './components/CharacterBossIntro.vue'
-import BreakthroughEffect from './components/BreakthroughEffect.vue'
+// 演出组件改为异步组件：它们依赖 useIdleSystem（约 280KB 单体模块），
+// 异步化后整块从首屏主 chunk 拆出，仅在 BOSS 击杀/突破等演出发生时按需加载
+const BossKillCinematic = defineAsyncComponent(() => import('./components/BossKillCinematic.vue'))
+const CharacterBossIntro = defineAsyncComponent(() => import('./components/CharacterBossIntro.vue'))
+const BreakthroughEffect = defineAsyncComponent(() => import('./components/BreakthroughEffect.vue'))
 
   // 日间模式 Naive UI 主题覆盖（青绿主色、深墨文字、米白背景）
   const lightThemeOverrides = {
@@ -267,7 +268,6 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
   const router = useRouter()
   const route = useRoute()
   const playerStore = usePlayerStore()
-  const idleSystem = useIdleSystem()
   const spiritWorker = ref(null)
   const menuItems = ref([])
   const isNewPlayer = ref(false)
@@ -417,7 +417,9 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     updateLoading('正在初始化挂机系统...', 80)
     await nextTick()
     // initIdle 内部已改为：先启动定时器，离线补算延后到 setTimeout(0) 异步执行，不阻塞加载
-    idleSystem.initIdle()
+    // useIdleSystem 为 280KB 单体模块，首屏不静态引入；进入游戏时才动态加载并初始化
+    const { initIdle } = await import('./composables/useIdleSystem')
+    initIdle()
 
     updateLoading('正在进入游戏...', 95)
     await nextTick()
