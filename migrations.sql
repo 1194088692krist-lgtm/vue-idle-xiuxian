@@ -1,7 +1,8 @@
 -- 凡人修仙（挂机）· 账号 / 云存档 / GM 礼包 数据库结构
 -- 适用于 Cloudflare D1（SQLite 兼容）。执行：wrangler d1 execute DB --file=./migrations.sql
 
--- 玩家账号：明文密码，仅用于区分用户（已与产品确认接受该简化）
+-- 玩家账号：密码 PBKDF2-SHA256 加盐哈希存储（pbkdf2$iterations$salt$hash），绝不落库明文。
+-- 历史明文账号会在下次成功登录时自动迁移为哈希（见 functions/api/login.js）
 CREATE TABLE IF NOT EXISTS users (
   id         INTEGER PRIMARY KEY AUTOINCREMENT,
   username   TEXT UNIQUE NOT NULL,   -- 即"用户ID"，登录名
@@ -32,7 +33,7 @@ CREATE TABLE IF NOT EXISTS gift_inbox (
 CREATE TABLE IF NOT EXISTS gm_accounts (
   id       INTEGER PRIMARY KEY AUTOINCREMENT,
   username TEXT UNIQUE NOT NULL,
-  password TEXT NOT NULL                  -- 明文即可；如需更稳可预先 hash
+  password TEXT NOT NULL                  -- 建议预置为 pbkdf2 哈希（生成方式见 functions/_utils.js hashPassword）
 );
 
 -- GM 凭证表：gm_tokens 校验系统核心

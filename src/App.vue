@@ -25,7 +25,7 @@
                   v-for="item in allMenuItems"
                   :key="item.key"
                   class="nav-item"
-                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  :class="{ active: currentMenuKey === item.key }"
                   @click="handleMenuClick(item.key)"
                 >
                   <n-icon class="nav-icon">
@@ -111,7 +111,7 @@
                   v-for="item in visibleMenuItems"
                   :key="item.key"
                   class="nav-item"
-                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  :class="{ active: currentMenuKey === item.key }"
                   @click="handleMenuClick(item.key)"
                 >
                   <n-icon class="nav-icon">
@@ -129,7 +129,7 @@
                   v-for="item in secondaryMenuItems"
                   :key="item.key"
                   class="nav-item"
-                  :class="{ active: getCurrentMenuKey() === item.key }"
+                  :class="{ active: currentMenuKey === item.key }"
                   @click="handleMenuClick(item.key)"
                 >
                   <n-icon class="nav-icon">
@@ -480,31 +480,25 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     getMenuItems()
   })
 
-  const visibleMenuItems = computed(() => {
-    const items = menuItems.value.filter(item => {
-      if (item.key === '') return isNewPlayer.value
-      if (item.key === 'gm') return playerStore.isGMMode
-      return true
-    })
-    return items.slice(0, Math.ceil(items.length / 2))
-  })
-
-  const secondaryMenuItems = computed(() => {
-    const items = menuItems.value.filter(item => {
-      if (item.key === '') return isNewPlayer.value
-      if (item.key === 'gm') return playerStore.isGMMode
-      return true
-    })
-    return items.slice(Math.ceil(items.length / 2))
-  })
-
-  const allMenuItems = computed(() => {
+  // 菜单统一过滤：欢迎页仅新玩家可见、GM 页仅 GM 模式可见。
+  // 三个展示 computed（all/visible/secondary）共用此结果，避免重复过滤
+  const filteredMenuItems = computed(() => {
     return menuItems.value.filter(item => {
       if (item.key === '') return isNewPlayer.value
       if (item.key === 'gm') return playerStore.isGMMode
       return true
     })
   })
+
+  const visibleMenuItems = computed(() => {
+    return filteredMenuItems.value.slice(0, Math.ceil(filteredMenuItems.value.length / 2))
+  })
+
+  const secondaryMenuItems = computed(() => {
+    return filteredMenuItems.value.slice(Math.ceil(filteredMenuItems.value.length / 2))
+  })
+
+  const allMenuItems = computed(() => filteredMenuItems.value)
 
   const realmColors = [
     '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32', '#32CD32',
@@ -644,9 +638,8 @@ import BreakthroughEffect from './components/BreakthroughEffect.vue'
     document.removeEventListener('visibilitychange', handleVisibilityChange)
   })
 
-  const getCurrentMenuKey = () => {
-    return route.path.slice(1)
-  }
+  // 当前路由菜单 key（模板中通过 computed 缓存，避免每次渲染都调用函数）
+  const currentMenuKey = computed(() => route.path.slice(1))
 
   const handleMenuClick = key => {
     router.push(`/${key}`)

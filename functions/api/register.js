@@ -1,6 +1,6 @@
-import { res, signJWT } from '../_utils.js'
+import { res, signJWT, hashPassword } from '../_utils.js'
 
-// 注册：写 users（明文密码，仅区分用户），签发 JWT
+// 注册：写 users（密码 PBKDF2 哈希存储，绝不明文落库），签发 JWT
 export async function onRequest({ request, env }) {
   if (request.method !== 'POST') return res({ ok: false, error: 'Method Not Allowed' }, 405)
   const { username, password } = await request.json().catch(() => ({}))
@@ -11,8 +11,9 @@ export async function onRequest({ request, env }) {
   const exist = await env.DB.prepare('SELECT id FROM users WHERE username = ?').bind(username).first()
   if (exist) return res({ ok: false, error: '该账号已存在' }, 409)
 
+  const passwordHash = await hashPassword(password)
   const r = await env.DB.prepare('INSERT INTO users (username, password, created_at) VALUES (?,?,?)')
-    .bind(username, password, Date.now()).run()
+    .bind(username, passwordHash, Date.now()).run()
   const userId = r.meta?.last_row_id
   if (!userId) return res({ ok: false, error: '注册失败' }, 500)
 

@@ -5,9 +5,10 @@
 // 用法：import { getIconUrl } from '../plugins/icons'
 //       getIconUrl('reward_mat_herb.png')  // 返回 base64 data URI 或带 hash 的 URL
 
-// import.meta.glob 批量导入 src/assets/icons/ 下所有 PNG（eager 同步加载，as: 'url' 获取 URL）
+// import.meta.glob 批量导入 src/assets/icons/ 下所有 PNG（eager 同步加载，query: '?url' 获取 URL）
 // Vite 会根据 assetsInlineLimit 自动决定内联为 base64 还是输出为独立文件
-const iconModules = import.meta.glob('../assets/icons/*.png', { eager: true, as: 'url' })
+// 注：vite 6 起 as: 'url' 已弃用，改用 query + import 显式取 default 导出
+const iconModules = import.meta.glob('../assets/icons/*.png', { eager: true, query: '?url', import: 'default' })
 
 // 构建文件名 -> URL 的映射表
 const ICON_URLS = {}

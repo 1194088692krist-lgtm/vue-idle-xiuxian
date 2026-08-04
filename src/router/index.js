@@ -1,64 +1,55 @@
 import { createRouter, createWebHashHistory } from 'vue-router'
 import { usePlayerStore } from '../stores/player'
 import { useAuthStore } from '../stores/auth'
-import StartScreen from '../views/StartScreen.vue'
-import Home from '../views/Home.vue'
-import Cultivation from '../views/Cultivation.vue'
-import Inventory from '../views/Inventory.vue'
-import Exploration from '../views/Exploration.vue'
-import Guide from '../views/Guide.vue'
-import Settings from '../views/Settings.vue'
-import GM from '../views/GM.vue'
-import GMTools from '../views/GMTools.vue'
-import Alchemy from '../views/Alchemy.vue'
-import Gacha from '../views/Gacha.vue'
 
+// 视图全部改为路由懒加载：首屏只加载入口视图对应 chunk，
+// 其余页面（宗门/背包/探索/八卦炉/抽卡等）按需分包，显著降低首屏 JS 体积
 const routes = [
   {
     path: '/',
     name: 'StartScreen',
-    component: StartScreen
+    component: () => import('../views/StartScreen.vue')
   },
   {
     path: '/home',
     name: 'Home',
-    component: Home,
+    component: () => import('../views/Home.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/cultivation',
     name: 'Cultivation',
-    component: Cultivation,
+    component: () => import('../views/Cultivation.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/inventory',
     name: 'Inventory',
-    component: Inventory,
+    component: () => import('../views/Inventory.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/exploration',
     name: 'Exploration',
-    component: Exploration,
+    component: () => import('../views/Exploration.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/guide',
     name: 'Guide',
-    component: Guide,
+    component: () => import('../views/Guide.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/settings',
     name: 'Settings',
-    component: Settings,
+    component: () => import('../views/Settings.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/gm',
     name: 'gm',
-    component: GM,
+    component: () => import('../views/GM.vue'),
     meta: { requiresGame: true },
     beforeEnter: (to, from, next) => {
       const playerStore = usePlayerStore()
@@ -72,7 +63,7 @@ const routes = [
   {
     path: '/gm-tools',
     name: 'GMTools',
-    component: GMTools,
+    component: () => import('../views/GMTools.vue'),
     meta: { requiresGame: true },
     beforeEnter: (to, from, next) => {
       const playerStore = usePlayerStore()
@@ -86,13 +77,13 @@ const routes = [
   {
     path: '/alchemy',
     name: 'alchemy',
-    component: Alchemy,
+    component: () => import('../views/Alchemy.vue'),
     meta: { requiresGame: true }
   },
   {
     path: '/gacha',
     name: 'Gacha',
-    component: Gacha,
+    component: () => import('../views/Gacha.vue'),
     meta: { requiresGame: true }
   }
 ]

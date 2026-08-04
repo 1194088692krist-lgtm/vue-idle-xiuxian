@@ -34,6 +34,58 @@ async function hmacSHA256(message, secret) {
   return b64url(new Uint8Array(sig))
 }
 
+// ---- 密码哈希（PBKDF2-SHA256，无第三方依赖，使用 Workers 内置 Web Crypto）----
+// 存储格式：pbkdf2$<iterations>$<salt>$<hash>
+// 密码只存哈希、绝不落库明文；旧版明文密码在登录成功时自动迁移为哈希
+const PBKDF2_ITERATIONS = 100000
+
+function randomSalt(bytes = 16) {
+  return Array.from(crypto.getRandomValues(new Uint8Array(bytes)))
+    .map(b => b.toString(16).padStart(2, '0')).join('')
+}
+
+export async function hashPassword(password, iterations = PBKDF2_ITERATIONS) {
+  const enc = new TextEncoder()
+  const salt = randomSalt()
+  const keyMaterial = await crypto.subtle.importKey(
+    'raw', enc.encode(password), 'PBKDF2', false, ['deriveBits']
+  )
+  const bits = await crypto.subtle.deriveBits(
+    { name: 'PBKDF2', salt: enc.encode(salt), iterations, hash: 'SHA-256' },
+    keyMaterial, 256
+  )
+  const hash = b64url(new Uint8Array(bits))
+  return `pbkdf2$${iterations}$${salt}$${hash}`
+}
+
+// 校验密码：优先识别新格式哈希；兼容旧版明文存储（登录成功后由调用方迁移）
+export async function verifyPassword(password, stored) {
+  if (!stored) return false
+  const parts = String(stored).split('$')
+  if (parts.length === 4 && parts[0] === 'pbkdf2') {
+    const [, iterations, salt, hash] = parts
+    const it = parseInt(iterations, 10)
+    if (!isFinite(it) || it <= 0) return false
+    const keyMaterial = await crypto.subtle.importKey(
+      'raw', new TextEncoder().encode(password), 'PBKDF2', false, ['deriveBits']
+    )
+    const bits = await crypto.subtle.deriveBits(
+      { name: 'PBKDF2', salt: new TextEncoder().encode(salt), iterations: it, hash: 'SHA-256' },
+      keyMaterial, 256
+    )
+    const computed = b64url(new Uint8Array(bits))
+    if (computed !== hash) return false
+    // 恒定时间比较，避免时序侧信道（内容相同则长度也相同，比较开销固定）
+    let diff = computed.length === hash.length ? 0 : 1
+    for (let i = 0; i < Math.min(computed.length, hash.length); i++) {
+      diff |= computed.charCodeAt(i) ^ hash.charCodeAt(i)
+    }
+    return diff === 0
+  }
+  // 旧版明文（历史数据）：直接比较；调用方在登录成功后迁移为哈希
+  return stored === password
+}
+
 // ---- JWT 签发 / 校验 ----
 export async function signJWT(payload, secret) {
   const header = { alg: 'HS256', typ: 'JWT' }
