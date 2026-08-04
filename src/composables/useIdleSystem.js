@@ -5501,3 +5501,7 @@ export function useIdleSystem() {
     getZoneDifficulty
   }
 }
+
+// 模块级命名导出 initIdle：App.vue 通过 `const { initIdle } = await import('./composables/useIdleSystem')` 动态加载
+// initIdle 定义在上方（模块作用域），此处仅补充导出声明
+export { initIdle }
