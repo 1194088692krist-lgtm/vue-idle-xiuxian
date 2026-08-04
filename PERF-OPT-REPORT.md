@@ -125,3 +125,35 @@
 | `idleDashboard` 拆分 computed | 拆成多个小 computed 减少重算范围，需改组件模板引用 | 高（影响面广） |
 | `equippedArtifacts` shallowReactive | 减少 Pinia 深响应式代理开销，需排查所有 mutation 点 | 中 |
 | `sectMembers`/`materials` Map 索引 | 动态存档数据建索引，维护复杂度高 | 中 |
+
+---
+
+## 第五轮：菜单切卡顿专项修复
+
+> 修复日期：2026-08-04
+> 提交：`5a59dc71` perf: 修复菜单切卡顿
+> 现象：点击「宗门 / 八卦炉 / 探索 / 背包」等菜单按钮时卡顿严重
+
+### 根因
+
+1. **每次切菜单全量重挂载（高）**：四个视图都是巨型 SFC（Cultivation 3000+ 行、Exploration 含 ZoneSelector、Alchemy 4400+ 行、Inventory 3300+ 行），每次路由切换都走完整 `unmount + mount`，重新执行 `setup` 冷启动、重建所有 computed、重新生成整树 DOM。
+2. **战力重计算被重复调用（高）**：`getCharacterBuildStrength` 是重计算（涉及装备词条、灵宠、天赋、技能多维加权）。宗门页模板 3 处 + 脚本 2 处、探索页 ZoneSelector 团队弹窗逐个成员调用，每次渲染/排序都重复重算，100 名成员场景下开销极大。
+3. **八卦炉排序 O(2·n·log n)（高）**：`forgeFilteredEquipments` / `forgeFilteredInventory` 的排序比较器内直接调用 `calculateEquipmentScore`，每次比较调用两次，且 Schwartzian transform 缺失。
+4. **Pinia 深响应式代理（中）**：大对象（装备/角色）全程走深响应式代理，首次访问构建代理成本高（已被 keep-alive 缓解，本轮未做 markRaw 改造以免引入响应式回归）。
+
+### 修复清单
+
+| # | 文件 | 改动 | 收益 |
+|---|------|------|------|
+| 1 | `src/App.vue` | `router-view` 外包 `<keep-alive include="Cultivation,Exploration,Alchemy,Inventory">`，消除切菜单冷启动开销 | 高 |
+| 2 | `src/views/Cultivation.vue` | 新增基于装备快照签名的 `getCachedStrength` 缓存；模板 3 处 + 脚本 2 处 `getCharacterBuildStrength` 调用统一走缓存（装备变更自动失效） | 高 |
+| 3 | `src/components/ZoneSelector.vue` | 新增 `getZoneMemberStrength` 缓存，团队弹窗逐个成员战力调用走缓存 | 高 |
+| 4 | `src/views/Alchemy.vue` | 两处排序改 Schwartzian transform，避免比较器内重复重算战力；合并重复 computed | 高 |
+| 5 | 四视图 | 补充 `defineOptions({ name })` 显式组件名，保证 keep-alive `include` 精确匹配（Inventory 保留原 CRLF 换行，未污染整体 diff） | 中 |
+
+### 验证
+
+- **测试**：53 个用例全部通过 ✅
+- **构建**：`vite build` 成功 ✅
+- **变更**：7 files changed, +191 -18 lines（含本报告）
+- **注意**：`Inventory.vue` 仓库原始为 CRLF，本轮回退后按 CRLF 重新插入 `defineOptions`，仅 2 行新增、未触发全文件换行变更。
