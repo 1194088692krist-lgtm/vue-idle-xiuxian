@@ -1946,9 +1946,9 @@ defineOptions({ name: 'Alchemy' })
         return { label: '自动回血', value: `每秒恢复 ${(e.value * 100).toFixed(0)}% 最大生命` }
       case 'effortGain': {
         let valueText = `+${Math.round(e.value)} 点`
-        if (e.extraStats) {
-          const extras = Object.entries(e.extraStats)
-            .map(([stat, val]) => `${statNames[stat] || stat} +${Math.round(val)}`)
+        if (e.extraStatsPercent) {
+          const extras = Object.entries(e.extraStatsPercent)
+            .map(([stat, val]) => `${statNames[stat] || stat} +${(val * 100).toFixed(0)}%`)
             .join('，')
           valueText += `，${extras}`
         }

@@ -2225,6 +2225,64 @@ html.fx-medium .progress-glow { animation: none; }
   color: #C9C4BA;
 }
 
+/* 人物详情弹窗 - 灵宠区（此前该区块所有类名均无 CSS 定义，
+   导致灵宠头像以原始尺寸渲染成大图、布局错乱。补齐尺寸约束与布局） */
+.detail-pet-section {
+  margin-top: 12px;
+}
+.detail-pet-info {
+  display: flex;
+  align-items: center;
+  gap: 10px;
+  padding: 10px;
+  background: rgba(0, 0, 0, 0.2);
+  border: 1px solid rgba(140, 120, 255, 0.25);
+  border-radius: 8px;
+}
+.detail-pet-thumb {
+  width: 44px;
+  height: 44px;
+  object-fit: cover;
+  border-radius: 8px;
+  border: 1px solid rgba(140, 120, 255, 0.5);
+  flex-shrink: 0;
+  background: rgba(0, 0, 0, 0.3);
+}
+.detail-pet-meta {
+  flex: 1;
+  min-width: 0;
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+}
+.detail-pet-name {
+  font-size: 14px;
+  font-weight: bold;
+  white-space: nowrap;
+  overflow: hidden;
+  text-overflow: ellipsis;
+}
+.detail-pet-sub {
+  font-size: 12px;
+  color: #C9C4BA;
+}
+.detail-pet-btn {
+  flex-shrink: 0;
+}
+.detail-pet-empty {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 10px;
+  color: #C9C4BA;
+  font-size: 13px;
+  background: rgba(0, 0, 0, 0.2);
+  border-radius: 8px;
+}
+.detail-pet-empty-icon {
+  font-size: 18px;
+}
+
 /* 队伍管理 */
 .team-actions {
   margin-bottom: 12px;

@@ -81,7 +81,7 @@ export const pillRecipes = [
   {
     id: 'immortal_essence',
     name: '仙灵丹',
-    description: '永久提升多属性的中阶神丹（攻击+15，防御+10，生命+50）',
+    description: '永久提升多属性的中阶神丹（攻击+3%，防御+3%，生命+3%）',
     grade: 'grade4',
     type: 'special',
     materials: [
@@ -89,13 +89,13 @@ export const pillRecipes = [
       { kind: 'herb', id: 'immortal_jade_grass', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
-    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
-    baseEffect: { type: 'permanentStatMulti', stats: { attack: 15, defense: 10, health: 50 }, duration: 0, effortCost: 2 }
+    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久百分比属性提升
+    baseEffect: { type: 'permanentStatMulti', statsPercent: { attack: 0.03, defense: 0.03, health: 0.03 }, duration: 0, effortCost: 2 }
   },
   {
     id: 'five_elements_pill',
     name: '五行丹',
-    description: '永久提升多属性的高阶神丹（攻击+30，防御+20，生命+100，速度+5）',
+    description: '永久提升多属性的高阶神丹（攻击+5%，防御+4%，生命+5%，速度+3%）',
     grade: 'grade5',
     type: 'attribute',
     materials: [
@@ -103,8 +103,8 @@ export const pillRecipes = [
       { kind: 'herb', id: 'phoenix_feather_herb', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
-    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久属性提升
-    baseEffect: { type: 'permanentStatMulti', stats: { attack: 30, defense: 20, health: 100, speed: 5 }, duration: 0, effortCost: 3 }
+    // 原 allAttributes 类型在 getEffectiveStats 中无消费者，改为永久百分比属性提升
+    baseEffect: { type: 'permanentStatMulti', statsPercent: { attack: 0.05, defense: 0.04, health: 0.05, speed: 0.03 }, duration: 0, effortCost: 3 }
   },
   {
     id: 'celestial_essence_pill',
@@ -222,7 +222,7 @@ export const pillRecipes = [
   {
     id: 'wash_marrow_pill',
     name: '洗髓丹',
-    description: '洗髓易筋，永久提升攻击（存档沉淀）',
+    description: '洗髓易筋，永久提升攻击（攻击+2%，存档沉淀）',
     grade: 'grade1',
     type: 'attribute',
     func: 'permanent',
@@ -231,12 +231,12 @@ export const pillRecipes = [
       { kind: 'ore', id: 'iron_essence', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade1'),
-    baseEffect: { type: 'permanentStat', stat: 'attack', value: 5, duration: 0, effortCost: 1 }
+    baseEffect: { type: 'permanentStat', stat: 'attack', percent: 0.02, duration: 0, effortCost: 1 }
   },
   {
     id: 'forge_bone_pill',
     name: '锻骨丹',
-    description: '锻骨淬体，永久提升防御（存档沉淀）',
+    description: '锻骨淬体，永久提升防御（防御+2.5%，存档沉淀）',
     grade: 'grade2',
     type: 'attribute',
     func: 'permanent',
@@ -245,7 +245,7 @@ export const pillRecipes = [
       { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
-    baseEffect: { type: 'permanentStat', stat: 'defense', value: 6, duration: 0, effortCost: 1 }
+    baseEffect: { type: 'permanentStat', stat: 'defense', percent: 0.025, duration: 0, effortCost: 1 }
   },
   {
     id: 'heal_pill',
@@ -379,7 +379,7 @@ export const pillRecipes = [
   {
     id: 'minor_foundation_pill',
     name: '小培元丹',
-    description: '固本培元，少量提升根骨潜力（努力值+1，生命+10）',
+    description: '固本培元，少量提升根骨潜力（努力值+1，生命+2%）',
     grade: 'grade1',
     type: 'attribute',
     func: 'effort',
@@ -388,12 +388,12 @@ export const pillRecipes = [
       { kind: 'ore', id: 'iron_essence', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade1'),
-    baseEffect: { type: 'effortGain', value: 1, duration: 0, extraStats: { health: 10 } }
+    baseEffect: { type: 'effortGain', value: 1, duration: 0, extraStatsPercent: { health: 0.02 } }
   },
   {
     id: 'foundation_pill',
     name: '培元丹',
-    description: '强筋健骨，稳步提升根骨潜力（努力值+2，攻击+15，生命+20）',
+    description: '强筋健骨，稳步提升根骨潜力（努力值+2，攻击+2%，生命+2%）',
     grade: 'grade2',
     type: 'attribute',
     func: 'effort',
@@ -402,12 +402,12 @@ export const pillRecipes = [
       { kind: 'ore', id: 'dark_iron_marrow', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade2'),
-    baseEffect: { type: 'effortGain', value: 2, duration: 0, extraStats: { attack: 15, health: 20 } }
+    baseEffect: { type: 'effortGain', value: 2, duration: 0, extraStatsPercent: { attack: 0.02, health: 0.02 } }
   },
   {
     id: 'great_foundation_pill',
     name: '大培元丹',
-    description: '脱胎换骨，大幅提升根骨潜力（努力值+3，攻击+30，生命+40，防御+15）',
+    description: '脱胎换骨，大幅提升根骨潜力（努力值+3，攻击+3%，生命+3%，防御+2%）',
     grade: 'grade3',
     type: 'attribute',
     func: 'effort',
@@ -417,12 +417,12 @@ export const pillRecipes = [
       { kind: 'core', id: 'elite_core', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade3'),
-    baseEffect: { type: 'effortGain', value: 3, duration: 0, extraStats: { attack: 30, health: 40, defense: 15 } }
+    baseEffect: { type: 'effortGain', value: 3, duration: 0, extraStatsPercent: { attack: 0.03, health: 0.03, defense: 0.02 } }
   },
   {
     id: 'extreme_foundation_pill',
     name: '极培元丹',
-    description: '逆天改命，极限提升根骨潜力（努力值+4，攻击+50，生命+60，防御+25，速度+10）',
+    description: '逆天改命，极限提升根骨潜力（努力值+4，攻击+4%，生命+4%，防御+3%，速度+2%）',
     grade: 'grade4',
     type: 'special',
     func: 'effort',
@@ -432,12 +432,12 @@ export const pillRecipes = [
       { kind: 'core', id: 'demon_king_core', count: 1 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade4'),
-    baseEffect: { type: 'effortGain', value: 4, duration: 0, extraStats: { attack: 50, health: 60, defense: 25, speed: 10 } }
+    baseEffect: { type: 'effortGain', value: 4, duration: 0, extraStatsPercent: { attack: 0.04, health: 0.04, defense: 0.03, speed: 0.02 } }
   },
   {
     id: 'heaven_foundation_pill',
     name: '天培元丹',
-    description: '夺天地造化，突破潜力极限（努力值+5，全属性大幅提升，无视上限）',
+    description: '夺天地造化，突破潜力极限（努力值+5，全属性+6%，无视上限）',
     grade: 'grade5',
     type: 'special',
     func: 'effort',
@@ -447,7 +447,7 @@ export const pillRecipes = [
       { kind: 'herb', id: 'sun_essence_flower', count: 2 }
     ],
     fragmentsNeeded: getFragmentsNeeded('grade5'),
-    baseEffect: { type: 'effortGain', value: 5, duration: 0, ignoreCap: true, extraStats: { attack: 80, health: 100, defense: 40, speed: 20 } }
+    baseEffect: { type: 'effortGain', value: 5, duration: 0, ignoreCap: true, extraStatsPercent: { attack: 0.06, health: 0.06, defense: 0.06, speed: 0.06 } }
   }
 ]
 
@@ -519,13 +519,14 @@ export const calculatePillEffect = (recipe, playerLevel) => {
   return {
     type: recipe.baseEffect.type,
     stat: recipe.baseEffect.stat,
+    percent: recipe.baseEffect.percent, // permanentStat 的百分比加成
     value: (recipe.baseEffect.value || 0) * levelMultiplier,
-    stats: recipe.baseEffect.stats, // permanentStatMulti 的多属性直接透传，不受 multiplier 影响
+    statsPercent: recipe.baseEffect.statsPercent, // permanentStatMulti 的多属性百分比加成
     duration: recipe.baseEffect.duration || 0,
     successRate: grade.successRate,
     effortCost: recipe.baseEffect.effortCost || 0, // 永久丹消耗的努力值预算
     ignoreCap: recipe.baseEffect.ignoreCap || false,
-    extraStats: recipe.baseEffect.extraStats || null
+    extraStatsPercent: recipe.baseEffect.extraStatsPercent || null
   }
 }
 

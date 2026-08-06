@@ -1238,9 +1238,9 @@ defineOptions({ name: 'Inventory' })
         return `每秒恢复 ${(effect.value * 100).toFixed(0)}% 最大生命`
       case 'effortGain': {
         let text = `努力值 +${Math.round(effect.value)} 点`
-        if (effect.extraStats) {
-          const extras = Object.entries(effect.extraStats)
-            .map(([stat, val]) => `${statNames[stat] || stat} +${Math.round(val)}`)
+        if (effect.extraStatsPercent) {
+          const extras = Object.entries(effect.extraStatsPercent)
+            .map(([stat, val]) => `${statNames[stat] || stat} +${(val * 100).toFixed(0)}%`)
             .join('，')
           text += `，${extras}`
         }

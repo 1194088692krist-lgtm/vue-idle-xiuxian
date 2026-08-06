@@ -440,6 +440,8 @@ export function generateCharacterById(charId) {
     talentValue: baseTalent,
     inheritedTalentBonus: 0,
     effortValue: 0,
+    permanentBonuses: { attack: 0, health: 0, defense: 0, speed: 0 }, // 固定值永久加成（旧丹药/存档）
+    permanentBonusPercent: { attack: 0, health: 0, defense: 0, speed: 0 }, // 百分比永久加成（新丹药均衡方案）
     rebirthCount: 0,
     breakThrough: 0,
     skillSchool: template.school || 'sword',
@@ -527,11 +529,22 @@ export function getEffectiveBaseStats(character) {
   const talent = character.talentValue || 100
   const effort = character.effortValue || 0
   const effortMult = 1 + effort / talent
+  // 固定值永久加成（旧洗髓/锻骨丹，叠加在 baseStats 上）
+  const fixed = character.permanentBonuses || {}
+  // 百分比永久加成（新丹药均衡方案：按当前基础属性放大，
+  // 随角色成长收益递增，且记录在独立字段不受 recalculate 覆盖影响）
+  const pct = character.permanentBonusPercent || {}
+  const apply = (k) => {
+    const baseVal = base[k] || 0
+    const fixedVal = fixed[k] || 0
+    const pctVal = pct[k] || 0
+    return Math.round((baseVal + fixedVal) * effortMult * (1 + pctVal))
+  }
   return {
-    attack: Math.round(base.attack * effortMult),
-    health: Math.round(base.health * effortMult),
-    defense: Math.round(base.defense * effortMult),
-    speed: Math.round(base.speed * effortMult)
+    attack: apply('attack'),
+    health: apply('health'),
+    defense: apply('defense'),
+    speed: apply('speed')
   }
 }
 

@@ -3745,30 +3745,24 @@ export const usePlayerStore = defineStore('player', {
             }
             if (baseEffect.type === 'permanentStat') {
               const stat = effect.stat
-              const val = Math.round(effect.value)
-              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
-              if (member.permanentBonuses[stat] !== undefined) member.permanentBonuses[stat] += val
-              const oldBase = member.baseStats?.[stat] || 0
-              if (member.baseStats && member.baseStats[stat] !== undefined) {
-                member.baseStats[stat] += val
-                changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + val, delta: val })
-              }
+              const pctVal = effect.percent || 0
+              if (!member.permanentBonusPercent) member.permanentBonusPercent = { attack: 0, health: 0, defense: 0, speed: 0 }
+              if (member.permanentBonusPercent[stat] !== undefined) member.permanentBonusPercent[stat] += pctVal
+              const nowVal = Math.round((member.permanentBonusPercent[stat] || 0) * 100)
+              changes.push({ stat: statNameMap[stat] || stat, old: Math.round((nowVal - pctVal * 100) * 100) / 100, new: nowVal, delta: pctVal, unit: '%' })
             } else {
-              // permanentStatMulti：仙灵丹/五行丹一次性永久提升多属性
-              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
-              if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
-              const stats = effect.stats || baseEffect.stats || {}
-              Object.entries(stats).forEach(([stat, val]) => {
-                const roundedVal = Math.round(val)
-                if (roundedVal <= 0) return
-                const oldBase = member.baseStats[stat] || 0
-                member.baseStats[stat] = oldBase + roundedVal
-                if (member.permanentBonuses[stat] !== undefined) {
-                  member.permanentBonuses[stat] += roundedVal
+              // permanentStatMulti：仙灵丹/五行丹一次性永久提升多属性（百分比）
+              if (!member.permanentBonusPercent) member.permanentBonusPercent = { attack: 0, health: 0, defense: 0, speed: 0 }
+              const statsPercent = effect.statsPercent || baseEffect.statsPercent || {}
+              Object.entries(statsPercent).forEach(([stat, pctVal]) => {
+                const roundedPct = Math.round(pctVal * 1000) / 1000
+                if (roundedPct <= 0) return
+                if (member.permanentBonusPercent[stat] !== undefined) {
+                  member.permanentBonusPercent[stat] += roundedPct
                 } else {
-                  member.permanentBonuses[stat] = roundedVal
+                  member.permanentBonusPercent[stat] = roundedPct
                 }
-                changes.push({ stat: statNameMap[stat] || stat, old: oldBase, new: oldBase + roundedVal, delta: roundedVal })
+                changes.push({ stat: statNameMap[stat] || stat, old: 0, new: Math.round((member.permanentBonusPercent[stat] || 0) * 100), delta: roundedPct, unit: '%' })
               })
             }
             break
@@ -3795,20 +3789,18 @@ export const usePlayerStore = defineStore('player', {
             member.effortValue = Math.round(newValue)
             changes.push({ stat: '努力值', old: Math.round(oldValue), new: Math.round(newValue), delta: actualGain })
             // 直接属性增益（培元丹附赠属性，不消耗 effort，由 effortGain 自身的发放预算承担）
-            if (effect.extraStats) {
-              if (!member.permanentBonuses) member.permanentBonuses = { attack: 0, health: 0, defense: 0, speed: 0 }
-              Object.entries(effect.extraStats).forEach(([stat, val]) => {
-                const roundedVal = Math.round(val)
-                if (roundedVal <= 0) return
-                if (!member.baseStats) member.baseStats = { attack: 10, health: 100, defense: 5, speed: 10 }
-                const oldStat = member.baseStats[stat] || 0
-                member.baseStats[stat] = oldStat + roundedVal
-                if (member.permanentBonuses[stat] !== undefined) {
-                  member.permanentBonuses[stat] += roundedVal
+            // 采用百分比加成：写入 permanentBonusPercent，随角色基础属性成长而放大，后期依然有效
+            if (effect.extraStatsPercent) {
+              if (!member.permanentBonusPercent) member.permanentBonusPercent = { attack: 0, health: 0, defense: 0, speed: 0 }
+              Object.entries(effect.extraStatsPercent).forEach(([stat, pctVal]) => {
+                const roundedPct = Math.round(pctVal * 1000) / 1000
+                if (roundedPct <= 0) return
+                if (member.permanentBonusPercent[stat] !== undefined) {
+                  member.permanentBonusPercent[stat] += roundedPct
                 } else {
-                  member.permanentBonuses[stat] = roundedVal
+                  member.permanentBonusPercent[stat] = roundedPct
                 }
-                changes.push({ stat: statNameMap[stat] || stat, old: oldStat, new: oldStat + roundedVal, delta: roundedVal })
+                changes.push({ stat: statNameMap[stat] || stat, old: 0, new: Math.round((member.permanentBonusPercent[stat] || 0) * 100), delta: roundedPct, unit: '%' })
               })
             }
             break
