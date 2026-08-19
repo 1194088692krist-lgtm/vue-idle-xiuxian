@@ -14,15 +14,15 @@ export const RUNE_ELEMENTS = {
 // 灵纹池：每个灵纹给一条词缀 + 一个元素（用于共鸣）
 export const runes = [
   { id: 'rune_fire_atk', name: '离火纹', element: 'fire', stat: 'attack', valueType: 'percent', value: 0.06, rarity: 'rare' },
-  { id: 'rune_fire_crit', name: '焚天纹', element: 'fire', stat: 'critDamageBoost', valueType: 'percent', value: 0.08, rarity: 'epic' },
+  { id: 'rune_fire_crit', name: '焚天纹', element: 'fire', stat: 'critDamageBoost', valueType: 'flat', value: 0.08, rarity: 'epic' },
   { id: 'rune_water_hp', name: '坎水纹', element: 'water', stat: 'health', valueType: 'percent', value: 0.06, rarity: 'rare' },
-  { id: 'rune_water_heal', name: '润泽纹', element: 'water', stat: 'healBoost', valueType: 'percent', value: 0.08, rarity: 'epic' },
+  { id: 'rune_water_heal', name: '润泽纹', element: 'water', stat: 'healBoost', valueType: 'flat', value: 0.08, rarity: 'epic' },
   { id: 'rune_metal_def', name: '锐金纹', element: 'metal', stat: 'defense', valueType: 'percent', value: 0.06, rarity: 'rare' },
-  { id: 'rune_metal_pen', name: '破甲纹', element: 'metal', stat: 'finalDamageBoost', valueType: 'percent', value: 0.06, rarity: 'epic' },
+  { id: 'rune_metal_pen', name: '破甲纹', element: 'metal', stat: 'finalDamageBoost', valueType: 'flat', value: 0.06, rarity: 'epic' },
   { id: 'rune_wood_spd', name: '巽木纹', element: 'wood', stat: 'speed', valueType: 'flat', value: 8, rarity: 'rare' },
-  { id: 'rune_wood_dodge', name: '风影纹', element: 'wood', stat: 'dodgeRate', valueType: 'percent', value: 0.05, rarity: 'epic' },
+  { id: 'rune_wood_dodge', name: '风影纹', element: 'wood', stat: 'dodgeRate', valueType: 'flat', value: 0.05, rarity: 'epic' },
   { id: 'rune_earth_hp', name: '厚土纹', element: 'earth', stat: 'health', valueType: 'flat', value: 150, rarity: 'rare' },
-  { id: 'rune_earth_res', name: '磐石纹', element: 'earth', stat: 'finalDamageReduce', valueType: 'percent', value: 0.06, rarity: 'epic' }
+  { id: 'rune_earth_res', name: '磐石纹', element: 'earth', stat: 'finalDamageReduce', valueType: 'flat', value: 0.06, rarity: 'epic' }
 ]
 
 // 相邻同元素共鸣加成（PoE 连线的简化：每对相邻同元素灵纹触发一次）

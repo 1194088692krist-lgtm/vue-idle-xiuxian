@@ -2004,13 +2004,8 @@ export const usePlayerStore = defineStore('player', {
     },
     // 对装备使用工艺货币（craft 面板入口）
     craftEquipmentWithCurrency(equipmentId, currencyId, targetAffixId = null) {
-      // 定位装备（背包或已装备）
-      let equip = this.items.find(i => i.id === equipmentId)
-      if (!equip) {
-        for (const slot of EQUIPMENT_SLOTS) {
-          if (this.equippedArtifacts[slot]?.id === equipmentId) { equip = this.equippedArtifacts[slot]; break }
-        }
-      }
+      // 定位装备（背包 / 玩家已装备 / 宗门成员已装备）
+      const equip = this._findEquipmentById(equipmentId)
       if (!equip) return { success: false, message: '装备不存在' }
       if (equip.corrupted && currencyId !== 'blood_sigil') return { success: false, message: '已腐化装备不可再 craft' }
       // 锁灵符特殊：解锁免费，仅"锁定"消耗 1 个
@@ -2031,14 +2026,8 @@ export const usePlayerStore = defineStore('player', {
         if (currencyId !== 'blood_sigil' && cost > 0) this.gainCraftCurrency(currencyId, cost)
         return result
       }
-      // 血祭碎裂：移除装备
-      if (result.shattered) {
-        const idx = this.items.findIndex(i => i.id === equipmentId)
-        if (idx !== -1) this.items.splice(idx, 1)
-        for (const slot of EQUIPMENT_SLOTS) {
-          if (this.equippedArtifacts[slot]?.id === equipmentId) this.equippedArtifacts[slot] = null
-        }
-      }
+      // 血祭碎裂：移除装备（覆盖背包 / 玩家 / 成员三处）
+      if (result.shattered) this._removeEquipmentById(equipmentId)
       this.queueSave()
       return result
     },
@@ -2049,15 +2038,48 @@ export const usePlayerStore = defineStore('player', {
       if (!Array.isArray(this.runes)) this.runes = []
       this.runes.push(rune)
     },
-    // 定位装备（背包或已装备）
+    // 定位装备（背包 / 玩家已装备 / 宗门成员已装备）
     _findEquipmentById(equipmentId) {
+      if (equipmentId == null) return null
+      // 1) 背包
       let equip = this.items.find(i => i.id === equipmentId)
       if (!equip) {
+        // 2) 玩家自身已装备
         for (const slot of EQUIPMENT_SLOTS) {
           if (this.equippedArtifacts[slot]?.id === equipmentId) { equip = this.equippedArtifacts[slot]; break }
         }
       }
+      if (!equip && Array.isArray(this.sectMembers)) {
+        // 3) 宗门成员已装备（人物详情页点开的装备属于成员）
+        for (const m of this.sectMembers) {
+          const ea = m && m.equippedArtifacts
+          if (!ea || typeof ea !== 'object') continue
+          for (const slot of EQUIPMENT_SLOTS) {
+            if (ea[slot]?.id === equipmentId) { equip = ea[slot]; break }
+          }
+          if (equip) break
+        }
+      }
       return equip || null
+    },
+    // 从背包 / 玩家已装备 / 宗门成员已装备三处移除指定装备（用于血祭碎裂等）
+    _removeEquipmentById(equipmentId) {
+      if (equipmentId == null) return false
+      const idx = this.items.findIndex(i => i.id === equipmentId)
+      if (idx !== -1) this.items.splice(idx, 1)
+      for (const slot of EQUIPMENT_SLOTS) {
+        if (this.equippedArtifacts[slot]?.id === equipmentId) this.equippedArtifacts[slot] = null
+      }
+      if (Array.isArray(this.sectMembers)) {
+        for (const m of this.sectMembers) {
+          const ea = m && m.equippedArtifacts
+          if (!ea || typeof ea !== 'object') continue
+          for (const slot of EQUIPMENT_SLOTS) {
+            if (ea[slot]?.id === equipmentId) ea[slot] = null
+          }
+        }
+      }
+      return true
     },
     // 镶嵌灵纹到装备指定槽位
     socketRune(equipmentId, slotIdx, runeUid) {
