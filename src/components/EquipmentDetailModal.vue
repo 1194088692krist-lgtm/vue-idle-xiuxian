@@ -1,5 +1,6 @@
 <template>
   <!-- 装备详情弹窗（复刻自 Inventory.vue 第 465-630 行）-->
+  <Teleport to="body">
   <div v-if="equipment" class="simple-modal equipment-detail-modal" @click.self="$emit('close')">
     <div class="simple-modal-content equipment-detail-content">
       <div class="modal-header">
@@ -203,6 +204,7 @@
       </div>
     </div>
   </div>
+  </Teleport>
 </template>
 
 <script setup>
@@ -485,7 +487,7 @@
     display: flex;
     align-items: center;
     justify-content: center;
-    z-index: 1000;
+    z-index: 10000;
     padding: 20px;
     /* 移动端留足安全区 */
     box-sizing: border-box;

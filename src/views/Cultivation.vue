@@ -644,6 +644,7 @@ import { useMessage } from 'naive-ui'
 import { characterSchools, characterTalents, starConfig, getCharacterAvatar, getCharacterThumbnail, characterList, getEffectiveBaseStats, getEffortCap } from '../plugins/characters'
 import { getExclusiveMultiplier } from '../plugins/exclusiveEquipment'
 import { getSkillCategoryIcon, getSkillTypeName } from '../plugins/skills'
+import { getRuneStats } from '../plugins/runes'
 import { petRarities } from '../plugins/gacha'
 import { getCharacterBiography } from '../plugins/characterBiographies'
 import { calculateLevelExp } from '../plugins/cultivationSystem'
@@ -939,7 +940,18 @@ const getMemberEquipBonus = (member) => {
         if (a.stat && a.valueType === 'percent') {
           bonus['__pct_' + a.stat] = (bonus['__pct_' + a.stat] || 0) + Math.round(adjValue * 1000) / 1000
         } else if (a.stat) {
-          bonus[a.stat] = (bonus[a.stat] || 0) + Math.round(adjValue)
+          bonus[a.stat] = (bonus[a.stat] || 0) + Math.round(adjValue * 1000) / 1000
+        }
+      })
+    }
+    // 灵纹词缀（含共鸣加成）：与 affixes 同口径纳入成员最终数值
+    if (Array.isArray(eq.runes)) {
+      getRuneStats(eq).forEach(rs => {
+        const adjValue = rs.value * exclMult
+        if (rs.stat && rs.valueType === 'percent') {
+          bonus['__pct_' + rs.stat] = (bonus['__pct_' + rs.stat] || 0) + Math.round(adjValue * 1000) / 1000
+        } else if (rs.stat) {
+          bonus[rs.stat] = (bonus[rs.stat] || 0) + Math.round(adjValue * 1000) / 1000
         }
       })
     }
